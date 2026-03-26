@@ -1,4 +1,5 @@
 import { initSupabase } from '../supabaseClient';
+import LZString from 'lz-string';
 
 const supabase = initSupabase();
 
@@ -204,7 +205,40 @@ export const supabaseService = {
     }
   },
 
-  // PDF Text Cache
+  // Clients
+  async saveClient(client: any) {
+    if (!supabase) return null;
+    
+    const compressedData = LZString.compressToUTF16(JSON.stringify(client));
+    
+    const { data, error } = await supabase
+      .from('clients')
+      .upsert({
+        id: client.id,
+        data: compressedData
+      });
+      
+    if (error) {
+      console.error('Error saving client to Supabase:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async deleteClient(id: string) {
+    if (!supabase) return null;
+    
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      console.error('Error deleting client from Supabase:', error);
+      throw error;
+    }
+  },
+
   async getPdfCache(fileHash: string) {
     if (!supabase) return null;
     
