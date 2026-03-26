@@ -333,10 +333,10 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredLaws.map((law) => (
-            <button
+            <div
               key={law.id}
               onClick={() => setSelectedLaw(law)}
-              className="text-left block p-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+              className="text-left block p-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group cursor-pointer"
             >
               <div className="flex justify-between items-start mb-2">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCategoryColor(law.category)}`}>
@@ -361,7 +361,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
               <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3">
                 {law.description}
               </p>
-            </button>
+            </div>
           ))}
           {filteredLaws.length === 0 && (
             <div className="col-span-full text-center py-12 text-slate-500 dark:text-slate-400">

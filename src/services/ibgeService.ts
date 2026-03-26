@@ -1,4 +1,6 @@
 
+import { IBGE_LIFE_EXPECTANCY } from '../constants/ibgeTable';
+
 /**
  * Service to fetch life expectancy data from IBGE SIDRA API.
  * Used for Fator Previdenciário calculations.
@@ -23,7 +25,8 @@ export const fetchIBGELifeExpectancy = async (): Promise<IBGELifeExpectancy[]> =
         
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`IBGE API error: ${response.status}`);
+            console.warn(`IBGE API error: ${response.status}. Falling back to local constants.`);
+            return getFallbackLifeExpectancy();
         }
         
         const data = await response.json();
@@ -55,9 +58,16 @@ export const fetchIBGELifeExpectancy = async (): Promise<IBGELifeExpectancy[]> =
         // Sort by age
         return results.sort((a, b) => a.age - b.age);
     } catch (error) {
-        console.error("Error fetching IBGE life expectancy:", error);
-        throw error;
+        console.warn("Error fetching IBGE life expectancy, falling back to local constants:", error);
+        return getFallbackLifeExpectancy();
     }
+};
+
+const getFallbackLifeExpectancy = (): IBGELifeExpectancy[] => {
+    return Object.entries(IBGE_LIFE_EXPECTANCY).map(([ageStr, expectancy]) => ({
+        age: parseInt(ageStr, 10),
+        expectancy
+    }));
 };
 
 /**
