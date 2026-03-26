@@ -85,6 +85,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedType, setLastSavedType] = useState<string | null>(null);
+  const [heavyRecords, setHeavyRecords] = useState<{name: string, size: string}[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
   
@@ -410,23 +412,66 @@ const Dashboard: React.FC<DashboardProps> = ({
   const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts', newData: any[]) => {
       setIsSyncing(true);
       setSaveError(null);
+      setLastSavedType(type);
       const supabase = initSupabase();
+
+      // Helper for retries with exponential backoff
+      const upsertWithRetry = async (payload: any, retries = 3) => {
+          if (!supabase) return null;
+          for (let i = 0; i < retries; i++) {
+              try {
+                  const { error } = await supabase.from('clients').upsert(payload);
+                  if (!error) return null;
+                  
+                  // If it's a payload too large error, we should stop retrying
+                  if (error.code === '413' || error.message?.includes('too large')) {
+                      return error;
+                  }
+
+                  console.warn(`Sync attempt ${i + 1} failed:`, error.message);
+                  if (i === retries - 1) return error;
+                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+              } catch (e: any) {
+                  if (i === retries - 1) return e;
+                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+              }
+          }
+          return null;
+      };
 
       try {
           if (type === 'clients') {
               setRecords(newData);
               safeSetLocalStorage('inss_records', JSON.stringify(newData));
               if (supabase) {
-                  // Background sync for large payloads
                   try {
-                      // Compress data to avoid payload size limits
-                      const compressedData = LZString.compressToUTF16(JSON.stringify(newData));
-                      const { error } = await supabase.from('clients').upsert({ id: 1, data: compressedData });
+                      const jsonString = JSON.stringify(newData);
+                      const compressedData = LZString.compressToUTF16(jsonString);
+                      
+                      // Check payload size
+                      const rawSize = new Blob([compressedData]).size;
+                      const sizeInMB = (rawSize / (1024 * 1024)).toFixed(2);
+                      
+                      // Identify heavy individual records
+                      const heavy = newData.map(r => ({
+                          name: r.name || r.firstName || 'Sem nome',
+                          size: new Blob([JSON.stringify(r)]).size
+                      }))
+                      .filter(r => r.size > 300 * 1024) // > 300KB
+                      .map(r => ({ name: r.name, size: (r.size / 1024).toFixed(0) + 'KB' }));
+                      
+                      setHeavyRecords(heavy);
+
+                      if (parseFloat(sizeInMB) > 4) {
+                          console.warn(`Payload size is large: ${sizeInMB}MB. This might cause sync errors.`);
+                      }
+
+                      const error = await upsertWithRetry({ id: 1, data: compressedData });
                       if (error) {
                           console.error("Sync error (clients):", error);
-                          setSaveError("Erro de sincronização (Clientes).");
+                          setSaveError(`Erro de sincronização (Clientes): ${error.message || 'Timeout'}`);
                       }
-                  } catch (e) {
+                  } catch (e: any) {
                       console.error("Compression or sync error (clients):", e);
                       setSaveError("Erro de sincronização (Clientes).");
                   }
@@ -439,7 +484,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               if (supabase) {
                   try {
                       const compressedData = LZString.compressToUTF16(JSON.stringify(newData));
-                      const { error } = await supabase.from('clients').upsert({ id: 2, data: compressedData });
+                      const error = await upsertWithRetry({ id: 2, data: compressedData });
                       if (error) {
                           console.error("Sync error (contracts):", error);
                           setSaveError("Erro de sincronização (Contratos).");
@@ -455,8 +500,11 @@ const Dashboard: React.FC<DashboardProps> = ({
               setSavedCalculations(newData);
               safeSetLocalStorage('inss_calculations', JSON.stringify(newData));
               if (supabase) {
-                  const { error } = await supabase.from('clients').upsert({ id: 3, data: newData });
-                  if (error) console.error("Sync error (calculations):", error);
+                  const error = await upsertWithRetry({ id: 3, data: newData });
+                  if (error) {
+                      console.error("Sync error (calculations):", error);
+                      setSaveError("Erro de sincronização (Cálculos).");
+                  }
                   setIsSyncing(false);
                   return;
               }
@@ -464,50 +512,60 @@ const Dashboard: React.FC<DashboardProps> = ({
               setSavedSocialCalculations(newData);
               safeSetLocalStorage('social_security_calculations', JSON.stringify(newData));
               if (supabase) {
-                  supabase.from('clients').upsert({ id: 4, data: newData }).then(({ error }) => {
-                      if (error) console.error("Sync error (social):", error);
-                      setIsSyncing(false);
-                  });
+                  const error = await upsertWithRetry({ id: 4, data: newData });
+                  if (error) {
+                      console.error("Sync error (social):", error);
+                      setSaveError("Erro de sincronização (Previdenciário).");
+                  }
+                  setIsSyncing(false);
                   return;
               }
           } else if (type === 'dr_michel') {
               setDrMichelSessions(newData);
               safeSetLocalStorage('dr_michel_sessions', JSON.stringify(newData));
               if (supabase) {
-                  supabase.from('clients').upsert({ id: 5, data: newData }).then(({ error }) => {
-                      if (error) console.error("Sync error (Michel):", error);
-                      setIsSyncing(false);
-                  });
+                  const error = await upsertWithRetry({ id: 5, data: newData });
+                  if (error) {
+                      console.error("Sync error (Michel):", error);
+                      setSaveError("Erro de sincronização (Dr. Michel).");
+                  }
+                  setIsSyncing(false);
                   return;
               }
           } else if (type === 'dra_luana') {
               setDraLuanaSessions(newData);
               safeSetLocalStorage('dra_luana_sessions', JSON.stringify(newData));
               if (supabase) {
-                  supabase.from('clients').upsert({ id: 6, data: newData }).then(({ error }) => {
-                      if (error) console.error("Sync error (Luana):", error);
-                      setIsSyncing(false);
-                  });
+                  const error = await upsertWithRetry({ id: 6, data: newData });
+                  if (error) {
+                      console.error("Sync error (Luana):", error);
+                      setSaveError("Erro de sincronização (Dra. Luana).");
+                  }
+                  setIsSyncing(false);
                   return;
               }
           } else if (type === 'agenda') {
               setAgendaEvents(newData);
               safeSetLocalStorage('agenda_events', JSON.stringify(newData));
               if (supabase) {
-                  supabase.from('clients').upsert({ id: 7, data: newData }).then(({ error }) => {
-                      if (error) console.error("Sync error (Agenda):", error);
-                      setIsSyncing(false);
-                  });
+                  const error = await upsertWithRetry({ id: 7, data: newData });
+                  if (error) {
+                      console.error("Sync error (Agenda):", error);
+                      setSaveError("Erro de sincronização (Agenda).");
+                  }
+                  setIsSyncing(false);
                   return;
               }
           } else if (type === 'resolved_alerts') {
               setResolvedAlerts(newData);
               safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
               if (supabase) {
-                  supabase.from('clients').upsert({ id: 8, data: newData }).then(({ error }) => {
-                      if (error) console.error("Sync error (Resolved Alerts):", error);
-                      setIsSyncing(false);
-                  });
+                  const error = await upsertWithRetry({ id: 8, data: newData });
+                  if (error) {
+                      console.error("Sync error (Resolved Alerts):", error);
+                      setSaveError("Erro de sincronização (Alertas).");
+                  }
+                  setIsSyncing(false);
                   return;
               }
           }
@@ -516,6 +574,26 @@ const Dashboard: React.FC<DashboardProps> = ({
           console.error("Erro ao salvar:", err);
           setSaveError("Erro: " + (err.message || "Falha na conexão"));
           setIsSyncing(false);
+      }
+  };
+
+  const handleRetrySync = () => {
+      if (!lastSavedType) return;
+      
+      let dataToSave: any[] = [];
+      switch (lastSavedType) {
+          case 'clients': dataToSave = records; break;
+          case 'contracts': dataToSave = contracts; break;
+          case 'calculations': dataToSave = savedCalculations; break;
+          case 'social_calculations': dataToSave = savedSocialCalculations; break;
+          case 'dr_michel': dataToSave = drMichelSessions; break;
+          case 'dra_luana': dataToSave = draLuanaSessions; break;
+          case 'agenda': dataToSave = agendaEvents; break;
+          case 'resolved_alerts': dataToSave = resolvedAlerts; break;
+      }
+      
+      if (dataToSave.length > 0) {
+          saveData(lastSavedType as any, dataToSave);
       }
   };
 
@@ -1014,7 +1092,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                  {isSyncing ? (
                       <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
                  ) : saveError ? (
-                      <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
+                          <button 
+                            onClick={handleRetrySync}
+                            className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors font-bold uppercase"
+                          >
+                            Tentar Novamente
+                          </button>
+                          <button 
+                            onClick={() => setSaveError(null)}
+                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 transition-colors font-bold uppercase"
+                          >
+                            Limpar
+                          </button>
+                      </div>
+                 ) : heavyRecords.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                          <span className="text-xs text-amber-500 flex items-center gap-1 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-800" title={`Registros pesados: ${heavyRecords.map(r => `${r.name} (${r.size})`).join(', ')}`}>
+                              <ExclamationTriangleIcon className="h-3 w-3" /> Base Pesada
+                          </span>
+                      </div>
                  ) : isCloudConfigured ? (
                      <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>
                  ) : (
