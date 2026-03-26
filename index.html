@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Felix e Castro Advocacia Especializada</title>
+    <meta name="theme-color" content="#be123c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            950: '#172554',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link id="manifest-placeholder" rel="manifest" href="">
+    
+    <script>
+        // Dynamic Manifest Generation for PWA Installation
+        window.addEventListener('DOMContentLoaded', () => {
+            const manifest = {
+                "name": "Felix e Castro Advocacia Especializada",
+                "short_name": "Felix e Castro",
+                "start_url": "/",
+                "display": "standalone",
+                "background_color": "#26190f",
+                "theme_color": "#be123c",
+                "icons": [
+                    {
+                        "src": "https://cdn-icons-png.flaticon.com/512/924/924915.png",
+                        "sizes": "192x192",
+                        "type": "image/png"
+                    },
+                    {
+                        "src": "https://cdn-icons-png.flaticon.com/512/924/924915.png",
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            };
+            const stringManifest = JSON.stringify(manifest);
+            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
+        });
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+        /* Tiptap Editor Styles */
+        .ProseMirror {
+            outline: none !important;
+            min-height: 29.7cm; /* A4 height approx */
+            padding: 2.5cm !important;
+        }
+        .ProseMirror p {
+            margin-bottom: 1em;
+        }
+        .ProseMirror blockquote {
+            border-left: 3px solid #000000;
+            padding-left: 1cm;
+            margin-left: 0;
+            margin-right: 0;
+            font-size: 1em;
+            line-height: 1.5;
+            color: #000000;
+        }
+        .pdf-export blockquote, .pdf-export blockquote * {
+            color: #000000 !important;
+            border-left-color: #000000 !important;
+        }
+        .ProseMirror table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+        .ProseMirror table td, .ProseMirror table th {
+            min-width: 1em;
+            border: 1px solid #cbd5e1;
+            padding: 3px 5px;
+            vertical-align: top;
+            box-sizing: border-box;
+            position: relative;
+            background-color: #ffffff;
+        }
+        .dark .ProseMirror table td, .dark .ProseMirror table th {
+            border-color: #334155;
+            background-color: #1e293b;
+            color: #f1f5f9;
+        }
+        .ProseMirror table th {
+            font-weight: bold;
+            text-align: left;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        .dark .ProseMirror table th {
+            background-color: #334155;
+            color: #f1f5f9;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background-color: white !important;
+                color: black !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .ProseMirror {
+                background-color: white !important;
+                color: black !important;
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                min-height: auto !important;
+            }
+            .dark .ProseMirror {
+                background-color: white !important;
+                color: black !important;
+            }
+            .dark body {
+                background-color: white !important;
+                color: black !important;
+            }
+        }
+        .pdf-export {
+            font-family: 'Inter', sans-serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            color: black;
+            padding: 0;
+            width: 190mm;
+            box-sizing: border-box;
+            background-color: white !important;
+            border: none !important;
+        }
+        .pdf-export p {
+            margin-bottom: 1em;
+            text-align: justify;
+            color: black !important;
+        }
+        .pdf-export blockquote {
+            border-left: 3px solid black !important;
+            margin-left: 1cm !important;
+            padding-left: 0.5cm !important;
+            color: black !important;
+            display: block !important;
+        }
+        .pdf-export blockquote * {
+            color: black !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>
