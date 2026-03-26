@@ -455,10 +455,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                       // Identify heavy individual records
                       const heavy = newData.map(r => ({
                           name: r.name || r.firstName || 'Sem nome',
-                          size: new Blob([JSON.stringify(r)]).size
+                          size: new Blob([JSON.stringify(r)]).size,
+                          record: r // Keep reference for logging
                       }))
                       .filter(r => r.size > 300 * 1024) // > 300KB
-                      .map(r => ({ name: r.name, size: (r.size / 1024).toFixed(0) + 'KB' }));
+                      .map(r => {
+                          console.log(`Heavy record found: ${r.name}, size: ${(r.size / 1024).toFixed(0)}KB`, r.record);
+                          return { name: r.name, size: (r.size / 1024).toFixed(0) + 'KB' };
+                      });
                       
                       setHeavyRecords(heavy);
 
