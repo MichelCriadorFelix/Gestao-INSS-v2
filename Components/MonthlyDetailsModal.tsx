@@ -13,6 +13,8 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
 
         contracts.forEach(contract => {
             (contract.payments || []).forEach(payment => {
+                if (!payment.isPaid) return;
+
                 const parts = payment.date.split('-'); // YYYY-MM-DD
                 const pYear = parseInt(parts[0]);
                 const pMonth = parseInt(parts[1]) - 1; 

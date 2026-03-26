@@ -25,13 +25,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
     }, [contracts, currentYear]);
 
     const stats = useMemo(() => {
-        const totalPortfolio = contracts.reduce((acc, c) => {
-            if (c.status === 'Concluído') {
-                return acc + (Number(c.totalFee) || 0);
-            }
-            return acc;
-        }, 0);
-        
+        let totalPortfolio = 0;
         let yearlyIncome = 0;
         let michelIncome = 0;
         let luanaIncome = 0;
@@ -44,6 +38,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
             // Portfolio Split (Potencial Total)
             if (c.status === 'Concluído') {
+                totalPortfolio += contractTotal;
                 if (responsible === 'Michel') {
                     michelPortfolio += contractTotal * 0.6;
                     luanaPortfolio += contractTotal * 0.4;
@@ -55,6 +50,8 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
             // Yearly Cash Flow (Baseado nos pagamentos realizados)
             (c.payments || []).forEach(p => {
+                if (!p.isPaid) return;
+                
                 // Fix timezone issue by parsing date manually or setting time to noon
                 // Here assuming date string YYYY-MM-DD
                 const parts = p.date.split('-');

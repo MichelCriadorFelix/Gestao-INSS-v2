@@ -3,7 +3,7 @@ import { SocialSecurityData } from '../SocialSecurityCalc';
 import { analyzeBenefits, BenefitResult } from '../BenefitRules';
 import { CheckCircleIcon, XCircleIcon, CalculatorIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
-import { IBGELifeExpectancy } from '../services/ibgeService';
+import { IBGELifeExpectancy } from '../src/services/ibgeService';
 
 interface BenefitAnalysisModalProps {
     isOpen: boolean;
