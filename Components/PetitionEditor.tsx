@@ -51,6 +51,16 @@ import htmlToPdfmake from 'html-to-pdfmake';
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
 import { ClientRecord, Petition } from '../types';
+import { extractTextFromPDF } from '../src/utils/pdfParser';
+import { supabaseService } from '../services/supabaseService';
+
+interface ChatDocument {
+  id: string;
+  name: string;
+  summary?: string;
+  fullText?: string;
+  type: string;
+}
 
 const CustomParagraph = Paragraph.extend({
   addAttributes() {
@@ -121,6 +131,187 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [uploadedDocs, setUploadedDocs] = useState<ChatDocument[]>([]);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [aiProgressText, setAiProgressText] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setAiProgress(0);
+    setAiProgressText('Iniciando processamento...');
+    
+    try {
+      const fileArray = Array.from(files);
+      
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setAiProgress(Math.round((i / fileArray.length) * 100));
+        setAiProgressText(`Lendo ${file.name}...`);
+
+        let fileText = "";
+        let images: string[] = [];
+
+        if (file.type === 'application/pdf') {
+          const result = await extractTextFromPDF(file);
+          fileText = result.text;
+          images = result.images;
+          
+          if (result.fileHash) {
+            const cachedText = await supabaseService.getPdfCache(result.fileHash);
+            if (cachedText) {
+              fileText = cachedText;
+            } else {
+              if (result.isScanned && images.length > 0) {
+                setAiProgressText(`Realizando OCR em ${file.name}...`);
+                const ocrResponse = await fetch('/api/ocr', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ images })
+                });
+                if (ocrResponse.ok) {
+                  const ocrData = await ocrResponse.json();
+                  if (ocrData.text) {
+                    fileText += `\n--- OCR ---\n${ocrData.text}`;
+                    await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
+                  }
+                }
+              } else if (fileText.trim()) {
+                await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
+              }
+            }
+          }
+        }
+
+        // Generate Summary
+        setAiProgressText(`Sintetizando ${file.name}...`);
+        const response = await fetch('/api/dr-michel/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `RESUMA ESTE DOCUMENTO PARA O EDITOR DE PETIÇÕES:\n${fileText.substring(0, 50000)}`,
+            history: [],
+            isIngestion: true
+          })
+        });
+
+        if (response.ok) {
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let summary = '';
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.text) summary += data.text;
+                  } catch (e) {}
+                }
+              }
+            }
+          }
+
+          const newDoc: ChatDocument = {
+            id: generateId(),
+            name: file.name,
+            summary: summary,
+            fullText: fileText,
+            type: file.type
+          };
+
+          setUploadedDocs(prev => [...prev, newDoc]);
+        }
+      }
+      setAiProgress(100);
+      setAiProgressText('Documentos processados!');
+      setTimeout(() => {
+        setAiProgress(0);
+        setAiProgressText('');
+      }, 2000);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Erro ao processar arquivos: ${error.message}`);
+    }
+  };
+
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim() && uploadedDocs.length === 0) return;
+    
+    setIsAiGenerating(true);
+    setAiProgressText('Gerando petição com IA...');
+    
+    try {
+      const docContext = uploadedDocs.map(doc => 
+        `DOCUMENTO: ${doc.name}\nRESUMO: ${doc.summary}`
+      ).join('\n\n---\n\n');
+
+      const fullPrompt = `[CONTEXTO DO PROCESSO]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: Gere o conteúdo da petição em formato de texto plano, seguindo as regras do Dr. Michel Felix.`;
+
+      const response = await fetch('/api/dr-michel/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: fullPrompt,
+          history: [],
+          images: []
+        })
+      });
+
+      if (!response.ok) throw new Error('Falha na geração');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.text) {
+                  fullText += data.text;
+                  // Update editor in real-time or wait? Let's wait for full text for better formatting
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      // Format and insert into editor
+      const formattedContent = fullText
+        .split('\n')
+        .map(line => line.trim() ? `<p>${line}</p>` : '<p>&nbsp;</p>')
+        .join('');
+
+      editor?.commands.setContent(formattedContent);
+      setIsAiPanelOpen(false);
+      setAiPrompt('');
+    } catch (error: any) {
+      console.error(error);
+      alert(`Erro na geração: ${error.message}`);
+    } finally {
+      setIsAiGenerating(false);
+      setAiProgressText('');
+    }
+  };
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   const [clientSearchQuery, setClientSearchQuery] = useState('');
@@ -619,6 +810,116 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
         {/* Editor Area */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
+          {/* AI Panel */}
+          <AnimatePresence>
+            {isAiPanelOpen && (
+              <motion.div
+                initial={{ x: 300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 300, opacity: 0 }}
+                className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-20 flex flex-col"
+              >
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-5 h-5 text-indigo-500" />
+                    <h3 className="font-bold text-sm text-slate-800 dark:text-white">Assistente IA</h3>
+                  </div>
+                  <button onClick={() => setIsAiPanelOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* Document Upload Section */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Documentos do Processo</label>
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-500 transition-colors group"
+                    >
+                      <Upload className="w-6 h-6 mx-auto text-slate-400 group-hover:text-indigo-500 mb-2" />
+                      <p className="text-xs text-slate-500">Clique para anexar arquivos do processo (PDF)</p>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileUpload} 
+                        multiple 
+                        accept=".pdf" 
+                        className="hidden" 
+                      />
+                    </div>
+
+                    {uploadedDocs.length > 0 && (
+                      <div className="space-y-2 mt-2">
+                        {uploadedDocs.map(doc => (
+                          <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <FileTextIcon className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                              <span className="text-[10px] font-medium truncate text-slate-700 dark:text-slate-300">{doc.name}</span>
+                            </div>
+                            <button 
+                              onClick={() => setUploadedDocs(prev => prev.filter(d => d.id !== doc.id))}
+                              className="p-1 hover:text-red-500 transition"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Prompt Section */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">O que deseja gerar?</label>
+                    <textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Ex: Gere uma petição inicial de aposentadoria por idade rural, destacando o período de 1990 a 2010 conforme documentos anexos."
+                      className="w-full h-32 p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    />
+                  </div>
+
+                  {aiProgressText && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-bold text-indigo-500">
+                        <span>{aiProgressText}</span>
+                        <span>{aiProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <motion.div 
+                          className="bg-indigo-500 h-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${aiProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                  <button
+                    onClick={handleAiGenerate}
+                    disabled={isAiGenerating || (!aiPrompt.trim() && uploadedDocs.length === 0)}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition flex items-center justify-center gap-2"
+                  >
+                    {isAiGenerating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Scale className="w-4 h-4" />
+                        Gerar Conteúdo
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Toolbar */}
           <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm">
             <ToolbarButton 
@@ -676,6 +977,15 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               active={editor.isActive('blockquote')}
               icon={<Quote className="w-4 h-4" />}
               title="Citação (Recuo 4cm)"
+            />
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+
+            <ToolbarButton 
+              onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
+              active={isAiPanelOpen}
+              icon={<Scale className="w-4 h-4 text-indigo-500" />}
+              title="Assistente de Petição IA"
             />
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />

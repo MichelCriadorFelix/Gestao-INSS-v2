@@ -26,12 +26,22 @@ import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 
+interface ChatDocument {
+  id: string;
+  name: string;
+  summary?: string;
+  fullText?: string;
+  type: string;
+  pages?: number;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
   attachments?: { name: string; url: string; type: string }[];
+  isSystem?: boolean;
 }
 
 interface ChatSession {
@@ -39,6 +49,7 @@ interface ChatSession {
   title: string;
   date: string;
   messages: Message[];
+  documents?: ChatDocument[];
 }
 
 interface DrMichelFelixProps {
@@ -389,12 +400,21 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         console.warn("RAG search failed, continuing without context:", err);
       }
 
+      // Prepare context from documents
+      const session = sessionsRef.current.find(s => s.id === sessionId);
+      const docSummaries = session?.documents?.map(doc => 
+        `DOCUMENTO: ${doc.name}\nRESUMO: ${doc.summary}`
+      ).join('\n\n---\n\n') || '';
+
+      const contextPrompt = docSummaries ? 
+        `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
+
       const response = await fetch('/api/dr-michel/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: messageText,
-          history: sessions.find(s => s.id === sessionId)?.messages || [],
+          message: contextPrompt + messageText,
+          history: session?.messages || [],
           images: images || [],
           ragContext
         }),
@@ -516,6 +536,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
+    setProgress(0);
+    setProgressText('Iniciando processamento...');
     
     try {
       let activeSessionId = currentSessionId;
@@ -525,7 +547,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           id: generateId(),
           title: 'Nova Conversa',
           messages: [],
-          date: new Date().toLocaleDateString('pt-BR')
+          date: new Date().toLocaleDateString('pt-BR'),
+          documents: []
         };
         setSessions([newSession, ...sessions]);
         setCurrentSessionId(newSession.id);
@@ -533,14 +556,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       }
 
       const fileArray = Array.from(files);
-      let combinedText = "";
-      const imagesToSend: string[] = [];
-
+      
       // Inform user we are reading the files
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou lendo ${fileArray.length} arquivo(s). Por favor, aguarde um momento...`,
+        content: `Estou processando ${fileArray.length} arquivo(s). Vou analisar cada um individualmente para garantir que nenhuma informação do processo integral seja perdida. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -548,22 +569,29 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
       ));
 
-      for (const file of fileArray) {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const currentProgress = Math.round((i / fileArray.length) * 100);
+        setProgress(currentProgress);
+        setProgressText(`Lendo ${file.name} (${i + 1}/${fileArray.length})...`);
+
+        let fileText = "";
+        let images: string[] = [];
+        let isScanned = false;
+
         if (file.type === 'application/pdf') {
-          const { text: extractedText, images, isScanned, fileHash } = await extractTextFromPDF(file);
+          const result = await extractTextFromPDF(file);
+          fileText = result.text;
+          images = result.images;
+          isScanned = result.isScanned;
           
-          let finalPdfText = extractedText;
-          
-          // 1. Check Cache
-          if (fileHash) {
-            const cachedText = await supabaseService.getPdfCache(fileHash);
+          if (result.fileHash) {
+            const cachedText = await supabaseService.getPdfCache(result.fileHash);
             if (cachedText) {
-              console.log(`Usando cache para o arquivo: ${file.name}`);
-              finalPdfText = cachedText;
+              fileText = cachedText;
             } else {
-              // 2. If Scanned and no cache, perform OCR
               if (isScanned && images.length > 0) {
-                console.log(`Iniciando OCR para o arquivo digitalizado: ${file.name}`);
+                setProgressText(`Realizando OCR em ${file.name}...`);
                 try {
                   const ocrResponse = await fetch('/api/ocr', {
                     method: 'POST',
@@ -574,46 +602,109 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   if (ocrResponse.ok) {
                     const ocrData = await ocrResponse.json();
                     if (ocrData.text) {
-                      finalPdfText += `\n--- TEXTO EXTRAÍDO VIA OCR ---\n${ocrData.text}\n`;
-                      // 3. Save to Cache
-                      await supabaseService.savePdfCache(fileHash, file.name, finalPdfText);
+                      fileText += `\n--- OCR ---\n${ocrData.text}`;
+                      await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
                     }
                   }
                 } catch (ocrErr) {
-                  console.error("Erro no processo de OCR:", ocrErr);
+                  console.error("Erro no OCR:", ocrErr);
                 }
-              } else if (extractedText.trim() && fileHash) {
-                // Save digital text to cache too
-                await supabaseService.savePdfCache(fileHash, file.name, extractedText);
+              } else if (fileText.trim()) {
+                await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
+              }
+            }
+          }
+        } else {
+          fileText = `[Arquivo ${file.name} do tipo ${file.type} não suportado para extração de texto]`;
+        }
+
+        // Generate Summary for this specific file
+        setProgressText(`Sintetizando ${file.name}...`);
+        const summaryPrompt = `TOME CIÊNCIA DESTE DOCUMENTO (PARTE DO PROCESSO):
+        NOME DO ARQUIVO: ${file.name}
+        CONTEÚDO: ${fileText.substring(0, 80000)}
+        
+        INSTRUÇÃO: Forneça um resumo executivo de 3-5 parágrafos destacando os pontos cruciais deste documento específico para um recurso previdenciário. Identifique datas, valores e decisões importantes.`;
+
+        const response = await fetch('/api/dr-michel/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: summaryPrompt,
+            history: [], 
+            images: images.slice(0, 5),
+            isIngestion: true
+          })
+        });
+
+        if (response.ok) {
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let summary = '';
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.text) summary += data.text;
+                  } catch (e) {}
+                }
               }
             }
           }
 
-          combinedText += `\n--- CONTEÚDO DO ARQUIVO: ${file.name} ---\n${finalPdfText}\n`;
-          
-          if (isScanned && !finalPdfText.includes('--- TEXTO EXTRAÍDO VIA OCR ---')) {
-            combinedText += `\n[AVISO: Este arquivo contém ${images.length} páginas digitalizadas/manuscritas que foram convertidas para imagem para análise visual]\n`;
-            imagesToSend.push(...images);
-          }
-        } else {
-          combinedText += `\n--- ARQUIVO ANEXADO: ${file.name} (Tipo não suportado para extração direta) ---\n`;
+          const newDoc: ChatDocument = {
+            id: generateId(),
+            name: file.name,
+            summary: summary,
+            fullText: fileText,
+            type: file.type
+          };
+
+          setSessions(prev => prev.map(s => 
+            s.id === activeSessionId ? { 
+              ...s, 
+              documents: [...(s.documents || []), newDoc],
+              messages: [...s.messages, {
+                id: generateId(),
+                role: 'assistant',
+                content: `✅ **Documento Processado: ${file.name}**\n\n${summary}`,
+                timestamp: new Date().toISOString(),
+                isSystem: true
+              }]
+            } : s
+          ));
         }
       }
 
-      const uploadPrompt = `Enviei os seguintes documentos para análise: ${fileArray.map(f => f.name).join(', ')}. 
+      setProgress(100);
+      setProgressText('Concluído!');
       
-      Abaixo está o conteúdo extraído dos arquivos para sua análise e armazenamento:
-      ${combinedText}
+      const finalMsg: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `Tomei ciência integral de todos os ${fileArray.length} arquivos enviados. O processo foi mapeado e estou pronto para gerar o recurso ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
+        timestamp: new Date().toISOString()
+      };
       
-      INSTRUÇÃO OBRIGATÓRIA: Apenas armazene estas informações e confirme o recebimento. NÃO gere nenhum relatório agora. Aguarde meu comando "GERAR RELATÓRIO".`;
-      
-      // Send message with images if any
-      await handleSendMessage(uploadPrompt, imagesToSend);
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, finalMsg] } : s
+      ));
+
     } catch (error: any) {
       console.error("Erro ao processar arquivos:", error);
-      alert(`Erro ao ler os arquivos PDF: ${error.message || 'Erro desconhecido'}. Certifique-se de que não estão protegidos por senha.`);
+      alert(`Erro ao ler os arquivos: ${error.message}`);
     } finally {
       setIsUploading(false);
+      setTimeout(() => {
+        setProgress(0);
+        setProgressText('');
+      }, 3000);
     }
   };
 
