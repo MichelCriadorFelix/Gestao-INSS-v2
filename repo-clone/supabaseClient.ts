@@ -30,25 +30,15 @@ const getEnvVar = (key: string): string | undefined => {
     return undefined;
 };
 
-const isValidUrl = (url: string | undefined): boolean => {
-    if (!url || url === 'undefined' || url === 'null') return false;
-    try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch (e) {
-        return false;
-    }
-};
-
 export const getDbConfig = () => {
     const stored = localStorage.getItem(DB_CONFIG_KEY);
     if (stored) return JSON.parse(stored);
 
-    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL');
+    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-    if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
-        return { url: envUrl as string, key: envKey, isEnv: true };
+    if (envUrl && envKey) {
+        return { url: envUrl, key: envKey, isEnv: true };
     }
 
     if (GLOBAL_SUPABASE_URL && GLOBAL_SUPABASE_KEY) {
@@ -63,16 +53,16 @@ export const initSupabase = () => {
     const stored = localStorage.getItem(DB_CONFIG_KEY);
     if (stored) {
         const config = JSON.parse(stored);
-        if (config && isValidUrl(config.url) && config.key) {
+        if (config && config.url && config.key) {
             return createClient(config.url, config.key);
         }
     }
 
     // Prioridade 2: Variáveis de ambiente
-    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
-    if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
-        return createClient(envUrl as string, envKey);
+    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL');
+    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY');
+    if (envUrl && envKey) {
+        return createClient(envUrl, envKey);
     }
 
     // Prioridade 3: Configuração global (fallback)
