@@ -25,6 +25,7 @@ import { initSupabase } from '../supabaseClient';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
+import { markdownToHtml } from '../src/utils/markdownToHtml';
 
 interface ChatDocument {
   id: string;
@@ -734,11 +735,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
   const handleOpenInEditor = (content: string) => {
     if (onOpenPetition) {
-      // Convert newlines to paragraphs to ensure formatting is preserved in the editor
-      const formattedContent = content
-        .split('\n')
-        .map(line => line.trim() ? `<p>${line}</p>` : '<p>&nbsp;</p>')
-        .join('');
+      // Convert Markdown to HTML to ensure formatting (bold, italic, lists) is preserved
+      const formattedContent = markdownToHtml(content);
 
       onOpenPetition({
         title: `Petição Dr. Michel - ${new Date().toLocaleDateString('pt-BR')}`,
@@ -930,10 +928,16 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                         {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                      {msg.role === 'user' && (msg.content || '').length > 3000 
-                        ? (msg.content || '').substring(0, 800) + '\n\n[... Conteúdo longo ocultado na tela para evitar travamentos. A IA leu o texto completo ...]' 
-                        : (msg.content || '')}
+                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {msg.role === 'assistant' ? (
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                      ) : (
+                        <div className="whitespace-pre-wrap">
+                          {(msg.content || '').length > 3000 
+                            ? (msg.content || '').substring(0, 800) + '\n\n[... Conteúdo longo ocultado na tela para evitar travamentos. A IA leu o texto completo ...]' 
+                            : (msg.content || '')}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {msg.role === 'assistant' && (

@@ -80,10 +80,13 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - Sempre PARAFRASEIE os artigos de lei, súmulas e decisões.
    - Explique o conteúdo da norma com suas próprias palavras, conectando-a ao caso concreto.
    - Se precisar citar um trecho curto, faça-o entre aspas e com a devida referência, mas nunca copie parágrafos inteiros ou artigos longos de forma literal.
-3. TEXTO LIMPO E GRAMATICALMENTE PERFEITO:
-   - FORMATAÇÃO: Texto PLANO, pronto para Word.
-   - PROIBIDO: Markdown (*, #, ---).
-   - PERMITIDO: Símbolos essenciais (%, /, $, º, ª, -).
+3. TEXTO LIMPO E FORMATADO:
+   - FORMATAÇÃO: Use Markdown para estruturar o texto.
+   - NEGRITO: Use **texto** para destacar pontos cruciais, nomes de documentos e datas.
+   - ITÁLICO: Use *texto* para citações curtas ou termos estrangeiros.
+   - LISTAS: Use * para criar listas de tópicos (ex: * Item 1).
+   - TÍTULOS: Use ## para seções principais e ### para subseções.
+   - O sistema converterá esse Markdown automaticamente para o editor de petições.
    - GRAMÁTICA: Acentuação e pontuação rigorosas (Norma Culta).
    - NUMERAÇÃO: Tópicos (1., 2.) e Pedidos (a), b)) obrigatórios.
 4. EXTENSÃO E DENSIDADE (CRUCIAL - AUMENTO DE 25%):
@@ -801,7 +804,7 @@ SUA FUNÇÃO É:
 2. ANALISAR INDIVIDUALMENTE: Cada arquivo enviado é uma peça do quebra-cabeça.
 3. AUDITORIA VISUAL OBRIGATÓRIA: No TRCT, identifique as datas nos Campos 24, 25 e 26 olhando EXCLUSIVAMENTE para a IMAGEM.
 4. ZOOM NO ANO: No Campo 24 (Admissão), verifique se o ano termina em "4" (2024). Não confunda com 2020 ou 2015. Olhe para o formato do dígito.
-5. RESUMO ESTRUTURADO: Para cada arquivo, gere um resumo técnico destacando:
+5. RESUMO ESTRUTURADO (USE MARKDOWN): Para cada arquivo, gere um resumo técnico usando **negrito** para datas e valores, e *itálico* para citações ou nomes de documentos. Use listas (*) para pontos cruciais.
    - Tipo de documento (Petição, Laudo, Sentença, etc).
    - Datas relevantes encontradas.
    - Decisões ou fatos cruciais.

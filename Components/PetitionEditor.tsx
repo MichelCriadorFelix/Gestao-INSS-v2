@@ -18,6 +18,31 @@ const styles = `
   .ProseMirror p:has(img) {
     text-indent: 0 !important;
   }
+  .ProseMirror ul {
+    list-style-type: disc !important;
+    margin-left: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .ProseMirror ol {
+    list-style-type: decimal !important;
+    margin-left: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+  .ProseMirror li {
+    margin-bottom: 0.5rem !important;
+    display: list-item !important;
+  }
+  .ProseMirror strong {
+    font-weight: bold !important;
+  }
+  .ProseMirror em {
+    font-style: italic !important;
+  }
+  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+    font-weight: bold !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
 `;
 
 const PasteImageExtension = ResizableImage.extend({
@@ -53,6 +78,7 @@ import htmlToPdfmake from 'html-to-pdfmake';
 import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
+import { markdownToHtml } from '../src/utils/markdownToHtml';
 
 interface ChatDocument {
   id: string;
@@ -274,20 +300,23 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
+      let buffer = '';
       
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n\n');
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+          
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
                 if (data.text) {
                   fullText += data.text;
-                  // Update editor in real-time or wait? Let's wait for full text for better formatting
                 }
               } catch (e) {}
             }
@@ -296,10 +325,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       }
 
       // Format and insert into editor
-      const formattedContent = fullText
-        .split('\n')
-        .map(line => line.trim() ? `<p>${line}</p>` : '<p>&nbsp;</p>')
-        .join('');
+      const formattedContent = markdownToHtml(fullText);
 
       editor?.commands.setContent(formattedContent);
       setIsAiPanelOpen(false);
