@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ScaleIcon, UserGroupIcon, BriefcaseIcon, CalculatorIcon, ArrowRightOnRectangleIcon, 
   ArrowPathRoundedSquareIcon, CloudIcon, BellIcon, Cog6ToothIcon, SunIcon, MoonIcon,
-  ArchiveBoxIcon, MagnifyingGlassIcon, PlusIcon, StarIcon, ArrowUturnLeftIcon, 
+  ArchiveBoxIcon, MagnifyingGlassIcon, PlusIcon, StarIcon, ArrowUturnLeftIcon, ArrowPathIcon, 
   PencilSquareIcon, TrashIcon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, 
   ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckIcon, BookOpenIcon,
   GlobeAltIcon, AcademicCapIcon
@@ -100,190 +100,32 @@ const Dashboard: React.FC<DashboardProps> = ({
     const supabase = initSupabase();
 
     try {
-        // 1. Initialize with Supabase Data (Source of Truth)
-        supabaseService.getClients().then(remoteClients => {
-            if (remoteClients && remoteClients.length > 0) {
-                setRecords(remoteClients);
-                // Atualiza o cache local apenas para emergências
-                safeSetLocalStorage('inss_records', JSON.stringify(remoteClients));
-            } else {
-                // Se Supabase estiver vazio, não carrega local automaticamente
-                setRecords(INITIAL_DATA);
-            }
-        }).catch(err => {
-            console.error('Erro ao buscar do Supabase:', err);
-            // Fallback para local em caso de erro de rede com aviso
-            window.alert('Aviso: Não foi possível conectar ao banco de dados. Carregando dados locais (emergência).');
-            const localClients = localStorage.getItem('inss_records');
-            if (localClients) {
-                try {
-                    setRecords(JSON.parse(localClients));
-                } catch (e) {
-                    setRecords(INITIAL_DATA);
-                }
-            } else {
-                setRecords(INITIAL_DATA);
-            }
-        });
+        const [remoteClients, remoteContracts] = await Promise.all([
+            supabaseService.getClients(),
+            supabaseService.getContracts()
+        ]);
 
-        const localContracts = localStorage.getItem('inss_contracts');
-        let fetchedContracts;
-        if (localContracts) {
-            try {
-                fetchedContracts = JSON.parse(localContracts);
-            } catch (e) {
-                fetchedContracts = JSON.parse(LZString.decompressFromUTF16(localContracts) || '[]');
-            }
-        } else {
-            fetchedContracts = INITIAL_CONTRACTS_LIST;
-        }
-        setContracts(Array.isArray(fetchedContracts) ? fetchedContracts : INITIAL_CONTRACTS_LIST);
+        setRecords(remoteClients || []);
+        setContracts(remoteContracts || []);
 
-        const localCalculations = localStorage.getItem('inss_calculations');
-        let fetchedCalculations;
-        if (localCalculations) {
-            try {
-                fetchedCalculations = JSON.parse(localCalculations);
-            } catch (e) {
-                fetchedCalculations = JSON.parse(LZString.decompressFromUTF16(localCalculations) || '[]');
-            }
-        } else {
-            fetchedCalculations = [];
-        }
-        setSavedCalculations(Array.isArray(fetchedCalculations) ? fetchedCalculations : []);
+        const remoteCalculations = await supabaseService.getLaborCalculations().catch(() => []);
+        setSavedCalculations(remoteCalculations || []);
 
-        const localResolved = localStorage.getItem('inss_resolved_alerts');
-        let fetchedResolved;
-        if (localResolved) {
-            try {
-                fetchedResolved = JSON.parse(localResolved);
-            } catch (e) {
-                fetchedResolved = JSON.parse(LZString.decompressFromUTF16(localResolved) || '[]');
-            }
-        } else {
-            fetchedResolved = [];
-        }
-        setResolvedAlerts(Array.isArray(fetchedResolved) ? fetchedResolved : []);
+        setResolvedAlerts([]);
 
-        const localSocialCalculations = localStorage.getItem('social_security_calculations');
-        let fetchedSocialCalculations = localSocialCalculations ? JSON.parse(localSocialCalculations) : [];
-        setSavedSocialCalculations(Array.isArray(fetchedSocialCalculations) ? fetchedSocialCalculations : []);
+        const [remoteSocial, remoteMichel, remoteLuana] = await Promise.all([
+            supabaseService.getCalculations().catch(() => []),
+            supabaseService.getAIConversations('michel').catch(() => []),
+            supabaseService.getAIConversations('luana').catch(() => [])
+        ]);
 
-        const localMichel = localStorage.getItem('dr_michel_sessions');
-        let fetchedDrMichelSessions = localMichel ? JSON.parse(localMichel) : [];
-        setDrMichelSessions(Array.isArray(fetchedDrMichelSessions) ? fetchedDrMichelSessions : []);
+        setSavedSocialCalculations(remoteSocial || []);
+        setDrMichelSessions(remoteMichel || []);
+        setDraLuanaSessions(remoteLuana || []);
 
-        const localLuana = localStorage.getItem('dra_luana_sessions');
-        let fetchedDraLuanaSessions = localLuana ? JSON.parse(localLuana) : [];
-        setDraLuanaSessions(Array.isArray(fetchedDraLuanaSessions) ? fetchedDraLuanaSessions : []);
-
-        const localAgenda = localStorage.getItem('agenda_events');
-        let fetchedAgendaEvents = localAgenda ? JSON.parse(localAgenda) : [];
-        setAgendaEvents(Array.isArray(fetchedAgendaEvents) ? fetchedAgendaEvents : []);
-
-        const localLaws = localStorage.getItem('custom_laws');
-        let fetchedLaws = localLaws ? JSON.parse(localLaws) : [];
-        setCustomLaws(Array.isArray(fetchedLaws) ? fetchedLaws : []);
-
-        if (supabase) {
-            // Cloud Fetch with Timeout Resilience
-            const fetchWithTimeout = async (id: number) => {
-                try {
-                    const { data, error } = await supabase
-                        .from('clients')
-                        .select('data')
-                        .eq('id', id)
-                        .single();
-                    
-                    if (error) {
-                        if (error.message?.includes('timeout') || error.code === '57014') {
-                            return null; // Signal timeout
-                        }
-                        throw error;
-                    }
-                    return data?.data;
-                } catch (err) {
-                    console.error(`Fetch error for ID ${id}:`, err);
-                    return null;
-                }
-            };
-
-            // Run fetches in parallel but don't block
-            Promise.all([
-                fetchWithTimeout(1),
-                fetchWithTimeout(2),
-                supabaseService.getLaborCalculations().catch(() => null),
-                supabaseService.getCalculations().catch(() => null),
-                fetchWithTimeout(7),
-                fetchWithTimeout(8),
-                fetchWithTimeout(9)
-            ]).then(([cData, conData, labData, socData, agendaData, resData, lawsData]) => {
-                let partialSync = false;
-
-                let parsedCData = cData;
-                if (typeof cData === 'string') {
-                    try {
-                        const decompressed = LZString.decompressFromUTF16(cData);
-                        parsedCData = decompressed ? JSON.parse(decompressed) : JSON.parse(cData);
-                    } catch (e) {
-                        console.error("Failed to decompress clients data", e);
-                    }
-                }
-
-                if (parsedCData && Array.isArray(parsedCData)) {
-                    setRecords(parsedCData);
-                    safeSetLocalStorage('inss_records', JSON.stringify(parsedCData));
-                } else partialSync = true;
-
-                if (conData) {
-                    let parsedConData = conData;
-                    if (typeof conData === 'string') {
-                        try {
-                            const decompressed = LZString.decompressFromUTF16(conData);
-                            parsedConData = decompressed ? JSON.parse(decompressed) : JSON.parse(conData);
-                        } catch (e) {
-                            console.error("Failed to decompress contracts data", e);
-                        }
-                    }
-                    if (Array.isArray(parsedConData)) {
-                        setContracts(parsedConData);
-                        safeSetLocalStorage('inss_contracts', JSON.stringify(parsedConData));
-                    } else partialSync = true;
-                } else partialSync = true;
-
-                if (labData && Array.isArray(labData) && labData.length > 0) {
-                    setSavedCalculations(labData);
-                    safeSetLocalStorage('inss_calculations', JSON.stringify(labData));
-                }
-                
-                if (socData && Array.isArray(socData) && socData.length > 0) {
-                    setSavedSocialCalculations(socData);
-                    safeSetLocalStorage('social_security_calculations', JSON.stringify(socData));
-                }
-
-                if (agendaData && Array.isArray(agendaData)) {
-                    setAgendaEvents(agendaData);
-                    safeSetLocalStorage('agenda_events', JSON.stringify(agendaData));
-                }
-
-                if (resData) {
-                    setResolvedAlerts(resData);
-                    safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(resData));
-                }
-
-                if (lawsData && Array.isArray(lawsData)) {
-                    setCustomLaws(lawsData);
-                    safeSetLocalStorage('custom_laws', JSON.stringify(lawsData));
-                }
-
-                if (partialSync) {
-                    setDbError("Sincronização parcial (Timeout). Dados locais preservados.");
-                }
-                setIsLoading(false);
-            });
-        } else {
-            setIsLoading(false);
-        }
+        setAgendaEvents([]);
+        setCustomLaws([]);
+        setIsLoading(false);
     } catch (err) {
         console.error("Exception in fetchData:", err);
         setIsLoading(false);
@@ -687,14 +529,27 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   // Handlers for Contracts
-  const handleContractCreate = (data: ContractRecord) => {
+  const handleContractCreate = async (data: ContractRecord) => {
       const newRec = { ...data, id: Math.random().toString(36).substr(2, 9) };
-      saveData('contracts', [newRec, ...contracts]);
+      try {
+          await supabaseService.saveContract(newRec);
+          const updated = [newRec, ...contracts];
+          setContracts(updated);
+          safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
+      } catch (e) {
+          console.error("Error creating contract:", e);
+      }
       setIsContractModalOpen(false);
   }
-  const handleContractUpdate = (data: ContractRecord) => {
-      const updated = contracts.map(c => c.id === data.id ? data : c);
-      saveData('contracts', updated);
+  const handleContractUpdate = async (data: ContractRecord) => {
+      try {
+          await supabaseService.saveContract(data);
+          const updated = contracts.map(c => c.id === data.id ? data : c);
+          setContracts(updated);
+          safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
+      } catch (e) {
+          console.error("Error updating contract:", e);
+      }
       setIsContractModalOpen(false);
   }
 
@@ -706,11 +561,61 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleContractDelete = (id: string) => {
+  const handleContractDelete = async (id: string) => {
       if (confirm('Excluir contrato e histórico financeiro?')) {
-          saveData('contracts', contracts.filter(c => c.id !== id));
+          try {
+              await supabaseService.deleteContract(id);
+              const updated = contracts.filter(c => c.id !== id);
+              setContracts(updated);
+              safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
+          } catch (e) {
+              console.error("Error deleting contract:", e);
+          }
       }
   }
+
+  const handleRecoverLocalContracts = async () => {
+      try {
+          const localContractsStr = localStorage.getItem('inss_contracts');
+          if (!localContractsStr) {
+              alert("Nenhum contrato encontrado no cache local.");
+              return;
+          }
+          
+          let localContracts = [];
+          try {
+              const decompressed = LZString.decompressFromUTF16(localContractsStr);
+              localContracts = decompressed ? JSON.parse(decompressed) : JSON.parse(localContractsStr);
+          } catch (e) {
+              localContracts = JSON.parse(localContractsStr);
+          }
+
+          if (!Array.isArray(localContracts) || localContracts.length === 0) {
+              alert("Nenhum contrato válido encontrado no cache local.");
+              return;
+          }
+
+          setIsLoading(true);
+          let successCount = 0;
+          for (const contract of localContracts) {
+              try {
+                  await supabaseService.saveContract(contract);
+                  successCount++;
+              } catch (err) {
+                  console.error("Erro ao salvar contrato recuperado:", err);
+              }
+          }
+
+          const remoteContracts = await supabaseService.getContracts();
+          setContracts(remoteContracts || []);
+          setIsLoading(false);
+          alert(`${successCount} contratos recuperados e enviados para o Supabase com sucesso!`);
+      } catch (err) {
+          console.error("Erro ao recuperar contratos:", err);
+          setIsLoading(false);
+          alert("Ocorreu um erro ao tentar recuperar os contratos locais.");
+      }
+  };
 
   const handleSaveCalculation = async (calc: CalculationRecord) => {
       try {
@@ -1429,13 +1334,23 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <button
-                            onClick={() => { setCurrentContract(null); setIsContractModalOpen(true); }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
-                        >
-                            <PlusIcon className="h-5 w-5" />
-                            Novo Contrato
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleRecoverLocalContracts}
+                                className="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-2"
+                                title="Recuperar contratos que estavam salvos apenas no navegador"
+                            >
+                                <ArrowPathIcon className="h-5 w-5" />
+                                Recuperar Locais
+                            </button>
+                            <button
+                                onClick={() => { setCurrentContract(null); setIsContractModalOpen(true); }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
+                            >
+                                <PlusIcon className="h-5 w-5" />
+                                Novo Contrato
+                            </button>
+                        </div>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">

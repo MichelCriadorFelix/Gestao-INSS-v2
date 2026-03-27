@@ -54,7 +54,10 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         if (e.target.name === 'clientId') {
             const client = (clients || []).find(c => c.id === e.target.value);
             if (client) {
-                setFormData({ ...formData, clientId: client.id, firstName: client.name, lastName: '', cpf: client.cpf });
+                const nameParts = (client.name || '').split(' ');
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                setFormData({ ...formData, clientId: client.id, firstName: firstName, lastName: lastName, cpf: client.cpf });
             } else {
                 setFormData({ ...formData, clientId: undefined });
             }

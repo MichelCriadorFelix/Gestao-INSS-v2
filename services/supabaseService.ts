@@ -268,7 +268,7 @@ export const supabaseService = {
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
-      return [];
+      throw error;
     }
     
     return (data || []).map(c => ({
@@ -315,6 +315,80 @@ export const supabaseService = {
       
     if (error) {
       console.error('Error deleting client from Supabase:', error);
+      throw error;
+    }
+  },
+
+  // Contracts
+  async saveContract(contract: any) {
+    if (!supabase) return null;
+    
+    const record = {
+      id: String(contract.id || Date.now()),
+      client_id: contract.clientId,
+      first_name: contract.firstName,
+      last_name: contract.lastName,
+      cpf: contract.cpf,
+      service_type: contract.serviceType,
+      lawyer: contract.lawyer,
+      total_fee: contract.totalFee,
+      status: contract.status,
+      payment_method: contract.paymentMethod,
+      installments_count: contract.installmentsCount || 0,
+      payments: contract.payments || [],
+      created_at: contract.createdAt || new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('contracts_v2')
+      .upsert(record);
+      
+    if (error) {
+      console.error('Error saving contract to Supabase:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async getContracts() {
+    if (!supabase) return [];
+    
+    const { data, error } = await supabase
+      .from('contracts_v2')
+      .select('*');
+      
+    if (error) {
+      console.error('Error fetching contracts from Supabase:', error);
+      throw error;
+    }
+    
+    return (data || []).map(c => ({
+      id: String(c.id),
+      clientId: c.client_id,
+      firstName: c.first_name,
+      lastName: c.last_name,
+      cpf: c.cpf,
+      serviceType: c.service_type,
+      lawyer: c.lawyer,
+      totalFee: c.total_fee,
+      status: c.status,
+      paymentMethod: c.payment_method,
+      installmentsCount: c.installments_count,
+      payments: c.payments,
+      createdAt: c.created_at
+    }));
+  },
+
+  async deleteContract(id: string) {
+    if (!supabase) return null;
+    
+    const { error } = await supabase
+      .from('contracts_v2')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      console.error('Error deleting contract from Supabase:', error);
       throw error;
     }
   },
