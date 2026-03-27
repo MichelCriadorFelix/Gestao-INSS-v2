@@ -102,17 +102,17 @@ const Dashboard: React.FC<DashboardProps> = ({
     try {
         // 1. Initialize with Supabase Data (Source of Truth)
         supabaseService.getClients().then(remoteClients => {
-            if (remoteClients.length > 0) {
+            if (remoteClients && remoteClients.length > 0) {
                 setRecords(remoteClients);
+                // Atualiza o cache local apenas para emergências
                 safeSetLocalStorage('inss_records', JSON.stringify(remoteClients));
             } else {
-                // Fallback to Local Data if Supabase is empty
+                // Se Supabase estiver vazio, tenta carregar local (emergência)
                 const localClients = localStorage.getItem('inss_records');
                 if (localClients) {
                     try {
                         setRecords(JSON.parse(localClients));
                     } catch (e) {
-                        // Handle legacy compressed data if needed
                         setRecords(INITIAL_DATA);
                     }
                 } else {
@@ -120,8 +120,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 }
             }
         }).catch(err => {
-            console.error('Error fetching clients:', err);
-            // Fallback to Local Data on error
+            console.error('Erro ao buscar do Supabase:', err);
+            // Fallback para local em caso de erro de rede
             const localClients = localStorage.getItem('inss_records');
             if (localClients) {
                 try {
