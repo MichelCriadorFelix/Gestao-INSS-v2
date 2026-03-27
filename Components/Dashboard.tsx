@@ -536,10 +536,11 @@ const Dashboard: React.FC<DashboardProps> = ({
           const updated = [newRec, ...contracts];
           setContracts(updated);
           safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
+          setIsContractModalOpen(false);
       } catch (e) {
           console.error("Error creating contract:", e);
+          alert("Erro ao salvar contrato no servidor. Por favor, tente novamente.");
       }
-      setIsContractModalOpen(false);
   }
   const handleContractUpdate = async (data: ContractRecord) => {
       try {
@@ -547,10 +548,11 @@ const Dashboard: React.FC<DashboardProps> = ({
           const updated = contracts.map(c => c.id === data.id ? data : c);
           setContracts(updated);
           safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
+          setIsContractModalOpen(false);
       } catch (e) {
           console.error("Error updating contract:", e);
+          alert("Erro ao atualizar contrato no servidor. Por favor, tente novamente.");
       }
-      setIsContractModalOpen(false);
   }
 
   const handleSaveContract = (data: ContractRecord) => {

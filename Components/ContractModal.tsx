@@ -186,7 +186,10 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     key={c.id}
                                                     type="button"
                                                     onClick={() => {
-                                                        setFormData({ ...formData, clientId: c.id, firstName: c.name, lastName: '', cpf: c.cpf });
+                                                        const nameParts = (c.name || '').split(' ');
+                                                        const firstName = nameParts[0] || '';
+                                                        const lastName = nameParts.slice(1).join(' ') || '';
+                                                        setFormData({ ...formData, clientId: c.id, firstName, lastName, cpf: c.cpf });
                                                         setIsClientDropdownOpen(false);
                                                         setClientSearchQuery('');
                                                     }}
@@ -219,8 +222,8 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                         <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
                      <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Tipo de Serviço</label>
-                        <input type="text" name="serviceType" value={formData.serviceType || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Tipo de Serviço <span className="text-red-500">*</span></label>
+                        <input type="text" name="serviceType" required value={formData.serviceType || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
 
                      <div className="md:col-span-2 mt-2">
