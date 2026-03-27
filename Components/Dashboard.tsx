@@ -107,21 +107,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                 // Atualiza o cache local apenas para emergências
                 safeSetLocalStorage('inss_records', JSON.stringify(remoteClients));
             } else {
-                // Se Supabase estiver vazio, tenta carregar local (emergência)
-                const localClients = localStorage.getItem('inss_records');
-                if (localClients) {
-                    try {
-                        setRecords(JSON.parse(localClients));
-                    } catch (e) {
-                        setRecords(INITIAL_DATA);
-                    }
-                } else {
-                    setRecords(INITIAL_DATA);
-                }
+                // Se Supabase estiver vazio, não carrega local automaticamente
+                setRecords(INITIAL_DATA);
             }
         }).catch(err => {
             console.error('Erro ao buscar do Supabase:', err);
-            // Fallback para local em caso de erro de rede
+            // Fallback para local em caso de erro de rede com aviso
+            window.alert('Aviso: Não foi possível conectar ao banco de dados. Carregando dados locais (emergência).');
             const localClients = localStorage.getItem('inss_records');
             if (localClients) {
                 try {
