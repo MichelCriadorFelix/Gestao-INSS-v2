@@ -14,6 +14,7 @@ import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaE
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from '../data';
 import LaborCalc, { CalculationRecord } from '../LaborCalc';
 import SocialSecurityCalc, { SocialSecurityData } from '../SocialSecurityCalc';
+import LZString from 'lz-string';
 
 export interface SocialSecurityCalculationRecord {
     id: string;
@@ -22,7 +23,6 @@ export interface SocialSecurityCalculationRecord {
     data: SocialSecurityData;
 }
 
-import LZString from 'lz-string';
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
 import { isUrgentDate, formatCurrency } from '../utils';
@@ -86,7 +86,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [dbError, setDbError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedType, setLastSavedType] = useState<string | null>(null);
-  const [heavyRecords, setHeavyRecords] = useState<{name: string, size: string}[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
   
@@ -101,24 +100,78 @@ const Dashboard: React.FC<DashboardProps> = ({
     const supabase = initSupabase();
 
     try {
-        // 1. Initialize with Local Data (Immediate UI response)
-        const localClients = localStorage.getItem('inss_records');
-        let fetchedClients = localClients ? JSON.parse(localClients) : INITIAL_DATA;
-        setRecords(Array.isArray(fetchedClients) ? fetchedClients : INITIAL_DATA);
+        // 1. Initialize with Supabase Data (Source of Truth)
+        supabaseService.getClients().then(remoteClients => {
+            if (remoteClients.length > 0) {
+                setRecords(remoteClients);
+                safeSetLocalStorage('inss_records', JSON.stringify(remoteClients));
+            } else {
+                // Fallback to Local Data if Supabase is empty
+                const localClients = localStorage.getItem('inss_records');
+                if (localClients) {
+                    try {
+                        setRecords(JSON.parse(localClients));
+                    } catch (e) {
+                        // Handle legacy compressed data if needed
+                        setRecords(INITIAL_DATA);
+                    }
+                } else {
+                    setRecords(INITIAL_DATA);
+                }
+            }
+        }).catch(err => {
+            console.error('Error fetching clients:', err);
+            // Fallback to Local Data on error
+            const localClients = localStorage.getItem('inss_records');
+            if (localClients) {
+                try {
+                    setRecords(JSON.parse(localClients));
+                } catch (e) {
+                    setRecords(INITIAL_DATA);
+                }
+            } else {
+                setRecords(INITIAL_DATA);
+            }
+        });
 
         const localContracts = localStorage.getItem('inss_contracts');
-        let fetchedContracts = localContracts ? JSON.parse(localContracts) : INITIAL_CONTRACTS_LIST;
+        let fetchedContracts;
+        if (localContracts) {
+            try {
+                fetchedContracts = JSON.parse(localContracts);
+            } catch (e) {
+                fetchedContracts = JSON.parse(LZString.decompressFromUTF16(localContracts) || '[]');
+            }
+        } else {
+            fetchedContracts = INITIAL_CONTRACTS_LIST;
+        }
         setContracts(Array.isArray(fetchedContracts) ? fetchedContracts : INITIAL_CONTRACTS_LIST);
 
         const localCalculations = localStorage.getItem('inss_calculations');
-        let fetchedCalculations = localCalculations ? JSON.parse(localCalculations) : [];
+        let fetchedCalculations;
+        if (localCalculations) {
+            try {
+                fetchedCalculations = JSON.parse(localCalculations);
+            } catch (e) {
+                fetchedCalculations = JSON.parse(LZString.decompressFromUTF16(localCalculations) || '[]');
+            }
+        } else {
+            fetchedCalculations = [];
+        }
         setSavedCalculations(Array.isArray(fetchedCalculations) ? fetchedCalculations : []);
 
         const localResolved = localStorage.getItem('inss_resolved_alerts');
+        let fetchedResolved;
         if (localResolved) {
-            const parsed = JSON.parse(localResolved);
-            setResolvedAlerts(Array.isArray(parsed) ? parsed : []);
+            try {
+                fetchedResolved = JSON.parse(localResolved);
+            } catch (e) {
+                fetchedResolved = JSON.parse(LZString.decompressFromUTF16(localResolved) || '[]');
+            }
+        } else {
+            fetchedResolved = [];
         }
+        setResolvedAlerts(Array.isArray(fetchedResolved) ? fetchedResolved : []);
 
         const localSocialCalculations = localStorage.getItem('social_security_calculations');
         let fetchedSocialCalculations = localSocialCalculations ? JSON.parse(localSocialCalculations) : [];
@@ -409,7 +462,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // Save Logic (Generic)
-  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts', newData: any[]) => {
+  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts', newData: any[], clientToSave?: ClientRecord) => {
       setIsSyncing(true);
       setSaveError(null);
       setLastSavedType(type);
@@ -440,48 +493,19 @@ const Dashboard: React.FC<DashboardProps> = ({
       };
 
       try {
-          if (type === 'clients') {
-              setRecords(newData);
-              safeSetLocalStorage('inss_records', JSON.stringify(newData));
-              if (supabase) {
-                  try {
-                      const jsonString = JSON.stringify(newData);
-                      const compressedData = LZString.compressToUTF16(jsonString);
-                      
-                      // Check payload size
-                      const rawSize = new Blob([compressedData]).size;
-                      const sizeInMB = (rawSize / (1024 * 1024)).toFixed(2);
-                      
-                      // Identify heavy individual records
-                      const heavy = newData.map(r => ({
-                          name: r.name || r.firstName || 'Sem nome',
-                          size: new Blob([JSON.stringify(r)]).size,
-                          record: r // Keep reference for logging
-                      }))
-                      .filter(r => r.size > 300 * 1024) // > 300KB
-                      .map(r => {
-                          console.log(`Heavy record found: ${r.name}, size: ${(r.size / 1024).toFixed(0)}KB`, r.record);
-                          return { name: r.name, size: (r.size / 1024).toFixed(0) + 'KB' };
-                      });
-                      
-                      setHeavyRecords(heavy);
-
-                      if (parseFloat(sizeInMB) > 4) {
-                          console.warn(`Payload size is large: ${sizeInMB}MB. This might cause sync errors.`);
-                      }
-
-                      const error = await upsertWithRetry({ id: 1, data: compressedData });
-                      if (error) {
-                          console.error("Sync error (clients):", error);
-                          setSaveError(`Erro de sincronização (Clientes): ${error.message || 'Timeout'}`);
-                      }
-                  } catch (e: any) {
-                      console.error("Compression or sync error (clients):", e);
-                      setSaveError("Erro de sincronização (Clientes).");
-                  }
-                  setIsSyncing(false);
-                  return;
+          if (type === 'clients' && clientToSave) {
+              // Save directly to Supabase first
+              try {
+                  await supabaseService.saveClient(clientToSave);
+                  // Update local state and cache
+                  setRecords(newData);
+                  safeSetLocalStorage('inss_records', JSON.stringify(newData));
+              } catch (e: any) {
+                  console.error("Sync error (client):", e);
+                  setSaveError(`Erro de sincronização (Cliente): ${e.message || 'Erro'}`);
               }
+              setIsSyncing(false);
+              return;
           } else if (type === 'contracts') {
               setContracts(newData);
               safeSetLocalStorage('inss_contracts', JSON.stringify(newData));
@@ -603,13 +627,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Handlers for Clients
   const handleClientCreate = (data: ClientRecord) => {
-    const newRecord = { ...data, id: Math.random().toString(36).substr(2, 9) };
-    saveData('clients', [newRecord, ...records]);
+    // Generate a numeric ID for compatibility with bigint columns (Supabase default)
+    const newRecord = { ...data, id: Date.now().toString() };
+    saveData('clients', [newRecord, ...records], newRecord);
     setIsModalOpen(false);
   };
   const handleClientUpdate = (data: ClientRecord) => {
     const updated = records.map(r => r.id === data.id ? data : r);
-    saveData('clients', updated);
+    saveData('clients', updated, data);
     setIsModalOpen(false);
   };
 
@@ -621,9 +646,17 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleClientDelete = (id: string) => {
+  const handleClientDelete = async (id: string) => {
     if (confirm('Excluir cliente permanentemente?')) {
-        saveData('clients', records.filter(r => r.id !== id));
+        const updated = records.filter(r => r.id !== id);
+        setRecords(updated);
+        safeSetLocalStorage('inss_records', JSON.stringify(updated));
+        try {
+            await supabaseService.deleteClient(id);
+        } catch (e) {
+            console.error("Error deleting client:", e);
+            setSaveError("Erro ao excluir cliente.");
+        }
     }
   };
   const handleToggleArchive = (id: string) => {
@@ -633,27 +666,32 @@ const Dashboard: React.FC<DashboardProps> = ({
       const action = newValue ? 'arquivar' : 'restaurar';
       
       if (confirm(`Deseja realmente ${action} este cliente?`)) {
-          const updated = records.map(r => r.id === id ? { ...r, isArchived: newValue } : r);
-          saveData('clients', updated);
+          const updatedRecord = { ...record, isArchived: newValue };
+          const updated = records.map(r => r.id === id ? updatedRecord : r);
+          saveData('clients', updated, updatedRecord);
       }
   }
 
   const toggleDailyAttention = (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
+      let updatedRecord: ClientRecord | null = null;
       const updated = records.map(r => {
           if (r.id === id) {
               // Cycle: None -> Yellow (Daily) -> Red (Urgent) -> None
               if (!r.isDailyAttention && !r.isUrgentAttention) {
-                  return { ...r, isDailyAttention: true, isUrgentAttention: false };
+                  updatedRecord = { ...r, isDailyAttention: true, isUrgentAttention: false };
               } else if (r.isDailyAttention) {
-                  return { ...r, isDailyAttention: false, isUrgentAttention: true };
+                  updatedRecord = { ...r, isDailyAttention: false, isUrgentAttention: true };
               } else {
-                  return { ...r, isDailyAttention: false, isUrgentAttention: false };
+                  updatedRecord = { ...r, isDailyAttention: false, isUrgentAttention: false };
               }
+              return updatedRecord;
           }
           return r;
       });
-      saveData('clients', updated);
+      if (updatedRecord) {
+          saveData('clients', updated, updatedRecord);
+      }
   }
 
   // Handlers for Contracts
@@ -766,8 +804,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           updatedPetitions = [petition, ...existingPetitions];
       }
 
-      const updatedClients = records.map(c => c.id === clientId ? { ...c, petitions: updatedPetitions } : c);
-      saveData('clients', updatedClients);
+      const updatedClient = { ...client, petitions: updatedPetitions };
+      const updatedClients = records.map(c => c.id === clientId ? updatedClient : c);
+      saveData('clients', updatedClients, updatedClient);
       
       if (!activePetition || activePetition.id === petition.id || !activePetition.id) {
           setActivePetition(petition);
@@ -792,7 +831,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         setRecords(updatedClients);
         
         // Persist to storage
-        await saveData('clients', updatedClients);
+        await saveData('clients', updatedClients, updatedClient);
     };
 
   const handleOpenPetition = (petition: any) => {
@@ -1110,12 +1149,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             Limpar
                           </button>
-                      </div>
-                 ) : heavyRecords.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                          <span className="text-xs text-amber-500 flex items-center gap-1 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-100 dark:border-amber-800" title={`Registros pesados: ${heavyRecords.map(r => `${r.name} (${r.size})`).join(', ')}`}>
-                              <ExclamationTriangleIcon className="h-3 w-3" /> Base Pesada
-                          </span>
                       </div>
                  ) : isCloudConfigured ? (
                      <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>

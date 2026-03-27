@@ -209,27 +209,107 @@ export const supabaseService = {
   async saveClient(client: any) {
     if (!supabase) return null;
     
-    const compressedData = LZString.compressToUTF16(JSON.stringify(client));
-    
+    // Garantir que o ID seja uma string válida e não nula
+    const clientId = String(client.id || Date.now());
+
+    // Map to new schema
+    const record = {
+      id: clientId,
+      name: client.name || 'Sem Nome', // Evita 'EMPTY'
+      cpf: client.cpf || '',
+      password: client.password || '',
+      nationality: client.nationality,
+      marital_status: client.maritalStatus,
+      profession: client.profession,
+      type: client.type || 'Cliente',
+      der: client.der,
+      med_expertise_date: client.medExpertiseDate,
+      social_expertise_date: client.socialExpertiseDate,
+      extension_date: client.extensionDate,
+      dcb_date: client.dcbDate,
+      ninety_days_date: client.ninetyDaysDate,
+      security_mandate_date: client.securityMandateDate,
+      address: client.address,
+      legal_representative: client.legalRepresentative,
+      legal_representative_cpf: client.legalRepresentativeCpf,
+      legal_representative_marital_status: client.legalRepresentativeMaritalStatus,
+      legal_representative_profession: client.legalRepresentativeProfession,
+      legal_representative_address: client.legalRepresentativeAddress,
+      is_daily_attention: !!client.isDailyAttention,
+      is_urgent_attention: !!client.isUrgentAttention,
+      is_archived: !!client.isArchived,
+      is_referral: !!client.isReferral,
+      referrer_name: client.referrerName,
+      referrer_percentage: client.referrerPercentage || 0,
+      total_fee: client.totalFee || 0,
+      documents: client.documents || [],
+      petitions: client.petitions || []
+    };
+
+    console.log('Salvando cliente no Supabase:', record);
+
     const { data, error } = await supabase
-      .from('clients')
-      .upsert({
-        id: client.id,
-        data: compressedData
-      });
+      .from('clients_v2')
+      .upsert(record);
       
     if (error) {
-      console.error('Error saving client to Supabase:', error);
+      console.error('Erro detalhado ao salvar cliente no Supabase:', error);
       throw error;
     }
     return data;
+  },
+
+  async getClients() {
+    if (!supabase) return [];
+    
+    const { data, error } = await supabase
+      .from('clients_v2')
+      .select('*');
+      
+    if (error) {
+      console.error('Error fetching clients from Supabase:', error);
+      return [];
+    }
+    
+    return (data || []).map(c => ({
+      id: String(c.id),
+      name: c.name,
+      cpf: c.cpf,
+      password: c.password,
+      nationality: c.nationality,
+      maritalStatus: c.marital_status,
+      profession: c.profession,
+      type: c.type,
+      der: c.der,
+      medExpertiseDate: c.med_expertise_date,
+      socialExpertiseDate: c.social_expertise_date,
+      extensionDate: c.extension_date,
+      dcbDate: c.dcb_date,
+      ninetyDaysDate: c.ninety_days_date,
+      securityMandateDate: c.security_mandate_date,
+      address: c.address,
+      legalRepresentative: c.legal_representative,
+      legalRepresentativeCpf: c.legal_representative_cpf,
+      legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
+      legalRepresentativeProfession: c.legal_representative_profession,
+      legalRepresentativeAddress: c.legal_representative_address,
+      isDailyAttention: c.is_daily_attention,
+      isUrgentAttention: c.is_urgent_attention,
+      isArchived: c.is_archived,
+      isReferral: c.is_referral,
+      referrerName: c.referrer_name,
+      referrerPercentage: c.referrer_percentage,
+      totalFee: c.total_fee,
+      documents: c.documents,
+      petitions: c.petitions
+    }));
   },
 
   async deleteClient(id: string) {
     if (!supabase) return null;
     
     const { error } = await supabase
-      .from('clients')
+      .from('clients_v2')
       .delete()
       .eq('id', id);
       
