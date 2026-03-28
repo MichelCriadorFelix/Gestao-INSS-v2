@@ -9,17 +9,21 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
         if (!type) return [];
         
         // 12 months array (0-11)
-        const data = Array(12).fill(null).map(() => ({ total: 0, payments: [] as { client: string, day: string, amount: number, fullAmount: number }[] }));
+        const data = Array(12).fill(null).map(() => ({ total: 0, payments: [] as { client: string, date: string, amount: number, fullAmount: number }[] }));
 
         contracts.forEach(contract => {
             (contract.payments || []).forEach(payment => {
                 if (!payment.isPaid) return;
 
-                const parts = payment.date.split('-'); // YYYY-MM-DD
+                // Use dueDate as primary reference if available, fallback to date
+                const referenceDate = payment.dueDate || payment.date;
+                if (!referenceDate) return;
+
+                const parts = referenceDate.split('-'); // YYYY-MM-DD
                 const pYear = parseInt(parts[0]);
                 const pMonth = parseInt(parts[1]) - 1; 
 
-                if (pYear === year && pMonth >= 0 && pMonth < 12) {
+                if ((year === 0 || pYear === year) && pMonth >= 0 && pMonth < 12) {
                     let amount = payment.amount;
                     let displayAmount = amount;
 
@@ -36,7 +40,7 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
                         data[pMonth].total += displayAmount;
                         data[pMonth].payments.push({
                             client: `${contract.firstName} ${contract.lastName}`,
-                            day: parts[2],
+                            date: referenceDate,
                             amount: displayAmount,
                             fullAmount: amount
                         });
@@ -44,6 +48,12 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
                 }
             });
         });
+        
+        // Sort payments within each month by date
+        data.forEach(m => {
+            m.payments.sort((a, b) => b.date.localeCompare(a.date));
+        });
+
         return data;
     }, [contracts, year, type]);
 
@@ -55,9 +65,10 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
     ];
 
     const getTitle = () => {
-        if (type === 'revenue') return `Receita Total - ${year}`;
-        if (type === 'michel') return `Lucro Dr. Michel - ${year}`;
-        if (type === 'luana') return `Lucro Dra. Luana - ${year}`;
+        const period = year === 0 ? 'Todos os Períodos' : year;
+        if (type === 'revenue') return `Receita Total - ${period}`;
+        if (type === 'michel') return `Lucro Dr. Michel - ${period}`;
+        if (type === 'luana') return `Lucro Dra. Luana - ${period}`;
         return '';
     };
 
@@ -94,14 +105,21 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
                                     <span className="font-mono font-bold text-lg">{formatCurrency(month.total)}</span>
                                 </div>
                                 <div className="space-y-1.5 pl-2">
-                                    {month.payments.map((p, pIdx) => (
-                                        <div key={pIdx} className="flex justify-between text-xs items-center">
-                                            <span className="text-slate-700 dark:text-slate-300 font-medium">
-                                                {p.day}/{String(idx + 1).padStart(2, '0')} - {p.client}
-                                            </span>
-                                            <span className="font-mono opacity-80">{formatCurrency(p.amount)}</span>
-                                        </div>
-                                    ))}
+                                    {month.payments.map((p, pIdx) => {
+                                        const dateParts = p.date.split('-');
+                                        const displayDate = year === 0 
+                                            ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`
+                                            : `${dateParts[2]}/${dateParts[1]}`;
+                                            
+                                        return (
+                                            <div key={pIdx} className="flex justify-between text-xs items-center">
+                                                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                                                    {displayDate} - {p.client}
+                                                </span>
+                                                <span className="font-mono opacity-80">{formatCurrency(p.amount)}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )

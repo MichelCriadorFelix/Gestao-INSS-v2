@@ -298,12 +298,14 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                             <div className="flex items-center gap-1">
                               <button 
                                 onClick={() => handleToggleResolve(event)}
+                                disabled={event.isVirtual}
                                 className={`p-1.5 rounded-md transition-colors ${
+                                  event.isVirtual ? 'opacity-30 cursor-not-allowed bg-slate-100 text-slate-400' :
                                   isResolved 
                                     ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300' 
                                     : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300'
                                 }`}
-                                title={isResolved ? "Reabrir compromisso" : "Marcar como resolvido"}
+                                title={event.isVirtual ? "Evento automático (não editável)" : (isResolved ? "Reabrir compromisso" : "Marcar como resolvido")}
                               >
                                 {isResolved ? (
                                   <ArrowUturnLeftIcon className="h-4 w-4" />
@@ -313,8 +315,9 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                               </button>
                               <button 
                                 onClick={() => onDeleteEvent(event.id)}
-                                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                                title="Excluir compromisso"
+                                disabled={event.isVirtual}
+                                className={`p-1.5 rounded-md transition-colors ${event.isVirtual ? 'opacity-30 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}
+                                title={event.isVirtual ? "Evento automático (não excluível)" : "Excluir compromisso"}
                               >
                                 <TrashIcon className="h-4 w-4 opacity-70 hover:opacity-100 text-red-600 dark:text-red-400" />
                               </button>
@@ -328,6 +331,11 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                             <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${STATUS_LABELS[status].color}`}>
                               {STATUS_LABELS[status].label}
                             </span>
+                            {event.isVirtual && (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                Automático
+                              </span>
+                            )}
                           </div>
                           
                           {(event.clientName || event.clientId) && (

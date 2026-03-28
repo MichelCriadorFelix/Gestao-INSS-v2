@@ -123,8 +123,47 @@ const Dashboard: React.FC<DashboardProps> = ({
         setDrMichelSessions(remoteMichel || []);
         setDraLuanaSessions(remoteLuana || []);
 
-        setAgendaEvents([]);
-        setCustomLaws([]);
+        // Fetch global data from 'clients' table (used as KV store)
+        if (supabase) {
+          const { data: globalData, error: globalError } = await supabase
+            .from('clients')
+            .select('id, data')
+            .in('id', [7, 8, 9]);
+
+        if (!globalError && globalData) {
+            const agenda = globalData.find(d => d.id === 7)?.data;
+            if (agenda) setAgendaEvents(agenda);
+            else {
+                const localAgenda = localStorage.getItem('agenda_events');
+                if (localAgenda) setAgendaEvents(JSON.parse(localAgenda));
+            }
+            
+            const resolved = globalData.find(d => d.id === 8)?.data;
+            if (resolved) setResolvedAlerts(resolved);
+            else {
+                const localResolved = localStorage.getItem('inss_resolved_alerts');
+                if (localResolved) setResolvedAlerts(JSON.parse(localResolved));
+            }
+
+            const laws = globalData.find(d => d.id === 9)?.data;
+            if (laws) setCustomLaws(laws);
+            else {
+                const localLaws = localStorage.getItem('custom_laws');
+                if (localLaws) setCustomLaws(JSON.parse(localLaws));
+            }
+        }
+    } else {
+            // Fallback to local storage if global fetch fails or no data in cloud
+            const localAgenda = localStorage.getItem('agenda_events');
+            if (localAgenda) setAgendaEvents(JSON.parse(localAgenda));
+            
+            const localResolved = localStorage.getItem('inss_resolved_alerts');
+            if (localResolved) setResolvedAlerts(JSON.parse(localResolved));
+
+            const localLaws = localStorage.getItem('custom_laws');
+            if (localLaws) setCustomLaws(JSON.parse(localLaws));
+        }
+
         setIsLoading(false);
     } catch (err) {
         console.error("Exception in fetchData:", err);
@@ -176,6 +215,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                              if (Array.isArray(newData)) {
                                  setContracts(newData);
                                  safeSetLocalStorage('inss_contracts', JSON.stringify(newData));
+                             }
+                         } else if (payload.new.id === 7) {
+                             if (Array.isArray(payload.new.data)) {
+                                 setAgendaEvents(payload.new.data);
+                                 safeSetLocalStorage('agenda_events', JSON.stringify(payload.new.data));
                              }
                          } else if (payload.new.id === 8) {
                              if (Array.isArray(payload.new.data)) {
@@ -674,6 +718,40 @@ const Dashboard: React.FC<DashboardProps> = ({
       safeSetLocalStorage('dra_luana_sessions', JSON.stringify(sessions));
   };
 
+  // Merge virtual events from clients into agenda
+  const mergedAgendaEvents = useMemo(() => {
+    const virtualEvents: AgendaEvent[] = [];
+    
+    records.forEach(r => {
+      if (r.isArchived) return;
+
+      const addVirtual = (date: string | undefined, type: 'perícia' | 'prazo' | 'outro', description: string) => {
+        if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          virtualEvents.push({
+            id: `v-${r.id}-${type}-${date}`,
+            date,
+            time: '00:00',
+            type,
+            description,
+            clientId: r.id,
+            clientName: r.name,
+            status: 'pending',
+            isVirtual: true
+          });
+        }
+      };
+
+      addVirtual(r.medExpertiseDate, 'perícia', 'Perícia Médica (Automático)');
+      addVirtual(r.socialExpertiseDate, 'perícia', 'Perícia Social (Automático)');
+      addVirtual(r.extensionDate, 'prazo', 'Prorrogação (Automático)');
+      addVirtual(r.securityMandateDate, 'prazo', 'Mandado de Segurança (Automático)');
+      addVirtual(r.dcbDate, 'prazo', 'DCB (Automático)');
+      addVirtual(r.ninetyDaysDate, 'prazo', '90 Dias (Automático)');
+    });
+
+    return [...agendaEvents, ...virtualEvents];
+  }, [agendaEvents, records]);
+
   const handleSaveAgendaEvent = (event: AgendaEvent) => {
       const existing = agendaEvents.find(e => e.id === event.id);
       let updated;
@@ -1089,7 +1167,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <Legislation customLaws={customLaws} onSaveCustomLaws={handleSaveCustomLaws} />
              ) : currentView === 'agenda' ? (
                  <Agenda 
-                    events={agendaEvents}
+                    events={mergedAgendaEvents}
                     clients={records}
                     onSaveEvent={handleSaveAgendaEvent}
                     onDeleteEvent={handleDeleteAgendaEvent}
@@ -1461,7 +1539,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <AgendaModal 
             isOpen={isAgendaModalOpen}
             onClose={() => setIsAgendaModalOpen(false)}
-            events={agendaEvents}
+            events={mergedAgendaEvents}
             onUpdateEvent={handleSaveAgendaEvent}
         />
       </div>

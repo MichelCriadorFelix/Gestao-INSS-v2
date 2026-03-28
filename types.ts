@@ -17,6 +17,7 @@ export interface AgendaEvent {
   description: string;
   status?: 'pending' | 'resolved' | 'cancelled';
   resolvedAt?: string;
+  isVirtual?: boolean;
 }
 
 export interface Petition {

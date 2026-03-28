@@ -86,7 +86,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         if (!newPaymentAmount || Number(newPaymentAmount) <= 0) return;
         const payment: PaymentEntry = {
             id: Math.random().toString(36).substr(2, 9),
-            date: newPaymentDate,
+            date: newPaymentDueDate, // Sync date with dueDate for consistent reporting
             dueDate: newPaymentDueDate,
             amount: Number(newPaymentAmount),
             isPaid: false,
@@ -326,7 +326,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     type="date" 
                                                     value={p.dueDate || p.date || new Date().toISOString().split('T')[0]} 
                                                     onChange={(e) => {
-                                                        const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, dueDate: e.target.value} : pay);
+                                                        const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, dueDate: e.target.value, date: e.target.value} : pay);
                                                         setFormData({...formData, payments: updatedPayments});
                                                     }}
                                                     className="text-[10px] text-slate-500 uppercase bg-transparent border-none p-0 focus:ring-0"

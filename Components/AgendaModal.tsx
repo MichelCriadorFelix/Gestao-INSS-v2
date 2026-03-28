@@ -98,25 +98,33 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, onUp
                       {event.description}
                     </p>
 
-                    <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700/50">
-                      <button
-                        onClick={() => handleResolve(event, 'resolved')}
-                        className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
-                      >
-                        Resolvido
-                      </button>
-                      <button
-                        onClick={() => {
-                          const newDate = prompt('Nova data (AAAA-MM-DD):', event.date);
-                          if (newDate && newDate !== event.date) {
-                            handleResolve(event, 'pending', newDate);
-                          }
-                        }}
-                        className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
-                      >
-                        Mudar Data
-                      </button>
-                    </div>
+                    {!event.isVirtual ? (
+                      <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700/50">
+                        <button
+                          onClick={() => handleResolve(event, 'resolved')}
+                          className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                        >
+                          Resolvido
+                        </button>
+                        <button
+                          onClick={() => {
+                            const newDate = prompt('Nova data (AAAA-MM-DD):', event.date);
+                            if (newDate && newDate !== event.date) {
+                              handleResolve(event, 'pending', newDate);
+                            }
+                          }}
+                          className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 rounded-lg hover:bg-primary-200 dark:hover:bg-primary-900/50 transition-colors"
+                        >
+                          Mudar Data
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex justify-center">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 italic">
+                          Compromisso Automático (Não Editável)
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
