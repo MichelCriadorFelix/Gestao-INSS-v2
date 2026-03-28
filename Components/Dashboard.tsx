@@ -25,7 +25,7 @@ export interface SocialSecurityCalculationRecord {
 
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
-import { isUrgentDate, formatCurrency } from '../utils';
+import { isUrgentDate, formatCurrency, parseDate } from '../utils';
 import { parseISO, differenceInDays, startOfDay } from 'date-fns';
 import StatsCards from './StatsCards';
 import ReferralModal from './ReferralModal';
@@ -725,11 +725,30 @@ const Dashboard: React.FC<DashboardProps> = ({
     records.forEach(r => {
       if (r.isArchived) return;
 
-      const addVirtual = (date: string | undefined, type: 'perícia' | 'prazo' | 'outro', description: string) => {
-        if (date && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const addVirtual = (dateStr: string | undefined, type: 'perícia' | 'prazo' | 'outro', description: string, fieldKey: string) => {
+        if (!dateStr) return;
+
+        let isoDate = '';
+        
+        // Check if it's already YYYY-MM-DD
+        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          isoDate = dateStr;
+        } 
+        // Check if it's DD/MM/YYYY (handles 1 or 2 digits for day/month)
+        else if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+          const parsed = parseDate(dateStr);
+          if (parsed) {
+            const year = parsed.getFullYear();
+            const month = String(parsed.getMonth() + 1).padStart(2, '0');
+            const day = String(parsed.getDate()).padStart(2, '0');
+            isoDate = `${year}-${month}-${day}`;
+          }
+        }
+
+        if (isoDate) {
           virtualEvents.push({
-            id: `v-${r.id}-${type}-${date}`,
-            date,
+            id: `v-${r.id}-${fieldKey}`,
+            date: isoDate,
             time: '00:00',
             type,
             description,
@@ -741,15 +760,19 @@ const Dashboard: React.FC<DashboardProps> = ({
         }
       };
 
-      addVirtual(r.medExpertiseDate, 'perícia', 'Perícia Médica (Automático)');
-      addVirtual(r.socialExpertiseDate, 'perícia', 'Perícia Social (Automático)');
-      addVirtual(r.extensionDate, 'prazo', 'Prorrogação (Automático)');
-      addVirtual(r.securityMandateDate, 'prazo', 'Mandado de Segurança (Automático)');
-      addVirtual(r.dcbDate, 'prazo', 'DCB (Automático)');
-      addVirtual(r.ninetyDaysDate, 'prazo', '90 Dias (Automático)');
+      addVirtual(r.medExpertiseDate, 'perícia', 'Perícia Médica (Automático)', 'medExpertiseDate');
+      addVirtual(r.socialExpertiseDate, 'perícia', 'Perícia Social (Automático)', 'socialExpertiseDate');
+      addVirtual(r.extensionDate, 'prazo', 'Prorrogação (Automático)', 'extensionDate');
+      addVirtual(r.securityMandateDate, 'prazo', 'Mandado de Segurança (Automático)', 'securityMandateDate');
+      addVirtual(r.dcbDate, 'prazo', 'DCB (Automático)', 'dcbDate');
+      addVirtual(r.ninetyDaysDate, 'prazo', '90 Dias (Automático)', 'ninetyDaysDate');
     });
 
-    return [...agendaEvents, ...virtualEvents];
+    // Filter out virtual events that have been overridden or "deleted" (cancelled) in agendaEvents
+    const manualIds = new Set(agendaEvents.map(e => e.id));
+    const filteredVirtual = virtualEvents.filter(v => !manualIds.has(v.id));
+
+    return [...agendaEvents, ...filteredVirtual];
   }, [agendaEvents, records]);
 
   const handleSaveAgendaEvent = (event: AgendaEvent) => {
@@ -819,6 +842,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleDeleteAgendaEvent = (id: string) => {
       if (confirm('Excluir este compromisso?')) {
+          const isVirtual = id.startsWith('v-');
+          if (isVirtual) {
+              const virtualEvent = mergedAgendaEvents.find(e => e.id === id);
+              if (virtualEvent) {
+                  const updated = [...agendaEvents, { ...virtualEvent, status: 'cancelled' }];
+                  saveData('agenda', updated);
+                  return;
+              }
+          }
           saveData('agenda', agendaEvents.filter(e => e.id !== id));
       }
   };
@@ -1169,6 +1201,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <Agenda 
                     events={mergedAgendaEvents}
                     clients={records}
+                    user={user}
                     onSaveEvent={handleSaveAgendaEvent}
                     onDeleteEvent={handleDeleteAgendaEvent}
                  />
@@ -1540,6 +1573,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             isOpen={isAgendaModalOpen}
             onClose={() => setIsAgendaModalOpen(false)}
             events={mergedAgendaEvents}
+            user={user}
             onUpdateEvent={handleSaveAgendaEvent}
         />
       </div>

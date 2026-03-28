@@ -29,11 +29,13 @@ import {
   CheckIcon,
   ArrowUturnLeftIcon
 } from '@heroicons/react/24/outline';
-import { AgendaEvent, ClientRecord } from '../types';
+import { AgendaEvent, ClientRecord, User } from '../types';
+import ResolutionNoteModal from './ResolutionNoteModal';
 
 interface AgendaProps {
   events: AgendaEvent[];
   clients: ClientRecord[];
+  user: User;
   onSaveEvent: (event: AgendaEvent) => void;
   onDeleteEvent: (id: string) => void;
 }
@@ -52,17 +54,20 @@ const STATUS_LABELS = {
   'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
 };
 
-const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteEvent }) => {
+const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onDeleteEvent }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isResolutionModalOpen, setIsResolutionModalOpen] = useState(false);
+  const [eventToResolve, setEventToResolve] = useState<AgendaEvent | null>(null);
   
   // Form State
   const [formData, setFormData] = useState<Partial<AgendaEvent>>({
     type: 'atendimento',
     time: '09:00',
     description: '',
+    location: '',
     clientName: ''
   });
   const [clientSearch, setClientSearch] = useState('');
@@ -77,15 +82,23 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
     setIsFormOpen(false);
   };
 
-  const handleOpenForm = () => {
-    setFormData({
-      type: 'atendimento',
-      time: '09:00',
-      description: '',
-      clientName: '',
-      clientId: undefined
-    });
-    setClientSearch('');
+  const handleOpenForm = (event?: AgendaEvent) => {
+    if (event) {
+      setFormData({
+        ...event
+      });
+      setClientSearch(event.clientName || '');
+    } else {
+      setFormData({
+        type: 'atendimento',
+        time: '09:00',
+        description: '',
+        location: '',
+        clientName: '',
+        clientId: undefined
+      });
+      setClientSearch('');
+    }
     setIsFormOpen(true);
   };
 
@@ -93,13 +106,16 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
     if (!selectedDate || !formData.type || !formData.time) return;
     
     const newEvent: AgendaEvent = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: formData.id || Math.random().toString(36).substr(2, 9),
       date: format(selectedDate, 'yyyy-MM-dd'),
       time: formData.time,
       type: formData.type as any,
       description: formData.description || '',
+      location: formData.location || '',
       clientId: formData.clientId,
-      clientName: formData.clientId ? clients.find(c => c.id === formData.clientId)?.name : formData.clientName
+      clientName: formData.clientId ? clients.find(c => c.id === formData.clientId)?.name : formData.clientName,
+      status: formData.status || 'pending',
+      resolvedAt: formData.resolvedAt
     };
 
     onSaveEvent(newEvent);
@@ -110,11 +126,35 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
 
   const handleToggleResolve = (event: AgendaEvent) => {
     const isResolved = event.status === 'resolved';
+    if (isResolved) {
+        // Se já estiver resolvido, volta para pendente e limpa a nota
+        onSaveEvent({
+          ...event,
+          status: 'pending',
+          resolvedAt: undefined,
+          resolvedBy: undefined,
+          resolutionNote: undefined
+        });
+    } else {
+        // Se estiver pendente, abre o modal para escrever a nota
+        setEventToResolve(event);
+        setIsResolutionModalOpen(true);
+    }
+  };
+
+  const handleConfirmResolution = (note: string) => {
+    if (!eventToResolve) return;
+    
     onSaveEvent({
-      ...event,
-      status: isResolved ? 'pending' : 'resolved',
-      resolvedAt: isResolved ? undefined : new Date().toISOString()
+      ...eventToResolve,
+      status: 'resolved',
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: `${user.firstName} ${user.lastName}`,
+      resolutionNote: note
     });
+    
+    setIsResolutionModalOpen(false);
+    setEventToResolve(null);
   };
 
   const filteredClients = useMemo(() => {
@@ -173,7 +213,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
         formattedDate = format(day, 'd');
         const cloneDay = day;
         const dateStr = format(day, 'yyyy-MM-dd');
-        const dayEvents = events.filter(e => e.date === dateStr).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        const dayEvents = events.filter(e => e.date === dateStr && e.status !== 'cancelled').sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         const isToday = isSameDay(day, new Date());
         const isSelected = selectedDate && isSameDay(day, selectedDate);
         const pendingEvents = dayEvents.filter(e => e.status !== 'resolved' && e.status !== 'cancelled');
@@ -240,7 +280,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
     if (!selectedDate) return null;
     
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const dayEvents = events.filter(e => e.date === dateStr).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const dayEvents = events.filter(e => e.date === dateStr && e.status !== 'cancelled').sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
     return (
       <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out z-50 ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -265,7 +305,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
             {!isFormOpen ? (
               <>
                 <button 
-                  onClick={handleOpenForm}
+                  onClick={() => handleOpenForm()}
                   className="w-full mb-6 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 rounded-xl font-medium transition-colors shadow-sm shadow-primary-500/20"
                 >
                   <PlusIcon className="h-5 w-5" />
@@ -297,15 +337,20 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                             </div>
                             <div className="flex items-center gap-1">
                               <button 
+                                onClick={() => handleOpenForm(event)}
+                                className="p-1.5 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                                title="Editar compromisso"
+                              >
+                                <TagIcon className="h-4 w-4 opacity-70" />
+                              </button>
+                              <button 
                                 onClick={() => handleToggleResolve(event)}
-                                disabled={event.isVirtual}
                                 className={`p-1.5 rounded-md transition-colors ${
-                                  event.isVirtual ? 'opacity-30 cursor-not-allowed bg-slate-100 text-slate-400' :
                                   isResolved 
                                     ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300' 
                                     : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300'
                                 }`}
-                                title={event.isVirtual ? "Evento automático (não editável)" : (isResolved ? "Reabrir compromisso" : "Marcar como resolvido")}
+                                title={isResolved ? "Reabrir compromisso" : "Marcar como resolvido"}
                               >
                                 {isResolved ? (
                                   <ArrowUturnLeftIcon className="h-4 w-4" />
@@ -315,9 +360,8 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                               </button>
                               <button 
                                 onClick={() => onDeleteEvent(event.id)}
-                                disabled={event.isVirtual}
-                                className={`p-1.5 rounded-md transition-colors ${event.isVirtual ? 'opacity-30 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`}
-                                title={event.isVirtual ? "Evento automático (não excluível)" : "Excluir compromisso"}
+                                className="p-1.5 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                                title="Excluir compromisso"
                               >
                                 <TrashIcon className="h-4 w-4 opacity-70 hover:opacity-100 text-red-600 dark:text-red-400" />
                               </button>
@@ -345,10 +389,31 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                             </div>
                           )}
                           
+                          {event.location && (
+                            <div className={`text-sm font-medium mt-1 flex items-center gap-2 ${isResolved ? 'opacity-60' : ''}`}>
+                              <TagIcon className="h-4 w-4 opacity-70" />
+                              {event.location}
+                            </div>
+                          )}
+                          
                           {event.description && (
                             <div className={`text-sm opacity-90 mt-2 whitespace-pre-wrap flex items-start gap-2 ${isResolved ? 'opacity-50' : ''}`}>
                               <DocumentTextIcon className="h-4 w-4 opacity-70 mt-0.5 shrink-0" />
                               <p>{event.description}</p>
+                            </div>
+                          )}
+
+                          {isResolved && event.resolutionNote && (
+                            <div className="mt-3 bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                              <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <CheckIcon className="h-3 w-3" />
+                                Conclusão
+                              </p>
+                              <p className="text-xs text-slate-700 dark:text-slate-300 italic">"{event.resolutionNote}"</p>
+                              <div className="mt-2 flex justify-between items-center text-[9px] text-slate-400 font-medium">
+                                <span>Por: {event.resolvedBy}</span>
+                                <span>{event.resolvedAt && format(parseISO(event.resolvedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -360,7 +425,9 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
             ) : (
               <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-bold text-lg text-slate-800 dark:text-white">Adicionar Compromisso</h4>
+                  <h4 className="font-bold text-lg text-slate-800 dark:text-white">
+                    {formData.id ? 'Editar Compromisso' : 'Adicionar Compromisso'}
+                  </h4>
                   <button onClick={() => setIsFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancelar</button>
                 </div>
 
@@ -384,13 +451,40 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
                   </div>
                 </div>
 
-                {/* Horário */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Data (Apenas se estiver editando) */}
+                  {formData.id && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
+                      <input 
+                        type="date" 
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                      />
+                    </div>
+                  )}
+
+                  {/* Horário */}
+                  <div className={formData.id ? "" : "col-span-2"}>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Horário</label>
+                    <input 
+                      type="time" 
+                      value={formData.time}
+                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Local */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Horário</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Local</label>
                   <input 
-                    type="time" 
-                    value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    type="text" 
+                    placeholder="Ex: Sala 01, Fórum, Clínica..."
+                    value={formData.location || ''}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
                   />
                 </div>
@@ -489,6 +583,17 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, onSaveEvent, onDeleteE
       )}
 
       {renderSidePanel()}
+
+      <ResolutionNoteModal
+        isOpen={isResolutionModalOpen}
+        onClose={() => {
+          setIsResolutionModalOpen(false);
+          setEventToResolve(null);
+        }}
+        onConfirm={handleConfirmResolution}
+        event={eventToResolve}
+        user={user}
+      />
     </div>
   );
 };

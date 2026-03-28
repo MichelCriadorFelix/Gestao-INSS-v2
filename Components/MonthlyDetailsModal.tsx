@@ -12,8 +12,35 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
         const data = Array(12).fill(null).map(() => ({ total: 0, payments: [] as { client: string, date: string, amount: number, fullAmount: number }[] }));
 
         contracts.forEach(contract => {
+            if (type === 'total_concluded') {
+                if (contract.status !== 'Concluído' || !contract.payments || contract.payments.length === 0) return;
+                
+                const sortedPayments = [...contract.payments].sort((a, b) => a.date.localeCompare(b.date));
+                const firstPaymentDate = sortedPayments[0].date;
+                const parts = firstPaymentDate.split('-');
+                const pYear = parseInt(parts[0]);
+                const pMonth = parseInt(parts[1]) - 1;
+
+                if ((year === 0 || pYear === year) && pMonth >= 0 && pMonth < 12) {
+                    const amount = Number(contract.totalFee || 0);
+                    data[pMonth].total += amount;
+                    data[pMonth].payments.push({
+                        client: `${contract.firstName} ${contract.lastName}`,
+                        date: firstPaymentDate,
+                        amount: amount,
+                        fullAmount: amount
+                    });
+                }
+                return;
+            }
+
             (contract.payments || []).forEach(payment => {
-                if (!payment.isPaid) return;
+                // If type is portfolio, we want UNPAID payments. Otherwise, we want PAID payments.
+                if (type === 'portfolio') {
+                    if (payment.isPaid) return;
+                } else {
+                    if (!payment.isPaid) return;
+                }
 
                 // Use dueDate as primary reference if available, fallback to date
                 const referenceDate = payment.dueDate || payment.date;
@@ -69,13 +96,23 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
         if (type === 'revenue') return `Receita Total - ${period}`;
         if (type === 'michel') return `Lucro Dr. Michel - ${period}`;
         if (type === 'luana') return `Lucro Dra. Luana - ${period}`;
+        if (type === 'portfolio') return `Valor em Carteira - ${period}`;
+        if (type === 'total_concluded') return `Valor Total (Concluídos) - ${period}`;
         return '';
+    };
+
+    const getSubtitle = () => {
+        if (type === 'portfolio') return 'Detalhamento mensal dos pagamentos pendentes';
+        if (type === 'total_concluded') return 'Valor total dos honorários dos processos concluídos';
+        return 'Detalhamento mensal dos pagamentos recebidos';
     };
 
     const getThemeColor = () => {
         if (type === 'revenue') return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
         if (type === 'michel') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
         if (type === 'luana') return 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800';
+        if (type === 'portfolio') return 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800';
+        if (type === 'total_concluded') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
         return '';
     }
 
@@ -85,7 +122,7 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
                 <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                     <div>
                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{getTitle()}</h3>
-                         <p className="text-xs text-slate-500 dark:text-slate-400">Detalhamento mensal dos pagamentos recebidos</p>
+                         <p className="text-xs text-slate-500 dark:text-slate-400">{getSubtitle()}</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-lg transition">
                         <XMarkIcon className="h-6 w-6" />

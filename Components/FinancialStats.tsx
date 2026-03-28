@@ -8,7 +8,7 @@ import MonthlyDetailsModal from './MonthlyDetailsModal';
 const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-    const [activeModalType, setActiveModalType] = useState<'revenue' | 'michel' | 'luana' | null>(null);
+    const [activeModalType, setActiveModalType] = useState<'revenue' | 'michel' | 'luana' | 'portfolio' | 'total_concluded' | null>(null);
 
     // Extrair anos disponíveis nos pagamentos e na criação dos contratos
     const availableYears = useMemo(() => {
@@ -24,6 +24,13 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                         if (!isNaN(pYear)) years.add(pYear);
                     }
                 });
+
+                // Ano de conclusão (primeiro pagamento)
+                if (c.status === 'Concluído' && c.payments.length > 0) {
+                    const sorted = [...c.payments].sort((a, b) => a.date.localeCompare(b.date));
+                    const cYear = parseInt(sorted[0].date.split('-')[0]);
+                    if (!isNaN(cYear)) years.add(cYear);
+                }
             }
             // Ano de criação do contrato
             if (c.createdAt) {
@@ -41,32 +48,45 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
         let luanaIncome = 0;
         let michelPortfolio = 0;
         let luanaPortfolio = 0;
+        let totalConcludedValue = 0;
 
         contracts.forEach(c => {
-            const contractTotal = Number(c.totalFee) || 0;
             const responsible = c.lawyer;
             
-            // Get contract year from createdAt or payments or current year as fallback
-            let cYear = new Date().getFullYear();
-            if (c.createdAt) {
-                cYear = new Date(c.createdAt).getFullYear();
-            } else if (c.payments && c.payments.length > 0) {
-                cYear = new Date(c.payments[0].date).getFullYear();
-            }
-
-            // Portfolio Split (Potencial Total) - Now filtered by year if not 0
-            if (c.status === 'Concluído') {
-                if (selectedYear === 0 || cYear === selectedYear) {
-                    totalPortfolio += contractTotal;
-                    if (responsible === 'Michel') {
-                        michelPortfolio += contractTotal * 0.6;
-                        luanaPortfolio += contractTotal * 0.4;
-                    } else if (responsible === 'Luana') {
-                        luanaPortfolio += contractTotal * 0.6;
-                        michelPortfolio += contractTotal * 0.4;
-                    }
+            // Valor Total de Concluídos (Baseado no ano do primeiro pagamento)
+            if (c.status === 'Concluído' && c.payments && c.payments.length > 0) {
+                const sortedPayments = [...c.payments].sort((a, b) => a.date.localeCompare(b.date));
+                const firstPaymentDate = sortedPayments[0].date;
+                const conclusionYear = parseInt(firstPaymentDate.split('-')[0]);
+                
+                if (selectedYear === 0 || conclusionYear === selectedYear) {
+                    totalConcludedValue += Number(c.totalFee || 0);
                 }
             }
+            
+            // Portfolio Split (Potencial a Receber - Baseado nos pagamentos pendentes)
+            (c.payments || []).forEach(p => {
+                if (p.isPaid) return;
+                
+                const referenceDate = p.dueDate || p.date;
+                if (!referenceDate) return;
+
+                const parts = referenceDate.split('-');
+                const pYear = parseInt(parts[0]);
+                
+                if (selectedYear === 0 || pYear === selectedYear) {
+                    const amount = Number(p.amount);
+                    totalPortfolio += amount;
+                    
+                    if (responsible === 'Michel') {
+                        michelPortfolio += amount * 0.6;
+                        luanaPortfolio += amount * 0.4;
+                    } else if (responsible === 'Luana') {
+                        luanaPortfolio += amount * 0.6;
+                        michelPortfolio += amount * 0.4;
+                    }
+                }
+            });
 
             // Yearly Cash Flow (Baseado nos pagamentos realizados)
             (c.payments || []).forEach(p => {
@@ -89,14 +109,14 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                         michelIncome += amount * 0.6;
                         luanaIncome += amount * 0.4;
                     } else if (responsible === 'Luana') {
-                        luanaIncome += amount * 0.6;
+                        luanaPortfolio += amount * 0.6;
                         michelIncome += amount * 0.4;
                     }
                 }
             });
         });
 
-        return { totalPortfolio, yearlyIncome, michelIncome, luanaIncome, michelPortfolio, luanaPortfolio };
+        return { totalPortfolio, yearlyIncome, michelIncome, luanaIncome, michelPortfolio, luanaPortfolio, totalConcludedValue };
     }, [contracts, selectedYear]);
 
     return (
@@ -127,15 +147,38 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div 
+                    onClick={() => setActiveModalType('total_concluded')}
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-md"
+                >
+                    <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <BanknotesIcon className="h-24 w-24 text-blue-600" />
+                    </div>
+                    <div className="flex justify-between items-start">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Valor Total ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
+                        <MagnifyingGlassIcon className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(stats.totalConcludedValue)}</p>
+                    <div className="mt-3 text-[10px] text-slate-400 flex justify-between">
+                        <span>Total dos processos concluídos</span>
+                    </div>
+                </div>
+
+                <div 
+                    onClick={() => setActiveModalType('portfolio')}
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-md"
+                >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <WalletIcon className="h-24 w-24 text-indigo-600" />
                     </div>
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Valor em Carteira ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
+                    <div className="flex justify-between items-start">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Valor em Carteira ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
+                        <MagnifyingGlassIcon className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                     <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{formatCurrency(stats.totalPortfolio)}</p>
                     <div className="mt-3 text-[10px] text-slate-400 flex justify-between">
-                        <span>Potencial a receber ({selectedYear === 0 ? 'Tudo' : selectedYear})</span>
+                        <span>Potencial a receber</span>
                     </div>
                 </div>
 
@@ -151,7 +194,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                          <MagnifyingGlassIcon className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                     <p className="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-1">{formatCurrency(stats.yearlyIncome)}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">Total recebido no período selecionado</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Total recebido no período</p>
                 </div>
 
                 <div 

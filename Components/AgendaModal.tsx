@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { AgendaEvent } from '../types';
+import { AgendaEvent, User } from '../types';
+import ResolutionNoteModal from './ResolutionNoteModal';
 import { format, isAfter, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -8,11 +9,14 @@ interface AgendaModalProps {
   isOpen: boolean;
   onClose: () => void;
   events: AgendaEvent[];
+  user: User;
   onUpdateEvent: (event: AgendaEvent) => void;
 }
 
-const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, onUpdateEvent }) => {
+const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user, onUpdateEvent }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [isResolutionModalOpen, setIsResolutionModalOpen] = useState(false);
+  const [eventToResolve, setEventToResolve] = useState<AgendaEvent | null>(null);
   const itemsPerPage = 10;
 
   if (!isOpen) return null;
@@ -37,13 +41,36 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, onUp
   const paginatedEvents = upcomingEvents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleResolve = (event: AgendaEvent, status: 'resolved' | 'pending', newDate?: string) => {
+    if (status === 'resolved') {
+        setEventToResolve(event);
+        setIsResolutionModalOpen(true);
+    } else {
+        const updatedEvent: AgendaEvent = {
+          ...event,
+          status,
+          resolvedAt: undefined,
+          resolvedBy: undefined,
+          resolutionNote: undefined,
+          date: newDate || event.date
+        };
+        onUpdateEvent(updatedEvent);
+    }
+  };
+
+  const handleConfirmResolution = (note: string) => {
+    if (!eventToResolve) return;
+    
     const updatedEvent: AgendaEvent = {
-      ...event,
-      status,
-      resolvedAt: status === 'resolved' ? new Date().toISOString() : undefined,
-      date: newDate || event.date
+      ...eventToResolve,
+      status: 'resolved',
+      resolvedAt: new Date().toISOString(),
+      resolvedBy: `${user.firstName} ${user.lastName}`,
+      resolutionNote: note
     };
     onUpdateEvent(updatedEvent);
+    
+    setIsResolutionModalOpen(false);
+    setEventToResolve(null);
   };
 
   return (
@@ -151,6 +178,17 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, onUp
             </button>
           </div>
         )}
+
+        <ResolutionNoteModal
+          isOpen={isResolutionModalOpen}
+          onClose={() => {
+            setIsResolutionModalOpen(false);
+            setEventToResolve(null);
+          }}
+          onConfirm={handleConfirmResolution}
+          event={eventToResolve}
+          user={user}
+        />
       </div>
     </div>
   );

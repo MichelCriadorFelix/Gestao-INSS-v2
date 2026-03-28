@@ -15,8 +15,11 @@ export interface AgendaEvent {
   clientId?: string;
   clientName?: string;
   description: string;
+  location?: string;
   status?: 'pending' | 'resolved' | 'cancelled';
   resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNote?: string;
   isVirtual?: boolean;
 }
 
@@ -146,7 +149,7 @@ export interface MonthlyDetailsModalProps {
     onClose: () => void;
     year: number;
     contracts: ContractRecord[];
-    type: 'revenue' | 'michel' | 'luana' | null;
+    type: 'revenue' | 'michel' | 'luana' | 'portfolio' | 'total_concluded' | null;
 }
 
 export interface DashboardProps {
