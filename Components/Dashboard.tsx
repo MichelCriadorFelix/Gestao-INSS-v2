@@ -80,6 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<AgendaEvent | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -1202,6 +1203,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     events={mergedAgendaEvents}
                     clients={records}
                     user={user}
+                    eventToEdit={eventToEdit}
+                    onClearEventToEdit={() => setEventToEdit(null)}
                     onSaveEvent={handleSaveAgendaEvent}
                     onDeleteEvent={handleDeleteAgendaEvent}
                  />
@@ -1575,6 +1578,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             events={mergedAgendaEvents}
             user={user}
             onUpdateEvent={handleSaveAgendaEvent}
+            onEditEvent={(event) => {
+              setEventToEdit(event);
+              setIsAgendaModalOpen(false);
+              setCurrentView('agenda');
+            }}
         />
       </div>
     </div>

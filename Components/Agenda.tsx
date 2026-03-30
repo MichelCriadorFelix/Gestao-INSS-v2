@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   format, 
   addMonths, 
@@ -36,6 +36,8 @@ interface AgendaProps {
   events: AgendaEvent[];
   clients: ClientRecord[];
   user: User;
+  eventToEdit?: AgendaEvent | null;
+  onClearEventToEdit?: () => void;
   onSaveEvent: (event: AgendaEvent) => void;
   onDeleteEvent: (id: string) => void;
 }
@@ -54,7 +56,7 @@ const STATUS_LABELS = {
   'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
 };
 
-const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onDeleteEvent }) => {
+const Agenda: React.FC<AgendaProps> = ({ events, clients, user, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -72,6 +74,25 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onD
   });
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+
+  useEffect(() => {
+    if (eventToEdit) {
+      const eventDate = parseISO(eventToEdit.date);
+      setCurrentDate(eventDate);
+      setSelectedDate(eventDate);
+      setIsPanelOpen(true);
+      
+      setFormData({
+        ...eventToEdit
+      });
+      setClientSearch(eventToEdit.clientName || '');
+      setIsFormOpen(true);
+
+      if (onClearEventToEdit) {
+        onClearEventToEdit();
+      }
+    }
+  }, [eventToEdit, onClearEventToEdit]);
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -106,6 +127,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onD
     if (!selectedDate || !formData.type || !formData.time) return;
     
     const newEvent: AgendaEvent = {
+      ...formData,
       id: formData.id || Math.random().toString(36).substr(2, 9),
       date: format(selectedDate, 'yyyy-MM-dd'),
       time: formData.time,
@@ -115,8 +137,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onD
       clientId: formData.clientId,
       clientName: formData.clientId ? clients.find(c => c.id === formData.clientId)?.name : formData.clientName,
       status: formData.status || 'pending',
-      resolvedAt: formData.resolvedAt
-    };
+    } as AgendaEvent;
 
     onSaveEvent(newEvent);
     if (closeForm) {
@@ -412,7 +433,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, user, onSaveEvent, onD
                               <p className="text-xs text-slate-700 dark:text-slate-300 italic">"{event.resolutionNote}"</p>
                               <div className="mt-2 flex justify-between items-center text-[9px] text-slate-400 font-medium">
                                 <span>Por: {event.resolvedBy}</span>
-                                <span>{event.resolvedAt && format(parseISO(event.resolvedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
+                                <span>{event.resolvedAt && format(parseISO(event.resolvedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
                               </div>
                             </div>
                           )}

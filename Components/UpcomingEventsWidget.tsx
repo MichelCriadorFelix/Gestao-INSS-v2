@@ -43,7 +43,7 @@ const UpcomingEventsWidget: React.FC<UpcomingEventsWidgetProps> = ({ events, onG
     const date = parseISO(dateStr);
     if (isToday(date)) return 'Hoje';
     if (isTomorrow(date)) return 'Amanhã';
-    return format(date, "dd/MM", { locale: ptBR });
+    return format(date, "dd/MM/yyyy", { locale: ptBR });
   };
 
   const handleResolve = (event: AgendaEvent, status: 'resolved' | 'pending', newDate?: string) => {
