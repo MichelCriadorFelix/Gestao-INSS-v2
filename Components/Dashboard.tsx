@@ -26,7 +26,7 @@ export interface SocialSecurityCalculationRecord {
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
 import { isUrgentDate, formatCurrency, parseDate } from '../utils';
-import { parseISO, differenceInDays, startOfDay } from 'date-fns';
+import { parseISO, differenceInDays, startOfDay, format } from 'date-fns';
 import StatsCards from './StatsCards';
 import ReferralModal from './ReferralModal';
 import FinancialStats from './FinancialStats';
@@ -335,9 +335,83 @@ const Dashboard: React.FC<DashboardProps> = ({
       });
   }, [records, agendaEvents, resolvedAlerts]);
 
-  const handleResolveAlert = (id: string) => {
+  const handleResolveAlert = (id: string, skipAgendaUpdate: boolean = false) => {
       const updated = [...resolvedAlerts, id];
       saveData('resolved_alerts', updated);
+
+      if (skipAgendaUpdate) return;
+
+      // Also mark the corresponding virtual event as resolved
+      let fieldKey = '';
+      let clientId = '';
+      if (id.endsWith('_med')) { fieldKey = 'medExpertiseDate'; clientId = id.slice(0, -4); }
+      else if (id.endsWith('_soc')) { fieldKey = 'socialExpertiseDate'; clientId = id.slice(0, -4); }
+      else if (id.endsWith('_ext')) { fieldKey = 'extensionDate'; clientId = id.slice(0, -4); }
+      else if (id.endsWith('_mand')) { fieldKey = 'securityMandateDate'; clientId = id.slice(0, -5); }
+      else if (id.endsWith('_dcb')) { fieldKey = 'dcbDate'; clientId = id.slice(0, -4); }
+      else if (id.endsWith('_90d')) { fieldKey = 'ninetyDaysDate'; clientId = id.slice(0, -4); }
+
+      if (clientId && fieldKey) {
+          const eventId = `v-${clientId}-${fieldKey}`;
+          const existingEvent = agendaEvents.find(e => e.id === eventId);
+          
+          if (existingEvent) {
+              if (existingEvent.status !== 'resolved') {
+                  const updatedAgenda = agendaEvents.map(e => e.id === eventId ? { ...e, status: 'resolved' as const } : e);
+                  setAgendaEvents(updatedAgenda);
+                  saveData('agenda', updatedAgenda);
+              }
+          } else {
+              // We need to create the override
+              const client = records.find(c => c.id === clientId);
+              if (client) {
+                  const dateStr = client[fieldKey as keyof ClientRecord] as string;
+                  if (dateStr) {
+                      let isoDate = '';
+                      if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                          isoDate = dateStr;
+                      } else if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                          const parsed = parseDate(dateStr);
+                          if (parsed) {
+                              const year = parsed.getFullYear();
+                              const month = String(parsed.getMonth() + 1).padStart(2, '0');
+                              const day = String(parsed.getDate()).padStart(2, '0');
+                              isoDate = `${year}-${month}-${day}`;
+                          }
+                      }
+                      
+                      if (isoDate) {
+                          let type: 'perícia' | 'prazo' | 'outro' = 'prazo';
+                          let description = '';
+                          if (fieldKey === 'medExpertiseDate') { type = 'perícia'; description = 'Perícia Médica (Automático)'; }
+                          else if (fieldKey === 'socialExpertiseDate') { type = 'perícia'; description = 'Perícia Social (Automático)'; }
+                          else if (fieldKey === 'extensionDate') { description = 'Prorrogação (Automático)'; }
+                          else if (fieldKey === 'securityMandateDate') { description = 'Mandado de Segurança (Automático)'; }
+                          else if (fieldKey === 'dcbDate') { description = 'DCB (Automático)'; }
+                          else if (fieldKey === 'ninetyDaysDate') { description = '90 Dias (Automático)'; }
+
+                          const newEvent: AgendaEvent = {
+                              id: eventId,
+                              date: isoDate,
+                              time: '00:00',
+                              type,
+                              description,
+                              clientId: client.id,
+                              clientName: client.name,
+                              status: 'resolved',
+                              isVirtual: true,
+                              resolvedAt: new Date().toISOString(),
+                              resolvedBy: user ? `${user.firstName} ${user.lastName}` : 'Sistema'
+                          };
+                          
+                          const updatedAgenda = [...agendaEvents, newEvent];
+                          setAgendaEvents(updatedAgenda);
+                          saveData('agenda', updatedAgenda);
+                      }
+                  }
+              }
+          }
+      }
   };
 
   // Save Logic (Generic)
@@ -512,9 +586,60 @@ const Dashboard: React.FC<DashboardProps> = ({
     setIsModalOpen(false);
   };
   const handleClientUpdate = (data: ClientRecord) => {
+    const oldData = records.find(r => r.id === data.id);
     const updated = records.map(r => r.id === data.id ? data : r);
     saveData('clients', updated, data);
     setIsModalOpen(false);
+
+    // Sync date changes to agendaEvents overrides
+    if (oldData) {
+        let agendaUpdated = false;
+        const newAgendaEvents = [...agendaEvents];
+        
+        const checkAndUpdateAgenda = (fieldKey: keyof ClientRecord) => {
+            if (oldData[fieldKey] !== data[fieldKey]) {
+                const eventId = `v-${data.id}-${fieldKey}`;
+                const eventIndex = newAgendaEvents.findIndex(e => e.id === eventId);
+                if (eventIndex >= 0) {
+                    const newDateStr = data[fieldKey] as string;
+                    if (newDateStr) {
+                        let isoDate = '';
+                        if (newDateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                            isoDate = newDateStr;
+                        } else if (newDateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                            const parsed = parseDate(newDateStr);
+                            if (parsed) {
+                                const year = parsed.getFullYear();
+                                const month = String(parsed.getMonth() + 1).padStart(2, '0');
+                                const day = String(parsed.getDate()).padStart(2, '0');
+                                isoDate = `${year}-${month}-${day}`;
+                            }
+                        }
+                        if (isoDate && newAgendaEvents[eventIndex].date !== isoDate) {
+                            newAgendaEvents[eventIndex] = { ...newAgendaEvents[eventIndex], date: isoDate };
+                            agendaUpdated = true;
+                        }
+                    } else {
+                        // Date was cleared, remove the manual override so it disappears
+                        newAgendaEvents.splice(eventIndex, 1);
+                        agendaUpdated = true;
+                    }
+                }
+            }
+        };
+
+        checkAndUpdateAgenda('medExpertiseDate');
+        checkAndUpdateAgenda('socialExpertiseDate');
+        checkAndUpdateAgenda('extensionDate');
+        checkAndUpdateAgenda('securityMandateDate');
+        checkAndUpdateAgenda('dcbDate');
+        checkAndUpdateAgenda('ninetyDaysDate');
+
+        if (agendaUpdated) {
+            setAgendaEvents(newAgendaEvents);
+            saveData('agenda', newAgendaEvents);
+        }
+    }
   };
 
   const handleSaveClient = (data: ClientRecord) => {
@@ -785,6 +910,72 @@ const Dashboard: React.FC<DashboardProps> = ({
           updated = [...agendaEvents, event];
       }
       saveData('agenda', updated);
+
+      // Sincronizar com o cliente se for um evento virtual
+      if (event.id.startsWith('v-')) {
+          const parts = event.id.split('-');
+          const fieldKey = parts.pop();
+          const clientId = parts.slice(1).join('-');
+          
+          if (clientId && fieldKey) {
+              const client = records.find(c => c.id === clientId);
+              if (client) {
+                  let clientUpdated = false;
+                  const updatedClient = { ...client };
+                  
+                  // Se a data mudou, atualiza no cliente
+                  const eventDateFormatted = format(parseISO(event.date), 'dd/MM/yyyy');
+                  const currentClientDate = updatedClient[fieldKey as keyof ClientRecord];
+                  
+                  if (currentClientDate !== eventDateFormatted && currentClientDate !== event.date) {
+                      (updatedClient as any)[fieldKey] = eventDateFormatted;
+                      clientUpdated = true;
+                  }
+                  
+                  if (clientUpdated) {
+                      const updatedClients = records.map(c => c.id === clientId ? updatedClient : c);
+                      setRecords(updatedClients);
+                      saveData('clients', updatedClients, updatedClient);
+                  }
+                  
+                  // Se foi marcado como resolvido, adiciona aos alertas resolvidos
+                  if (event.status === 'resolved') {
+                      let suffix = '';
+                      if (fieldKey === 'medExpertiseDate') suffix = '_med';
+                      else if (fieldKey === 'socialExpertiseDate') suffix = '_soc';
+                      else if (fieldKey === 'extensionDate') suffix = '_ext';
+                      else if (fieldKey === 'securityMandateDate') suffix = '_mand';
+                      else if (fieldKey === 'dcbDate') suffix = '_dcb';
+                      else if (fieldKey === 'ninetyDaysDate') suffix = '_90d';
+                      
+                      if (suffix) {
+                          const alertId = clientId + suffix;
+                          if (!resolvedAlerts.includes(alertId)) {
+                              handleResolveAlert(alertId, true);
+                          }
+                      }
+                  } else if (event.status === 'pending') {
+                      // Se voltou para pendente, remove dos alertas resolvidos
+                      let suffix = '';
+                      if (fieldKey === 'medExpertiseDate') suffix = '_med';
+                      else if (fieldKey === 'socialExpertiseDate') suffix = '_soc';
+                      else if (fieldKey === 'extensionDate') suffix = '_ext';
+                      else if (fieldKey === 'securityMandateDate') suffix = '_mand';
+                      else if (fieldKey === 'dcbDate') suffix = '_dcb';
+                      else if (fieldKey === 'ninetyDaysDate') suffix = '_90d';
+                      
+                      if (suffix) {
+                          const alertId = clientId + suffix;
+                          if (resolvedAlerts.includes(alertId)) {
+                              const newAlerts = resolvedAlerts.filter(id => id !== alertId);
+                              setResolvedAlerts(newAlerts);
+                              saveData('resolved_alerts', newAlerts);
+                          }
+                      }
+                  }
+              }
+          }
+      }
   };
 
   const handleSavePetition = (clientId: string, petition: any) => {
@@ -1392,8 +1583,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 {renderDateCell(record.medExpertiseDate, record.id, '_med')}
                                                 {renderDateCell(record.socialExpertiseDate, record.id, '_soc')}
                                                 {renderDateCell(record.extensionDate, record.id, '_ext')}
-                                                {renderDateCell(record.dcbDate)}
-                                                <td className="px-4 py-3 text-xs italic text-slate-400">{record.ninetyDaysDate || '-'}</td>
+                                                {renderDateCell(record.dcbDate, record.id, '_dcb')}
+                                                <td className="px-4 py-3 text-xs italic text-slate-400">
+                                                    <div className={`flex items-center gap-1.5 ${resolvedAlerts.includes(record.id + '_90d') ? 'text-emerald-600 dark:text-emerald-400 font-medium' : ''}`}>
+                                                        {resolvedAlerts.includes(record.id + '_90d') && <CheckIcon className="h-4 w-4" />}
+                                                        {record.ninetyDaysDate || '-'}
+                                                    </div>
+                                                </td>
                                                 {renderDateCell(record.securityMandateDate, record.id, '_mand')}
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex justify-end gap-1">
