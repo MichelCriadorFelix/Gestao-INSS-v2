@@ -174,6 +174,7 @@ interface LaborData {
       isDouble: boolean;
   }[];
   claim13thProportional: boolean;
+  claim13thAdmissionProportional: boolean;
   claimVacationProportional: boolean;
   attorneyFees: number; // 5, 10, 15, 20, 25, 30%
   
@@ -249,6 +250,7 @@ const INITIAL_LABOR_DATA: LaborData = {
   unpaid13thPeriods: [],
   vacationPeriods: [],
   claim13thProportional: true,
+  claim13thAdmissionProportional: false,
   claimVacationProportional: true,
   attorneyFees: 0,
   salaryBalance: { active: true, days: 0 },
@@ -538,13 +540,12 @@ const calculateLaborResults = (calcData: LaborData) => {
 
     // 3. 13º Salário Proporcional
     if (end && salary && start) {
-        if (calcData.claim13thProportional) {
-            // 1. Proporcional do Ano de Saída
-            const endYear = end.getFullYear();
-            const startYear = start.getFullYear();
+        const endYear = end.getFullYear();
+        const startYear = start.getFullYear();
 
-            // Se entrou e saiu no mesmo ano, o cálculo é único (meses trabalhados no ano)
-            if (startYear === endYear) {
+        // Se entrou e saiu no mesmo ano, o cálculo é único (meses trabalhados no ano)
+        if (startYear === endYear) {
+            if (calcData.claim13thProportional) {
                 const months = countMonths15DayRule(start, end);
                 const thirteenth = (salary / 12) * months;
                 results.push({ 
@@ -553,7 +554,9 @@ const calculateLaborResults = (calcData: LaborData) => {
                     category: 'Rescisórias',
                     details: `Salário Base: ${formatCurrency(salary)}\nMeses Trabalhados: ${months}\nCálculo: (${formatCurrency(salary)} / 12) * ${months} = ${formatCurrency(thirteenth)}`
                 });
-            } else {
+            }
+        } else {
+            if (calcData.claim13thProportional) {
                 // Proporcional do Ano de Saída (Janeiro até Data Saída)
                 const startOfEndYear = new Date(endYear, 0, 1);
                 const monthsExitYear = countMonths15DayRule(startOfEndYear, end);
@@ -566,16 +569,9 @@ const calculateLaborResults = (calcData: LaborData) => {
                         details: `Salário Base: ${formatCurrency(salary)}\nMeses Trabalhados: ${monthsExitYear}\nCálculo: (${formatCurrency(salary)} / 12) * ${monthsExitYear} = ${formatCurrency(thirteenthExit)}`
                     });
                 }
+            }
 
-                // Proporcional do Ano de Admissão (Data Admissão até Dezembro)
-                // Verifica se o ano de admissão não está na lista de "Vencidos" (unpaid13thPeriods) para não duplicar
-                // Se o usuário marcou "Calcular Proporcional", entende-se que quer os que não foram pagos integralmente.
-                // Mas geralmente "Proporcional" na rescisão refere-se ao ano corrente.
-                // O usuário pediu explicitamente: "TEM PELO MENOS DOIS PERÍODOS PROPORCIONAIS... AO MARCAR A CAIXINHA... DEVE APARECER OS VALORES DE AMBOS"
-                
-                // Vamos verificar se o ano de admissão já foi pago (está nos vencidos? ou assume-se não pago?)
-                // Se o usuário pediu para calcular proporcional, vamos adicionar o do ano de admissão também se for diferente do ano de saída.
-                
+            if (calcData.claim13thAdmissionProportional) {
                 const isAdmissionYearPaid = calcData.unpaid13thPeriods.some(p => p.year === startYear);
                 
                 if (!isAdmissionYearPaid) {
@@ -602,16 +598,25 @@ const calculateLaborResults = (calcData: LaborData) => {
         if (calcData.unpaid13thPeriods.length > 0) {
             calcData.unpaid13thPeriods.forEach(p => {
                 // Determine reference date for salary lookup (Dec 20th of that year)
-                const refDate = new Date(p.year, (p.month || 12) - 1, 20);
+                const refDate = new Date(p.year, 11, 20);
                 const historicalSalary = getSalaryAtDate(refDate, calcData.salaryHistory, salary);
                 
-                const label = p.month ? `${String(p.month).padStart(2, '0')}/${p.year}` : `${p.year}`;
-                results.push({ 
-                    desc: `13º Salário Vencido (${label})`, 
-                    value: historicalSalary, 
-                    category: 'Rescisórias',
-                    details: `Salário Base (Histórico): ${formatCurrency(historicalSalary)}\nCálculo: Valor integral do salário da época.`
-                });
+                if (p.month && p.month < 12) {
+                    const proportionalValue = (historicalSalary / 12) * p.month;
+                    results.push({ 
+                        desc: `13º Salário Proporcional (${p.year}) - ${p.month}/12 avos`, 
+                        value: proportionalValue, 
+                        category: 'Rescisórias',
+                        details: `Salário Base (Histórico): ${formatCurrency(historicalSalary)}\nCálculo: (${formatCurrency(historicalSalary)} / 12) * ${p.month} = ${formatCurrency(proportionalValue)}`
+                    });
+                } else {
+                    results.push({ 
+                        desc: `13º Salário Vencido (${p.year})`, 
+                        value: historicalSalary, 
+                        category: 'Rescisórias',
+                        details: `Salário Base (Histórico): ${formatCurrency(historicalSalary)}\nCálculo: Valor integral do salário da época.`
+                    });
+                }
             });
         }
     }
@@ -3206,13 +3211,19 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
                                    <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">13º Salário</h4>
-                                       <label className="flex items-center gap-3 mb-2 cursor-pointer">
-                                            <input type="checkbox" checked={data.claim13thProportional} onChange={e => handleInputChange('claim13thProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
-                                            <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcional</span>
-                                       </label>
+                                       <div className="flex flex-col gap-2 mb-3">
+                                           <label className="flex items-center gap-3 cursor-pointer">
+                                                <input type="checkbox" checked={data.claim13thProportional} onChange={e => handleInputChange('claim13thProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                                <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcional (Ano Saída)</span>
+                                           </label>
+                                           <label className="flex items-center gap-3 cursor-pointer">
+                                                <input type="checkbox" checked={data.claim13thAdmissionProportional} onChange={e => handleInputChange('claim13thAdmissionProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                                <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcional (Ano Admissão)</span>
+                                           </label>
+                                       </div>
                                        <div className="mt-3">
                                            <div className="flex justify-between items-center mb-2">
-                                               <label className={STYLES.LABEL_TINY}>13º Vencidos (Mês/Ano)</label>
+                                               <label className={STYLES.LABEL_TINY}>13º Devidos (Avos/Ano)</label>
                                                <button onClick={add13thPeriod} className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-200 transition">+ Adicionar</button>
                                            </div>
                                            
@@ -3225,7 +3236,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                            <div className="flex-1 grid grid-cols-2 gap-2">
                                                                <input 
                                                                    type="number" 
-                                                                   placeholder="Mês" 
+                                                                   placeholder="Avos (1 a 12)" 
                                                                    className={`${STYLES.INPUT_TINY}`}
                                                                    value={period.month}
                                                                    onChange={e => update13thPeriod(period.id, 'month', Number(e.target.value))}
