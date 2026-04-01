@@ -121,11 +121,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               const dbIndex = mergedSessions.findIndex(s => s.id === localSession.id);
               if (dbIndex === -1) {
                 mergedSessions.push(localSession);
-              } else if (localSession.messages && mergedSessions[dbIndex].messages && localSession.messages.length > mergedSessions[dbIndex].messages.length) {
-                mergedSessions[dbIndex] = localSession;
               }
             }
-            mergedSessions.sort((a, b) => Number(b.id) - Number(a.id));
+            mergedSessions.sort((a, b) => b.id.localeCompare(a.id));
             formattedSessions = mergedSessions;
           } catch (e) {
             console.error("Error parsing local sessions:", e);

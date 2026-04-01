@@ -55,7 +55,7 @@ export const supabaseService = {
       .from('ai_conversations')
       .select('*')
       .eq('lawyer_type', aiName)
-      .order('date', { ascending: false });
+      .order('updated_at', { ascending: false });
       
     if (error) {
       console.error('Error fetching AI conversations from Supabase:', error);
@@ -104,7 +104,7 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('social_security_calculations')
       .select('*')
-      .order('date', { ascending: false });
+      .order('id', { ascending: false });
       
     if (error) {
       console.error('Error fetching calculations from Supabase:', error);
@@ -160,7 +160,7 @@ export const supabaseService = {
     const { data, error } = await supabase
       .from('labor_calculations')
       .select('*')
-      .order('date', { ascending: false });
+      .order('id', { ascending: false });
       
     if (error) {
       console.error('Error fetching labor calculations from Supabase:', error);
