@@ -805,7 +805,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
     setIsUploading(true);
     setProgress(0);
-    setProgressText(`Importando dossiê de ${client.name}...`);
+    setProgressText(`Preparando dossiê de ${client.name}...`);
     
     try {
       let activeSessionId = currentSessionId;
@@ -826,7 +826,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${client.name}**. Processando ${client.documents.length} documento(s) organizados no GED. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${client.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases, garantindo ciência integral de cada página. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -834,118 +834,24 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
       ));
 
-      let fullDossierText = `DOSSIÊ DO CLIENTE: ${client.name}\nCPF: ${client.cpf}\n\n`;
-      const newDocs: ChatDocument[] = [];
-
+      const fileArray: File[] = [];
       for (let i = 0; i < client.documents.length; i++) {
         const doc = client.documents[i];
-        const currentProgress = Math.round((i / client.documents.length) * 100);
-        setProgress(currentProgress);
-        setProgressText(`Lendo ${doc.name} (${i + 1}/${client.documents.length})...`);
-
-        let fileText = "";
-        
-        if (doc.type === 'application/pdf' && doc.url.startsWith('data:application/pdf')) {
-            try {
-                const res = await fetch(doc.url);
-                const blob = await res.blob();
-                const file = new File([blob], doc.name, { type: 'application/pdf' });
-                const result = await extractTextFromPDF(file);
-                fileText = result.text;
-            } catch (e) {
-                console.error("Erro ao extrair PDF do GED:", e);
-                fileText = "[Erro ao ler PDF]";
-            }
-        } else {
-            fileText = `[Documento de imagem: ${doc.name}]`;
+        try {
+          const res = await fetch(doc.url);
+          const blob = await res.blob();
+          const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
+          fileArray.push(file);
+        } catch (e) {
+          console.error(`Erro ao baixar documento ${doc.name}:`, e);
         }
-
-        fullDossierText += `--- DOCUMENTO ${i + 1}: ${doc.name} ---\n`;
-        if (doc.tags && doc.tags.length > 0) {
-            fullDossierText += `Etiquetas: ${doc.tags.join(', ')}\n`;
-        }
-        fullDossierText += `Conteúdo:\n${fileText.substring(0, 20000)}\n\n`;
-        
-        newDocs.push({
-            id: doc.id,
-            name: doc.name,
-            summary: `Documento importado do GED: ${doc.name}`,
-            fullText: fileText.substring(0, 50000),
-            type: doc.type || 'application/pdf'
-        });
       }
 
-      setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, documents: [...(s.documents || []), ...newDocs] } : s
-      ));
-
-      setProgressText(`Sintetizando dossiê...`);
-      const summaryPrompt = `TOME CIÊNCIA DESTE DOSSIÊ COMPLETO DO CLIENTE:
-      NOME: ${client.name}
-      
-      ${fullDossierText.substring(0, 100000)}
-      
-      INSTRUÇÃO: Forneça um resumo executivo do caso deste cliente com base nos documentos apresentados. Liste os documentos lidos e destaque os pontos principais para uma análise jurídica.`;
-
-      const response = await fetch('/api/dra-luana/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: summaryPrompt,
-          history: [], 
-          isIngestion: true
-        })
-      });
-
-      if (response.ok) {
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let summary = '';
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.text) summary += parsed.text;
-                } catch (e) {}
-              }
-            }
-          }
-        }
-
-        const summaryMsg: Message = {
-          id: generateId(),
-          role: 'assistant',
-          content: `**Dossiê Importado com Sucesso!**\n\n${summary}`,
-          timestamp: new Date().toISOString()
-        };
-
-        setSessions(prev => prev.map(s => {
-          if (s.id === activeSessionId) {
-            const newMessages = s.messages.filter(m => m.id !== readingMsg.id);
-            return { ...s, messages: [...newMessages, summaryMsg] };
-          }
-          return s;
-        }));
-        
-        pendingSyncRef.current.add(activeSessionId);
-      }
+      await processFilesPhased(fileArray, activeSessionId);
     } catch (error) {
       console.error("Error importing client:", error);
       alert("Erro ao importar cliente.");
-    } finally {
       setIsUploading(false);
-      setTimeout(() => {
-        setProgress(0);
-        setProgressText('');
-      }, 3000);
     }
   };
 
