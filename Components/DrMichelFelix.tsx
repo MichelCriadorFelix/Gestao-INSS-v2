@@ -61,6 +61,7 @@ interface DrMichelFelixProps {
 }
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
 const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSessions, onOpenPetition }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
@@ -76,6 +77,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const [pendingAudit, setPendingAudit] = useState<{
+    fileIndex: number;
+    pageIndex: number;
+    files: File[];
+    activeSessionId: string;
+  } | null>(null);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
@@ -337,6 +344,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     const messageText = overrideInput || input;
     if ((!messageText.trim() && (!images || images.length === 0)) || isLoading) return;
 
+    if (messageText.toUpperCase().includes("CONTINUAR AUDITORIA") && pendingAudit) {
+      resumeAudit();
+      setInput('');
+      return;
+    }
+
     let sessionId = currentSessionId;
     if (!sessionId) {
       const newSession: ChatSession = {
@@ -541,6 +554,183 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     }
   };
 
+  const resumeAudit = async () => {
+    if (!pendingAudit) return;
+    const { fileIndex, pageIndex, files, activeSessionId } = pendingAudit;
+    setPendingAudit(null);
+    setIsUploading(true);
+    await processFilesPhased(files, activeSessionId, fileIndex, pageIndex);
+  };
+
+  const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
+    const startTime = Date.now();
+    const CHUNK_SIZE = 5;
+
+    try {
+      for (let i = startFileIndex; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setProgressText(`Lendo ${file.name} (${i + 1}/${fileArray.length})...`);
+
+        if (file.type === 'application/pdf') {
+          const result = await extractTextFromPDF(file, (current, total, status) => {
+            const fileProgress = Math.round((current / total) * 100);
+            setProgress(Math.round(((i + (fileProgress / 100)) / fileArray.length) * 100));
+            setProgressText(`Lendo ${file.name}: ${status}`);
+          });
+
+          const totalPages = result.totalPages;
+          const pages = result.pages;
+          let fullFileText = result.text;
+          let allSummaries = "";
+          
+          const initialP = (i === startFileIndex) ? startPageIndex : 0;
+
+          for (let p = initialP; p < totalPages; p += CHUNK_SIZE) {
+            // Check global timeout
+            if (Date.now() - startTime > PHASE_TIMEOUT) {
+              const timeoutMsg: Message = {
+                id: generateId(),
+                role: 'assistant',
+                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até a página ${p} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
+                timestamp: new Date().toISOString()
+              };
+              setSessions(prev => prev.map(s => 
+                s.id === activeSessionId ? { ...s, messages: [...s.messages, timeoutMsg] } : s
+              ));
+              setPendingAudit({ fileIndex: i, pageIndex: p, files: fileArray, activeSessionId });
+              setIsUploading(false);
+              return;
+            }
+
+            const chunkPages = pages.slice(p, p + CHUNK_SIZE);
+            const chunkText = chunkPages.map(page => page.text).join('\n');
+            const chunkImages = chunkPages.map(page => page.image).filter(Boolean) as string[];
+
+            setProgressText(`Auditoria: ${file.name} (Páginas ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalPages)})...`);
+
+            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA]
+            ARQUIVO: ${file.name}
+            PÁGINAS: ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalPages)} de ${totalPages}
+            
+            CONTEÚDO:
+            ${chunkText}
+            
+            INSTRUÇÃO: Tome ciência desta parte do documento. Extraia dados cruciais e confirme o recebimento.`;
+
+            const response = await fetch('/api/dr-michel/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: phasePrompt,
+                history: [], 
+                images: chunkImages,
+                isIngestion: true
+              })
+            });
+
+            if (response.ok) {
+              const reader = response.body?.getReader();
+              const decoder = new TextDecoder();
+              let phaseSummary = '';
+              if (reader) {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const chunk = decoder.decode(value);
+                  const lines = chunk.split('\n\n');
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.text) phaseSummary += data.text;
+                      } catch (e) {}
+                    }
+                  }
+                }
+              }
+              allSummaries += `\n\n--- PÁGINAS ${p + 1}-${Math.min(p + CHUNK_SIZE, totalPages)} ---\n${phaseSummary}`;
+            }
+          }
+
+          const newDoc: ChatDocument = {
+            id: generateId(),
+            name: file.name,
+            summary: allSummaries,
+            fullText: fullFileText,
+            type: file.type,
+            pages: totalPages
+          };
+
+          setSessions(prev => prev.map(s => 
+            s.id === activeSessionId ? { 
+              ...s, 
+              documents: [...(s.documents || []), newDoc],
+              messages: [...s.messages, {
+                id: generateId(),
+                role: 'assistant',
+                content: `✅ **Ciência Integral Tomada: ${file.name}**\n\n${allSummaries}`,
+                timestamp: new Date().toISOString(),
+                isSystem: true
+              }]
+            } : s
+          ));
+        } else {
+          const reader = new FileReader();
+          const fileText = await new Promise<string>((resolve) => {
+            reader.onload = (e) => resolve(e.target?.result as string || "");
+            reader.readAsText(file);
+          });
+
+          const newDoc: ChatDocument = {
+            id: generateId(),
+            name: file.name,
+            summary: `Arquivo de texto processado: ${file.name}`,
+            fullText: fileText,
+            type: file.type
+          };
+
+          setSessions(prev => prev.map(s => 
+            s.id === activeSessionId ? { 
+              ...s, 
+              documents: [...(s.documents || []), newDoc],
+              messages: [...s.messages, {
+                id: generateId(),
+                role: 'assistant',
+                content: `✅ **Arquivo Processado: ${file.name}**`,
+                timestamp: new Date().toISOString(),
+                isSystem: true
+              }]
+            } : s
+          ));
+        }
+      }
+
+      setProgress(100);
+      setProgressText('Concluído!');
+      
+      const finalMsg: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `Tomei ciência integral de todos os arquivos enviados. O processo foi mapeado e estou pronto para gerar o recurso ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, finalMsg] } : s
+      ));
+
+    } catch (error: any) {
+      console.error("Erro ao processar arquivos:", error);
+      alert(`Erro ao ler os arquivos: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => {
+        setProgress(0);
+        setProgressText('');
+      }, 3000);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -571,7 +761,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou processando ${fileArray.length} arquivo(s). Vou analisar cada um individualmente para garantir que nenhuma informação do processo integral seja perdida. Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou processar cada página individualmente para garantir ciência integral de todo o processo, respeitando o tempo de qualidade solicitado (máx. 3 min por ciclo). Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -579,152 +769,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
       ));
 
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
-        const currentProgress = Math.round((i / fileArray.length) * 100);
-        setProgress(currentProgress);
-        setProgressText(`Lendo ${file.name} (${i + 1}/${fileArray.length})...`);
-
-        let fileText = "";
-        let images: string[] = [];
-        let isScanned = false;
-
-        if (file.type === 'application/pdf') {
-          const result = await extractTextFromPDF(file, (current, total, status) => {
-            const fileProgress = Math.round((current / total) * 100);
-            setProgress(Math.round(((i + (fileProgress / 100)) / fileArray.length) * 100));
-            setProgressText(`Lendo ${file.name}: ${status}`);
-          });
-          fileText = result.text;
-          images = result.images;
-          isScanned = result.isScanned;
-          
-          if (result.fileHash) {
-            const cachedText = await supabaseService.getPdfCache(result.fileHash);
-            if (cachedText) {
-              fileText = cachedText;
-            } else {
-              if (isScanned && images.length > 0) {
-                setProgressText(`Realizando OCR em ${file.name}...`);
-                try {
-                  const ocrResponse = await fetch('/api/ocr', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ images })
-                  });
-                  
-                  if (ocrResponse.ok) {
-                    const ocrData = await ocrResponse.json();
-                    if (ocrData.text) {
-                      fileText += `\n--- OCR ---\n${ocrData.text}`;
-                      await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
-                    }
-                  }
-                } catch (ocrErr) {
-                  console.error("Erro no OCR:", ocrErr);
-                }
-              } else if (fileText.trim()) {
-                await supabaseService.savePdfCache(result.fileHash, file.name, fileText);
-              }
-            }
-          }
-        } else {
-          fileText = `[Arquivo ${file.name} do tipo ${file.type} não suportado para extração de texto]`;
-        }
-
-        // Generate Summary for this specific file
-        setProgressText(`Sintetizando ${file.name}...`);
-        const summaryPrompt = `TOME CIÊNCIA DESTE DOCUMENTO (PARTE DO PROCESSO):
-        NOME DO ARQUIVO: ${file.name}
-        CONTEÚDO: ${fileText.substring(0, 80000)}
-        
-        INSTRUÇÃO: Forneça um resumo executivo técnico destacando:
-        1. DADOS DE IDENTIFICAÇÃO: Nome, CPF, RG, Endereço, Nome da Mãe (se houver).
-        2. DADOS DO PROCESSO: Número do Processo, Vara, Advogados constituídos.
-        3. FATOS CRUCIAIS: Datas de admissão/demissão, DII, DER, CIDs, decisões do INSS ou do Juiz.
-        4. VALORES: Salários, teto, benefícios.
-        
-        Seja preciso. Se o documento for um RG/CNH, extraia TODOS os dados de identificação. Se for um TRCT, extraia as datas dos campos 24, 25 e 26.`;
-
-        const response = await fetch('/api/dr-michel/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: summaryPrompt,
-            history: [], 
-            images: images.slice(0, 5),
-            isIngestion: true
-          })
-        });
-
-        if (response.ok) {
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let summary = '';
-          if (reader) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const chunk = decoder.decode(value);
-              const lines = chunk.split('\n\n');
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.text) summary += data.text;
-                  } catch (e) {}
-                }
-              }
-            }
-          }
-
-          const newDoc: ChatDocument = {
-            id: generateId(),
-            name: file.name,
-            summary: summary,
-            fullText: fileText,
-            type: file.type
-          };
-
-          setSessions(prev => prev.map(s => 
-            s.id === activeSessionId ? { 
-              ...s, 
-              documents: [...(s.documents || []), newDoc],
-              messages: [...s.messages, {
-                id: generateId(),
-                role: 'assistant',
-                content: `✅ **Documento Processado: ${file.name}**\n\n${summary}`,
-                timestamp: new Date().toISOString(),
-                isSystem: true
-              }]
-            } : s
-          ));
-        }
-      }
-
-      setProgress(100);
-      setProgressText('Concluído!');
-      
-      const finalMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: `Tomei ciência integral de todos os ${fileArray.length} arquivos enviados. O processo foi mapeado e estou pronto para gerar o recurso ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, finalMsg] } : s
-      ));
-
+      await processFilesPhased(fileArray, activeSessionId);
     } catch (error: any) {
       console.error("Erro ao processar arquivos:", error);
       alert(`Erro ao ler os arquivos: ${error.message}`);
-    } finally {
       setIsUploading(false);
-      setTimeout(() => {
-        setProgress(0);
-        setProgressText('');
-      }, 3000);
     }
   };
 

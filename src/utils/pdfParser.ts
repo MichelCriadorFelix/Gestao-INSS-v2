@@ -4,9 +4,16 @@ import * as pdfjsLib from 'pdfjs-dist';
 const PDFJS_VERSION = '3.11.174';
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
 
+export interface PDFPageData {
+  pageNumber: number;
+  text: string;
+  image?: string; // Base64
+}
+
 export interface PDFContent {
   text: string;
   images: string[]; // Base64 strings for pages that need OCR/Vision
+  pages: PDFPageData[]; // New: structured pages for phased processing
   isScanned: boolean;
   fileHash?: string;
   totalPages: number;
@@ -66,6 +73,7 @@ export async function extractTextFromPDF(
     return {
       text: "ERRO TÉCNICO: A biblioteca de leitura de PDF não foi carregada.",
       images: [],
+      pages: [],
       isScanned: false,
       totalPages: 0
     };
@@ -85,6 +93,7 @@ export async function extractTextFromPDF(
     const pdf = await loadingTask.promise;
     let fullText = '';
     const images: string[] = [];
+    const pages: PDFPageData[] = [];
     const totalPages = pdf.numPages;
     
     // Limit image extraction to 50 pages if they are small, or less if large
@@ -105,11 +114,15 @@ export async function extractTextFromPDF(
           .map((item: any) => item.str)
           .join(' ');
         
+        let currentPageText = '';
         if (pageText.trim()) {
-          fullText += `--- PÁGINA ${i} ---\n${pageText}\n\n`;
+          currentPageText = `--- PÁGINA ${i} ---\n${pageText}\n\n`;
         } else {
-          fullText += `--- PÁGINA ${i} (Página de Imagem/Escaneada) ---\n\n`;
+          currentPageText = `--- PÁGINA ${i} (Página de Imagem/Escaneada) ---\n\n`;
         }
+        fullText += currentPageText;
+        
+        let currentPageImage: string | undefined = undefined;
         
         // 2. Extract Image (OCR for handwritten/scanned docs)
         // FORCE image extraction for the first 10 pages (most critical for TRCT/CNIS/Procuração)
@@ -146,6 +159,7 @@ export async function extractTextFromPDF(
                   // COMPRESSION: JPEG 0.7 is a good balance
                   const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
                   images.push(base64);
+                  currentPageImage = base64;
                   
                   // CLEANUP
                   canvas.width = 0;
@@ -164,6 +178,7 @@ export async function extractTextFromPDF(
                         await page.render({ canvasContext: context, viewport }).promise;
                         const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
                         images.push(base64);
+                        currentPageImage = base64;
                         canvas.width = 0;
                         canvas.height = 0;
                         canvas.remove();
@@ -171,21 +186,32 @@ export async function extractTextFromPDF(
                 } catch (e) {}
             }
         }
+
+        pages.push({
+          pageNumber: i,
+          text: currentPageText,
+          image: currentPageImage
+        });
       } catch (pageError) {
         console.warn(`Erro ao processar página ${i}:`, pageError);
         fullText += `\n[Erro de leitura na página ${i}]\n`;
+        pages.push({
+          pageNumber: i,
+          text: `\n[Erro de leitura na página ${i}]\n`
+        });
       }
     }
 
     const isScanned = images.length > 0;
 
-    return { text: fullText, images, isScanned, fileHash, totalPages };
+    return { text: fullText, images, pages, isScanned, fileHash, totalPages };
 
   } catch (error: any) {
     console.error("PDF Extraction Fatal Error:", error);
     return {
         text: `ERRO DE LEITURA: ${error.message || "Falha ao processar PDF."}`,
         images: [],
+        pages: [],
         isScanned: false,
         totalPages: 0
     };

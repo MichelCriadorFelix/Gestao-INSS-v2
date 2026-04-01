@@ -798,18 +798,28 @@ app.post("/api/analyze-cnis", async (req, res) => {
 });
 
 const ARCHIVIST_SYSTEM_PROMPT = `
-VOCÊ É UM SISTEMA DE ARMAZENAMENTO DE DADOS E AUDITORIA VISUAL DE ALTA PRECISÃO.
-SUA FUNÇÃO É:
-1. Receber textos/documentos e IMAGENS de partes de um processo judicial.
-2. ANALISAR INDIVIDUALMENTE: Cada arquivo enviado é uma peça do quebra-cabeça.
-3. AUDITORIA VISUAL OBRIGATÓRIA: No TRCT, identifique as datas nos Campos 24, 25 e 26 olhando EXCLUSIVAMENTE para a IMAGEM.
-4. ZOOM NO ANO: No Campo 24 (Admissão), verifique se o ano termina em "4" (2024). Não confunda com 2020 ou 2015. Olhe para o formato do dígito.
-5. RESUMO ESTRUTURADO (USE MARKDOWN): Para cada arquivo, gere um resumo técnico usando **negrito** para datas e valores, e *itálico* para citações ou nomes de documentos. Use listas (*) para pontos cruciais.
-   - Tipo de documento (Petição, Laudo, Sentença, etc).
-   - Datas relevantes encontradas.
-   - Decisões ou fatos cruciais.
-6. SAÍDA OBRIGATÓRIA: "Recebido. Documento [Nome do Arquivo] processado e indexado. [Resumo Técnico]. Aguardando próxima parte do processo ou comando."
-NÃO GERE MAIS NADA ALÉM DISSO.
+VOCÊ É UM SISTEMA DE AUDITORIA VISUAL E ARMAZENAMENTO DE ALTA PRECISÃO (MODO ARQUIVISTA).
+SUA MISSÃO: Tomar ciência integral de documentos jurídicos, extraindo dados com fidelidade absoluta.
+
+DIRETRIZES DE AUDITORIA:
+1. CIÊNCIA PARCELADA: Você receberá documentos em partes (páginas). Sua tarefa é confirmar a ciência de cada parte e extrair os dados cruciais.
+2. SUPREMACIA DA IMAGEM: Se houver imagens, elas são a autoridade final. O OCR pode falhar; sua visão não.
+3. FOCO EM DATAS E VALORES:
+   - TRCT: Campos 24 (Admissão), 25 (Aviso Prévio), 26 (Afastamento).
+   - CNIS: Datas de início e fim de cada vínculo.
+   - LAUDOS: CIDs, datas de exames e conclusões médicas.
+4. IDENTIFICAÇÃO: Extraia nomes, CPFs, RGs e OABs com precisão cirúrgica.
+5. RESUMO TÉCNICO: Para cada parte, forneça um resumo estruturado em Markdown.
+
+FORMATO DE RESPOSTA (OBRIGATÓRIO):
+"✅ Ciência tomada da [Parte X] do documento [Nome].
+**Dados Extraídos:**
+* [Dado 1]
+* [Dado 2]
+...
+Aguardando próxima parte ou comando."
+
+NÃO gere relatórios completos ou petições neste modo. Apenas acumule o conhecimento.
 `;
 
 app.post("/api/dr-michel/chat", async (req, res) => {
@@ -859,12 +869,26 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     Siga isso AGORA.
     `;
 
+    const PHASED_SCIENCE_PROMPT = `
+    [MODO DE TOMADA DE CIÊNCIA PARCELADA]
+    Você está recebendo uma PARTE de um documento longo para AUDITORIA DETALHADA.
+    SUA TAREFA:
+    1. Analise o texto e as imagens fornecidas nesta fase com foco total em detalhes.
+    2. Extraia TODOS os dados cruciais (Datas, Nomes, CIDs, Valores, OABs).
+    3. Se houver divergência entre o texto e a imagem, a IMAGEM prevalece.
+    4. Responda seguindo o protocolo: "✅ Ciência tomada da Parte X do documento [Nome]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."
+    5. NÃO gere relatórios completos ainda. Apenas acumule o conhecimento para a fase final.
+    `;
+
     const historyParts = history.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
+    if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
+    }
     if (ragContext) {
       finalMessage += `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -988,6 +1012,17 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     
     selectedSystemPrompt += "\n" + RITE_RULES;
 
+    const PHASED_SCIENCE_PROMPT = `
+    [MODO DE TOMADA DE CIÊNCIA PARCELADA]
+    Você está recebendo uma PARTE de um documento longo para AUDITORIA DETALHADA.
+    SUA TAREFA:
+    1. Analise o texto e as imagens fornecidas nesta fase com foco total em detalhes.
+    2. Extraia TODOS os dados cruciais (Datas, Nomes, CIDs, Valores, OABs).
+    3. Se houver divergência entre o texto e a imagem, a IMAGEM prevalece.
+    4. Responda seguindo o protocolo: "✅ Ciência tomada da Parte X do documento [Nome]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."
+    5. NÃO gere relatórios completos ainda. Apenas acumule o conhecimento para a fase final.
+    `;
+
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
@@ -1029,6 +1064,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     }));
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
+    if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
+    }
     if (ragContext) {
       finalMessage += `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
