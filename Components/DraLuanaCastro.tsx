@@ -578,7 +578,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
       for (const file of fileArray) {
         if (file.type === 'application/pdf') {
-          const { text: extractedText, images, isScanned, fileHash } = await extractTextFromPDF(file);
+          const { text: extractedText, images, isScanned, fileHash, totalPages } = await extractTextFromPDF(
+            file,
+            (current, total, status) => {
+              setProgress(Math.round((current / total) * 100));
+              setProgressText(`Lendo ${file.name}: ${status}`);
+            }
+          );
           
           let finalPdfText = extractedText;
           

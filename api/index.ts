@@ -851,10 +851,10 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     8. SE O USUÁRIO PEDIR PARA "CONTINUAR": Retome a redação EXATAMENTE da última palavra que você escreveu na mensagem anterior, sem repetir nada e sem introduções.
     9. PROTOCOLO DE AUDITORIA VISUAL (ANTI-ERRO):
        - ATENÇÃO: Se houver IMAGENS nesta mensagem, priorize a leitura direta delas sobre o texto extraído (que pode conter erros de OCR).
-       - Se NÃO houver imagens nesta mensagem, utilize o [CONTEXTO DO PROCESSO INTEGRAL] fornecido no início da mensagem, que contém os resumos e textos extraídos anteriormente.
-       - No TRCT, localize os campos numerados: Campo 24 (Admissão), Campo 25 (Aviso Prévio), Campo 26 (Afastamento/Saída).
-       - Verifique o último dígito do ano com atenção redobrada (ex: diferenciar 2024 de 2019).
-       - Se a imagem mostrar uma data e o OCR outra, a IMAGEM é a autoridade final.
+       - Se NÃO houver imagens nesta mensagem, utilize o [CONTEXTO DO PROCESSO INTEGRAL] fornecido no início da mensagem.
+       - PROCURAÇÃO: Extraia com precisão cirúrgica os nomes dos advogados e OABs. Verifique se há substabelecimento.
+       - CNIS/TRCT: Verifique datas de entrada e saída. No TRCT, campos 24, 25 e 26 são fundamentais.
+       - LAUDOS: Localize CIDs e datas de início da incapacidade (DII) e início da doença (DID).
        - Proibido alucinar ou chutar datas inexistentes. Se não estiver claro, reporte como ilegível.
     Siga isso AGORA.
     `;
@@ -1015,9 +1015,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     10. ZERO ALUCINAÇÃO DE DANOS: Se a planilha de cálculo não tiver uma linha com valor para "Dano Moral" ou "Dano Estético", VOCÊ NÃO PODE PEDIR ISSO NA PETIÇÃO. Ignore qualquer menção a sofrimento se não houver valor calculado.
     11. PROTOCOLO DE AUDITORIA VISUAL (ANTI-ERRO):
         - ATENÇÃO: Se houver IMAGENS nesta mensagem, priorize a leitura direta delas sobre o texto extraído (que pode conter erros de OCR).
-        - Se NÃO houver imagens nesta mensagem, utilize o [CONTEXTO DO PROCESSO INTEGRAL] fornecido no início da mensagem, que contém os resumos e textos extraídos anteriormente.
-        - No TRCT, localize os campos numerados: Campo 24 (Admissão), Campo 25 (Aviso Prévio), Campo 26 (Afastamento/Saída).
-        - Verifique o último dígito do ano com atenção redobrada (ex: diferenciar 2024 de 2019 ou 2015).
+        - Se NÃO houver imagens nesta mensagem, utilize o [CONTEXTO DO PROCESSO INTEGRAL] fornecido no início da mensagem.
+        - LAUDOS MÉDICOS/FISIO: Analise cada página em busca de CIDs, limitações funcionais e datas de exames.
+        - TRCT: Verifique campos 24 (Admissão), 25 (Aviso Prévio) e 26 (Afastamento).
         - Se a imagem mostrar uma data e o OCR outra, a IMAGEM é a autoridade final.
         - Proibido alucinar ou chutar datas inexistentes. Se não estiver claro, reporte como ilegível.
     Siga isso AGORA.

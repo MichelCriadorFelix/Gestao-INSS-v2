@@ -9,22 +9,19 @@ export interface PDFContent {
   images: string[]; // Base64 strings for pages that need OCR/Vision
   isScanned: boolean;
   fileHash?: string;
+  totalPages: number;
 }
 
 /**
- * Applies a high-contrast black and white filter to a canvas.
- * This is the "Filtro de Xerox" to optimize OCR and reduce token usage.
+ * Applies a high-contrast filter to a canvas.
+ * Optimized for Vision AI reading.
  */
-function applyXeroxFilter(canvas: HTMLCanvasElement) {
+function applyHighContrastFilter(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
-
-  // Threshold for black and white conversion
-  // 128 is the middle, but we can adjust for better contrast
-  const threshold = 140; 
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
@@ -34,12 +31,17 @@ function applyXeroxFilter(canvas: HTMLCanvasElement) {
     // Grayscale using luminance formula
     const gray = 0.299 * r + 0.587 * g + 0.114 * b;
     
-    // thresholding removed to preserve fine details for Vision AI
-    const value = gray; // Keep original grayscale intensity
+    // Increase contrast: push values away from middle gray
+    let value = gray;
+    if (gray < 128) {
+      value = Math.max(0, gray * 0.8); // Darken darks
+    } else {
+      value = Math.min(255, gray * 1.2); // Brighten brights
+    }
     
-    data[i] = value;     // R
-    data[i + 1] = value; // G
-    data[i + 2] = value; // B
+    data[i] = value;
+    data[i + 1] = value;
+    data[i + 2] = value;
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -55,13 +57,17 @@ async function getFileHash(file: File): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function extractTextFromPDF(file: File): Promise<PDFContent> {
+export async function extractTextFromPDF(
+  file: File,
+  onProgress?: (current: number, total: number, status: string) => void
+): Promise<PDFContent> {
   if (!pdfjsLib || !pdfjsLib.getDocument) {
     console.error("PDF.js library not loaded correctly.");
     return {
-      text: "ERRO TÉCNICO: A biblioteca de leitura de PDF não foi carregada. Tente recarregar a página.",
+      text: "ERRO TÉCNICO: A biblioteca de leitura de PDF não foi carregada.",
       images: [],
-      isScanned: false
+      isScanned: false,
+      totalPages: 0
     };
   }
 
@@ -76,23 +82,20 @@ export async function extractTextFromPDF(file: File): Promise<PDFContent> {
       standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
     });
     
-    const timeoutPromise = new Promise<any>((_, reject) => 
-      setTimeout(() => reject(new Error("Tempo limite de leitura do PDF excedido (60s).")), 60000)
-    );
-
-    const pdf = await Promise.race([loadingTask.promise, timeoutPromise]);
-    
+    const pdf = await loadingTask.promise;
     let fullText = '';
     const images: string[] = [];
+    const totalPages = pdf.numPages;
     
-    // MEMORY SAFE OCR SETTINGS
-    // We limit image extraction to 30 pages now that we optimize them
-    const MAX_PAGES_FOR_OCR = 30; 
+    // Limit image extraction to 50 pages if they are small, or less if large
+    const MAX_PAGES_FOR_VISION = 50; 
     
-    for (let i = 1; i <= pdf.numPages; i++) {
+    for (let i = 1; i <= totalPages; i++) {
       try {
-        // Yield to main thread to prevent UI freeze
-        await new Promise(resolve => setTimeout(resolve, 50));
+        if (onProgress) onProgress(i, totalPages, `Lendo página ${i} de ${totalPages}...`);
+        
+        // Yield to main thread
+        await new Promise(resolve => setTimeout(resolve, 20));
 
         const page = await pdf.getPage(i);
         
@@ -102,36 +105,27 @@ export async function extractTextFromPDF(file: File): Promise<PDFContent> {
           .map((item: any) => item.str)
           .join(' ');
         
-        // CRITICAL: If it's a critical page (1-5), we IGNORE the digital text layer
-        // to prevent "poisoning" the AI with incorrect hidden text data.
-        // We want the AI to use ONLY its eyes (Vision) for these pages.
-        const isCriticalPage = i <= 5;
-        
         if (pageText.trim()) {
-          if (isCriticalPage) {
-            fullText += `--- Página ${i} (Auditoria Visual Prioritária) ---\n[Texto Digital Extraído]: ${pageText}\n[Nota: Use a imagem desta página se disponível para confirmar dados críticos]\n\n`;
-          } else {
-            fullText += `--- Página ${i} ---\n${pageText}\n\n`;
-          }
-        } else if (isCriticalPage) {
-          fullText += `--- Página ${i} (Leitura Visual Obrigatória) ---\n[Conteúdo enviado via imagem para auditoria pericial]\n\n`;
+          fullText += `--- PÁGINA ${i} ---\n${pageText}\n\n`;
+        } else {
+          fullText += `--- PÁGINA ${i} (Página de Imagem/Escaneada) ---\n\n`;
         }
         
         // 2. Extract Image (OCR for handwritten/scanned docs)
-        // FORCE image extraction for the first 5 pages (most critical for TRCT/CNIS)
-        const isLowTextDensity = pageText.trim().length < 100; 
+        // FORCE image extraction for the first 10 pages (most critical for TRCT/CNIS/Procuração)
+        const isCriticalPage = i <= 10;
+        const isLowTextDensity = pageText.trim().length < 150; 
 
-        if ((isLowTextDensity || isCriticalPage) && i <= MAX_PAGES_FOR_OCR) {
+        if ((isLowTextDensity || isCriticalPage) && i <= MAX_PAGES_FOR_VISION) {
             try {
-                // SCALE: 3.0 for ultra-high-definition Vision AI reading
-                const viewport = page.getViewport({ scale: 3.0 }); 
+                // DYNAMIC SCALING: Target ~2048px on the longest side
+                const originalViewport = page.getViewport({ scale: 1.0 });
+                const targetLongestSide = 2048;
+                const currentLongestSide = Math.max(originalViewport.width, originalViewport.height);
+                const dynamicScale = Math.min(3.0, targetLongestSide / currentLongestSide);
                 
-                // Safety check for abnormally large pages (increased limit for 3.0 scale)
-                if (viewport.width * viewport.height > 25000000) {
-                   fullText += `[AVISO: Imagem da página ${i} muito pesada, leitura visual ignorada para evitar travamento]\n`;
-                   continue;
-                }
-
+                let viewport = page.getViewport({ scale: dynamicScale });
+                
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d', { alpha: false }); 
                 
@@ -139,40 +133,44 @@ export async function extractTextFromPDF(file: File): Promise<PDFContent> {
                   canvas.height = viewport.height;
                   canvas.width = viewport.width;
                   
-                  // Fill white background before rendering
                   context.fillStyle = '#FFFFFF';
                   context.fillRect(0, 0, canvas.width, canvas.height);
 
-                  const renderTask = page.render({ 
+                  await page.render({ 
                     canvasContext: context, 
                     viewport: viewport 
                   }).promise;
                   
-                  const renderTimeout = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Render timeout")), 20000)
-                  );
+                  applyHighContrastFilter(canvas);
                   
-                  await Promise.race([renderTask, renderTimeout]);
-                  
-                  // APPLY SOFT GRAYSCALE FILTER (Preserves details better than B&W)
-                  applyXeroxFilter(canvas);
-                  
-                  // COMPRESSION: Higher quality for Vision AI
-                  const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                  // COMPRESSION: JPEG 0.7 is a good balance
+                  const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
                   images.push(base64);
                   
-                  // AGGRESSIVE MEMORY CLEANUP
+                  // CLEANUP
                   canvas.width = 0;
                   canvas.height = 0;
                   canvas.remove();
                 }
             } catch (renderError) {
-                console.warn(`Erro ao renderizar imagem da página ${i}:`, renderError);
+                console.warn(`Erro ao renderizar imagem da página ${i}, tentando escala 1.0:`, renderError);
+                try {
+                    const viewport = page.getViewport({ scale: 1.0 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    if (context) {
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        await page.render({ canvasContext: context, viewport }).promise;
+                        const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+                        images.push(base64);
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        canvas.remove();
+                    }
+                } catch (e) {}
             }
-        } else if (isLowTextDensity && i > MAX_PAGES_FOR_OCR) {
-             fullText += `[AVISO: Página ${i} parece ser uma imagem, mas o limite seguro de ${MAX_PAGES_FOR_OCR} páginas visuais foi atingido. Envie esta página separadamente se necessário.]\n`;
         }
-
       } catch (pageError) {
         console.warn(`Erro ao processar página ${i}:`, pageError);
         fullText += `\n[Erro de leitura na página ${i}]\n`;
@@ -181,23 +179,15 @@ export async function extractTextFromPDF(file: File): Promise<PDFContent> {
 
     const isScanned = images.length > 0;
 
-    if (!fullText.trim() && images.length === 0) {
-       return { 
-         text: "AVISO: Não foi possível extrair conteúdo deste arquivo.", 
-         images: [], 
-         isScanned: false,
-         fileHash
-       };
-    }
-
-    return { text: fullText, images, isScanned, fileHash };
+    return { text: fullText, images, isScanned, fileHash, totalPages };
 
   } catch (error: any) {
     console.error("PDF Extraction Fatal Error:", error);
     return {
         text: `ERRO DE LEITURA: ${error.message || "Falha ao processar PDF."}`,
         images: [],
-        isScanned: false
+        isScanned: false,
+        totalPages: 0
     };
   }
 }

@@ -590,7 +590,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         let isScanned = false;
 
         if (file.type === 'application/pdf') {
-          const result = await extractTextFromPDF(file);
+          const result = await extractTextFromPDF(file, (current, total, status) => {
+            const fileProgress = Math.round((current / total) * 100);
+            setProgress(Math.round(((i + (fileProgress / 100)) / fileArray.length) * 100));
+            setProgressText(`Lendo ${file.name}: ${status}`);
+          });
           fileText = result.text;
           images = result.images;
           isScanned = result.isScanned;
@@ -778,7 +782,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 const res = await fetch(doc.url);
                 const blob = await res.blob();
                 const file = new File([blob], doc.name, { type: 'application/pdf' });
-                const result = await extractTextFromPDF(file);
+                const result = await extractTextFromPDF(file, (current, total, status) => {
+                    const fileProgress = Math.round((current / total) * 100);
+                    setProgress(Math.round(((i + (fileProgress / 100)) / client.documents.length) * 100));
+                    setProgressText(`Lendo ${doc.name}: ${status}`);
+                });
                 fileText = result.text;
             } catch (e) {
                 console.error("Erro ao extrair PDF do GED:", e);
