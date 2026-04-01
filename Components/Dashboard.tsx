@@ -579,16 +579,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // Handlers for Clients
-  const handleClientCreate = (data: ClientRecord) => {
+  const handleClientCreate = async (data: ClientRecord) => {
     // Generate a numeric ID for compatibility with bigint columns (Supabase default)
     const newRecord = { ...data, id: Date.now().toString() };
-    saveData('clients', [newRecord, ...records], newRecord);
+    const result = await saveData('clients', [newRecord, ...records], newRecord);
     setIsModalOpen(false);
+    return result;
   };
-  const handleClientUpdate = (data: ClientRecord) => {
+  const handleClientUpdate = async (data: ClientRecord) => {
     const oldData = records.find(r => r.id === data.id);
     const updated = records.map(r => r.id === data.id ? data : r);
-    saveData('clients', updated, data);
+    const result = await saveData('clients', updated, data);
     setIsModalOpen(false);
 
     // Sync date changes to agendaEvents overrides
@@ -640,13 +641,14 @@ const Dashboard: React.FC<DashboardProps> = ({
             saveData('agenda', newAgendaEvents);
         }
     }
+    return result;
   };
 
-  const handleSaveClient = (data: ClientRecord) => {
+  const handleSaveClient = async (data: ClientRecord) => {
     if (currentRecord) {
-        handleClientUpdate(data);
+        return handleClientUpdate(data);
     } else {
-        handleClientCreate(data);
+        return handleClientCreate(data);
     }
   };
 

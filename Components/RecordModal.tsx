@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, useRef } from 'react';
+import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
 import { parseDate, addDays, formatDate } from '../utils';
@@ -14,6 +14,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   });
   const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions'>('info');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editDocName, setEditDocName] = useState('');
+  const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success'>>({});
+  const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const AVAILABLE_TAGS = [
+      { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+      { id: 'trabalhista', label: 'Trabalhista', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+      { id: 'medico', label: 'Médico', color: 'bg-red-100 text-red-700 border-red-200' },
+      { id: 'previdenciario', label: 'Previdenciário', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+      { id: 'outro', label: 'Outro', color: 'bg-slate-100 text-slate-700 border-slate-200' }
+  ];
 
   useEffect(() => {
     if (initialData) {
@@ -57,10 +70,121 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, documents: updatedDocs });
   }
 
-  const handleScannerSave = (doc: ScannedDocument) => {
+  const handleScannerSave = async (doc: ScannedDocument) => {
       const updatedDocs = [...(formData.documents || []), doc];
-      setFormData({ ...formData, documents: updatedDocs });
+      const updatedFormData = { ...formData, documents: updatedDocs };
+      setFormData(updatedFormData);
+      
+      setSyncStatus(prev => ({ ...prev, [doc.id]: 'syncing' }));
+      try {
+          await onSave(updatedFormData as ClientRecord);
+          setSyncStatus(prev => ({ ...prev, [doc.id]: 'success' }));
+      } catch (e) {
+          console.error("Error saving document:", e);
+          setSyncStatus(prev => ({ ...prev, [doc.id]: 'error' }));
+      }
   }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      const newDocs: ScannedDocument[] = [];
+      const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
+
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const id = Date.now().toString() + i;
+          
+          try {
+              const reader = new FileReader();
+              const base64Promise = new Promise<string>((resolve, reject) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+              });
+              reader.readAsDataURL(file);
+              const base64Url = await base64Promise;
+
+              const newDoc: ScannedDocument = {
+                  id,
+                  name: file.name,
+                  type: file.type || 'application/pdf',
+                  url: base64Url,
+                  date: new Date().toISOString()
+              };
+              
+              newDocs.push(newDoc);
+              newSyncStatus[id] = 'syncing';
+          } catch (error) {
+              console.error("Error reading file:", error);
+          }
+      }
+
+      if (newDocs.length > 0) {
+          const updatedDocs = [...(formData.documents || []), ...newDocs];
+          const updatedFormData = { ...formData, documents: updatedDocs };
+          setFormData(updatedFormData);
+          setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+
+          try {
+              await onSave(updatedFormData as ClientRecord);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'success');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          } catch (e) {
+              console.error("Error saving uploaded documents:", e);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'error');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          }
+      }
+      
+      if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+      }
+  };
+
+  const retryUpload = async (docId: string) => {
+      setSyncStatus(prev => ({ ...prev, [docId]: 'syncing' }));
+      try {
+          await onSave(formData as ClientRecord);
+          setSyncStatus(prev => ({ ...prev, [docId]: 'success' }));
+      } catch (e) {
+          console.error("Error retrying document upload:", e);
+          setSyncStatus(prev => ({ ...prev, [docId]: 'error' }));
+      }
+  };
+
+  const moveDocument = (index: number, direction: 'up' | 'down') => {
+      const docs = [...(formData.documents || [])];
+      if (direction === 'up' && index > 0) {
+          [docs[index - 1], docs[index]] = [docs[index], docs[index - 1]];
+      } else if (direction === 'down' && index < docs.length - 1) {
+          [docs[index + 1], docs[index]] = [docs[index], docs[index + 1]];
+      }
+      setFormData({ ...formData, documents: docs });
+  };
+
+  const startEditingDoc = (doc: ScannedDocument) => {
+      setEditingDocId(doc.id);
+      setEditDocName(doc.name);
+  };
+
+  const saveDocName = (docId: string) => {
+      const docs = (formData.documents || []).map(d => d.id === docId ? { ...d, name: editDocName } : d);
+      setFormData({ ...formData, documents: docs });
+      setEditingDocId(null);
+  };
+
+  const toggleTag = (docId: string, tagId: string) => {
+      const docs = (formData.documents || []).map(d => {
+          if (d.id === docId) {
+              const tags = d.tags || [];
+              const newTags = tags.includes(tagId) ? tags.filter(t => t !== tagId) : [...tags, tagId];
+              return { ...d, tags: newTags };
+          }
+          return d;
+      });
+      setFormData({ ...formData, documents: docs });
+  };
 
   const handleRemovePetition = (petitionId: string) => {
       const updatedPetitions = (formData.petitions || []).filter(p => p.id !== petitionId);
@@ -638,13 +762,30 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <h4 className="font-bold text-slate-700 dark:text-white">Documentos Digitalizados</h4>
-                        <button 
-                            onClick={() => setIsScannerOpen(true)}
-                            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-primary-700 transition"
-                        >
-                            <CameraIcon className="h-4 w-4" />
-                            Nova Digitalização
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="file" 
+                                multiple 
+                                accept=".pdf,image/*"
+                                ref={fileInputRef} 
+                                onChange={handleFileUpload} 
+                                className="hidden" 
+                            />
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                            >
+                                <ArrowUpTrayIcon className="h-4 w-4" />
+                                Upload
+                            </button>
+                            <button 
+                                onClick={() => setIsScannerOpen(true)}
+                                className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-primary-700 transition"
+                            >
+                                <CameraIcon className="h-4 w-4" />
+                                Nova Digitalização
+                            </button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
@@ -665,17 +806,65 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="space-y-3">
                         {formData.documents && formData.documents.length > 0 ? (
                             formData.documents.map((doc, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl gap-3">
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <div className="flex flex-col gap-1">
+                                            <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
+                                            <button onClick={() => moveDocument(idx, 'down')} disabled={idx === formData.documents!.length - 1} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDownIcon className="h-4 w-4" /></button>
+                                        </div>
+                                        <div className="h-10 w-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shrink-0">
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.name}</p>
-                                            <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMG'}</p>
+                                        <div className="flex-1 min-w-0">
+                                            {editingDocId === doc.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={editDocName} 
+                                                        onChange={(e) => setEditDocName(e.target.value)}
+                                                        className="flex-1 px-2 py-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                                        autoFocus
+                                                        onKeyDown={(e) => e.key === 'Enter' && saveDocName(doc.id)}
+                                                    />
+                                                    <button onClick={() => saveDocName(doc.id)} className="text-green-600 hover:text-green-700"><CheckIcon className="h-5 w-5" /></button>
+                                                    <button onClick={() => setEditingDocId(null)} className="text-slate-400 hover:text-slate-600"><XMarkIcon className="h-5 w-5" /></button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-bold text-sm text-slate-800 dark:text-white truncate" title={doc.name}>{doc.name}</p>
+                                                    <button onClick={() => startEditingDoc(doc)} className="text-slate-400 hover:text-primary-600"><PencilSquareIcon className="h-4 w-4" /></button>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMG'}</p>
+                                                {doc.tags?.map(tagId => {
+                                                    const t = AVAILABLE_TAGS.find(t => t.id === tagId);
+                                                    return t ? <span key={tagId} className={`text-[10px] px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span> : null;
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 sm:ml-auto">
+                                        {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
+                                        {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Tentar Novamente</button>}
+                                        
+                                        <div className="relative">
+                                            <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg" title="Etiquetas">
+                                                <TagIcon className="h-5 w-5" />
+                                            </button>
+                                            {activeTagMenu === doc.id && (
+                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 p-2">
+                                                    <p className="text-xs font-bold text-slate-500 mb-2 px-2">Etiquetas</p>
+                                                    {AVAILABLE_TAGS.map(t => (
+                                                        <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                                            <input type="checkbox" checked={doc.tags?.includes(t.id) || false} onChange={() => toggleTag(doc.id, t.id)} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                                            <span className={`text-xs px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        
                                         <a href={doc.url} download={`${doc.name}.${doc.type === 'application/pdf' ? 'pdf' : 'jpg'}`} className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" title="Baixar">
                                             <ArrowDownTrayIcon className="h-5 w-5" />
                                         </a>

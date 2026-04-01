@@ -5,6 +5,7 @@ export interface ScannedDocument {
   type: string; // Ex: image/jpeg
   url: string; // Base64
   date: string;
+  tags?: string[];
 }
 
 export interface AgendaEvent {

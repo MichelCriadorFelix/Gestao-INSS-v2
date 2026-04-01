@@ -11,6 +11,7 @@ import {
   ArrowDownTrayIcon as Download, 
   ArrowPathIcon as Loader2, 
   UserIcon as User, 
+  UsersIcon as Users,
   CpuChipIcon as Bot,
   ClockIcon as History, 
   ChatBubbleLeftRightIcon as MessageSquare, 
@@ -75,6 +76,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clients, setClients] = useState<any[]>([]);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +93,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   useEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+
+  useEffect(() => {
+    if (isClientModalOpen && clients.length === 0) {
+      supabaseService.getClients().then(setClients).catch(console.error);
+    }
+  }, [isClientModalOpen]);
 
   useEffect(() => {
     const loadFromSupabase = async () => {
@@ -404,7 +414,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       // Prepare context from documents
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => 
-        `DOCUMENTO: ${doc.name}\nRESUMO: ${doc.summary}`
+        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 15000) : doc.summary}`
       ).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -700,6 +710,159 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     } catch (error: any) {
       console.error("Erro ao processar arquivos:", error);
       alert(`Erro ao ler os arquivos: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => {
+        setProgress(0);
+        setProgressText('');
+      }, 3000);
+    }
+  };
+
+  const handleImportClient = async (client: any) => {
+    setIsClientModalOpen(false);
+    if (!client.documents || client.documents.length === 0) {
+        alert("Este cliente não possui documentos cadastrados.");
+        return;
+    }
+
+    setIsUploading(true);
+    setProgress(0);
+    setProgressText(`Importando dossiê de ${client.name}...`);
+    
+    try {
+      let activeSessionId = currentSessionId;
+      
+      if (!activeSessionId) {
+        const newSession: ChatSession = {
+          id: generateId(),
+          title: `Dossiê: ${client.name}`,
+          messages: [],
+          date: new Date().toLocaleDateString('pt-BR'),
+          documents: []
+        };
+        setSessions([newSession, ...sessions]);
+        setCurrentSessionId(newSession.id);
+        activeSessionId = newSession.id;
+      }
+
+      const readingMsg: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `Importando dossiê do cliente **${client.name}**. Processando ${client.documents.length} documento(s) organizados no GED. Por favor, aguarde...`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
+      ));
+
+      let fullDossierText = `DOSSIÊ DO CLIENTE: ${client.name}\nCPF: ${client.cpf}\n\n`;
+      const newDocs: ChatDocument[] = [];
+
+      for (let i = 0; i < client.documents.length; i++) {
+        const doc = client.documents[i];
+        const currentProgress = Math.round((i / client.documents.length) * 100);
+        setProgress(currentProgress);
+        setProgressText(`Lendo ${doc.name} (${i + 1}/${client.documents.length})...`);
+
+        let fileText = "";
+        
+        if (doc.type === 'application/pdf' && doc.url.startsWith('data:application/pdf')) {
+            try {
+                const res = await fetch(doc.url);
+                const blob = await res.blob();
+                const file = new File([blob], doc.name, { type: 'application/pdf' });
+                const result = await extractTextFromPDF(file);
+                fileText = result.text;
+            } catch (e) {
+                console.error("Erro ao extrair PDF do GED:", e);
+                fileText = "[Erro ao ler PDF]";
+            }
+        } else {
+            fileText = `[Documento de imagem: ${doc.name}]`;
+        }
+
+        fullDossierText += `--- DOCUMENTO ${i + 1}: ${doc.name} ---\n`;
+        if (doc.tags && doc.tags.length > 0) {
+            fullDossierText += `Etiquetas: ${doc.tags.join(', ')}\n`;
+        }
+        fullDossierText += `Conteúdo:\n${fileText.substring(0, 20000)}\n\n`;
+        
+        newDocs.push({
+            id: doc.id,
+            name: doc.name,
+            summary: `Documento importado do GED: ${doc.name}`,
+            fullText: fileText.substring(0, 50000),
+            type: doc.type || 'application/pdf'
+        });
+      }
+
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, documents: [...(s.documents || []), ...newDocs] } : s
+      ));
+
+      setProgressText(`Sintetizando dossiê...`);
+      const summaryPrompt = `TOME CIÊNCIA DESTE DOSSIÊ COMPLETO DO CLIENTE:
+      NOME: ${client.name}
+      
+      ${fullDossierText.substring(0, 100000)}
+      
+      INSTRUÇÃO: Forneça um resumo executivo do caso deste cliente com base nos documentos apresentados. Liste os documentos lidos e destaque os pontos principais para uma análise jurídica.`;
+
+      const response = await fetch('/api/dr-michel/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: summaryPrompt,
+          history: [], 
+          isIngestion: true
+        })
+      });
+
+      if (response.ok) {
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let summary = '';
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.text) summary += parsed.text;
+                } catch (e) {}
+              }
+            }
+          }
+        }
+
+        const summaryMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: `**Dossiê Importado com Sucesso!**\n\n${summary}`,
+          timestamp: new Date().toISOString()
+        };
+
+        setSessions(prev => prev.map(s => {
+          if (s.id === activeSessionId) {
+            const newMessages = s.messages.filter(m => m.id !== readingMsg.id);
+            return { ...s, messages: [...newMessages, summaryMsg] };
+          }
+          return s;
+        }));
+        
+        pendingSyncRef.current.add(activeSessionId);
+      }
+    } catch (error) {
+      console.error("Error importing client:", error);
+      alert("Erro ao importar cliente.");
     } finally {
       setIsUploading(false);
       setTimeout(() => {
@@ -1030,6 +1193,14 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   >
                     {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </button>
+                  <button 
+                    onClick={() => setIsClientModalOpen(true)}
+                    disabled={isUploading}
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
+                    title="Importar Cliente (GED)"
+                  >
+                    <Users className="w-5 h-5" />
+                  </button>
                 </div>
                 <button 
                   onClick={() => handleSendMessage()}
@@ -1046,6 +1217,51 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           </div>
         </div>
       </div>
+
+      {/* Client Import Modal */}
+      {isClientModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white">Importar Cliente (GED)</h3>
+              <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XMark className="w-6 h-6" /></button>
+            </div>
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar por nome ou CPF..." 
+                  value={clientSearchTerm}
+                  onChange={(e) => setClientSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                />
+              </div>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {clients.length === 0 ? (
+                <p className="text-center text-slate-500 py-10">Carregando clientes...</p>
+              ) : (
+                <div className="space-y-2">
+                  {clients.filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || c.cpf.includes(clientSearchTerm)).map(client => (
+                    <button 
+                      key={client.id}
+                      onClick={() => handleImportClient(client)}
+                      className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 dark:text-white">{client.name}</p>
+                        <p className="text-xs text-slate-500">{client.cpf} • {client.documents?.length || 0} documentos</p>
+                      </div>
+                      <Plus className="w-5 h-5 text-emerald-600" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
