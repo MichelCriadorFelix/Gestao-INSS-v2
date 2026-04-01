@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
 import { parseDate, addDays, formatDate } from '../utils';
 import ScannerModal from './ScannerModal';
+import { supabaseService } from '../services/supabaseService';
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, initialData, onOpenPetition }) => {
   const [formData, setFormData] = useState<Partial<ClientRecord>>({
@@ -71,12 +72,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   }
 
   const handleScannerSave = async (doc: ScannedDocument) => {
-      const updatedDocs = [...(formData.documents || []), doc];
-      const updatedFormData = { ...formData, documents: updatedDocs };
-      setFormData(updatedFormData);
-      
       setSyncStatus(prev => ({ ...prev, [doc.id]: 'syncing' }));
+      
       try {
+          // Tenta fazer upload para o Supabase Storage se disponível
+          let finalUrl = doc.url;
+          try {
+              const clientId = formData.id || 'temp';
+              const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/${doc.id}`, doc.url);
+              if (storageUrl) {
+                  finalUrl = storageUrl;
+              }
+          } catch (storageErr) {
+              console.warn("Storage upload failed, falling back to base64:", storageErr);
+          }
+
+          const updatedDoc = { ...doc, url: finalUrl };
+          const updatedDocs = [...(formData.documents || []), updatedDoc];
+          const updatedFormData = { ...formData, documents: updatedDocs };
+          setFormData(updatedFormData);
+          
           await onSave(updatedFormData as ClientRecord);
           setSyncStatus(prev => ({ ...prev, [doc.id]: 'success' }));
       } catch (e) {
@@ -91,10 +106,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
       const newDocs: ScannedDocument[] = [];
       const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
+      const clientId = formData.id || 'temp';
 
       for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const id = Date.now().toString() + i;
+          newSyncStatus[id] = 'syncing';
           
           try {
               const reader = new FileReader();
@@ -105,18 +122,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               reader.readAsDataURL(file);
               const base64Url = await base64Promise;
 
+              // Tenta fazer upload para o Supabase Storage
+              let finalUrl = base64Url;
+              try {
+                  const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/${id}`, base64Url);
+                  if (storageUrl) {
+                      finalUrl = storageUrl;
+                  }
+              } catch (storageErr) {
+                  console.warn("Storage upload failed for file:", file.name, storageErr);
+              }
+
               const newDoc: ScannedDocument = {
                   id,
                   name: file.name,
                   type: file.type || 'application/pdf',
-                  url: base64Url,
+                  url: finalUrl,
                   date: new Date().toISOString()
               };
               
               newDocs.push(newDoc);
-              newSyncStatus[id] = 'syncing';
           } catch (error) {
               console.error("Error reading file:", error);
+              newSyncStatus[id] = 'error';
           }
       }
 
@@ -832,6 +860,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <p className="font-bold text-sm text-slate-800 dark:text-white truncate" title={doc.name}>{doc.name}</p>
+                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-blue-500" title="Armazenado na Nuvem" />}
                                                     <button onClick={() => startEditingDoc(doc)} className="text-slate-400 hover:text-primary-600"><PencilSquareIcon className="h-4 w-4" /></button>
                                                 </div>
                                             )}

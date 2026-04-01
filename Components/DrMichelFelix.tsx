@@ -165,6 +165,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const sanitizedSessions = React.useMemo(() => {
     return sessions.map(session => ({
       ...session,
+      documents: session.documents?.map(doc => ({
+        ...doc,
+        fullText: undefined // Never save fullText in the session object to avoid payload bloat
+      })),
       messages: session.messages.map(msg => {
         if (msg.role === 'user' && msg.content.length > 50000 && msg.content.includes('--- CONTEÚDO DO ARQUIVO:')) {
           return {
@@ -652,11 +656,16 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             }
           }
 
+          // Save to cache separately to avoid bloating the session object
+          if (fullFileText) {
+            supabaseService.savePdfCache(activeSessionId + '-' + file.name, file.name, fullFileText).catch(console.error);
+          }
+
           const newDoc: ChatDocument = {
             id: generateId(),
             name: file.name,
             summary: allSummaries,
-            fullText: fullFileText,
+            // fullText: fullFileText, // Removed to prevent Supabase payload bloat
             type: file.type,
             pages: totalPages
           };
@@ -681,11 +690,16 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             reader.readAsText(file);
           });
 
+          // Save to cache separately
+          if (fileText) {
+            supabaseService.savePdfCache(activeSessionId + '-' + file.name, file.name, fileText).catch(console.error);
+          }
+
           const newDoc: ChatDocument = {
             id: generateId(),
             name: file.name,
             summary: `Arquivo de texto processado: ${file.name}`,
-            fullText: fileText,
+            // fullText: fileText, // Removed to prevent Supabase payload bloat
             type: file.type
           };
 

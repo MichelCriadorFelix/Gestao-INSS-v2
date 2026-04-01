@@ -89,10 +89,30 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [lastSavedType, setLastSavedType] = useState<string | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const handleEditClient = async (record: ClientRecord) => {
+    setIsFetchingDetails(true);
+    try {
+        const fullDetails = await supabaseService.getClientDetails(record.id);
+        if (fullDetails) {
+            setCurrentRecord(fullDetails);
+        } else {
+            setCurrentRecord(record);
+        }
+        setIsModalOpen(true);
+    } catch (err) {
+        console.error("Error fetching client details:", err);
+        setCurrentRecord(record);
+        setIsModalOpen(true);
+    } finally {
+        setIsFetchingDetails(false);
+    }
+  };
 
   // --- Realtime & Data Fetching Logic ---
     const fetchData = async () => {
@@ -166,10 +186,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         }
 
         setIsLoading(false);
-    } catch (err) {
+    } catch (err: any) {
         console.error("Exception in fetchData:", err);
         setIsLoading(false);
-        setDbError("Erro de carregamento. Usando dados locais.");
+        
+        let errorMessage = "Erro de carregamento. Usando dados locais.";
+        if (err.message?.includes('fetch') || err.message?.includes('Falha ao buscar')) {
+            errorMessage = "⚠️ Erro de Conexão com a Nuvem. Verifique se o projeto Supabase está ativo ou se as chaves nas Configurações estão corretas.";
+        }
+        
+        setDbError(errorMessage);
     }
   };
 
@@ -1612,7 +1638,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                                 <ArrowUturnLeftIcon className="h-4 w-4" />
                                                             </button>
                                                         )}
-                                                        <button onClick={() => { setCurrentRecord(record); setIsModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><PencilSquareIcon className="h-4 w-4" /></button>
+                                                        <button 
+                                                            onClick={() => handleEditClient(record)} 
+                                                            disabled={isFetchingDetails}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+                                                        >
+                                                            {isFetchingDetails && currentRecord?.id === record.id ? (
+                                                                <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <PencilSquareIcon className="h-4 w-4" />
+                                                            )}
+                                                        </button>
                                                         <button onClick={() => handleClientDelete(record.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><TrashIcon className="h-4 w-4" /></button>
                                                     </div>
                                                 </td>

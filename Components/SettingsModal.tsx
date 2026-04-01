@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { CloudIcon, CheckIcon, ExclamationTriangleIcon, ArchiveBoxArrowDownIcon } from '@heroicons/react/24/outline';
-import { getDbConfig, DB_CONFIG_KEY } from '../supabaseClient';
+import { CloudIcon, CheckIcon, ExclamationTriangleIcon, ArchiveBoxArrowDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { getDbConfig, DB_CONFIG_KEY, validateSupabaseConnection } from '../supabaseClient';
 import { safeSetLocalStorage, getMinWage, setMinWage } from '../utils';
 
 const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: boolean, onClose: () => void, onSave: () => void, onRestoreBackup: () => void }) => {
@@ -9,6 +9,7 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
     const [key, setKey] = useState('');
     const [isEnvManaged, setIsEnvManaged] = useState(false);
     const [minWage, setMinWageState] = useState(1621.00);
+    const [testStatus, setTestStatus] = useState<{ loading: boolean, success?: boolean, message?: string } | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -29,6 +30,67 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
         setMinWage(minWage);
         onSave();
         onClose();
+    };
+
+    const handleTestConnection = async () => {
+        setTestStatus({ loading: true });
+        
+        // Se for manual, salva temporariamente no localStorage para o initSupabase ler
+        if (!isEnvManaged) {
+            safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({ url, key }));
+        }
+
+        const result = await validateSupabaseConnection();
+        setTestStatus({ loading: false, success: result.success, message: result.message });
+        
+        if (result.success) {
+            setTimeout(() => setTestStatus(null), 3000);
+        }
+    };
+
+    const handleCleanupHeavyData = async () => {
+        if (!confirm("Esta ação irá remover o conteúdo integral de texto dos documentos das conversas de IA para reduzir o tamanho do banco de dados. Os resumos e o histórico de mensagens serão preservados. Deseja continuar?")) {
+            return;
+        }
+
+        setTestStatus({ loading: true, message: 'Otimizando banco de dados...' });
+        try {
+            const { supabaseService } = await import('../services/supabaseService');
+            const michelSessions = await supabaseService.getAIConversations('michel');
+            const luanaSessions = await supabaseService.getAIConversations('luana');
+            
+            const allSessions = [...michelSessions, ...luanaSessions];
+            let count = 0;
+
+            for (const session of allSessions) {
+                const hasFullText = session.documents?.some((d: any) => d.fullText);
+                const hasLongMessages = session.messages?.some((m: any) => m.content.length > 50000);
+
+                if (hasFullText || hasLongMessages) {
+                    const sanitized = {
+                        ...session,
+                        documents: session.documents?.map((d: any) => ({ ...d, fullText: undefined })),
+                        messages: session.messages?.map((m: any) => {
+                            if (m.content.length > 50000) {
+                                return { ...m, content: m.content.substring(0, 50000) + '... [Truncado]' };
+                            }
+                            return m;
+                        })
+                    };
+                    await supabaseService.saveAIConversation({
+                        ...sanitized,
+                        ai_name: session.ai_name || (michelSessions.includes(session) ? 'michel' : 'luana')
+                    });
+                    count++;
+                }
+            }
+
+            setTestStatus({ loading: false, success: true, message: `Limpeza concluída! ${count} sessões otimizadas.` });
+            setTimeout(() => setTestStatus(null), 5000);
+        } catch (error) {
+            console.error("Cleanup failed:", error);
+            setTestStatus({ loading: false, success: false, message: "Erro ao realizar limpeza. Verifique a conexão." });
+        }
     };
 
     const handleClear = () => {
@@ -96,15 +158,35 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Supabase Anon Key</label>
-                        <input type="password" value={key} onChange={e => setKey(e.target.value)} disabled={isEnvManaged} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed font-mono text-slate-600 dark:text-slate-300" placeholder="eyJhbGciOiJIUzI1NiIsInR5..." />
+                        <div className="relative">
+                            <input type="password" value={key} onChange={e => setKey(e.target.value)} disabled={isEnvManaged} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed font-mono text-slate-600 dark:text-slate-300" placeholder="eyJhbGciOiJIUzI1NiIsInR5..." />
+                            <button 
+                                onClick={handleTestConnection}
+                                disabled={testStatus?.loading || !url || !key}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md transition disabled:opacity-30"
+                                title="Testar Conexão"
+                            >
+                                <ArrowPathIcon className={`h-4 w-4 ${testStatus?.loading ? 'animate-spin' : ''}`} />
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                {testStatus && (
+                    <div className={`mt-4 p-3 rounded-lg text-xs border ${testStatus.success ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                        <p className="font-bold">{testStatus.success ? "Sucesso!" : "Erro de Conexão:"}</p>
+                        <p className="mt-0.5">{testStatus.message}</p>
+                    </div>
+                )}
                 
-                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                    <button onClick={handleCleanupHeavyData} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/50 rounded-lg text-sm font-medium transition border border-amber-200 dark:border-amber-800">
+                        <ArchiveBoxArrowDownIcon className="h-4 w-4" /> Otimizar Banco (Limpar Cache AI)
+                    </button>
                     <button onClick={handleRestore} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition">
                         <ArchiveBoxArrowDownIcon className="h-4 w-4" /> Restaurar Dados Iniciais (Backup)
                     </button>
-                    <p className="text-[10px] text-center text-slate-400 mt-2">Use isto caso a tabela esteja vazia (0 registros).</p>
+                    <p className="text-[10px] text-center text-slate-400">Use isto caso a tabela esteja vazia (0 registros).</p>
                 </div>
 
                 <div className="flex gap-3 mt-6">

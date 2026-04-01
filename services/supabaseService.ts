@@ -1,7 +1,7 @@
 import { initSupabase } from '../supabaseClient';
 import LZString from 'lz-string';
 
-const supabase = initSupabase();
+const getSupabase = () => initSupabase();
 
 export interface Message {
   id: string;
@@ -30,6 +30,7 @@ export interface SavedCalculation {
 export const supabaseService = {
   // AI Conversations
   async saveAIConversation(session: ChatSession) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     let messagesToSave = session.messages.filter(m => !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
@@ -60,6 +61,7 @@ export const supabaseService = {
   },
 
   async getAIConversations(aiName: 'michel' | 'luana') {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -95,6 +97,7 @@ export const supabaseService = {
   },
 
   async deleteAIConversation(id: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -110,6 +113,7 @@ export const supabaseService = {
 
   // Social Security Calculations
   async saveCalculation(calc: SavedCalculation) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { data, error } = await supabase
@@ -129,6 +133,7 @@ export const supabaseService = {
   },
 
   async getCalculations() {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -150,6 +155,7 @@ export const supabaseService = {
   },
 
   async deleteCalculation(id: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -165,6 +171,7 @@ export const supabaseService = {
 
   // Labor Calculations
   async saveLaborCalculation(calc: any) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { data, error } = await supabase
@@ -185,6 +192,7 @@ export const supabaseService = {
   },
 
   async getLaborCalculations() {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -222,6 +230,7 @@ export const supabaseService = {
   },
 
   async deleteLaborCalculation(id: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -237,6 +246,7 @@ export const supabaseService = {
 
   // Clients
   async saveClient(client: any) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     // Garantir que o ID seja uma string válida e não nula
@@ -290,11 +300,13 @@ export const supabaseService = {
   },
 
   async getClients() {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
+    // Fetch summary only (no documents, no petitions) to avoid "Failed to fetch" on large datasets
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('*');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -330,12 +342,64 @@ export const supabaseService = {
       referrerName: c.referrer_name,
       referrerPercentage: c.referrer_percentage,
       totalFee: c.total_fee,
-      documents: c.documents,
-      petitions: c.petitions
+      documents: [], // Empty by default in summary
+      petitions: []  // Empty by default in summary
     }));
   },
 
+  async getClientDetails(id: string) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('clients_v2')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching client details from Supabase:', error);
+      throw error;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: String(data.id),
+      name: data.name,
+      cpf: data.cpf,
+      password: data.password,
+      nationality: data.nationality,
+      maritalStatus: data.marital_status,
+      profession: data.profession,
+      type: data.type,
+      der: data.der,
+      medExpertiseDate: data.med_expertise_date,
+      socialExpertiseDate: data.social_expertise_date,
+      extensionDate: data.extension_date,
+      dcbDate: data.dcb_date,
+      ninetyDaysDate: data.ninety_days_date,
+      securityMandateDate: data.security_mandate_date,
+      address: data.address,
+      legalRepresentative: data.legal_representative,
+      legalRepresentativeCpf: data.legal_representative_cpf,
+      legalRepresentativeMaritalStatus: data.legal_representative_marital_status,
+      legalRepresentativeProfession: data.legal_representative_profession,
+      legalRepresentativeAddress: data.legal_representative_address,
+      isDailyAttention: data.is_daily_attention,
+      isUrgentAttention: data.is_urgent_attention,
+      isArchived: data.is_archived,
+      isReferral: data.is_referral,
+      referrerName: data.referrer_name,
+      referrerPercentage: data.referrer_percentage,
+      totalFee: data.total_fee,
+      documents: data.documents || [],
+      petitions: data.petitions || []
+    };
+  },
+
   async deleteClient(id: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -351,6 +415,7 @@ export const supabaseService = {
 
   // Contracts
   async saveContract(contract: any) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const record = {
@@ -381,6 +446,7 @@ export const supabaseService = {
   },
 
   async getContracts() {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -410,6 +476,7 @@ export const supabaseService = {
   },
 
   async deleteContract(id: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -424,6 +491,7 @@ export const supabaseService = {
   },
 
   async getPdfCache(fileHash: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { data, error } = await supabase
@@ -440,6 +508,7 @@ export const supabaseService = {
   },
 
   async savePdfCache(fileHash: string, fileName: string, fullText: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { error } = await supabase
@@ -459,6 +528,7 @@ export const supabaseService = {
 
   // RAG (Retrieval-Augmented Generation)
   async saveLegalDocuments(chunks: { content: string, metadata: any, embedding: number[] }[]) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     const { data, error } = await supabase
@@ -473,6 +543,7 @@ export const supabaseService = {
   },
 
   async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5) {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -490,6 +561,7 @@ export const supabaseService = {
   },
 
   async deleteLegalDocumentByTitle(title: string) {
+    const supabase = getSupabase();
     if (!supabase) return null;
     
     // We use the JSON operator ->> to query inside the metadata JSONB column
@@ -505,6 +577,7 @@ export const supabaseService = {
   },
 
   async getLegalDocumentTitles(): Promise<string[]> {
+    const supabase = getSupabase();
     if (!supabase) return [];
     
     // Select unique titles from metadata
@@ -526,5 +599,41 @@ export const supabaseService = {
     }).filter(Boolean) as string[];
     
     return [...new Set(titles)].sort();
+  },
+
+  // Supabase Storage
+  async uploadFile(bucket: string, path: string, file: File | Blob | string): Promise<string | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    // Se for base64 (Data URL), converte para Blob
+    let fileBody: File | Blob | string = file;
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      const response = await fetch(file);
+      fileBody = await response.blob();
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, fileBody, {
+        upsert: true,
+        contentType: typeof file === 'string' && file.startsWith('data:') ? file.split(';')[0].split(':')[1] : undefined
+      });
+
+    if (error) {
+      // Se o erro for que o bucket não existe, tenta criar (pode falhar se não for admin)
+      if (error.message.includes('bucket not found') || error.message.includes('does not exist')) {
+        console.log(`Bucket ${bucket} não encontrado, tentando criar...`);
+        await supabase.storage.createBucket(bucket, { public: true });
+        // Tenta o upload novamente
+        return this.uploadFile(bucket, path, file);
+      }
+      console.error('Erro ao fazer upload para Storage:', error);
+      throw error;
+    }
+
+    // Retorna a URL pública
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+    return publicUrl;
   }
 };

@@ -59,26 +59,64 @@ export const getDbConfig = () => {
 };
 
 export const initSupabase = () => {
-    // Prioridade 1: Configuração salva pelo usuário na interface (localStorage)
-    const stored = localStorage.getItem(DB_CONFIG_KEY);
-    if (stored) {
-        const config = JSON.parse(stored);
-        if (config && isValidUrl(config.url) && config.key) {
-            return createClient(config.url, config.key);
+    try {
+        // Prioridade 1: Configuração salva pelo usuário na interface (localStorage)
+        const stored = localStorage.getItem(DB_CONFIG_KEY);
+        if (stored) {
+            const config = JSON.parse(stored);
+            if (config && isValidUrl(config.url) && config.key) {
+                return createClient(config.url, config.key);
+            }
         }
-    }
 
-    // Prioridade 2: Variáveis de ambiente
-    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
-    if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
-        return createClient(envUrl as string, envKey);
-    }
+        // Prioridade 2: Variáveis de ambiente
+        const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
+        const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+        
+        if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
+            return createClient(envUrl as string, envKey);
+        }
 
-    // Prioridade 3: Configuração global (fallback)
-    if (GLOBAL_SUPABASE_URL && GLOBAL_SUPABASE_KEY) {
-        return createClient(GLOBAL_SUPABASE_URL, GLOBAL_SUPABASE_KEY);
+        // Prioridade 3: Configuração global (fallback)
+        if (GLOBAL_SUPABASE_URL && GLOBAL_SUPABASE_KEY) {
+            return createClient(GLOBAL_SUPABASE_URL, GLOBAL_SUPABASE_KEY);
+        }
+    } catch (e) {
+        console.error("Erro ao inicializar Supabase:", e);
     }
 
     return null;
+};
+
+/**
+ * Valida a conexão com o Supabase tentando buscar um registro simples.
+ * Útil para diagnosticar erros de "Falha ao buscar" (CORS ou Projeto Pausado).
+ */
+export const validateSupabaseConnection = async () => {
+    const supabase = initSupabase();
+    if (!supabase) return { success: false, message: "Supabase não inicializado. Verifique URL e Key." };
+
+    try {
+        // Tenta buscar da tabela 'clients_v2' que é a principal
+        const { error } = await supabase.from('clients_v2').select('id').limit(1);
+        
+        if (error) {
+            if (error.message.includes('fetch')) {
+                return { 
+                    success: false, 
+                    message: "Erro de Rede (Falha ao buscar). Possíveis causas: 1. Projeto Supabase Pausado. 2. Bloqueio de CORS. 3. Sem conexão com internet.",
+                    details: error
+                };
+            }
+            return { success: false, message: `Erro do Supabase: ${error.message}`, details: error };
+        }
+
+        return { success: true, message: "Conexão estabelecida com sucesso!" };
+    } catch (err: any) {
+        return { 
+            success: false, 
+            message: "Exceção ao conectar: " + (err.message || "Erro desconhecido"),
+            details: err
+        };
+    }
 };
