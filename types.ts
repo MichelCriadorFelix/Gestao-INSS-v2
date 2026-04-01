@@ -66,6 +66,7 @@ export interface ClientRecord {
   referrerPercentage?: number;
   totalFee?: number;
   documents?: ScannedDocument[];
+  documentCount?: number;
   petitions?: Petition[];
 }
 

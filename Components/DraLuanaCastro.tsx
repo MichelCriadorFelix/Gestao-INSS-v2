@@ -161,10 +161,6 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const sanitizedSessions = React.useMemo(() => {
     return sessions.map(session => ({
       ...session,
-      documents: session.documents?.map(doc => ({
-        ...doc,
-        fullText: undefined // Never save fullText in the session object to avoid payload bloat
-      })),
       messages: session.messages.map(msg => {
         if (msg.role === 'user' && msg.content.length > 50000 && msg.content.includes('--- CONTEÚDO DO ARQUIVO:')) {
           return {
@@ -653,16 +649,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             }
           }
 
-          // Save to cache separately to avoid bloating the session object
-          if (fullFileText) {
-            supabaseService.savePdfCache(activeSessionId + '-' + file.name, file.name, fullFileText).catch(console.error);
-          }
-
           const newDoc: ChatDocument = {
             id: generateId(),
             name: file.name,
             summary: allSummaries,
-            // fullText: fullFileText, // Removed to prevent Supabase payload bloat
+            fullText: fullFileText,
             type: file.type,
             pages: totalPages
           };
@@ -686,16 +677,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             reader.readAsText(file);
           });
 
-          // Save to cache separately
-          if (fileText) {
-            supabaseService.savePdfCache(activeSessionId + '-' + file.name, file.name, fileText).catch(console.error);
-          }
-
           const newDoc: ChatDocument = {
             id: generateId(),
             name: file.name,
             summary: `Arquivo de texto processado: ${file.name}`,
-            // fullText: fileText, // Removed to prevent Supabase payload bloat
+            fullText: fileText,
             type: file.type
           };
 
@@ -812,22 +798,28 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
   const handleImportClient = async (client: any) => {
     setIsClientModalOpen(false);
-    if (!client.documents || client.documents.length === 0) {
-        alert("Este cliente não possui documentos cadastrados.");
-        return;
-    }
-
     setIsUploading(true);
     setProgress(0);
-    setProgressText(`Preparando dossiê de ${client.name}...`);
-    
+    setProgressText(`Buscando detalhes de ${client.name}...`);
+
     try {
+      // Fetch full details including documents
+      const fullClient = await supabaseService.getClientDetails(client.id);
+      
+      if (!fullClient || !fullClient.documents || fullClient.documents.length === 0) {
+          alert("Este cliente não possui documentos cadastrados.");
+          setIsUploading(false);
+          return;
+      }
+
+      setProgressText(`Preparando dossiê de ${fullClient.name}...`);
+      
       let activeSessionId = currentSessionId;
       
       if (!activeSessionId) {
         const newSession: ChatSession = {
           id: generateId(),
-          title: `Dossiê: ${client.name}`,
+          title: `Dossiê: ${fullClient.name}`,
           messages: [],
           date: new Date().toLocaleDateString('pt-BR'),
           documents: []
@@ -840,7 +832,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${client.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases, garantindo ciência integral de cada página. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases, garantindo ciência integral de cada página. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -849,8 +841,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       ));
 
       const fileArray: File[] = [];
-      for (let i = 0; i < client.documents.length; i++) {
-        const doc = client.documents[i];
+      for (let i = 0; i < fullClient.documents.length; i++) {
+        const doc = fullClient.documents[i];
         try {
           const res = await fetch(doc.url);
           const blob = await res.blob();
