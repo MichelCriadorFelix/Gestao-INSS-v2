@@ -107,8 +107,12 @@ export async function extractTextFromPDF(file: File): Promise<PDFContent> {
         // We want the AI to use ONLY its eyes (Vision) for these pages.
         const isCriticalPage = i <= 5;
         
-        if (pageText.trim() && !isCriticalPage) {
-          fullText += `--- Página ${i} ---\n${pageText}\n\n`;
+        if (pageText.trim()) {
+          if (isCriticalPage) {
+            fullText += `--- Página ${i} (Auditoria Visual Prioritária) ---\n[Texto Digital Extraído]: ${pageText}\n[Nota: Use a imagem desta página se disponível para confirmar dados críticos]\n\n`;
+          } else {
+            fullText += `--- Página ${i} ---\n${pageText}\n\n`;
+          }
         } else if (isCriticalPage) {
           fullText += `--- Página ${i} (Leitura Visual Obrigatória) ---\n[Conteúdo enviado via imagem para auditoria pericial]\n\n`;
         }

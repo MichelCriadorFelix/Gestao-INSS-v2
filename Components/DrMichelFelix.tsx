@@ -108,7 +108,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           id: s.id,
           title: s.title,
           date: s.date,
-          messages: s.messages
+          messages: s.messages,
+          documents: s.documents || []
         })) : [];
 
         // Merge with local storage to prevent data loss on page refresh
@@ -412,7 +413,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       // Prepare context from documents
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => 
-        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 15000) : doc.summary}`
+        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 50000) : doc.summary}`
       ).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -633,7 +634,13 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         NOME DO ARQUIVO: ${file.name}
         CONTEÚDO: ${fileText.substring(0, 80000)}
         
-        INSTRUÇÃO: Forneça um resumo executivo de 3-5 parágrafos destacando os pontos cruciais deste documento específico para um recurso previdenciário. Identifique datas, valores e decisões importantes.`;
+        INSTRUÇÃO: Forneça um resumo executivo técnico destacando:
+        1. DADOS DE IDENTIFICAÇÃO: Nome, CPF, RG, Endereço, Nome da Mãe (se houver).
+        2. DADOS DO PROCESSO: Número do Processo, Vara, Advogados constituídos.
+        3. FATOS CRUCIAIS: Datas de admissão/demissão, DII, DER, CIDs, decisões do INSS ou do Juiz.
+        4. VALORES: Salários, teto, benefícios.
+        
+        Seja preciso. Se o documento for um RG/CNH, extraia TODOS os dados de identificação. Se for um TRCT, extraia as datas dos campos 24, 25 e 26.`;
 
         const response = await fetch('/api/dr-michel/chat', {
           method: 'POST',

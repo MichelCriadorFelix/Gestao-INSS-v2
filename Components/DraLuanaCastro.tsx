@@ -104,7 +104,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           id: s.id,
           title: s.title,
           date: s.date,
-          messages: s.messages
+          messages: s.messages,
+          documents: s.documents || []
         })) : [];
 
         // Merge with local storage to prevent data loss on page refresh
@@ -408,7 +409,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       // Prepare context from documents
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => 
-        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 15000) : doc.summary}`
+        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 50000) : doc.summary}`
       ).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -551,7 +552,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           id: generateId(),
           title: 'Nova Conversa',
           messages: [],
-          date: new Date().toLocaleDateString('pt-BR')
+          date: new Date().toLocaleDateString('pt-BR'),
+          documents: []
         };
         setSessions([newSession, ...sessions]);
         setCurrentSessionId(newSession.id);
@@ -561,6 +563,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const fileArray = Array.from(files);
       let combinedText = "";
       const imagesToSend: string[] = [];
+      const newDocs: ChatDocument[] = [];
 
       const readingMsg: Message = {
         id: generateId(),
@@ -616,6 +619,14 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
           combinedText += `\n--- CONTEÚDO DO ARQUIVO: ${file.name} ---\n${finalPdfText}\n`;
           
+          newDocs.push({
+            id: generateId(),
+            name: file.name,
+            summary: `Documento anexado: ${file.name}`,
+            fullText: finalPdfText,
+            type: file.type
+          });
+
           if (isScanned && !finalPdfText.includes('--- TEXTO EXTRAÍDO VIA OCR ---')) {
             combinedText += `\n[AVISO: Este arquivo contém ${images.length} páginas digitalizadas/manuscritas que foram convertidas para imagem para análise visual]\n`;
             imagesToSend.push(...images);
@@ -624,6 +635,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           combinedText += `\n--- ARQUIVO ANEXADO: ${file.name} (Tipo não suportado para extração direta) ---\n`;
         }
       }
+
+      // Update session with documents
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, documents: [...(s.documents || []), ...newDocs] } : s
+      ));
 
       const uploadPrompt = `Enviei os seguintes documentos para análise: ${fileArray.map(f => f.name).join(', ')}. 
       

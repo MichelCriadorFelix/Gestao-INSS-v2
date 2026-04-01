@@ -17,6 +17,7 @@ export interface ChatSession {
   date: string;
   messages: Message[];
   ai_name: 'michel' | 'luana';
+  documents?: any[];
 }
 
 export interface SavedCalculation {
@@ -31,6 +32,16 @@ export const supabaseService = {
   async saveAIConversation(session: ChatSession) {
     if (!supabase) return null;
     
+    let messagesToSave = session.messages.filter(m => !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
+    if (session.documents && session.documents.length > 0) {
+      messagesToSave = [...messagesToSave, {
+        id: 'system-documents-metadata',
+        role: 'user',
+        content: `[SYSTEM_DOCUMENTS_METADATA]\n${JSON.stringify(session.documents)}`,
+        timestamp: new Date().toISOString()
+      }];
+    }
+
     const { data, error } = await supabase
       .from('ai_conversations')
       .upsert({
@@ -38,7 +49,7 @@ export const supabaseService = {
         lawyer_type: session.ai_name,
         title: session.title,
         date: session.date,
-        messages: session.messages
+        messages: messagesToSave
       });
       
     if (error) {
@@ -61,7 +72,26 @@ export const supabaseService = {
       console.error('Error fetching AI conversations from Supabase:', error);
       return [];
     }
-    return data || [];
+    
+    return (data || []).map(session => {
+      let documents = [];
+      let messages = session.messages || [];
+      const docsMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
+      if (docsMsgIndex !== -1) {
+        try {
+          const docsJson = messages[docsMsgIndex].content.replace('[SYSTEM_DOCUMENTS_METADATA]\n', '');
+          documents = JSON.parse(docsJson);
+          messages = messages.filter((_: any, i: number) => i !== docsMsgIndex);
+        } catch (e) {
+          console.error('Error parsing documents metadata', e);
+        }
+      }
+      return {
+        ...session,
+        messages,
+        documents
+      };
+    });
   },
 
   async deleteAIConversation(id: string) {
