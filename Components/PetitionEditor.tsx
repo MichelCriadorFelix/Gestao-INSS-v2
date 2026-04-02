@@ -579,6 +579,25 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             };
           }
 
+          if (node.nodeName === 'IMG' || node.image) {
+            // A4 width is ~595pt. Margins are 50pt left and right. Max width = 495pt.
+            // If we only set 'width' and leave 'height' undefined, pdfmake scales it proportionally.
+            // If we use 'fit', it bounds it within a box. Sometimes 'fit' with a large height causes issues if the image is very wide.
+            // Let's set a max width and let it scale proportionally.
+            
+            // Remove any existing hardcoded dimensions from the HTML
+            delete node.width;
+            delete node.height;
+            delete node.fit;
+
+            // Set a maximum width to fit the page, pdfmake will auto-calculate height proportionally
+            node.width = 495;
+            
+            // Center images by default
+            node.alignment = 'center';
+            node.margin = [0, 12, 0, 12];
+          }
+
           if (node.stack) applyIndent(node.stack, isBlockquote, isTable);
           if (node.text && Array.isArray(node.text)) applyIndent(node.text, isBlockquote, isTable);
           if (node.ul) applyIndent(node.ul, isBlockquote, isTable);
