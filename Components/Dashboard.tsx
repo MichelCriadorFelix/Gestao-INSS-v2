@@ -1678,7 +1678,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              ) : currentView === 'knowledge_base' ? (
                  <KnowledgeBase />
              ) : currentView === 'marketing' ? (
-                 <MarketingGenerator darkMode={darkMode} />
+                 <MarketingGenerator darkMode={darkMode} user={user} />
              ) : (
                  <>
                     <FinancialStats contracts={contracts} />

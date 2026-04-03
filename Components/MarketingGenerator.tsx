@@ -9,12 +9,16 @@ import {
   PencilIcon,
   BookmarkIcon,
   ClockIcon,
-  TrashIcon
+  TrashIcon,
+  CheckCircleIcon,
+  PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
 import { supabaseService } from '../services/supabaseService';
+import { User, UserRole } from '../types';
 
 interface MarketingGeneratorProps {
   darkMode: boolean;
+  user: User;
 }
 
 interface PostData {
@@ -32,9 +36,10 @@ interface SavedPost {
   templateType: string;
   postData: PostData;
   uploadedImage: string | null;
+  status?: 'draft' | 'pending_approval' | 'approved';
 }
 
-export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps) {
+export default function MarketingGenerator({ darkMode, user }: MarketingGeneratorProps) {
   const [topic, setTopic] = useState('');
   const [persona, setPersona] = useState<'michel' | 'luana'>('michel');
   const [templateType, setTemplateType] = useState<'list' | 'urgent' | 'qa'>('list');
@@ -43,6 +48,8 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [isEditingText, setIsEditingText] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const [currentPostStatus, setCurrentPostStatus] = useState<'draft' | 'pending_approval' | 'approved'>('draft');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -355,30 +362,54 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
     }
   };
 
-  const handleSavePost = async () => {
+  const handleSavePost = async (statusOverride?: 'draft' | 'pending_approval' | 'approved') => {
     if (!postData) return;
+    
+    const newStatus = statusOverride || currentPostStatus;
+    const postId = currentPostId || Date.now().toString();
+    
     const newPost: SavedPost = {
-      id: Date.now().toString(),
+      id: postId,
       date: new Date().toISOString(),
       topic,
       persona,
       templateType,
       postData,
-      uploadedImage
+      uploadedImage,
+      status: newStatus
     };
     
     // Optimistic update
-    const updated = [newPost, ...savedPosts];
+    const updated = currentPostId 
+      ? savedPosts.map(p => p.id === postId ? newPost : p)
+      : [newPost, ...savedPosts];
+      
     setSavedPosts(updated);
     localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
+    setCurrentPostId(postId);
+    setCurrentPostStatus(newStatus);
     
     try {
       await supabaseService.saveMarketingPost(newPost);
-      alert('Post salvo com sucesso no histórico da nuvem!');
+      if (!statusOverride) {
+        alert('Post salvo com sucesso no histórico da nuvem!');
+      }
     } catch (error) {
       console.error('Failed to save to Supabase:', error);
-      alert('Post salvo localmente, mas houve um erro ao sincronizar com a nuvem.');
+      if (!statusOverride) {
+        alert('Post salvo localmente, mas houve um erro ao sincronizar com a nuvem.');
+      }
     }
+  };
+
+  const handleRequestApproval = async () => {
+    await handleSavePost('pending_approval');
+    alert('Post enviado para aprovação dos advogados!');
+  };
+
+  const handleApprovePost = async () => {
+    await handleSavePost('approved');
+    alert('Post aprovado com sucesso!');
   };
 
   const handleLoadPost = (post: SavedPost) => {
@@ -387,6 +418,8 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
     setTemplateType(post.templateType as any);
     setPostData(post.postData);
     setUploadedImage(post.uploadedImage);
+    setCurrentPostId(post.id);
+    setCurrentPostStatus(post.status || 'draft');
   };
 
   const handleDeletePost = async (id: string) => {
@@ -505,7 +538,7 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
               )}
             </button>
 
-            {/* History Section */}
+              {/* History Section */}
             {savedPosts.length > 0 && (
               <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
                 <h3 className={`font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -521,8 +554,10 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
                           <TrashIcon className="w-4 h-4" />
                         </button>
                       </div>
-                      <div className="text-xs text-slate-500 mb-2">
-                        {new Date(post.date).toLocaleDateString('pt-BR')} • {post.persona === 'michel' ? 'Dr. Michel' : 'Dra. Luana'}
+                      <div className="text-xs text-slate-500 mb-2 flex items-center justify-between">
+                        <span>{new Date(post.date).toLocaleDateString('pt-BR')} • {post.persona === 'michel' ? 'Dr. Michel' : 'Dra. Luana'}</span>
+                        {post.status === 'pending_approval' && <span className="text-amber-500 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> Pendente</span>}
+                        {post.status === 'approved' && <span className="text-emerald-500 flex items-center gap-1"><CheckCircleIcon className="w-3 h-3"/> Aprovado</span>}
                       </div>
                       <button 
                         onClick={() => handleLoadPost(post)}
@@ -545,9 +580,21 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
               {/* Image Preview */}
               <div className={`p-6 rounded-2xl shadow-sm border flex flex-col items-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className="w-full flex justify-between items-center mb-4">
-                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Prévia da Arte
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Prévia da Arte
+                    </h3>
+                    {currentPostStatus === 'pending_approval' && (
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded-md flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3" /> Aguardando Aprovação
+                      </span>
+                    )}
+                    {currentPostStatus === 'approved' && (
+                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-md flex items-center gap-1">
+                        <CheckCircleIcon className="w-3 h-3" /> Aprovado
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setIsEditingText(!isEditingText)}
@@ -557,7 +604,7 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
                       {isEditingText ? 'Ocultar Edição' : 'Editar Textos'}
                     </button>
                     <button
-                      onClick={handleSavePost}
+                      onClick={() => handleSavePost()}
                       className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 rounded-lg text-sm font-medium transition-colors"
                     >
                       <BookmarkIcon className="w-4 h-4" />
@@ -606,13 +653,45 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
                   />
                 </div>
                 
-                <button
-                  onClick={handleDownload}
-                  className="mt-6 flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-medium transition-all"
-                >
-                  <ArrowDownTrayIcon className="w-5 h-5" />
-                  Baixar Imagem (PNG)
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-4 mt-6">
+                  {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
+                    <button
+                      onClick={handleDownload}
+                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                    >
+                      <ArrowDownTrayIcon className="w-5 h-5" />
+                      Baixar Imagem (PNG)
+                    </button>
+                  ) : (
+                    <>
+                      {currentPostStatus === 'draft' && (
+                        <button
+                          onClick={handleRequestApproval}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                        >
+                          <PaperAirplaneIcon className="w-5 h-5" />
+                          Concluído (Solicitar Aprovação)
+                        </button>
+                      )}
+                      {currentPostStatus === 'pending_approval' && (
+                        <div className="flex items-center gap-2 bg-amber-100 text-amber-700 px-6 py-3 rounded-xl font-medium">
+                          <ClockIcon className="w-5 h-5" />
+                          Aguardando Aprovação
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {user.role === UserRole.ADVOGADO && currentPostStatus === 'pending_approval' && (
+                    <button
+                      onClick={handleApprovePost}
+                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                    >
+                      <CheckCircleIcon className="w-5 h-5" />
+                      Aprovar Post
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Caption Preview */}
@@ -621,13 +700,19 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
                   <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     Legenda para o Instagram
                   </h3>
-                  <button
-                    onClick={handleCopyCaption}
-                    className="flex items-center gap-2 text-primary-500 hover:text-primary-600 font-medium text-sm"
-                  >
-                    <DocumentDuplicateIcon className="w-4 h-4" />
-                    Copiar Legenda
-                  </button>
+                  {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
+                    <button
+                      onClick={handleCopyCaption}
+                      className="flex items-center gap-2 text-primary-500 hover:text-primary-600 font-medium text-sm"
+                    >
+                      <DocumentDuplicateIcon className="w-4 h-4" />
+                      Copiar Legenda
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-500">
+                      Aprovação necessária para copiar
+                    </span>
+                  )}
                 </div>
                 {isEditingText ? (
                   <textarea 
