@@ -30,7 +30,36 @@ interface PostData {
   caption: string;
   ctaCaption?: string;
   imagePrompt?: string;
+  suggestedStockCategory?: string;
 }
+
+const DEFAULT_STOCK_IMAGES: Record<string, string> = {
+  aposentadoria: 'https://loremflickr.com/1000/1000/elderly,brazil,couple',
+  pensao_morte: 'https://loremflickr.com/1000/1000/family,support,mourning',
+  incapacidade: 'https://loremflickr.com/1000/1000/medical,rehabilitation',
+  reclusao: 'https://loremflickr.com/1000/1000/justice,law,prison',
+  maternidade: 'https://loremflickr.com/1000/1000/baby,feet,maternity',
+  deficiencia: 'https://loremflickr.com/1000/1000/accessibility,disability',
+  idoso: 'https://loremflickr.com/1000/1000/elderly,person,brazil',
+  jurisprudencia: 'https://loremflickr.com/1000/1000/law,books,library',
+  lei: 'https://loremflickr.com/1000/1000/constitution,brazil,law',
+  revisao: 'https://loremflickr.com/1000/1000/document,review,calculator',
+  processual: 'https://loremflickr.com/1000/1000/justice,scales,gavel',
+};
+
+const STOCK_PROMPTS: Record<string, string> = {
+  aposentadoria: 'Uma ilustração moderna e acolhedora de um casal de idosos brasileiros sorrindo, estilo flat design profissional, cores quentes.',
+  pensao_morte: 'Uma ilustração simbólica e respeitosa representando apoio familiar e união, estilo artístico suave e reconfortante.',
+  incapacidade: 'Uma ilustração profissional de reabilitação médica ou saúde, cores sóbrias, estilo corporativo moderno.',
+  reclusao: 'Uma ilustração da balança da justiça em estilo limpo e moderno, representando direitos e amparo legal.',
+  maternidade: 'Uma ilustração delicada e artística de pezinhos de bebê, estilo maternidade suave, cores pastéis.',
+  deficiencia: 'Uma ilustração moderna representando acessibilidade e inclusão, estilo flat design elegante.',
+  idoso: 'Uma ilustração de um idoso brasileiro ativo e feliz, transmitindo dignidade, estilo moderno e limpo.',
+  jurisprudencia: 'Uma ilustração de livros jurídicos e uma lupa, estilo acadêmico e profissional, cores clássicas.',
+  lei: 'Uma ilustração da Constituição Federal do Brasil com elementos da bandeira, estilo oficial e moderno.',
+  revisao: 'Uma ilustração de análise de documentos e cálculos, estilo financeiro/jurídico organizado.',
+  processual: 'Uma ilustração de um martelo de juiz e a balança da justiça, estilo clássico revisitado de forma moderna.',
+};
 
 interface StrategySuggestion {
   title: string;
@@ -59,6 +88,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const [templateType, setTemplateType] = useState<'list' | 'urgent' | 'qa'>('list');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isRegeneratingLibrary, setIsRegeneratingLibrary] = useState(false);
+  const [stockImages, setStockImages] = useState<Record<string, string>>(DEFAULT_STOCK_IMAGES);
   const [imageQuotaError, setImageQuotaError] = useState(false);
   const [postData, setPostData] = useState<PostData | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -71,7 +102,58 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
   useEffect(() => {
     loadSavedPosts();
+    loadStockImages();
   }, []);
+
+  const loadStockImages = async () => {
+    const loaded: Record<string, string> = { ...DEFAULT_STOCK_IMAGES };
+    for (const key of Object.keys(DEFAULT_STOCK_IMAGES)) {
+      try {
+        const savedUrl = await supabaseService.getThemeImage(`stock_${key}`);
+        if (savedUrl) {
+          loaded[key] = savedUrl;
+        }
+      } catch (e) {}
+    }
+    setStockImages(loaded);
+  };
+
+  const regenerateStockLibrary = async () => {
+    if (!window.confirm('Isso irá gerar novas imagens para TODA a biblioteca usando IA. Deseja continuar?')) return;
+    
+    setIsRegeneratingLibrary(true);
+    try {
+      for (const [key, prompt] of Object.entries(STOCK_PROMPTS)) {
+        try {
+          console.log(`Gerando imagem para: ${key}`);
+          const response = await fetch('/api/marketing/generate-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt }),
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.imageUrl) {
+              // Upload to Supabase Storage
+              const publicUrl = await supabaseService.uploadFile('marketing', `stock/${key}_${Date.now()}.png`, result.imageUrl);
+              if (publicUrl) {
+                await supabaseService.saveThemeImage(`stock_${key}`, publicUrl);
+                setStockImages(prev => ({ ...prev, [key]: publicUrl }));
+              }
+            }
+          }
+          // Wait a bit between generations to avoid quota issues
+          await new Promise(resolve => setTimeout(resolve, 12000));
+        } catch (err) {
+          console.error(`Erro ao gerar stock image para ${key}:`, err);
+        }
+      }
+      alert('Biblioteca de templates atualizada com sucesso!');
+    } finally {
+      setIsRegeneratingLibrary(false);
+    }
+  };
 
   const loadSavedPosts = async () => {
     try {
@@ -176,9 +258,13 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           const existingThemeImage = await supabaseService.getThemeImage(topic);
           if (existingThemeImage) {
             setUploadedImage(existingThemeImage);
-          } else if (data.imagePrompt && !uploadedImage) {
-            // Generate a new one if not found
-            generateAIImage(data.imagePrompt);
+          } else if (!uploadedImage) {
+            // Only suggest a new image if one isn't already selected
+            if (data.suggestedStockCategory && stockImages[data.suggestedStockCategory]) {
+              setUploadedImage(stockImages[data.suggestedStockCategory]);
+            } else if (data.imagePrompt) {
+              generateAIImage(data.imagePrompt);
+            }
           }
         } else if (mode === 'template' && postData) {
           setPostData({
@@ -737,6 +823,56 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                   Gerar com IA
                 </button>
               </div>
+
+              {uploadedImage && (
+                <button 
+                  onClick={() => setUploadedImage(null)}
+                  className="mt-2 text-xs text-red-500 hover:text-red-600 flex items-center gap-1"
+                >
+                  <TrashIcon className="w-3 h-3" />
+                  Remover Foto Selecionada
+                </button>
+              )}
+
+              {/* Stock Images Library */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className={`block text-xs font-medium opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Biblioteca de Templates
+                  </label>
+                  <button 
+                    onClick={regenerateStockLibrary}
+                    disabled={isRegeneratingLibrary}
+                    className="text-[10px] text-primary-500 hover:underline flex items-center gap-1 disabled:opacity-50"
+                    title="Gera novas imagens para a biblioteca usando IA"
+                  >
+                    {isRegeneratingLibrary ? (
+                      <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <SparklesIcon className="w-3 h-3" />
+                    )}
+                    {isRegeneratingLibrary ? 'Gerando...' : 'Regenerar Biblioteca'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-5 gap-2 overflow-x-auto pb-2">
+                  {Object.entries(stockImages).map(([key, url]) => (
+                    <button
+                      key={key}
+                      onClick={() => setUploadedImage(url)}
+                      className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all flex flex-col ${uploadedImage === url ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-transparent hover:border-slate-400'}`}
+                      title={key.replace('_', ' ')}
+                    >
+                      <img src={url} alt={key} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/20 hover:bg-transparent transition-colors flex items-end justify-center">
+                        <span className="text-[8px] text-white font-bold bg-black/50 w-full py-0.5 truncate px-1 capitalize">
+                          {key.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {imageQuotaError && (
                 <p className="mt-2 text-xs text-amber-500 flex items-center gap-1">
                   <ClockIcon className="w-3 h-3" />

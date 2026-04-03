@@ -841,33 +841,17 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     });
 
     let base64Image = "";
-    if (response.candidates && response.candidates[0] && response.candidates[0].content) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          base64Image = part.inlineData.data;
-          break;
-        }
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        base64Image = part.inlineData.data;
+        break;
       }
-    }
-
-    if (!base64Image) {
-      return res.status(500).json({ error: "A IA não retornou uma imagem válida. Tente novamente." });
     }
 
     res.json({ image: `data:image/png;base64,${base64Image}` });
   } catch (error: any) {
     console.error("Erro na geração de imagem:", error);
-    
-    // Check for quota/rate limit errors (429)
-    const errorMsg = error.message || "";
-    if (errorMsg.includes("429") || errorMsg.includes("quota") || errorMsg.includes("RESOURCE_EXHAUSTED") || errorMsg.includes("limit")) {
-      return res.status(429).json({ 
-        error: "Limite de geração de imagens atingido (o Google permite 5 por minuto no plano gratuito). Por favor, aguarde 1 minuto e tente novamente.",
-        isQuotaError: true
-      });
-    }
-    
-    res.status(500).json({ error: "Erro ao processar imagem: " + error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -930,7 +914,7 @@ app.post("/api/marketing/generate", async (req, res) => {
       "points": ["Ponto 1 curto", "Ponto 2 curto", "Ponto 3 curto"],
       "ctaCaption": "Frase curta chamando para ler a legenda (ex: Leia a legenda para entender melhor)",
       "caption": "Legenda completa para o Instagram, educativa, explicando o tema com clareza, incluindo emojis discretos e hashtags relevantes (#advocaciaprevidenciaria #inss #direitoprevidenciario).",
-      "imagePrompt": "Prompt detalhado para geração de imagem realista e respeitosa sobre o tema, sem textos, focada no público brasileiro (ex: idoso brasileiro sorrindo em frente a uma casa simples)."
+      "imagePrompt": "Prompt detalhado para geração de imagem realista e respeitosa sobre o tema. INSPIRAÇÃO VISUAL: Estilo fotográfico natural, luz do dia, cores quentes, foco em pessoas reais brasileiras. TEMAS: 1. Idosos (casais ou sozinhos) em parques ou bancos de praça. 2. Famílias brasileiras diversas (ex: piquenique com bebê). 3. Contexto de saúde/deficiência (médicos atenciosos, pessoas com gesso, andador ou cadeira de rodas, próteses). 4. Contexto jurídico (martelo de juiz sobre mármore com inscrições). 5. Realidade social (casais simples em frente a casas humildes em cidades do interior). NÃO inclua textos na imagem, foque na emoção e autenticidade."
     }`;
     }
 
