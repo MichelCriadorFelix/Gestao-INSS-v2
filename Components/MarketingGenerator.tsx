@@ -83,48 +83,22 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
 
     setIsGenerating(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error('Chave da API do Gemini não encontrada.');
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const personaDesc = persona === 'michel' 
-        ? 'Dr. Michel Felix: Estilo direto, estratégico, focado em resultados e direitos previdenciários.'
-        : 'Dra. Luana Castro: Estilo acolhedor, detalhista, focado em explicar os direitos trabalhistas e previdenciários com empatia.';
-
-      const prompt = `Você é um especialista em marketing jurídico para o escritório "Felix & Castro Advocacia Previdenciária e Consumerista".
-      Crie o conteúdo para um post de Instagram sobre o seguinte tema: "${topic}".
-      
-      Tom de voz (${personaDesc}).
-      
-      REGRAS CRÍTICAS DA OAB (NÃO VIOLAR):
-      - O conteúdo DEVE ser estritamente INFORMATIVO e EDUCACIONAL.
-      - É PROIBIDO qualquer tipo de captação de clientela, mercantilização ou tom comercial.
-      - NÃO use frases como "consulte um advogado", "entre em contato", "agende uma consulta", "garanta seu direito", "não perca tempo", ou "não admite amadorismo".
-      - O tom deve ser sóbrio, elegante e focado em explicar o direito, sem promessas de resultados ou autoengrandecimento.
-      - Termine o texto de forma neutra, apenas com a informação jurídica.
-      
-      Responda EXATAMENTE no formato JSON abaixo, sem formatação markdown extra, apenas o JSON puro:
-      {
-        "title": "Título curto e chamativo (máximo 4 palavras)",
-        "highlight": "Subtítulo de destaque em caixa alta (ex: REQUISITOS, ATENÇÃO, POR IDADE URBANA)",
-        "points": ["Ponto 1 curto", "Ponto 2 curto", "Ponto 3 curto"],
-        "caption": "Legenda completa para o Instagram, educativa, explicando o tema com clareza, incluindo emojis discretos e hashtags relevantes (#advocaciaprevidenciaria #inss #direitoprevidenciario)."
-      }`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        }
+      const response = await fetch('/api/marketing/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topic, persona }),
       });
 
-      const text = response.text;
-      if (text) {
-        const data = JSON.parse(text) as PostData;
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.text) {
+        const data = JSON.parse(result.text) as PostData;
         setPostData(data);
       }
     } catch (error) {

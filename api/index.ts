@@ -822,6 +822,53 @@ Aguardando próxima parte ou comando."
 NÃO gere relatórios completos ou petições neste modo. Apenas acumule o conhecimento.
 `;
 
+app.post("/api/marketing/generate", async (req, res) => {
+  try {
+    const { topic, persona } = req.body;
+    
+    if (!topic) {
+      return res.status(400).json({ error: "Topic is required" });
+    }
+
+    const personaDesc = persona === 'michel' 
+      ? 'Dr. Michel Felix: Estilo direto, estratégico, focado em resultados e direitos previdenciários.'
+      : 'Dra. Luana Castro: Estilo acolhedor, detalhista, focado em explicar os direitos trabalhistas e previdenciários com empatia.';
+
+    const prompt = `Você é um especialista em marketing jurídico para o escritório "Felix & Castro Advocacia Previdenciária e Consumerista".
+    Crie o conteúdo para um post de Instagram sobre o seguinte tema: "${topic}".
+    
+    Tom de voz (${personaDesc}).
+    
+    REGRAS CRÍTICAS DA OAB (NÃO VIOLAR):
+    - O conteúdo DEVE ser estritamente INFORMATIVO e EDUCACIONAL.
+    - É PROIBIDO qualquer tipo de captação de clientela, mercantilização ou tom comercial.
+    - NÃO use frases como "consulte um advogado", "entre em contato", "agende uma consulta", "garanta seu direito", "não perca tempo", ou "não admite amadorismo".
+    - O tom deve ser sóbrio, elegante e focado em explicar o direito, sem promessas de resultados ou autoengrandecimento.
+    - Termine o texto de forma neutra, apenas com a informação jurídica.
+    
+    Responda EXATAMENTE no formato JSON abaixo, sem formatação markdown extra, apenas o JSON puro:
+    {
+      "title": "Título curto e chamativo (máximo 4 palavras)",
+      "highlight": "Subtítulo de destaque em caixa alta (ex: REQUISITOS, ATENÇÃO, POR IDADE URBANA)",
+      "points": ["Ponto 1 curto", "Ponto 2 curto", "Ponto 3 curto"],
+      "caption": "Legenda completa para o Instagram, educativa, explicando o tema com clareza, incluindo emojis discretos e hashtags relevantes (#advocaciaprevidenciaria #inss #direitoprevidenciario)."
+    }`;
+
+    const response = await callGemini({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      }
+    });
+
+    res.json({ text: response.text });
+  } catch (error: any) {
+    console.error("Erro na geração de marketing:", error);
+    res.status(500).json({ error: error.message || "Erro interno do servidor" });
+  }
+});
+
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
     const { message, history, images, ragContext } = req.body;
