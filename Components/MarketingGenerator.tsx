@@ -32,6 +32,13 @@ interface PostData {
   imagePrompt?: string;
 }
 
+interface LibraryAsset {
+  id: string;
+  topic: string;
+  url: string;
+  description: string;
+}
+
 interface StrategySuggestion {
   title: string;
   description: string;
@@ -66,12 +73,28 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const [isEditingText, setIsEditingText] = useState(false);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [currentPostStatus, setCurrentPostStatus] = useState<'draft' | 'pending_approval' | 'approved'>('draft');
+  const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[]>([]);
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+  const [newAssetDescription, setNewAssetDescription] = useState('');
+  const [newAssetTopic, setNewAssetTopic] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState<LibraryAsset | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSavedPosts();
+    loadLibraryAssets();
   }, []);
+
+  const loadLibraryAssets = async () => {
+    try {
+      const assets = await supabaseService.getThemeImages();
+      setLibraryAssets(assets);
+    } catch (error) {
+      console.error('Error loading library assets:', error);
+    }
+  };
 
   const loadSavedPosts = async () => {
     try {
@@ -157,7 +180,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           persona, 
           mode, 
           currentData: postData,
-          strategy: selectedStrategy ? selectedStrategy.description : strategy
+          strategy: selectedStrategy ? selectedStrategy.description : strategy,
+          assetDescription: selectedAsset ? selectedAsset.description : null
         }),
       });
 
@@ -254,8 +278,41 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedImage(event.target?.result as string);
+        setSelectedAsset(null); // Clear selected asset if manual upload
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !newAssetTopic.trim()) {
+      alert('Por favor, preencha o tema antes de fazer o upload.');
+      return;
+    }
+
+    setIsUploadingAsset(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        const fileName = `assets/${newAssetTopic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+        const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, base64);
+        
+        if (publicUrl) {
+          await supabaseService.saveThemeImage(newAssetTopic, publicUrl, newAssetDescription);
+          await loadLibraryAssets();
+          setNewAssetTopic('');
+          setNewAssetDescription('');
+          alert('Imagem salva na biblioteca com sucesso!');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading asset:', error);
+      alert('Erro ao salvar na biblioteca.');
+    } finally {
+      setIsUploadingAsset(false);
     }
   };
 
@@ -707,27 +764,46 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-all ${darkMode ? 'border-slate-600 hover:border-primary-500 text-slate-300' : 'border-slate-300 hover:border-primary-500 text-slate-600'}`}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 border-dashed transition-all ${darkMode ? 'border-slate-600 hover:border-primary-500 text-slate-300' : 'border-slate-300 hover:border-primary-500 text-slate-600'}`}
                 >
                   <PhotoIcon className="w-5 h-5" />
-                  Upload
+                  <span className="text-[10px] font-medium">Upload</span>
+                </button>
+                <button
+                  onClick={() => setShowAssetLibrary(true)}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border transition-all ${selectedAsset ? (darkMode ? 'bg-primary-900/20 border-primary-500 text-primary-400' : 'bg-primary-50 border-primary-500 text-primary-700') : (darkMode ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-white' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700')}`}
+                >
+                  <BookmarkIcon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">Biblioteca</span>
                 </button>
                 <button
                   onClick={() => generateAIImage()}
                   disabled={isGeneratingImage || !postData?.imagePrompt}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${darkMode ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-white' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}
+                  className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border transition-all ${darkMode ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-white' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}
                 >
                   {isGeneratingImage ? (
                     <ArrowPathIcon className="w-5 h-5 animate-spin" />
                   ) : (
                     <SparklesIcon className="w-5 h-5 text-primary-500" />
                   )}
-                  Gerar com IA
+                  <span className="text-[10px] font-medium">IA</span>
                 </button>
               </div>
+              {selectedAsset && (
+                <div className={`mt-3 p-2 rounded-lg border flex items-center gap-3 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <img src={selectedAsset.url} alt="" className="w-12 h-12 rounded object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{selectedAsset.topic}</p>
+                    <p className={`text-[10px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedAsset.description}</p>
+                  </div>
+                  <button onClick={() => { setSelectedAsset(null); setUploadedImage(null); }} className="text-red-500 hover:text-red-600">
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
@@ -976,6 +1052,90 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           )}
         </div>
       </div>
+      {/* Asset Library Modal */}
+      {showAssetLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Biblioteca de Ativos</h2>
+                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gerencie e selecione fotos para seus posts</p>
+              </div>
+              <button 
+                onClick={() => setShowAssetLibrary(false)}
+                className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+              >
+                <PlusIcon className="w-6 h-6 rotate-45" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Upload Section */}
+                <div className={`p-4 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+                  <h3 className={`font-semibold mb-4 text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>Adicionar Novo Ativo</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium mb-1 opacity-70">Tema/Título</label>
+                      <input 
+                        type="text"
+                        value={newAssetTopic}
+                        onChange={(e) => setNewAssetTopic(e.target.value)}
+                        placeholder="Ex: Aposentadoria Rural"
+                        className={`w-full p-2 text-sm rounded-lg border outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 opacity-70">Descrição (para a IA)</label>
+                      <textarea 
+                        value={newAssetDescription}
+                        onChange={(e) => setNewAssetDescription(e.target.value)}
+                        placeholder="Descreva o que tem na foto..."
+                        className={`w-full p-2 text-sm rounded-lg border outline-none h-20 resize-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = (e) => handleAssetUpload(e as any);
+                        input.click();
+                      }}
+                      disabled={isUploadingAsset || !newAssetTopic.trim()}
+                      className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white p-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                    >
+                      {isUploadingAsset ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <PlusIcon className="w-4 h-4" />}
+                      Upload e Salvar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Assets Grid */}
+                <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {libraryAssets.map((asset) => (
+                    <div 
+                      key={asset.id}
+                      className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-primary-500 ${selectedAsset?.id === asset.id ? 'ring-2 ring-primary-500' : (darkMode ? 'border-slate-700' : 'border-slate-200')}`}
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        setUploadedImage(asset.url);
+                        setShowAssetLibrary(false);
+                      }}
+                    >
+                      <img src={asset.url} alt={asset.topic} className="w-full h-32 object-cover" />
+                      <div className={`p-2 ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
+                        <p className={`text-xs font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{asset.topic}</p>
+                        <p className={`text-[10px] truncate opacity-60 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{asset.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

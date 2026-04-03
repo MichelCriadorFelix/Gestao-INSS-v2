@@ -184,7 +184,7 @@ export const supabaseService = {
   },
 
   // Theme Images (Reusable images for specific topics)
-  async saveThemeImage(topic: string, imageUrl: string) {
+  async saveThemeImage(topic: string, imageUrl: string, description?: string) {
     const supabase = getSupabase();
     if (!supabase) return null;
 
@@ -199,6 +199,7 @@ export const supabaseService = {
           id: 'img',
           role: 'assistant',
           content: imageUrl,
+          description: description || '',
           timestamp: new Date().toISOString()
         }]
       });
@@ -208,6 +209,29 @@ export const supabaseService = {
       throw error;
     }
     return data;
+  },
+
+  async getThemeImages() {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .select('*')
+      .eq('lawyer_type', 'theme_image')
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching theme images:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      topic: row.title,
+      url: row.messages?.[0]?.content || '',
+      description: row.messages?.[0]?.description || ''
+    }));
   },
 
   async getThemeImage(topic: string) {
@@ -227,7 +251,10 @@ export const supabaseService = {
     }
 
     if (data && data.messages && data.messages.length > 0) {
-      return data.messages[0].content;
+      return {
+        url: data.messages[0].content,
+        description: data.messages[0].description || ''
+      };
     }
     return null;
   },
