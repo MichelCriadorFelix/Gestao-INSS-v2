@@ -5,7 +5,7 @@ import {
   ArchiveBoxIcon, MagnifyingGlassIcon, PlusIcon, StarIcon, ArrowUturnLeftIcon, ArrowPathIcon, 
   PencilSquareIcon, TrashIcon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, 
   ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckIcon, BookOpenIcon,
-  GlobeAltIcon, AcademicCapIcon
+  GlobeAltIcon, AcademicCapIcon, SparklesIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import Legislation from './Legislation';
@@ -42,6 +42,7 @@ import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
 import KnowledgeBase from './KnowledgeBase';
+import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
 const Dashboard: React.FC<DashboardProps> = ({ 
@@ -56,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSettingsSaved,
   onRestoreBackup
 }) => {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base'>('clients');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('clients');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -1326,6 +1327,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                    <AcademicCapIcon className="h-6 w-6 lg:mr-3" />
                    <span className="hidden lg:block font-medium whitespace-nowrap">Base de Conhecimento</span>
                </button>
+
+               <button 
+                   onClick={() => setCurrentView('marketing')}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+               >
+                   <SparklesIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium whitespace-nowrap">Marketing Jurídico</span>
+               </button>
            </div>
            
            <div className="p-4 border-t border-slate-800">
@@ -1359,6 +1368,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       currentView === 'dra_luana' ? 'Dra. Luana Castro - IA Trabalhista' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
+                      currentView === 'marketing' ? 'Marketing Jurídico' :
                       'Cálculos Previdenciários'}
                  </h2>
                  {isSyncing ? (
@@ -1667,6 +1677,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <MeuINSS />
              ) : currentView === 'knowledge_base' ? (
                  <KnowledgeBase />
+             ) : currentView === 'marketing' ? (
+                 <MarketingGenerator darkMode={darkMode} />
              ) : (
                  <>
                     <FinancialStats contracts={contracts} />
