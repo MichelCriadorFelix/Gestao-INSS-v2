@@ -843,10 +843,13 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     });
 
     let base64Image = "";
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        base64Image = part.inlineData.data;
-        break;
+    const candidate = response.candidates?.[0];
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData?.data) {
+          base64Image = part.inlineData.data;
+          break;
+        }
       }
     }
 

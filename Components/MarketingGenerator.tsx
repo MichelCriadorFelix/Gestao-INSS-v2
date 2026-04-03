@@ -201,7 +201,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           // Check if we already have a theme image for this topic
           const existingThemeImage = await supabaseService.getThemeImage(topic);
           if (existingThemeImage) {
-            setUploadedImage(existingThemeImage);
+            setUploadedImage(existingThemeImage.url);
           } else if (data.imagePrompt && !uploadedImage) {
             // Generate a new one if not found
             generateAIImage(data.imagePrompt);
@@ -253,7 +253,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         // Upload to Storage to get a public URL and save as theme image
         try {
           const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
-          const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, result.image);
+          const publicUrl = await supabaseService.uploadFile('marketing', fileName, result.image);
           if (publicUrl) {
             setUploadedImage(publicUrl);
             // Save as theme image for future use
@@ -306,7 +306,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     setIsUploadingAsset(true);
     try {
       const fileName = `assets/${newAssetTopic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
-      const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, newAssetPreview);
+      const publicUrl = await supabaseService.uploadFile('marketing', fileName, newAssetPreview);
       
       if (publicUrl) {
         await supabaseService.saveThemeImage(newAssetTopic, publicUrl, newAssetDescription);
@@ -316,9 +316,10 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         setNewAssetPreview(null);
         alert('Imagem salva na biblioteca com sucesso!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading asset:', error);
-      alert('Erro ao salvar na biblioteca.');
+      const errorMessage = error?.message || error?.error_description || 'Erro desconhecido';
+      alert(`Erro ao salvar na biblioteca: ${errorMessage}`);
     } finally {
       setIsUploadingAsset(false);
     }

@@ -755,27 +755,54 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return null;
 
-    // Se for base64 (Data URL), converte para Blob
+    // Se for base64 (Data URL), converte para Blob de forma robusta
     let fileBody: File | Blob | string = file;
+    let contentType: string | undefined = undefined;
+
     if (typeof file === 'string' && file.startsWith('data:')) {
-      const response = await fetch(file);
-      fileBody = await response.blob();
+      try {
+        const parts = file.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1];
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        fileBody = new Blob([u8arr], { type: mime });
+        contentType = mime;
+      } catch (e) {
+        console.error('Erro ao converter base64 para Blob, tentando fetch...', e);
+        const response = await fetch(file);
+        fileBody = await response.blob();
+        contentType = fileBody.type;
+      }
+    } else if (file instanceof File || file instanceof Blob) {
+      contentType = file.type;
     }
 
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(path, fileBody, {
         upsert: true,
-        contentType: typeof file === 'string' && file.startsWith('data:') ? file.split(';')[0].split(':')[1] : undefined
+        contentType: contentType
       });
 
     if (error) {
       // Se o erro for que o bucket não existe, tenta criar (pode falhar se não for admin)
       if (error.message.includes('bucket not found') || error.message.includes('does not exist')) {
         console.log(`Bucket ${bucket} não encontrado, tentando criar...`);
-        await supabase.storage.createBucket(bucket, { public: true });
-        // Tenta o upload novamente
-        return this.uploadFile(bucket, path, file);
+        try {
+          const { error: createError } = await supabase.storage.createBucket(bucket, { public: true });
+          if (createError) {
+            console.error('Erro ao criar bucket:', createError);
+            throw new Error(`O bucket "${bucket}" não existe e não pôde ser criado automaticamente. Por favor, crie-o manualmente no console do Supabase.`);
+          }
+          // Tenta o upload novamente
+          return this.uploadFile(bucket, path, file);
+        } catch (e: any) {
+          throw new Error(`Erro ao acessar o armazenamento: ${e.message}`);
+        }
       }
       console.error('Erro ao fazer upload para Storage:', error);
       throw error;
