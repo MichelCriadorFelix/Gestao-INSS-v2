@@ -112,6 +112,7 @@ export const supabaseService = {
   },
 
   // Marketing Posts (Reusing ai_conversations table)
+  // Feature: Theme-based image persistence
   async saveMarketingPost(post: any) {
     const supabase = getSupabase();
     if (!supabase) return null;

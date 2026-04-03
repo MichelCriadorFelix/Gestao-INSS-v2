@@ -822,6 +822,8 @@ Aguardando próxima parte ou comando."
 NÃO gere relatórios completos ou petições neste modo. Apenas acumule o conhecimento.
 `;
 
+// Marketing Endpoints
+// Enhanced with didactic language and AI image generation
 app.post("/api/marketing/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
