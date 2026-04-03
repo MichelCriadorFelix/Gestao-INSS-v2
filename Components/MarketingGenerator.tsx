@@ -79,8 +79,10 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const [newAssetDescription, setNewAssetDescription] = useState('');
   const [newAssetTopic, setNewAssetTopic] = useState('');
   const [selectedAsset, setSelectedAsset] = useState<LibraryAsset | null>(null);
+  const [newAssetPreview, setNewAssetPreview] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const libraryFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadSavedPosts();
@@ -284,30 +286,36 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     }
   };
 
-  const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAssetSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !newAssetTopic.trim()) {
-      alert('Por favor, preencha o tema antes de fazer o upload.');
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setNewAssetPreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAssetUpload = async () => {
+    if (!newAssetPreview || !newAssetTopic.trim()) {
+      alert('Por favor, selecione uma foto e preencha o tema.');
       return;
     }
 
     setIsUploadingAsset(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
-        const fileName = `assets/${newAssetTopic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
-        const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, base64);
-        
-        if (publicUrl) {
-          await supabaseService.saveThemeImage(newAssetTopic, publicUrl, newAssetDescription);
-          await loadLibraryAssets();
-          setNewAssetTopic('');
-          setNewAssetDescription('');
-          alert('Imagem salva na biblioteca com sucesso!');
-        }
-      };
-      reader.readAsDataURL(file);
+      const fileName = `assets/${newAssetTopic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+      const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, newAssetPreview);
+      
+      if (publicUrl) {
+        await supabaseService.saveThemeImage(newAssetTopic, publicUrl, newAssetDescription);
+        await loadLibraryAssets();
+        setNewAssetTopic('');
+        setNewAssetDescription('');
+        setNewAssetPreview(null);
+        alert('Imagem salva na biblioteca com sucesso!');
+      }
     } catch (error) {
       console.error('Error uploading asset:', error);
       alert('Erro ao salvar na biblioteca.');
@@ -1075,6 +1083,34 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 <div className={`p-4 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
                   <h3 className={`font-semibold mb-4 text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>Adicionar Novo Ativo</h3>
                   <div className="space-y-4">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      ref={libraryFileInputRef}
+                      onChange={handleAssetSelect}
+                      className="hidden"
+                    />
+                    
+                    {!newAssetPreview ? (
+                      <button
+                        onClick={() => libraryFileInputRef.current?.click()}
+                        className={`w-full flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed transition-all ${darkMode ? 'border-slate-700 hover:border-primary-500 text-slate-400' : 'border-slate-300 hover:border-primary-500 text-slate-500'}`}
+                      >
+                        <PhotoIcon className="w-8 h-8" />
+                        <span className="text-xs font-medium">Selecionar Foto</span>
+                      </button>
+                    ) : (
+                      <div className="relative group">
+                        <img src={newAssetPreview} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-slate-200 dark:border-slate-700" />
+                        <button 
+                          onClick={() => setNewAssetPreview(null)}
+                          className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-xs font-medium mb-1 opacity-70">Tema/Título</label>
                       <input 
@@ -1095,18 +1131,15 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       />
                     </div>
                     <button
-                      onClick={() => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = 'image/*';
-                        input.onchange = (e) => handleAssetUpload(e as any);
-                        input.click();
-                      }}
-                      disabled={isUploadingAsset || !newAssetTopic.trim()}
+                      onClick={handleAssetUpload}
+                      disabled={isUploadingAsset || !newAssetTopic.trim() || !newAssetPreview}
                       className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white p-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                     >
-                      {isUploadingAsset ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <PlusIcon className="w-4 h-4" />}
-                      Upload e Salvar
+                      {isUploadingAsset ? (
+                        <><ArrowPathIcon className="w-4 h-4 animate-spin" /> Salvando...</>
+                      ) : (
+                        <><CheckCircleIcon className="w-4 h-4" /> Salvar na Biblioteca</>
+                      )}
                     </button>
                   </div>
                 </div>
