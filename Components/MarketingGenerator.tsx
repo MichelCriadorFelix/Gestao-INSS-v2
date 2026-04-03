@@ -11,6 +11,7 @@ import {
   ClockIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
+import { supabaseService } from '../services/supabaseService';
 
 interface MarketingGeneratorProps {
   darkMode: boolean;
@@ -46,13 +47,24 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('marketing_saved_posts');
-    if (saved) {
-      try {
-        setSavedPosts(JSON.parse(saved));
-      } catch (e) {}
-    }
+    loadSavedPosts();
   }, []);
+
+  const loadSavedPosts = async () => {
+    try {
+      const posts = await supabaseService.getMarketingPosts();
+      setSavedPosts(posts);
+    } catch (error) {
+      console.error('Error loading marketing posts:', error);
+      // Fallback to local storage if Supabase fails
+      const saved = localStorage.getItem('marketing_saved_posts');
+      if (saved) {
+        try {
+          setSavedPosts(JSON.parse(saved));
+        } catch (e) {}
+      }
+    }
+  };
 
   // Colors based on user's Canva templates
   const colors = {
@@ -369,7 +381,7 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
     }
   };
 
-  const handleSavePost = () => {
+  const handleSavePost = async () => {
     if (!postData) return;
     const newPost: SavedPost = {
       id: Date.now().toString(),
@@ -380,10 +392,19 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
       postData,
       uploadedImage
     };
+    
+    // Optimistic update
     const updated = [newPost, ...savedPosts];
     setSavedPosts(updated);
     localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
-    alert('Post salvo com sucesso no histórico!');
+    
+    try {
+      await supabaseService.saveMarketingPost(newPost);
+      alert('Post salvo com sucesso no histórico da nuvem!');
+    } catch (error) {
+      console.error('Failed to save to Supabase:', error);
+      alert('Post salvo localmente, mas houve um erro ao sincronizar com a nuvem.');
+    }
   };
 
   const handleLoadPost = (post: SavedPost) => {
@@ -394,11 +415,18 @@ export default function MarketingGenerator({ darkMode }: MarketingGeneratorProps
     setUploadedImage(post.uploadedImage);
   };
 
-  const handleDeletePost = (id: string) => {
+  const handleDeletePost = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este post do histórico?')) {
+      // Optimistic update
       const updated = savedPosts.filter(p => p.id !== id);
       setSavedPosts(updated);
       localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
+      
+      try {
+        await supabaseService.deleteMarketingPost(id);
+      } catch (error) {
+        console.error('Failed to delete from Supabase:', error);
+      }
     }
   };
 

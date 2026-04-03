@@ -111,6 +111,77 @@ export const supabaseService = {
     }
   },
 
+  // Marketing Posts (Reusing ai_conversations table)
+  async saveMarketingPost(post: any) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .upsert({
+        id: post.id,
+        lawyer_type: 'marketing',
+        title: post.topic || 'Sem tema',
+        date: post.date,
+        messages: [{
+          id: post.id,
+          role: 'assistant',
+          content: JSON.stringify(post),
+          timestamp: post.date
+        }]
+      });
+      
+    if (error) {
+      console.error('Error saving marketing post to Supabase:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async getMarketingPosts() {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .select('*')
+      .eq('lawyer_type', 'marketing')
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching marketing posts from Supabase:', error);
+      return [];
+    }
+    
+    return (data || []).map(row => {
+      try {
+        if (row.messages && row.messages.length > 0) {
+          return JSON.parse(row.messages[0].content);
+        }
+      } catch (e) {
+        console.error('Error parsing marketing post:', e);
+      }
+      return null;
+    }).filter(Boolean);
+  },
+
+  async deleteMarketingPost(id: string) {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+    
+    const { error } = await supabase
+      .from('ai_conversations')
+      .delete()
+      .eq('id', id)
+      .eq('lawyer_type', 'marketing');
+      
+    if (error) {
+      console.error('Error deleting marketing post from Supabase:', error);
+      return false;
+    }
+    return true;
+  },
+
   // Social Security Calculations
   async saveCalculation(calc: SavedCalculation) {
     const supabase = getSupabase();
