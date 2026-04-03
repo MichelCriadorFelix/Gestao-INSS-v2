@@ -198,13 +198,20 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         if (mode === 'full') {
           setPostData(data as PostData);
           
-          // Check if we already have a theme image for this topic
-          const existingThemeImage = await supabaseService.getThemeImage(topic);
-          if (existingThemeImage) {
-            setUploadedImage(existingThemeImage.url);
-          } else if (data.imagePrompt && !uploadedImage) {
-            // Generate a new one if not found
-            generateAIImage(data.imagePrompt);
+          // 1. If we have a manually selected asset, use it
+          if (selectedAsset) {
+            setUploadedImage(selectedAsset.url);
+          } 
+          // 2. Otherwise, check if we already have a theme image for this topic in the database
+          else {
+            const existingThemeImage = await supabaseService.getThemeImage(topic);
+            if (existingThemeImage) {
+              setUploadedImage(existingThemeImage.url);
+            } 
+            // 3. Finally, generate a new one if nothing else is available
+            else if (data.imagePrompt && !uploadedImage) {
+              generateAIImage(data.imagePrompt);
+            }
           }
         } else if (mode === 'template' && postData) {
           setPostData({
@@ -474,16 +481,34 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     img.crossOrigin = "anonymous"; // Important for external images
     img.onload = () => {
       // Draw image with object-fit: cover logic
+      // We use a slightly smarter cover that centers the image
       const scale = Math.max(imgW / img.width, imgH / img.height);
-      const x = (imgW / 2) - (img.width / 2) * scale;
-      const y = (imgH / 2) - (img.height / 2) * scale;
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      const offsetX = (imgW - drawW) / 2;
+      const offsetY = (imgH - drawH) / 2;
       
       ctx.save();
       ctx.beginPath();
       // Rounded corners for the image
-      ctx.roundRect ? ctx.roundRect(imgX, imgY, imgW, imgH, 10) : ctx.rect(imgX, imgY, imgW, imgH);
+      if (ctx.roundRect) {
+        ctx.roundRect(imgX, imgY, imgW, imgH, 15);
+      } else {
+        ctx.rect(imgX, imgY, imgW, imgH);
+      }
       ctx.clip();
-      ctx.drawImage(img, imgX + x, imgY + y, img.width * scale, img.height * scale);
+      
+      // Draw a subtle shadow/gradient behind the image if it has transparency
+      ctx.fillStyle = '#f8f9fa';
+      ctx.fillRect(imgX, imgY, imgW, imgH);
+      
+      ctx.drawImage(img, imgX + offsetX, imgY + offsetY, drawW, drawH);
+      
+      // Add a very subtle inner shadow to the image for depth
+      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(imgX, imgY, imgW, imgH);
+      
       ctx.restore();
       
       // Draw text after image loads to ensure it's on top if they overlap

@@ -847,7 +847,7 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     if (candidate?.content?.parts) {
       for (const part of candidate.content.parts) {
         if (part.inlineData?.data) {
-          base64Image = part.inlineData.data;
+          base64Image = part.inlineData.data as string;
           break;
         }
       }
