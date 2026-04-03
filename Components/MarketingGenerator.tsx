@@ -11,7 +11,9 @@ import {
   ClockIcon,
   TrashIcon,
   CheckCircleIcon,
-  PaperAirplaneIcon
+  PaperAirplaneIcon,
+  PlusIcon,
+  LightBulbIcon
 } from '@heroicons/react/24/outline';
 import { supabaseService } from '../services/supabaseService';
 import { User, UserRole } from '../types';
@@ -26,6 +28,13 @@ interface PostData {
   highlight: string;
   points: string[];
   caption: string;
+  ctaCaption?: string;
+  imagePrompt?: string;
+}
+
+interface StrategySuggestion {
+  title: string;
+  description: string;
 }
 
 interface SavedPost {
@@ -37,13 +46,20 @@ interface SavedPost {
   postData: PostData;
   uploadedImage: string | null;
   status?: 'draft' | 'pending_approval' | 'approved';
+  strategy?: string;
 }
 
 export default function MarketingGenerator({ darkMode, user }: MarketingGeneratorProps) {
   const [topic, setTopic] = useState('');
+  const [strategy, setStrategy] = useState('educacional');
+  const [suggestedStrategies, setSuggestedStrategies] = useState<StrategySuggestion[] | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategySuggestion | null>(null);
+  const [isGeneratingStrategies, setIsGeneratingStrategies] = useState(false);
   const [persona, setPersona] = useState<'michel' | 'luana'>('michel');
   const [templateType, setTemplateType] = useState<'list' | 'urgent' | 'qa'>('list');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageQuotaError, setImageQuotaError] = useState(false);
   const [postData, setPostData] = useState<PostData | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
@@ -82,7 +98,48 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     blueText: '#003366',
   };
 
-  const generatePost = async () => {
+  const generateStrategies = async () => {
+    if (!topic.trim()) {
+      alert('Por favor, digite um tema para o post.');
+      return;
+    }
+
+    setIsGeneratingStrategies(true);
+    try {
+      const response = await fetch('/api/marketing/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          topic, 
+          persona, 
+          mode: 'strategies' 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.text) {
+        const data = JSON.parse(result.text);
+        if (data.strategies && Array.isArray(data.strategies)) {
+          setSuggestedStrategies(data.strategies);
+          setSelectedStrategy(null);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao gerar estratégias:', error);
+      alert('Ocorreu um erro ao gerar as ideias. Tente novamente.');
+    } finally {
+      setIsGeneratingStrategies(false);
+    }
+  };
+
+  const generatePost = async (mode: 'full' | 'template' | 'caption' = 'full') => {
     if (!topic.trim()) {
       alert('Por favor, digite um tema para o post.');
       return;
@@ -95,7 +152,13 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ topic, persona }),
+        body: JSON.stringify({ 
+          topic, 
+          persona, 
+          mode, 
+          currentData: postData,
+          strategy: selectedStrategy ? selectedStrategy.description : strategy
+        }),
       });
 
       if (!response.ok) {
@@ -105,14 +168,92 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        const data = JSON.parse(result.text) as PostData;
-        setPostData(data);
+        const data = JSON.parse(result.text);
+        if (mode === 'full') {
+          setPostData(data as PostData);
+          
+          // Check if we already have a theme image for this topic
+          const existingThemeImage = await supabaseService.getThemeImage(topic);
+          if (existingThemeImage) {
+            setUploadedImage(existingThemeImage);
+          } else if (data.imagePrompt && !uploadedImage) {
+            // Generate a new one if not found
+            generateAIImage(data.imagePrompt);
+          }
+        } else if (mode === 'template' && postData) {
+          setPostData({
+            ...postData,
+            title: data.title,
+            highlight: data.highlight,
+            points: data.points,
+            ctaCaption: data.ctaCaption
+          });
+        } else if (mode === 'caption' && postData) {
+          setPostData({
+            ...postData,
+            caption: data.caption
+          });
+        }
       }
     } catch (error) {
       console.error('Erro ao gerar post:', error);
       alert('Ocorreu um erro ao gerar o conteúdo. Tente novamente.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const generateAIImage = async (prompt?: string) => {
+    const finalPrompt = prompt || postData?.imagePrompt;
+    if (!finalPrompt) {
+      alert('Não há um prompt de imagem disponível.');
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    setImageQuotaError(false);
+    try {
+      const response = await fetch('/api/marketing/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: finalPrompt }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          setImageQuotaError(true);
+          alert(result.error || 'Limite de geração de imagens atingido. Tente novamente em 1 minuto.');
+        } else {
+          console.error('Erro ao gerar imagem:', result.error);
+        }
+        return;
+      }
+      
+      if (result.image) {
+        // Upload to Storage to get a public URL and save as theme image
+        try {
+          const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+          const publicUrl = await supabaseService.uploadFile('marketing_assets', fileName, result.image);
+          if (publicUrl) {
+            setUploadedImage(publicUrl);
+            // Save as theme image for future use
+            await supabaseService.saveThemeImage(topic, publicUrl);
+          } else {
+            setUploadedImage(result.image);
+          }
+        } catch (e) {
+          console.error('Error uploading generated image:', e);
+          setUploadedImage(result.image);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao gerar imagem:', error);
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -333,7 +474,14 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       currentY += 20; // Extra space between points
     });
 
-    // 8. Footer
+    // 8. CTA Caption
+    if (postData.ctaCaption) {
+      ctx.fillStyle = colors.yellowHighlight;
+      ctx.font = 'italic bold 32px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.fillText(postData.ctaCaption, 80, 930);
+    }
+
+    // 9. Footer
     ctx.fillStyle = colors.white;
     ctx.font = '500 25px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.fillText('@advprevfelixecastro', 80, 1000);
@@ -362,13 +510,25 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     }
   };
 
+  const handleNewPost = () => {
+    setTopic('');
+    setStrategy('educacional');
+    setSuggestedStrategies(null);
+    setSelectedStrategy(null);
+    setPostData(null);
+    setUploadedImage(null);
+    setCurrentPostId(null);
+    setCurrentPostStatus('draft');
+    setIsEditingText(false);
+  };
+
   const handleSavePost = async (statusOverride?: 'draft' | 'pending_approval' | 'approved') => {
     if (!postData) return;
     
     const newStatus = statusOverride || currentPostStatus;
     const postId = currentPostId || Date.now().toString();
     
-    const newPost: SavedPost = {
+    const newPost: SavedPost & { strategy?: string } = {
       id: postId,
       date: new Date().toISOString(),
       topic,
@@ -376,7 +536,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       templateType,
       postData,
       uploadedImage,
-      status: newStatus
+      status: newStatus,
+      strategy
     };
     
     // Optimistic update
@@ -386,8 +547,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       
     setSavedPosts(updated);
     localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
-    setCurrentPostId(postId);
-    setCurrentPostStatus(newStatus);
+    
+    // Clear form after saving
+    handleNewPost();
     
     try {
       await supabaseService.saveMarketingPost(newPost);
@@ -412,8 +574,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     alert('Post aprovado com sucesso!');
   };
 
-  const handleLoadPost = (post: SavedPost) => {
+  const handleLoadPost = (post: SavedPost & { strategy?: string }) => {
     setTopic(post.topic);
+    setStrategy(post.strategy || 'educacional');
     setPersona(post.persona as any);
     setTemplateType(post.templateType as any);
     setPostData(post.postData);
@@ -444,13 +607,24 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Fábrica de Posts (Marketing)
-        </h1>
-        <p className={`mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Gere imagens e legendas profissionais para o Instagram do escritório em segundos.
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            Fábrica de Posts (Marketing)
+          </h1>
+          <p className={`mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            Gere imagens e legendas profissionais para o Instagram do escritório em segundos.
+          </p>
+        </div>
+        {postData && (
+          <button
+            onClick={handleNewPost}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700' : 'bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 shadow-sm'}`}
+          >
+            <PlusIcon className="w-5 h-5" />
+            Criar Novo Post
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -468,7 +642,38 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 placeholder="Ex: Requisitos do BPC para idosos, ou Revisão da Vida Toda..."
                 className={`w-full p-3 rounded-xl border focus:ring-2 focus:ring-primary-500 outline-none transition-all resize-none h-24 ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
               />
+              <button
+                onClick={generateStrategies}
+                disabled={isGeneratingStrategies || !topic.trim()}
+                className={`mt-3 w-full flex items-center justify-center gap-2 p-2.5 rounded-xl font-medium transition-all border ${darkMode ? 'border-primary-500/30 text-primary-400 hover:bg-primary-900/30' : 'border-primary-200 text-primary-700 hover:bg-primary-50'} disabled:opacity-50`}
+              >
+                {isGeneratingStrategies ? (
+                  <><ArrowPathIcon className="w-4 h-4 animate-spin" /> Gerando ideias...</>
+                ) : (
+                  <><LightBulbIcon className="w-4 h-4" /> Sugerir Estratégias</>
+                )}
+              </button>
             </div>
+
+            {suggestedStrategies && (
+              <div className="space-y-3">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Escolha uma Estratégia:
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {suggestedStrategies.map((strat, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => setSelectedStrategy(strat)}
+                      className={`p-3 border rounded-xl cursor-pointer transition-all ${selectedStrategy?.title === strat.title ? (darkMode ? 'border-primary-500 bg-primary-900/20' : 'border-primary-500 bg-primary-50') : (darkMode ? 'border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300')}`}
+                    >
+                      <h4 className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>{strat.title}</h4>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{strat.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -511,24 +716,44 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-all ${darkMode ? 'border-slate-600 hover:border-primary-500 text-slate-300' : 'border-slate-300 hover:border-primary-500 text-slate-600'}`}
-              >
-                <PhotoIcon className="w-5 h-5" />
-                {uploadedImage ? 'Trocar Foto' : 'Fazer Upload de Foto'}
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed transition-all ${darkMode ? 'border-slate-600 hover:border-primary-500 text-slate-300' : 'border-slate-300 hover:border-primary-500 text-slate-600'}`}
+                >
+                  <PhotoIcon className="w-5 h-5" />
+                  Upload
+                </button>
+                <button
+                  onClick={() => generateAIImage()}
+                  disabled={isGeneratingImage || !postData?.imagePrompt}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${darkMode ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-white' : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'} disabled:opacity-50`}
+                >
+                  {isGeneratingImage ? (
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <SparklesIcon className="w-5 h-5 text-primary-500" />
+                  )}
+                  Gerar com IA
+                </button>
+              </div>
+              {imageQuotaError && (
+                <p className="mt-2 text-xs text-amber-500 flex items-center gap-1">
+                  <ClockIcon className="w-3 h-3" />
+                  Limite atingido. Tente novamente em 1 minuto.
+                </p>
+              )}
             </div>
 
             <button
-              onClick={generatePost}
+              onClick={() => generatePost('full')}
               disabled={isGenerating}
               className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white p-4 rounded-xl font-medium transition-all shadow-lg shadow-primary-500/30 disabled:opacity-50"
             >
               {isGenerating ? (
                 <>
                   <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                  Gerando Conteúdo...
+                  Gerando...
                 </>
               ) : (
                 <>
@@ -537,6 +762,27 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 </>
               )}
             </button>
+
+            {postData && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <button
+                  onClick={() => generatePost('template')}
+                  disabled={isGenerating}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all border ${darkMode ? 'border-primary-500/30 text-primary-400 hover:bg-primary-900/30' : 'border-primary-200 text-primary-700 hover:bg-primary-50'} disabled:opacity-50`}
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                  Regerar Template
+                </button>
+                <button
+                  onClick={() => generatePost('caption')}
+                  disabled={isGenerating}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all border ${darkMode ? 'border-primary-500/30 text-primary-400 hover:bg-primary-900/30' : 'border-primary-200 text-primary-700 hover:bg-primary-50'} disabled:opacity-50`}
+                >
+                  <ArrowPathIcon className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                  Regerar Legenda
+                </button>
+              </div>
+            )}
 
               {/* History Section */}
             {savedPosts.length > 0 && (
@@ -630,6 +876,15 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         type="text" 
                         value={postData.highlight} 
                         onChange={(e) => handleTextChange('highlight', e.target.value)}
+                        className={`w-full p-2 rounded border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 opacity-70">Chamada Legenda (CTA)</label>
+                      <input 
+                        type="text" 
+                        value={postData.ctaCaption || ''} 
+                        onChange={(e) => handleTextChange('ctaCaption', e.target.value)}
                         className={`w-full p-2 rounded border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
                       />
                     </div>

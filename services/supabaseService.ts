@@ -182,6 +182,55 @@ export const supabaseService = {
     return true;
   },
 
+  // Theme Images (Reusable images for specific topics)
+  async saveThemeImage(topic: string, imageUrl: string) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .upsert({
+        id: `theme_img_${topic.toLowerCase().replace(/\s+/g, '_')}`,
+        lawyer_type: 'theme_image',
+        title: topic,
+        date: new Date().toISOString(),
+        messages: [{
+          id: 'img',
+          role: 'assistant',
+          content: imageUrl,
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+    if (error) {
+      console.error('Error saving theme image:', error);
+      throw error;
+    }
+    return data;
+  },
+
+  async getThemeImage(topic: string) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .select('messages')
+      .eq('lawyer_type', 'theme_image')
+      .eq('id', `theme_img_${topic.toLowerCase().replace(/\s+/g, '_')}`)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching theme image:', error);
+      return null;
+    }
+
+    if (data && data.messages && data.messages.length > 0) {
+      return data.messages[0].content;
+    }
+    return null;
+  },
+
   // Social Security Calculations
   async saveCalculation(calc: SavedCalculation) {
     const supabase = getSupabase();
