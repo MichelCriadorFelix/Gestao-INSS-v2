@@ -13,7 +13,11 @@ import {
   CheckCircleIcon,
   PaperAirplaneIcon,
   PlusIcon,
-  LightBulbIcon
+  LightBulbIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { supabaseService } from '../services/supabaseService';
 import { User, UserRole } from '../types';
@@ -52,6 +56,9 @@ interface SavedPost {
   templateType: string;
   postData: PostData;
   uploadedImage: string | null;
+  imageZoom?: number;
+  imageOffsetX?: number;
+  imageOffsetY?: number;
   status?: 'draft' | 'pending_approval' | 'approved';
   strategy?: string;
 }
@@ -71,6 +78,10 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [isEditingText, setIsEditingText] = useState(false);
+  const [isEditingImage, setIsEditingImage] = useState(false);
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imageOffsetX, setImageOffsetX] = useState(0);
+  const [imageOffsetY, setImageOffsetY] = useState(0);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [currentPostStatus, setCurrentPostStatus] = useState<'draft' | 'pending_approval' | 'approved'>('draft');
   const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[]>([]);
@@ -197,6 +208,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         const data = JSON.parse(result.text);
         if (mode === 'full') {
           setPostData(data as PostData);
+          
+          // Reset image adjustments on new full post
+          setImageZoom(1);
+          setImageOffsetX(0);
+          setImageOffsetY(0);
           
           // 1. If we have a manually selected asset, use it
           if (selectedAsset) {
@@ -510,11 +526,12 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     img.onload = () => {
       // Draw image with object-fit: cover logic
       // We use a slightly smarter cover that centers the image
-      const scale = Math.max(imgW / img.width, imgH / img.height);
+      const baseScale = Math.max(imgW / img.width, imgH / img.height);
+      const scale = baseScale * imageZoom;
       const drawW = img.width * scale;
       const drawH = img.height * scale;
-      const offsetX = (imgW - drawW) / 2;
-      const offsetY = (imgH - drawH) / 2;
+      const offsetX = (imgW - drawW) / 2 + imageOffsetX;
+      const offsetY = (imgH - drawH) / 2 + imageOffsetY;
       
       ctx.save();
       ctx.beginPath();
@@ -602,7 +619,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     if (postData) {
       drawCanvas();
     }
-  }, [postData, uploadedImage]);
+  }, [postData, uploadedImage, imageZoom, imageOffsetX, imageOffsetY]);
 
   const handleDownload = () => {
     if (!canvasRef.current) return;
@@ -627,9 +644,13 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     setSelectedStrategy(null);
     setPostData(null);
     setUploadedImage(null);
+    setImageZoom(1);
+    setImageOffsetX(0);
+    setImageOffsetY(0);
     setCurrentPostId(null);
     setCurrentPostStatus('draft');
     setIsEditingText(false);
+    setIsEditingImage(false);
   };
 
   const handleSavePost = async (statusOverride?: 'draft' | 'pending_approval' | 'approved') => {
@@ -646,6 +667,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       templateType,
       postData,
       uploadedImage,
+      imageZoom,
+      imageOffsetX,
+      imageOffsetY,
       status: newStatus,
       strategy
     };
@@ -691,6 +715,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     setTemplateType(post.templateType as any);
     setPostData(post.postData);
     setUploadedImage(post.uploadedImage);
+    setImageZoom(post.imageZoom || 1);
+    setImageOffsetX(post.imageOffsetX || 0);
+    setImageOffsetY(post.imageOffsetY || 0);
     setCurrentPostId(post.id);
     setCurrentPostStatus(post.status || 'draft');
   };
@@ -966,11 +993,24 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setIsEditingText(!isEditingText)}
+                      onClick={() => {
+                        setIsEditingText(!isEditingText);
+                        if (!isEditingText) setIsEditingImage(false);
+                      }}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingText ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
                     >
                       <PencilIcon className="w-4 h-4" />
                       {isEditingText ? 'Ocultar Edição' : 'Editar Textos'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingImage(!isEditingImage);
+                        if (!isEditingImage) setIsEditingText(false);
+                      }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingImage ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                    >
+                      <PhotoIcon className="w-4 h-4" />
+                      {isEditingImage ? 'Ocultar Edição Imagem' : 'Editar Imagem'}
                     </button>
                     <button
                       onClick={() => handleSavePost()}
@@ -981,6 +1021,61 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                     </button>
                   </div>
                 </div>
+
+                {isEditingImage && (
+                  <div className={`w-full mb-6 p-4 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider opacity-50">Ajustes de Posição</h4>
+                      <div className="grid grid-cols-3 gap-2 max-w-[150px]">
+                        <div />
+                        <button onClick={() => setImageOffsetY(prev => prev - 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronUpIcon className="w-4 h-4"/></button>
+                        <div />
+                        <button onClick={() => setImageOffsetX(prev => prev - 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronLeftIcon className="w-4 h-4"/></button>
+                        <button onClick={() => {setImageOffsetX(0); setImageOffsetY(0); setImageZoom(1);}} className="p-2 bg-primary-500 text-white rounded hover:bg-primary-600 flex justify-center text-[10px] items-center">Reset</button>
+                        <button onClick={() => setImageOffsetX(prev => prev + 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronRightIcon className="w-4 h-4"/></button>
+                        <div />
+                        <button onClick={() => setImageOffsetY(prev => prev + 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronDownIcon className="w-4 h-4"/></button>
+                        <div />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-xs font-medium opacity-70">Zoom: {Math.round(imageZoom * 100)}%</label>
+                          <div className="flex gap-1">
+                            <button onClick={() => setImageZoom(prev => Math.max(0.5, prev - 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-xs">-</button>
+                            <button onClick={() => setImageZoom(prev => Math.min(3, prev + 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-xs">+</button>
+                          </div>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0.5" 
+                          max="3" 
+                          step="0.1" 
+                          value={imageZoom} 
+                          onChange={(e) => setImageZoom(parseFloat(e.target.value))}
+                          className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider opacity-50">Trocar Imagem</h4>
+                      <button 
+                        onClick={() => setShowAssetLibrary(true)}
+                        className="w-full flex items-center justify-center gap-2 p-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all shadow-md"
+                      >
+                        <BookmarkIcon className="w-4 h-4" />
+                        Abrir Biblioteca de Fotos
+                      </button>
+                      <p className="text-[10px] opacity-60 italic text-center">Selecione uma foto da sua galeria para substituir a atual.</p>
+                      
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Dica</p>
+                        <p className="text-[10px] opacity-60">Use as setas para centralizar o rosto das pessoas ou destacar detalhes importantes da foto.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {isEditingText && (
                   <div className={`w-full mb-6 p-4 rounded-xl border grid grid-cols-1 gap-4 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
