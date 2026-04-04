@@ -121,11 +121,15 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
   const loadSavedPosts = async () => {
     try {
+      console.log('Loading saved posts...');
       const remotePosts = await supabaseService.getMarketingPosts();
       const localSaved = localStorage.getItem('marketing_saved_posts');
       let localPosts = [];
+      
       if (localSaved) {
-        try { localPosts = JSON.parse(localSaved); } catch (e) {}
+        try { localPosts = JSON.parse(localSaved); } catch (e) {
+          console.error('Error parsing local marketing posts:', e);
+        }
       }
       
       // Merge: prefer remote but keep local if not in remote
@@ -136,7 +140,15 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         }
       });
       
+      console.log(`Loaded ${merged.length} posts (${remotePosts.length} remote, ${localPosts.length} local).`);
       setSavedPosts(merged);
+      
+      // Sync back to local storage if merged results differ
+      if (merged.length > 0) {
+        import('../utils').then(({ safeSetLocalStorage }) => {
+          safeSetLocalStorage('marketing_saved_posts', JSON.stringify(merged));
+        });
+      }
     } catch (error) {
       console.error('Error loading marketing posts:', error);
       const saved = localStorage.getItem('marketing_saved_posts');
@@ -692,8 +704,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const handleSavePost = async (statusOverride?: 'draft' | 'pending_approval' | 'approved') => {
     if (!postData) return;
     
+    const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newStatus = statusOverride || currentPostStatus;
-    const postId = currentPostId || Date.now().toString();
+    const postId = currentPostId || generateId();
     
     const newPost: SavedPost & { strategy?: string } = {
       id: postId,
@@ -721,18 +734,23 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       : [newPost, ...savedPosts];
       
     setSavedPosts(updated);
-    localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
     setCurrentPostId(postId); // Keep the current post ID
     
+    // Save to local storage safely
+    import('../utils').then(({ safeSetLocalStorage }) => {
+      safeSetLocalStorage('marketing_saved_posts', JSON.stringify(updated));
+    });
+    
     try {
+      console.log('Attempting to save marketing post to Supabase...');
       await supabaseService.saveMarketingPost(newPost);
       if (!statusOverride) {
-        alert('Post salvo com sucesso no histórico da nuvem!');
+        alert('Post salvo com sucesso no histórico e na nuvem!');
       }
     } catch (error) {
       console.error('Failed to save to Supabase:', error);
       if (!statusOverride) {
-        alert('Post salvo localmente, mas houve um erro ao sincronizar com a nuvem.');
+        alert('Post salvo localmente, mas houve um erro ao sincronizar com a nuvem. Verifique sua conexão.');
       }
     }
   };
@@ -1091,8 +1109,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetY(prev => prev - 10);
-                            else setImgFrameY(prev => prev - 10); // Pull top edge up (decrease top margin)
+                            else setImgFrameY(prev => prev - 10); 
                           }} 
+                          title={imageEditMode === 'move' ? 'Mover para cima' : 'Puxar borda superior'}
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
                           <ChevronUpIcon className="w-4 h-4"/>
@@ -1101,8 +1120,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetX(prev => prev - 10);
-                            else setImgFrameX(prev => prev - 10); // Pull left edge left (decrease left margin)
+                            else setImgFrameX(prev => prev - 10); 
                           }} 
+                          title={imageEditMode === 'move' ? 'Mover para esquerda' : 'Puxar borda esquerda'}
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
                           <ChevronLeftIcon className="w-4 h-4"/>
@@ -1124,8 +1144,12 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetX(prev => prev + 10);
-                            else setImgFrameW(prev => prev - 10); // Pull right edge right (decrease right margin)
+                            else {
+                              // Pull right edge (increase width)
+                              setImgFrameW(prev => prev + 10);
+                            }
                           }} 
+                          title={imageEditMode === 'move' ? 'Mover para direita' : 'Puxar borda direita'}
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
                           <ChevronRightIcon className="w-4 h-4"/>
@@ -1134,8 +1158,12 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetY(prev => prev + 10);
-                            else setImgFrameH(prev => prev - 10); // Pull bottom edge down (decrease bottom margin)
+                            else {
+                              // Pull bottom edge (increase height)
+                              setImgFrameH(prev => prev + 10);
+                            }
                           }} 
+                          title={imageEditMode === 'move' ? 'Mover para baixo' : 'Puxar borda inferior'}
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
                           <ChevronDownIcon className="w-4 h-4"/>
@@ -1144,25 +1172,65 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       </div>
                       
                       {imageEditMode === 'resize' && (
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          <button 
-                            onClick={() => {
-                              setImgFrameX(prev => prev + 10);
-                              setImgFrameW(prev => prev + 10);
-                            }}
-                            className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
-                          >
-                            Reduzir Largura
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setImgFrameY(prev => prev + 10);
-                              setImgFrameH(prev => prev + 10);
-                            }}
-                            className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
-                          >
-                            Reduzir Altura
-                          </button>
+                        <div className="space-y-2 mt-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => {
+                                setImgFrameW(prev => prev + 20);
+                              }}
+                              className="text-[10px] p-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded hover:bg-primary-200 font-bold"
+                            >
+                              + Largura (Simétrico)
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setImgFrameW(prev => Math.max(50, prev - 20));
+                              }}
+                              className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300"
+                            >
+                              - Largura (Simétrico)
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => {
+                                setImgFrameH(prev => prev + 20);
+                              }}
+                              className="text-[10px] p-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded hover:bg-primary-200 font-bold"
+                            >
+                              + Altura (Simétrico)
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setImgFrameH(prev => Math.max(50, prev - 20));
+                              }}
+                              className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300"
+                            >
+                              - Altura (Simétrico)
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => {
+                                // Center image in frame
+                                setImageOffsetX(0);
+                                setImageOffsetY(0);
+                              }}
+                              className="text-[10px] p-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded hover:bg-emerald-200 font-bold"
+                            >
+                              Centralizar Foto
+                            </button>
+                            <button 
+                              onClick={() => {
+                                // Reset frame offsets to equalize margins relative to canvas center
+                                setImgFrameX(0);
+                                setImgFrameY(0);
+                              }}
+                              className="text-[10px] p-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded hover:bg-emerald-200 font-bold"
+                            >
+                              Equalizar Margens
+                            </button>
+                          </div>
                         </div>
                       )}
                       

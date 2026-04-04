@@ -115,7 +115,12 @@ export const supabaseService = {
   // Feature: Theme-based image persistence
   async saveMarketingPost(post: any) {
     const supabase = getSupabase();
-    if (!supabase) return null;
+    if (!supabase) {
+      console.error('Supabase not initialized in saveMarketingPost');
+      return null;
+    }
+
+    console.log('Saving marketing post to Supabase:', post.id);
 
     const { data, error } = await supabase
       .from('ai_conversations')
@@ -136,13 +141,18 @@ export const supabaseService = {
       console.error('Error saving marketing post to Supabase:', error);
       throw error;
     }
+    console.log('Marketing post saved successfully:', post.id);
     return data;
   },
 
   async getMarketingPosts() {
     const supabase = getSupabase();
-    if (!supabase) return [];
+    if (!supabase) {
+      console.error('Supabase not initialized in getMarketingPosts');
+      return [];
+    }
     
+    console.log('Fetching marketing posts from Supabase...');
     const { data, error } = await supabase
       .from('ai_conversations')
       .select('*')
@@ -154,13 +164,15 @@ export const supabaseService = {
       return [];
     }
     
+    console.log(`Fetched ${data?.length || 0} marketing posts from Supabase.`);
+    
     return (data || []).map(row => {
       try {
         if (row.messages && row.messages.length > 0) {
           return JSON.parse(row.messages[0].content);
         }
       } catch (e) {
-        console.error('Error parsing marketing post:', e);
+        console.error('Error parsing marketing post JSON:', e);
       }
       return null;
     }).filter(Boolean);
