@@ -59,6 +59,11 @@ interface SavedPost {
   imageZoom?: number;
   imageOffsetX?: number;
   imageOffsetY?: number;
+  imgFrameX?: number;
+  imgFrameY?: number;
+  imgFrameW?: number;
+  imgFrameH?: number;
+  imageEditMode?: 'move' | 'resize';
   status?: 'draft' | 'pending_approval' | 'approved';
   strategy?: string;
 }
@@ -82,6 +87,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const [imageZoom, setImageZoom] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
+  const [imgFrameX, setImgFrameX] = useState(0);
+  const [imgFrameY, setImgFrameY] = useState(0);
+  const [imgFrameW, setImgFrameW] = useState(0);
+  const [imgFrameH, setImgFrameH] = useState(0);
+  const [imageEditMode, setImageEditMode] = useState<'move' | 'resize'>('move');
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [currentPostStatus, setCurrentPostStatus] = useState<'draft' | 'pending_approval' | 'approved'>('draft');
   const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[]>([]);
@@ -111,11 +121,24 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
   const loadSavedPosts = async () => {
     try {
-      const posts = await supabaseService.getMarketingPosts();
-      setSavedPosts(posts);
+      const remotePosts = await supabaseService.getMarketingPosts();
+      const localSaved = localStorage.getItem('marketing_saved_posts');
+      let localPosts = [];
+      if (localSaved) {
+        try { localPosts = JSON.parse(localSaved); } catch (e) {}
+      }
+      
+      // Merge: prefer remote but keep local if not in remote
+      const merged = [...remotePosts];
+      localPosts.forEach((lp: any) => {
+        if (!merged.find(rp => rp.id === lp.id)) {
+          merged.push(lp);
+        }
+      });
+      
+      setSavedPosts(merged);
     } catch (error) {
       console.error('Error loading marketing posts:', error);
-      // Fallback to local storage if Supabase fails
       const saved = localStorage.getItem('marketing_saved_posts');
       if (saved) {
         try {
@@ -510,10 +533,10 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.stroke();
 
     // 4. Image Area (Right Side)
-    const imgX = 580; // Moved slightly right
-    const imgY = 220; // Moved slightly up
-    const imgW = 420; // Slightly narrower
-    const imgH = 680; // Taller
+    const imgX = 580 + imgFrameX;
+    const imgY = 220 + imgFrameY;
+    const imgW = 420 + imgFrameW;
+    const imgH = 680 + imgFrameH;
 
     // White border for image
     ctx.fillStyle = colors.white;
@@ -619,7 +642,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     if (postData) {
       drawCanvas();
     }
-  }, [postData, uploadedImage, imageZoom, imageOffsetX, imageOffsetY]);
+  }, [postData, uploadedImage, imageZoom, imageOffsetX, imageOffsetY, imgFrameX, imgFrameY, imgFrameW, imgFrameH]);
 
   const handleDownload = () => {
     if (!canvasRef.current) return;
@@ -647,6 +670,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
+    setImgFrameX(0);
+    setImgFrameY(0);
+    setImgFrameW(0);
+    setImgFrameH(0);
+    setImageEditMode('move');
     setCurrentPostId(null);
     setCurrentPostStatus('draft');
     setIsEditingText(false);
@@ -670,6 +698,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       imageZoom,
       imageOffsetX,
       imageOffsetY,
+      imgFrameX,
+      imgFrameY,
+      imgFrameW,
+      imgFrameH,
+      imageEditMode,
       status: newStatus,
       strategy
     };
@@ -681,9 +714,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       
     setSavedPosts(updated);
     localStorage.setItem('marketing_saved_posts', JSON.stringify(updated));
-    
-    // Clear form after saving
-    handleNewPost();
+    setCurrentPostId(postId); // Keep the current post ID
     
     try {
       await supabaseService.saveMarketingPost(newPost);
@@ -718,6 +749,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     setImageZoom(post.imageZoom || 1);
     setImageOffsetX(post.imageOffsetX || 0);
     setImageOffsetY(post.imageOffsetY || 0);
+    setImgFrameX(post.imgFrameX || 0);
+    setImgFrameY(post.imgFrameY || 0);
+    setImgFrameW(post.imgFrameW || 0);
+    setImgFrameH(post.imgFrameH || 0);
+    setImageEditMode(post.imageEditMode || 'move');
     setCurrentPostId(post.id);
     setCurrentPostStatus(post.status || 'draft');
   };
@@ -1025,18 +1061,100 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 {isEditingImage && (
                   <div className={`w-full mb-6 p-4 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="space-y-4">
-                      <h4 className="text-xs font-bold uppercase tracking-wider opacity-50">Ajustes de Posição</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider opacity-50">Ajustes</h4>
+                        <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1">
+                          <button 
+                            onClick={() => setImageEditMode('move')}
+                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'move' ? 'bg-white dark:bg-slate-700 shadow-sm font-bold' : 'opacity-50'}`}
+                          >
+                            Mover
+                          </button>
+                          <button 
+                            onClick={() => setImageEditMode('resize')}
+                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'resize' ? 'bg-white dark:bg-slate-700 shadow-sm font-bold' : 'opacity-50'}`}
+                          >
+                            Redimensionar
+                          </button>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-3 gap-2 max-w-[150px]">
                         <div />
-                        <button onClick={() => setImageOffsetY(prev => prev - 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronUpIcon className="w-4 h-4"/></button>
+                        <button 
+                          onClick={() => {
+                            if (imageEditMode === 'move') setImageOffsetY(prev => prev - 10);
+                            else { setImgFrameY(prev => prev - 10); setImgFrameH(prev => prev + 10); }
+                          }} 
+                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                        >
+                          <ChevronUpIcon className="w-4 h-4"/>
+                        </button>
                         <div />
-                        <button onClick={() => setImageOffsetX(prev => prev - 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronLeftIcon className="w-4 h-4"/></button>
-                        <button onClick={() => {setImageOffsetX(0); setImageOffsetY(0); setImageZoom(1);}} className="p-2 bg-primary-500 text-white rounded hover:bg-primary-600 flex justify-center text-[10px] items-center">Reset</button>
-                        <button onClick={() => setImageOffsetX(prev => prev + 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronRightIcon className="w-4 h-4"/></button>
+                        <button 
+                          onClick={() => {
+                            if (imageEditMode === 'move') setImageOffsetX(prev => prev - 10);
+                            else { setImgFrameX(prev => prev - 10); setImgFrameW(prev => prev + 10); }
+                          }} 
+                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4"/>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setImageOffsetX(0); 
+                            setImageOffsetY(0); 
+                            setImageZoom(1);
+                            setImgFrameX(0);
+                            setImgFrameY(0);
+                            setImgFrameW(0);
+                            setImgFrameH(0);
+                          }} 
+                          className="p-2 bg-primary-500 text-white rounded hover:bg-primary-600 flex justify-center text-[10px] items-center"
+                        >
+                          Reset
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (imageEditMode === 'move') setImageOffsetX(prev => prev + 10);
+                            else setImgFrameW(prev => prev + 10);
+                          }} 
+                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                        >
+                          <ChevronRightIcon className="w-4 h-4"/>
+                        </button>
                         <div />
-                        <button onClick={() => setImageOffsetY(prev => prev + 10)} className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"><ChevronDownIcon className="w-4 h-4"/></button>
+                        <button 
+                          onClick={() => {
+                            if (imageEditMode === 'move') setImageOffsetY(prev => prev + 10);
+                            else setImgFrameH(prev => prev + 10);
+                          }} 
+                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                        >
+                          <ChevronDownIcon className="w-4 h-4"/>
+                        </button>
                         <div />
                       </div>
+                      
+                      {imageEditMode === 'resize' && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <button 
+                            onClick={() => {
+                              setImgFrameW(prev => Math.max(-400, prev - 10));
+                            }}
+                            className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
+                          >
+                            Reduzir Largura
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setImgFrameH(prev => Math.max(-600, prev - 10));
+                            }}
+                            className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
+                          >
+                            Reduzir Altura
+                          </button>
+                        </div>
+                      )}
                       
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -1071,7 +1189,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       
                       <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                         <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Dica</p>
-                        <p className="text-[10px] opacity-60">Use as setas para centralizar o rosto das pessoas ou destacar detalhes importantes da foto.</p>
+                        <p className="text-[10px] opacity-60">
+                          {imageEditMode === 'move' 
+                            ? 'Use as setas para centralizar o rosto das pessoas ou destacar detalhes importantes da foto.' 
+                            : 'Use as setas para "puxar" as bordas da foto e aumentar o quadro. Use os botões abaixo para reduzir.'}
+                        </p>
                       </div>
                     </div>
                   </div>
