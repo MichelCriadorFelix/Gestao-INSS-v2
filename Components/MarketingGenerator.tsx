@@ -202,15 +202,42 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           if (selectedAsset) {
             setUploadedImage(selectedAsset.url);
           } 
-          // 2. Otherwise, check if we already have a theme image for this topic in the database
+          // 2. Otherwise, check if we already have a theme image for this topic in the database (exact match)
           else {
             const existingThemeImage = await supabaseService.getThemeImage(topic);
             if (existingThemeImage) {
               setUploadedImage(existingThemeImage.url);
             } 
-            // 3. Finally, generate a new one if nothing else is available
-            else if (data.imagePrompt && !uploadedImage) {
-              generateAIImage(data.imagePrompt);
+            // 3. Try keyword matching in the library assets
+            else {
+              const searchTopic = topic.toLowerCase();
+              const matchedAsset = libraryAssets.find(asset => {
+                const assetTopic = asset.topic.toLowerCase();
+                const assetDesc = (asset.description || '').toLowerCase();
+                
+                // Split search topic into keywords (removing common small words)
+                const keywords = searchTopic.split(/\s+/).filter(w => w.length > 2 && !['com', 'dos', 'das', 'para', 'pelo'].includes(w));
+                
+                // Check if any keyword matches asset topic or description
+                const hasKeywordMatch = keywords.some(word => 
+                  assetTopic.includes(word) || assetDesc.includes(word)
+                );
+
+                return searchTopic.includes(assetTopic) || 
+                       assetTopic.includes(searchTopic) ||
+                       hasKeywordMatch;
+              });
+              
+              if (matchedAsset) {
+                setUploadedImage(matchedAsset.url);
+                setSelectedAsset(matchedAsset);
+              }
+              // 4. Finally, generate a new one if nothing else is available
+              else if (data.imagePrompt) {
+                // Clear old image before generating new one to avoid showing stale content
+                setUploadedImage(null);
+                generateAIImage(data.imagePrompt);
+              }
             }
           }
         } else if (mode === 'template' && postData) {
@@ -359,10 +386,11 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     if (t.includes('maternidade') || t.includes('gestante') || t.includes('mãe')) {
       return 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=800&auto=format&fit=crop';
     }
-    if (t.includes('aposentadoria') || t.includes('idoso') || t.includes('idade') || t.includes('bpc') || t.includes('loas')) {
+    if (t.includes('aposentadoria') || t.includes('idoso') || t.includes('idade')) {
       return 'https://images.unsplash.com/photo-1447069387593-a5de0862481e?q=80&w=800&auto=format&fit=crop';
     }
-    if (t.includes('invalidez') || t.includes('doença') || t.includes('incapacidade') || t.includes('deficiência') || t.includes('auxílio-doença')) {
+    if (t.includes('bpc') || t.includes('loas') || t.includes('invalidez') || t.includes('doença') || t.includes('incapacidade') || t.includes('deficiência') || t.includes('auxílio-doença')) {
+      // More appropriate image for disability/health
       return 'https://images.unsplash.com/photo-1584515933487-779824d29309?q=80&w=800&auto=format&fit=crop';
     }
     if (t.includes('rural') || t.includes('lavrador') || t.includes('agricultor') || t.includes('pescador')) {
