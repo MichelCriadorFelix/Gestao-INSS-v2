@@ -533,14 +533,22 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.stroke();
 
     // 4. Image Area (Right Side)
-    const imgX = 580 + imgFrameX;
-    const imgY = 220 + imgFrameY;
-    const imgW = 420 + imgFrameW;
-    const imgH = 680 + imgFrameH;
+    // Fixed Frame (The white background)
+    const frameX = 580;
+    const frameY = 220;
+    const frameW = 420;
+    const frameH = 680;
 
-    // White border for image
+    // White background (fixed as requested)
     ctx.fillStyle = colors.white;
-    ctx.fillRect(imgX - 15, imgY - 15, imgW + 30, imgH + 30);
+    ctx.fillRect(frameX - 15, frameY - 15, frameW + 30, frameH + 30);
+
+    // Image area (adjustable margins inside the fixed white frame)
+    // imgFrameX = marginLeft, imgFrameY = marginTop, imgFrameW = marginRight, imgFrameH = marginBottom
+    const imgX = frameX + imgFrameX;
+    const imgY = frameY + imgFrameY;
+    const imgW = Math.max(10, frameW - imgFrameX - imgFrameW);
+    const imgH = Math.max(10, frameH - imgFrameY - imgFrameH);
 
     const imageUrl = uploadedImage || getDefaultImage(topic);
     
@@ -1083,7 +1091,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetY(prev => prev - 10);
-                            else { setImgFrameY(prev => prev - 10); setImgFrameH(prev => prev + 10); }
+                            else setImgFrameY(prev => prev - 10); // Pull top edge up (decrease top margin)
                           }} 
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
@@ -1093,7 +1101,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetX(prev => prev - 10);
-                            else { setImgFrameX(prev => prev - 10); setImgFrameW(prev => prev + 10); }
+                            else setImgFrameX(prev => prev - 10); // Pull left edge left (decrease left margin)
                           }} 
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
@@ -1116,7 +1124,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetX(prev => prev + 10);
-                            else setImgFrameW(prev => prev + 10);
+                            else setImgFrameW(prev => prev - 10); // Pull right edge right (decrease right margin)
                           }} 
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
@@ -1126,7 +1134,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <button 
                           onClick={() => {
                             if (imageEditMode === 'move') setImageOffsetY(prev => prev + 10);
-                            else setImgFrameH(prev => prev + 10);
+                            else setImgFrameH(prev => prev - 10); // Pull bottom edge down (decrease bottom margin)
                           }} 
                           className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
                         >
@@ -1139,7 +1147,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <button 
                             onClick={() => {
-                              setImgFrameW(prev => Math.max(-400, prev - 10));
+                              setImgFrameX(prev => prev + 10);
+                              setImgFrameW(prev => prev + 10);
                             }}
                             className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
                           >
@@ -1147,7 +1156,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                           </button>
                           <button 
                             onClick={() => {
-                              setImgFrameH(prev => Math.max(-600, prev - 10));
+                              setImgFrameY(prev => prev + 10);
+                              setImgFrameH(prev => prev + 10);
                             }}
                             className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700"
                           >
