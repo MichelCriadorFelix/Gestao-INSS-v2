@@ -1178,6 +1178,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
     setContracts(updatedContracts);
     saveData('contracts', updatedContracts);
+
+    // Also update the client's status if necessary
+    const contract = contracts.find(c => c.id === contractId);
+    if (contract && contract.clientId) {
+      const client = records.find(r => r.id === contract.clientId);
+      if (client) {
+        const updatedClient = { ...client, status: newStatus };
+        const updatedClients = records.map(r => r.id === client.id ? updatedClient : r);
+        setRecords(updatedClients);
+        saveData('clients', updatedClients, updatedClient);
+      }
+    }
   };
 
   // Render Helpers
