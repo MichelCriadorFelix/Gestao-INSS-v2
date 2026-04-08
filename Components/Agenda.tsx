@@ -44,6 +44,8 @@ interface AgendaProps {
   onSaveEvent: (event: AgendaEvent) => void;
   onDeleteEvent: (id: string) => void;
   onUpdateContractStatus?: (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => void;
+  dailyFocusState?: any;
+  onUpdateDailyFocus?: (state: any) => void;
 }
 
 const EVENT_TYPES = {
@@ -60,7 +62,7 @@ const STATUS_LABELS = {
   'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
 };
 
-const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus }) => {
+const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -609,6 +611,8 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
               user={user} 
               darkMode={darkMode} 
               onUpdateContractStatus={onUpdateContractStatus}
+              dailyFocusState={dailyFocusState}
+              onUpdateDailyFocus={onUpdateDailyFocus}
             />
           </div>
         </div>

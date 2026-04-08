@@ -87,6 +87,33 @@ export const AUTHORIZED_USERS = [
   { firstName: 'Fabrícia', lastName: 'Sousa', role: UserRole.SECRETARIA },
 ];
 
+export interface FocusTask {
+  id: string;
+  title: string;
+  description: string;
+  type: 'alert' | 'contract' | 'postponed';
+  priority: 'high' | 'medium' | 'low';
+  dueDate?: string;
+  clientId?: string;
+  clientName?: string;
+  originalAlertKey?: string;
+}
+
+export interface TaskLogEntry {
+  id: string;
+  taskId: string;
+  title: string;
+  action: 'completed' | 'discarded';
+  completedAt: string;
+  completedBy: string;
+}
+
+export interface DailyFocusState {
+  resolvedTasks: string[];
+  postponedTasks: FocusTask[];
+  taskLog: TaskLogEntry[];
+}
+
 // --- NOVOS TIPOS PARA CONTRATOS ---
 
 export interface PaymentEntry {

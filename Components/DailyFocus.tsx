@@ -20,6 +20,8 @@ interface DailyFocusProps {
   user: User;
   darkMode: boolean;
   onUpdateContractStatus?: (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => void;
+  dailyFocusState?: any;
+  onUpdateDailyFocus?: (state: any) => void;
 }
 
 interface FocusTask {
@@ -38,51 +40,38 @@ interface TaskLogEntry {
   id: string;
   taskId: string;
   title: string;
-  action: 'completed' | 'discarded';
+  action: 'completed' | 'discarded' | 'postponed';
   completedAt: string;
   completedBy: string;
 }
 
-export default function DailyFocus({ events, clients, contracts, user, darkMode, onUpdateContractStatus }: DailyFocusProps) {
-  const [resolvedTasks, setResolvedTasks] = useState<string[]>([]);
-  const [postponedTasks, setPostponedTasks] = useState<FocusTask[]>([]);
-  const [taskLog, setTaskLog] = useState<TaskLogEntry[]>([]);
-
-  // Load state from local storage on mount
-  useEffect(() => {
-    try {
-      const savedResolved = localStorage.getItem('daily_focus_resolved');
-      if (savedResolved) setResolvedTasks(JSON.parse(savedResolved));
-
-      const savedPostponed = localStorage.getItem('daily_focus_postponed');
-      if (savedPostponed) setPostponedTasks(JSON.parse(savedPostponed));
-
-      const savedLog = localStorage.getItem('daily_focus_log');
-      if (savedLog) setTaskLog(JSON.parse(savedLog));
-    } catch (e) {
-      console.error('Error loading Daily Focus state:', e);
-    }
-  }, []);
-
-  // Save state to local storage when it changes
-  useEffect(() => {
-    localStorage.setItem('daily_focus_resolved', JSON.stringify(resolvedTasks));
-    localStorage.setItem('daily_focus_postponed', JSON.stringify(postponedTasks));
-    localStorage.setItem('daily_focus_log', JSON.stringify(taskLog));
-  }, [resolvedTasks, postponedTasks, taskLog]);
+export default function DailyFocus({ events, clients, contracts, user, darkMode, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }: DailyFocusProps) {
+  const resolvedTasks = dailyFocusState?.resolvedTasks || [];
+  const postponedTasks = dailyFocusState?.postponedTasks || [];
+  const taskLog = dailyFocusState?.taskLog || [];
 
   const contractTasks = useMemo(() => {
     let tasks: FocusTask[] = [];
-    const today = startOfDay(new Date());
+    const today = new Date();
 
-    postponedTasks.filter(t => t.type === 'contract').forEach(task => {
+    const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
+      l.action === 'completed' && 
+      l.taskId.startsWith('contract-') && 
+      isSameDay(parseISO(l.completedAt), today)
+    ).length;
+
+    const limit = Math.max(0, 3 - completedTodayCount);
+
+    if (limit === 0) return [];
+
+    postponedTasks.filter((t: FocusTask) => t.type === 'contract').forEach((task: FocusTask) => {
       if (!resolvedTasks.includes(task.id)) tasks.push(task);
     });
 
     contracts.forEach(contract => {
       if (contract.status === 'Pendente') {
         const taskId = `contract-${contract.id}`;
-        if (!resolvedTasks.includes(taskId) && !postponedTasks.find(p => p.id === taskId)) {
+        if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
           let parsedDate;
           try {
             parsedDate = parseISO(contract.createdAt);
@@ -106,8 +95,8 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
     });
 
     tasks.sort((a, b) => {
-      const isPostponedA = postponedTasks.some(p => p.id === a.id);
-      const isPostponedB = postponedTasks.some(p => p.id === b.id);
+      const isPostponedA = postponedTasks.some((p: FocusTask) => p.id === a.id);
+      const isPostponedB = postponedTasks.some((p: FocusTask) => p.id === b.id);
       if (isPostponedA && !isPostponedB) return -1;
       if (!isPostponedA && isPostponedB) return 1;
       if (a.priority === 'high' && b.priority !== 'high') return -1;
@@ -116,14 +105,24 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       return 0;
     });
 
-    return tasks.slice(0, 3);
-  }, [contracts, resolvedTasks, postponedTasks]);
+    return tasks.slice(0, limit);
+  }, [contracts, resolvedTasks, postponedTasks, taskLog]);
 
   const maintenanceTasks = useMemo(() => {
     let tasks: FocusTask[] = [];
-    const today = startOfDay(new Date());
+    const today = new Date();
 
-    postponedTasks.filter(t => t.type === 'alert').forEach(task => {
+    const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
+      l.action === 'completed' && 
+      (l.taskId.startsWith('alert-') || l.taskId.startsWith('agenda-')) && 
+      isSameDay(parseISO(l.completedAt), today)
+    ).length;
+
+    const limit = Math.max(0, 3 - completedTodayCount);
+
+    if (limit === 0) return [];
+
+    postponedTasks.filter((t: FocusTask) => t.type === 'alert').forEach((task: FocusTask) => {
       if (!resolvedTasks.includes(task.id)) tasks.push(task);
     });
 
@@ -133,7 +132,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       const checkAlert = (dateStr: string | undefined, title: string, key: string) => {
         if (dateStr && isUrgentDate(dateStr)) {
           const taskId = `alert-${client.id}-${key}`;
-          if (!resolvedTasks.includes(taskId) && !postponedTasks.find(p => p.id === taskId)) {
+          if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
             let parsedDate = parseDate(dateStr);
             if (!parsedDate) return;
 
@@ -142,7 +141,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
               title: `${title} - ${client.name}`,
               description: `Vencimento: ${format(parsedDate, 'dd/MM/yyyy')}`,
               type: 'alert',
-              priority: isBefore(parsedDate, today) ? 'high' : 'medium',
+              priority: isBefore(parsedDate, startOfDay(today)) ? 'high' : 'medium',
               dueDate: parsedDate.toISOString(),
               clientId: client.id,
               clientName: client.name,
@@ -165,15 +164,15 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       if (event.status === 'resolved' || event.status === 'cancelled') return;
       
       const eventDate = parseISO(event.date);
-      if (isBefore(eventDate, today) || isSameDay(eventDate, today)) {
+      if (isBefore(eventDate, startOfDay(today)) || isSameDay(eventDate, today)) {
         const taskId = `agenda-${event.id}`;
-        if (!resolvedTasks.includes(taskId) && !postponedTasks.find(p => p.id === taskId)) {
+        if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
           tasks.push({
             id: taskId,
             title: `Agenda: ${event.type.charAt(0).toUpperCase() + event.type.slice(1)}`,
             description: `${event.time} - ${event.clientName || event.description}`,
             type: 'alert',
-            priority: isBefore(eventDate, today) ? 'high' : 'medium',
+            priority: isBefore(eventDate, startOfDay(today)) ? 'high' : 'medium',
             dueDate: event.date,
             clientId: event.clientId,
             clientName: event.clientName
@@ -183,8 +182,8 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
     });
 
     tasks.sort((a, b) => {
-      const isPostponedA = postponedTasks.some(p => p.id === a.id);
-      const isPostponedB = postponedTasks.some(p => p.id === b.id);
+      const isPostponedA = postponedTasks.some((p: FocusTask) => p.id === a.id);
+      const isPostponedB = postponedTasks.some((p: FocusTask) => p.id === b.id);
       if (isPostponedA && !isPostponedB) return -1;
       if (!isPostponedA && isPostponedB) return 1;
       if (a.priority === 'high' && b.priority !== 'high') return -1;
@@ -193,36 +192,22 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       return 0;
     });
 
-    return tasks.slice(0, 3);
-  }, [clients, resolvedTasks, postponedTasks]);
+    return tasks.slice(0, limit);
+  }, [clients, events, resolvedTasks, postponedTasks, taskLog]);
 
   const handleAction = (task: FocusTask, action: 'completed' | 'discarded' | 'postponed') => {
+    let newResolvedTasks = [...resolvedTasks];
+    let newPostponedTasks = [...postponedTasks];
+    let newTaskLog = [...taskLog];
+
     if (action === 'postponed') {
-      // Move to postponed list for tomorrow
-      const tomorrow = addDays(new Date(), 1).toISOString();
       const postponedTask: FocusTask = {
         ...task,
-        priority: 'high', // Becomes high priority tomorrow
-        dueDate: tomorrow,
-        description: `Adiado de ontem. ${task.description}`
+        priority: 'high',
+        description: task.description.includes('Adiado') ? task.description : `Adiado. ${task.description}`
       };
-      setPostponedTasks(prev => [...prev.filter(p => p.id !== task.id), postponedTask]);
-      // Also mark original as resolved so it doesn't show up twice
-      setResolvedTasks(prev => [...prev, task.id]);
-    } else {
-      // Mark as resolved
-      setResolvedTasks(prev => [...prev, task.id]);
+      newPostponedTasks = [...newPostponedTasks.filter((p: FocusTask) => p.id !== task.id), postponedTask];
       
-      // If it was a postponed task, remove it from that list
-      setPostponedTasks(prev => prev.filter(p => p.id !== task.id));
-
-      // If it's a contract and action is completed, update its status
-      if (task.type === 'contract' && action === 'completed' && onUpdateContractStatus) {
-        const contractId = task.id.replace('contract-', '');
-        onUpdateContractStatus(contractId, 'Em Andamento');
-      }
-
-      // Log the action
       const newLog: TaskLogEntry = {
         id: Math.random().toString(36).substr(2, 9),
         taskId: task.id,
@@ -231,7 +216,33 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
         completedAt: new Date().toISOString(),
         completedBy: `${user.firstName} ${user.lastName}`
       };
-      setTaskLog(prev => [newLog, ...prev].slice(0, 50)); // Keep last 50 logs
+      newTaskLog = [newLog, ...newTaskLog].slice(0, 50);
+    } else {
+      newResolvedTasks = [...newResolvedTasks, task.id];
+      newPostponedTasks = newPostponedTasks.filter((p: FocusTask) => p.id !== task.id);
+
+      if (task.type === 'contract' && action === 'completed' && onUpdateContractStatus) {
+        const contractId = task.id.replace('contract-', '');
+        onUpdateContractStatus(contractId, 'Em Andamento');
+      }
+
+      const newLog: TaskLogEntry = {
+        id: Math.random().toString(36).substr(2, 9),
+        taskId: task.id,
+        title: task.title,
+        action,
+        completedAt: new Date().toISOString(),
+        completedBy: `${user.firstName} ${user.lastName}`
+      };
+      newTaskLog = [newLog, ...newTaskLog].slice(0, 50);
+    }
+
+    if (onUpdateDailyFocus) {
+      onUpdateDailyFocus({
+        resolvedTasks: newResolvedTasks,
+        postponedTasks: newPostponedTasks,
+        taskLog: newTaskLog
+      });
     }
   };
 
@@ -369,7 +380,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
             Últimas Ações
           </h3>
           <div className="space-y-2 max-h-40 overflow-y-auto pr-2 no-scrollbar">
-            {taskLog.slice(0, 5).map(log => (
+            {taskLog.slice(0, 5).map((log: TaskLogEntry) => (
               <div key={log.id} className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                 <div className="flex items-center gap-2">
                   {log.action === 'completed' ? (

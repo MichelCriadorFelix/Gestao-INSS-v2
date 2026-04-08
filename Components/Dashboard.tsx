@@ -10,7 +10,7 @@ import {
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import Legislation from './Legislation';
 import Jurisprudence from './Jurisprudence';
-import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaEvent } from '../types';
+import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaEvent, DailyFocusState } from '../types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from '../data';
 import LaborCalc, { CalculationRecord } from '../LaborCalc';
 import SocialSecurityCalc, { SocialSecurityData } from '../SocialSecurityCalc';
@@ -69,6 +69,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
   const [resolvedAlerts, setResolvedAlerts] = useState<string[]>([]);
   const [customLaws, setCustomLaws] = useState<any[]>([]);
+  const [dailyFocusState, setDailyFocusState] = useState<any>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -150,7 +151,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           const { data: globalData, error: globalError } = await supabase
             .from('clients')
             .select('id, data')
-            .in('id', [7, 8, 9]);
+            .in('id', [7, 8, 9, 10]);
 
         if (!globalError && globalData) {
             const agenda = globalData.find(d => d.id === 7)?.data;
@@ -173,6 +174,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                 const localLaws = localStorage.getItem('custom_laws');
                 if (localLaws) setCustomLaws(JSON.parse(localLaws));
             }
+
+            const focusState = globalData.find(d => d.id === 10)?.data;
+            if (focusState) setDailyFocusState(focusState);
+            else {
+                const localFocus = localStorage.getItem('daily_focus_state');
+                if (localFocus) setDailyFocusState(JSON.parse(localFocus));
+            }
         }
     } else {
             // Fallback to local storage if global fetch fails or no data in cloud
@@ -184,6 +192,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             const localLaws = localStorage.getItem('custom_laws');
             if (localLaws) setCustomLaws(JSON.parse(localLaws));
+
+            const localFocus = localStorage.getItem('daily_focus_state');
+            if (localFocus) setDailyFocusState(JSON.parse(localFocus));
         }
 
         setIsLoading(false);
@@ -258,6 +269,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                              if (Array.isArray(payload.new.data)) {
                                  setCustomLaws(payload.new.data);
                                  safeSetLocalStorage('custom_laws', JSON.stringify(payload.new.data));
+                             }
+                         } else if (payload.new.id === 10) {
+                             if (payload.new.data) {
+                                 setDailyFocusState(payload.new.data);
+                                 safeSetLocalStorage('daily_focus_state', JSON.stringify(payload.new.data));
                              }
                          }
                      }
@@ -442,7 +458,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // Save Logic (Generic)
-  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts', newData: any[], clientToSave?: ClientRecord) => {
+  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
       setIsSyncing(true);
       setSaveError(null);
       setLastSavedType(type);
@@ -572,6 +588,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                   if (error) {
                       console.error("Sync error (Resolved Alerts):", error);
                       setSaveError("Erro de sincronização (Alertas).");
+                  }
+                  setIsSyncing(false);
+                  return;
+              }
+          } else if (type === 'daily_focus') {
+              setDailyFocusState(newData[0]);
+              safeSetLocalStorage('daily_focus_state', JSON.stringify(newData[0]));
+              if (supabase) {
+                  const error = await upsertWithRetry({ id: 10, data: newData[0] });
+                  if (error) {
+                      console.error("Sync error (Daily Focus):", error);
+                      setSaveError("Erro de sincronização (Foco Diário).");
                   }
                   setIsSyncing(false);
                   return;
@@ -1226,6 +1254,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
   );
 
+  const handleUpdateDailyFocus = (newState: DailyFocusState) => {
+    setDailyFocusState(newState);
+    saveData('daily_focus', [newState]);
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-200 overflow-hidden">
       
@@ -1442,6 +1475,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     contracts={contracts}
                     user={user}
                     darkMode={darkMode}
+                    dailyFocusState={dailyFocusState}
+                    onUpdateDailyFocus={handleUpdateDailyFocus}
                     eventToEdit={eventToEdit}
                     onClearEventToEdit={() => setEventToEdit(null)}
                     onSaveEvent={handleSaveAgendaEvent}
