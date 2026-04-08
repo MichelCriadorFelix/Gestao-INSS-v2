@@ -808,10 +808,11 @@ DIRETRIZES DE AUDITORIA:
    - TRCT: Campos 24 (Admissão), 25 (Aviso Prévio), 26 (Afastamento).
    - CNIS: Datas de início e fim de cada vínculo.
    - LAUDOS: CIDs, datas de exames e conclusões médicas.
+   - ACORDOS: Verifique se há propostas de acordo do INSS ou da parte contrária.
 4. IDENTIFICAÇÃO: Extraia nomes, CPFs, RGs e OABs com precisão cirúrgica.
 5. RESUMO TÉCNICO: Para cada parte, forneça um resumo estruturado em Markdown.
 
-FORMATO DE RESPOSTA (OBRIGATÓRIO):
+FORMATO DE RESPOSTA (OBRIGATÓRIO - NÃO SEJA PREGUIÇOSO):
 "✅ Ciência tomada da [Parte X] do documento [Nome].
 **Dados Extraídos:**
 * [Dado 1]
@@ -819,7 +820,7 @@ FORMATO DE RESPOSTA (OBRIGATÓRIO):
 ...
 Aguardando próxima parte ou comando."
 
-NÃO gere relatórios completos ou petições neste modo. Apenas acumule o conhecimento.
+ATENÇÃO: Você DEVE listar os dados extraídos. Não responda apenas "Recebido" ou "Aguardando". Se não encontrar dados relevantes, diga "Nenhum dado relevante encontrado nesta parte".
 `;
 
 // Marketing Endpoints
@@ -967,7 +968,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
-                             message.includes("Enviei os seguintes documentos");
+                             message.includes("Enviei os seguintes documentos") ||
+                             message.includes("[FASE DE TOMADA DE CIÊNCIA]");
     
     const isGenerationRequest = message.includes("GERAR RELATÓRIO") || 
                                 message.includes("GERAR PEÇA");
@@ -1129,7 +1131,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
-                             message.includes("Enviei os seguintes documentos");
+                             message.includes("Enviei os seguintes documentos") ||
+                             message.includes("[FASE DE TOMADA DE CIÊNCIA]");
     
     const isGenerationRequest = message.includes("GERAR RELATÓRIO") || 
                                 message.includes("GERAR PEÇA");

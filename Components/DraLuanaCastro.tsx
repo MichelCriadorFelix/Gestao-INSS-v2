@@ -421,9 +421,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
       // Prepare context from documents
       const session = sessionsRef.current.find(s => s.id === sessionId);
-      const docSummaries = session?.documents?.map(doc => 
-        `DOCUMENTO: ${doc.name}\nCONTEÚDO/RESUMO: ${doc.fullText ? doc.fullText.substring(0, 50000) : doc.summary}`
-      ).join('\n\n---\n\n') || '';
+      const docSummaries = session?.documents?.map(doc => {
+        const header = `DOCUMENTO: ${doc.name}\n`;
+        const summaryPart = doc.summary ? `RESUMO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL):\n${doc.summary}\n\n` : '';
+        // Include a portion of full text for immediate context, but prioritize the summary for large docs
+        const fullTextPart = doc.fullText ? `CONTEÚDO BRUTO (OCR/TEXTO):\n${doc.fullText.substring(0, 20000)}` : '';
+        return `${header}${summaryPart}${fullTextPart}`;
+      }).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
         `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
@@ -581,10 +585,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           // OTIMIZAÇÃO: Filtrar páginas de ruído (separação, vazias)
           const filteredPages = pages.filter(page => {
             const text = page.text.toUpperCase();
-            const isSeparationPage = text.includes("PÁGINA DE SEPARAÇÃO") || 
-                                    text.includes("PAGINA DE SEPARACAO") ||
-                                    text.includes("FOLHA DE SEPARAÇÃO");
-            const hasContent = page.text.trim().length > 20 || page.image;
+            const isSeparationPage = (text.includes("PÁGINA DE SEPARAÇÃO") || 
+                                     text.includes("PAGINA DE SEPARACAO") ||
+                                     text.includes("FOLHA DE SEPARAÇÃO")) && 
+                                     page.text.trim().length < 100; // Only filter if it's mostly just the separation text
+            const hasContent = page.text.trim().length > 10 || page.image;
             return !isSeparationPage && hasContent;
           });
 
@@ -595,12 +600,17 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           const initialP = (i === startFileIndex) ? startPageIndex : 0;
 
           for (let p = initialP; p < totalFilteredPages; p += CHUNK_SIZE) {
+            const chunkPages = filteredPages.slice(p, p + CHUNK_SIZE);
+            const chunkText = chunkPages.map(page => page.text).join('\n');
+            const chunkImages = chunkPages.map(page => page.image).filter(Boolean) as string[];
+
             // Check global timeout
             if (Date.now() - startTime > PHASE_TIMEOUT) {
+              const currentPageNum = chunkPages[0]?.pageNumber || p;
               const timeoutMsg: Message = {
                 id: generateId(),
                 role: 'assistant',
-                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até o lote ${p} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
+                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até a página ${currentPageNum} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
                 timestamp: new Date().toISOString()
               };
               setSessions(prev => prev.map(s => 
@@ -610,10 +620,6 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               setIsUploading(false);
               return;
             }
-
-            const chunkPages = filteredPages.slice(p, p + CHUNK_SIZE);
-            const chunkText = chunkPages.map(page => page.text).join('\n');
-            const chunkImages = chunkPages.map(page => page.image).filter(Boolean) as string[];
 
             setProgressText(`Auditoria: ${file.name} (Lote de ${chunkPages.length} páginas)...`);
 
@@ -715,6 +721,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       setProgress(100);
       setProgressText('Concluído!');
       
+      // Only send final message if no audit is pending (it didn't return early)
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
