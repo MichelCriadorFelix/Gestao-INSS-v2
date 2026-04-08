@@ -29,17 +29,21 @@ import {
   CheckIcon,
   ArrowUturnLeftIcon
 } from '@heroicons/react/24/outline';
-import { AgendaEvent, ClientRecord, User } from '../types';
+import { AgendaEvent, ClientRecord, User, ContractRecord } from '../types';
 import ResolutionNoteModal from './ResolutionNoteModal';
+import DailyFocus from './DailyFocus';
 
 interface AgendaProps {
   events: AgendaEvent[];
   clients: ClientRecord[];
+  contracts: ContractRecord[];
   user: User;
+  darkMode: boolean;
   eventToEdit?: AgendaEvent | null;
   onClearEventToEdit?: () => void;
   onSaveEvent: (event: AgendaEvent) => void;
   onDeleteEvent: (id: string) => void;
+  onUpdateContractStatus?: (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => void;
 }
 
 const EVENT_TYPES = {
@@ -56,7 +60,7 @@ const STATUS_LABELS = {
   'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
 };
 
-const Agenda: React.FC<AgendaProps> = ({ events, clients, user, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent }) => {
+const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -588,10 +592,25 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, user, eventToEdit, onC
   return (
     <div className="h-full flex flex-col relative overflow-hidden bg-slate-50 dark:bg-[#0B1120]">
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
-          {renderHeader()}
-          {renderDays()}
-          {renderCells()}
+        <div className="max-w-6xl mx-auto space-y-8">
+          {/* Calendar Section */}
+          <div>
+            {renderHeader()}
+            {renderDays()}
+            {renderCells()}
+          </div>
+
+          {/* Daily Focus Section */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+            <DailyFocus 
+              events={events}
+              clients={clients} 
+              contracts={contracts} 
+              user={user} 
+              darkMode={darkMode} 
+              onUpdateContractStatus={onUpdateContractStatus}
+            />
+          </div>
         </div>
       </div>
 

@@ -57,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSettingsSaved,
   onRestoreBackup
 }) => {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('clients');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -1144,6 +1144,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedList = filteredList.slice(startIndex, startIndex + itemsPerPage);
 
+  const handleUpdateContractStatus = (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => {
+    const updatedContracts = contracts.map(c => 
+      c.id === contractId ? { ...c, status: newStatus } : c
+    );
+    setContracts(updatedContracts);
+    saveData('contracts', updatedContracts);
+  };
+
   // Render Helpers
   const renderSortIcon = (columnKey: string) => {
      if (sortConfig?.key !== columnKey) return null;
@@ -1431,11 +1439,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <Agenda 
                     events={mergedAgendaEvents}
                     clients={records}
+                    contracts={contracts}
                     user={user}
+                    darkMode={darkMode}
                     eventToEdit={eventToEdit}
                     onClearEventToEdit={() => setEventToEdit(null)}
                     onSaveEvent={handleSaveAgendaEvent}
                     onDeleteEvent={handleDeleteAgendaEvent}
+                    onUpdateContractStatus={handleUpdateContractStatus}
                  />
              ) : currentView === 'petition_editor' ? (
                   <PetitionEditor 
