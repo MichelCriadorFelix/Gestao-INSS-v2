@@ -424,8 +424,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const docSummaries = session?.documents?.map(doc => {
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
-        // Include as much full text as possible within safety limits
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 150000)}` : '';
+        // Include as much full text as possible within safety limits (increased to 500k)
+        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 500000)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
@@ -631,11 +631,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             CONTEÚDO DAS PÁGINAS:
             ${chunkText}
             
-            INSTRUÇÃO CRÍTICA: Você deve agir como um auditor jurídico. 
+            INSTRUÇÃO CRÍTICA: Você deve agir como um auditor jurídico e ANALISTA VISUAL. 
             1. Leia cada página com atenção.
-            2. Extraia nomes, datas, CIDs, valores e propostas de acordo.
-            3. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
-            4. Responda com a confirmação de ciência e a lista de dados extraídos. NÃO responda apenas "Recebido".`;
+            2. Se houver IMAGENS neste lote, descreva-as detalhadamente (fotos, exames, assinaturas).
+            3. Extraia nomes, datas, CIDs, valores e propostas de acordo.
+            4. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
+            5. Responda com a confirmação de ciência e o mapeamento detalhado por página.`;
 
             const response = await fetch('/api/dra-luana/chat', {
               method: 'POST',

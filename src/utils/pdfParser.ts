@@ -96,8 +96,8 @@ export async function extractTextFromPDF(
     const pages: PDFPageData[] = [];
     const totalPages = pdf.numPages;
     
-    // Limit image extraction to 50 pages if they are small, or less if large
-    const MAX_PAGES_FOR_VISION = 50; 
+    // Aumentado para cobrir processos longos, já que a ciência deve ser integral.
+    const MAX_PAGES_FOR_VISION = 1000; 
     
     for (let i = 1; i <= totalPages; i++) {
       try {
@@ -125,9 +125,9 @@ export async function extractTextFromPDF(
         let currentPageImage: string | undefined = undefined;
         
         // 2. Extract Image (OCR for handwritten/scanned docs)
-        // FORCE image extraction for the first 10 pages (most critical for TRCT/CNIS/Procuração)
-        const isCriticalPage = i <= 10;
-        const isLowTextDensity = pageText.trim().length < 150; 
+        // Renderiza se tiver pouco texto (provável scan) ou se for as primeiras páginas críticas
+        const isCriticalPage = i <= 20;
+        const isLowTextDensity = pageText.trim().length < 400; 
 
         if ((isLowTextDensity || isCriticalPage) && i <= MAX_PAGES_FOR_VISION) {
             try {
