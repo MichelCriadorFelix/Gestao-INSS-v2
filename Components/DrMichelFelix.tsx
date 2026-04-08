@@ -427,9 +427,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => {
         const header = `DOCUMENTO: ${doc.name}\n`;
-        const summaryPart = doc.summary ? `RESUMO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL):\n${doc.summary}\n\n` : '';
-        // Include a portion of full text for immediate context, but prioritize the summary for large docs
-        const fullTextPart = doc.fullText ? `CONTEÚDO BRUTO (OCR/TEXTO):\n${doc.fullText.substring(0, 20000)}` : '';
+        const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
+        // Include as much full text as possible within safety limits
+        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 150000)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
@@ -568,7 +568,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
     const startTime = Date.now();
-    const CHUNK_SIZE = 50;
+    const CHUNK_SIZE = 20;
 
     try {
       for (let i = startFileIndex; i < fileArray.length; i++) {
@@ -585,15 +585,16 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           const totalPages = result.totalPages;
           const pages = result.pages;
           
-          // OTIMIZAÇÃO: Filtrar páginas de ruído (separação, vazias)
+          // OTIMIZAÇÃO: Filtrar APENAS páginas que são comprovadamente de separação e sem conteúdo
           const filteredPages = pages.filter(page => {
             const text = page.text.toUpperCase();
             const isSeparationPage = (text.includes("PÁGINA DE SEPARAÇÃO") || 
                                      text.includes("PAGINA DE SEPARACAO") ||
                                      text.includes("FOLHA DE SEPARAÇÃO")) && 
-                                     page.text.trim().length < 100; // Only filter if it's mostly just the separation text
-            const hasContent = page.text.trim().length > 10 || page.image;
-            return !isSeparationPage && hasContent;
+                                     page.text.trim().length < 80; 
+            // Se tiver imagem, NUNCA filtra (pode ser um carimbo ou assinatura importante)
+            if (page.image) return true;
+            return !isSeparationPage;
           });
 
           const totalFilteredPages = filteredPages.length;
@@ -624,16 +625,20 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               return;
             }
 
-            setProgressText(`Auditoria: ${file.name} (Lote de ${chunkPages.length} páginas)...`);
+            setProgressText(`Auditoria: ${file.name} (Páginas ${chunkPages[0].pageNumber} a ${chunkPages[chunkPages.length-1].pageNumber})...`);
 
-            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA OTIMIZADA]
+            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA - AUDITORIA DETALHADA]
             ARQUIVO: ${file.name}
-            LOTE: ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalFilteredPages)} de ${totalFilteredPages} páginas úteis.
+            PÁGINAS DO LOTE: ${chunkPages[0].pageNumber} a ${chunkPages[chunkPages.length-1].pageNumber} de ${totalPages}
             
-            CONTEÚDO:
+            CONTEÚDO DAS PÁGINAS:
             ${chunkText}
             
-            INSTRUÇÃO: Tome ciência deste lote do documento. Extraia dados cruciais e confirme o recebimento.`;
+            INSTRUÇÃO CRÍTICA: Você deve agir como um auditor jurídico. 
+            1. Leia cada página com atenção.
+            2. Extraia nomes, datas, CIDs, valores e propostas de acordo.
+            3. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
+            4. Responda com a confirmação de ciência e a lista de dados extraídos. NÃO responda apenas "Recebido".`;
 
             const response = await fetch('/api/dr-michel/chat', {
               method: 'POST',
@@ -780,7 +785,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada Otimizada** de ${fileArray.length} arquivo(s). Vou processar o processo em lotes de 50 páginas para garantir máxima velocidade e ciência integral, respeitando o tempo de qualidade solicitado (máx. 3 min por ciclo). Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou processar o processo em lotes de 20 páginas para garantir máxima precisão e ciência integral de cada folha, respeitando o tempo de qualidade solicitado. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -832,7 +837,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada Otimizada** de todos os documentos do GED por fases em lotes de 50 páginas, garantindo ciência integral. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases em lotes de 20 páginas, garantindo ciência integral de cada folha. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
