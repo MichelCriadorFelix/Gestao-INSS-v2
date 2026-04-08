@@ -561,7 +561,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
     const startTime = Date.now();
-    const CHUNK_SIZE = 5;
+    const CHUNK_SIZE = 50;
 
     try {
       for (let i = startFileIndex; i < fileArray.length; i++) {
@@ -577,18 +577,30 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
           const totalPages = result.totalPages;
           const pages = result.pages;
+          
+          // OTIMIZAÇÃO: Filtrar páginas de ruído (separação, vazias)
+          const filteredPages = pages.filter(page => {
+            const text = page.text.toUpperCase();
+            const isSeparationPage = text.includes("PÁGINA DE SEPARAÇÃO") || 
+                                    text.includes("PAGINA DE SEPARACAO") ||
+                                    text.includes("FOLHA DE SEPARAÇÃO");
+            const hasContent = page.text.trim().length > 20 || page.image;
+            return !isSeparationPage && hasContent;
+          });
+
+          const totalFilteredPages = filteredPages.length;
           let fullFileText = result.text;
           let allSummaries = "";
           
           const initialP = (i === startFileIndex) ? startPageIndex : 0;
 
-          for (let p = initialP; p < totalPages; p += CHUNK_SIZE) {
+          for (let p = initialP; p < totalFilteredPages; p += CHUNK_SIZE) {
             // Check global timeout
             if (Date.now() - startTime > PHASE_TIMEOUT) {
               const timeoutMsg: Message = {
                 id: generateId(),
                 role: 'assistant',
-                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até a página ${p} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
+                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até o lote ${p} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
                 timestamp: new Date().toISOString()
               };
               setSessions(prev => prev.map(s => 
@@ -599,20 +611,20 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               return;
             }
 
-            const chunkPages = pages.slice(p, p + CHUNK_SIZE);
+            const chunkPages = filteredPages.slice(p, p + CHUNK_SIZE);
             const chunkText = chunkPages.map(page => page.text).join('\n');
             const chunkImages = chunkPages.map(page => page.image).filter(Boolean) as string[];
 
-            setProgressText(`Auditoria: ${file.name} (Páginas ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalPages)})...`);
+            setProgressText(`Auditoria: ${file.name} (Lote de ${chunkPages.length} páginas)...`);
 
-            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA]
+            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA OTIMIZADA]
             ARQUIVO: ${file.name}
-            PÁGINAS: ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalPages)} de ${totalPages}
+            LOTE: ${p + 1} a ${Math.min(p + CHUNK_SIZE, totalFilteredPages)} de ${totalFilteredPages} páginas úteis.
             
             CONTEÚDO:
             ${chunkText}
             
-            INSTRUÇÃO: Tome ciência desta parte do documento. Extraia dados cruciais e confirme o recebimento.`;
+            INSTRUÇÃO: Tome ciência deste lote do documento. Extraia dados cruciais e confirme o recebimento.`;
 
             const response = await fetch('/api/dra-luana/chat', {
               method: 'POST',
@@ -756,7 +768,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou processar cada página individualmente para garantir ciência integral de todo o processo, respeitando o tempo de qualidade solicitado (máx. 3 min por ciclo). Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada Otimizada** de ${fileArray.length} arquivo(s). Vou processar o processo em lotes de 50 páginas para garantir máxima velocidade e ciência integral, respeitando o tempo de qualidade solicitado (máx. 3 min por ciclo). Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -832,7 +844,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases, garantindo ciência integral de cada página. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada Otimizada** de todos os documentos do GED por fases em lotes de 50 páginas, garantindo ciência integral. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
