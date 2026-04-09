@@ -1142,7 +1142,15 @@ ${ragContext}`;
       let responseStream;
       
       if (modelProvider === 'openrouter') {
-        responseStream = callOpenRouterStream(model || 'qwen/qwen-2.5-72b-instruct', contents, selectedSystemPrompt, temperature);
+        // Mapeamento de modelos OpenRouter para garantir IDs corretos
+        const modelMap: Record<string, string> = {
+          'qwen-plus': 'qwen/qwen-2.5-72b-instruct',
+          'gemini-pro-1.5': 'google/gemini-pro-1.5',
+          'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
+          'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
+        };
+        const targetModel = modelMap[model] || model || 'qwen/qwen-2.5-72b-instruct';
+        responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
           model: model || "gemini-3-flash-preview",
@@ -1187,7 +1195,15 @@ ${ragContext}`;
     } catch (streamError: any) {
       clearInterval(heartbeat);
       console.error("Stream error:", streamError);
-      res.write(`data: ${JSON.stringify({ error: streamError.message || "Erro durante a geração do texto." })}\n\n`);
+      
+      let errorMessage = streamError.message || "Erro durante a geração do texto.";
+      
+      // Tratamento amigável para erro de contexto excedido no OpenRouter
+      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded") || errorMessage.includes("400")) {
+        errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
+      }
+
+      res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   } catch (error: any) {
@@ -1309,7 +1325,14 @@ ${ragContext}`;
       let responseStream;
       
       if (modelProvider === 'openrouter') {
-        responseStream = callOpenRouterStream(model || 'qwen/qwen-2.5-72b-instruct', contents, selectedSystemPrompt, temperature);
+        const modelMap: Record<string, string> = {
+          'qwen-plus': 'qwen/qwen-2.5-72b-instruct',
+          'gemini-pro-1.5': 'google/gemini-pro-1.5',
+          'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
+          'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
+        };
+        const targetModel = modelMap[model] || model || 'qwen/qwen-2.5-72b-instruct';
+        responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
           model: model || "gemini-3-flash-preview",
@@ -1354,7 +1377,14 @@ ${ragContext}`;
     } catch (streamError: any) {
       clearInterval(heartbeat);
       console.error("Stream error (Dra. Luana):", streamError);
-      res.write(`data: ${JSON.stringify({ error: streamError.message || "Erro durante a geração do texto." })}\n\n`);
+      
+      let errorMessage = streamError.message || "Erro durante a geração do texto.";
+      
+      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded") || errorMessage.includes("400")) {
+        errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
+      }
+
+      res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   } catch (error: any) {
