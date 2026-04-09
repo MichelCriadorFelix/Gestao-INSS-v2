@@ -1222,7 +1222,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       <option value="gemini-3-pro-preview">Gemini 3.1 Pro (2 Milhões de Tokens - Alta Complexidade)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (Modelos Alternativos)">
-                      <option value="qwen-plus">Qwen 2.5 72B (128k Tokens - Ótimo para Leitura)</option>
+                      <option value="qwen-plus">Qwen 3.6 Plus (128k Tokens - Ótimo para Leitura)</option>
                       <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (200k Tokens - Qualidade Superior)</option>
                       <option value="gemini-pro-1.5">Gemini 1.5 Pro via OR (2M Tokens - Contexto Infinito)</option>
                     </optgroup>
