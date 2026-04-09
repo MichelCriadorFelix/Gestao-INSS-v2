@@ -86,6 +86,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -443,7 +445,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
-          ragContext
+          ragContext,
+          modelProvider: selectedModelProvider,
+          model: selectedModel
         }),
         signal: abortController.signal
       });
@@ -648,7 +652,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 message: phasePrompt,
                 history: [], 
                 images: chunkImages,
-                isIngestion: true
+                isIngestion: true,
+                modelProvider: selectedModelProvider,
+                model: selectedModel
               })
             });
 
@@ -1196,6 +1202,24 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   >
                     <Users className="w-5 h-5" />
                   </button>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                  <select
+                    value={selectedModelProvider === 'gemini' ? selectedModel : 'openrouter-qwen'}
+                    onChange={(e) => {
+                      if (e.target.value === 'openrouter-qwen') {
+                        setSelectedModelProvider('openrouter');
+                        setSelectedModel('qwen/qwen-2.5-72b-instruct');
+                      } else {
+                        setSelectedModelProvider('gemini');
+                        setSelectedModel(e.target.value);
+                      }
+                    }}
+                    className="bg-transparent text-xs text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors"
+                  >
+                    <option value="gemini-3-flash-preview">Gemini 3.1 Flash (Rápido)</option>
+                    <option value="gemini-3-pro-preview">Gemini 3.1 Pro (Complexo)</option>
+                    <option value="openrouter-qwen">Qwen 3.6 Plus (Processos Gigantes)</option>
+                  </select>
                 </div>
                 <button 
                   onClick={() => handleSendMessage()}

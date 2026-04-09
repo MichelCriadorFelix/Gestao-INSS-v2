@@ -957,9 +957,95 @@ app.post("/api/marketing/generate", async (req, res) => {
   }
 });
 
+async function* callOpenRouterStream(model: string, contents: any[], systemInstruction: string, temperature: number) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY não configurada na Vercel.");
+
+  const orMessages = [];
+  if (systemInstruction) {
+    orMessages.push({ role: 'system', content: systemInstruction });
+  }
+
+  for (const msg of contents) {
+    const role = msg.role === 'model' ? 'assistant' : 'user';
+    let content: any[] = [];
+    
+    for (const part of msg.parts) {
+      if (part.text) {
+        content.push({ type: 'text', text: part.text });
+      } else if (part.inlineData) {
+        content.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+          }
+        });
+      }
+    }
+    
+    if (content.length === 1 && content[0].type === 'text') {
+      orMessages.push({ role, content: content[0].text });
+    } else {
+      orMessages.push({ role, content });
+    }
+  }
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://ais.studio',
+      'X-Title': 'Gestão INSS Jurídico',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: orMessages,
+      temperature: temperature,
+      stream: true
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`OpenRouter Error: ${response.status} ${err}`);
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder('utf-8');
+
+  if (!reader) throw new Error("Sem reader do OpenRouter");
+
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.choices && data.choices.length > 0) {
+            const delta = data.choices[0].delta;
+            if (delta && delta.content) {
+              yield { text: delta.content };
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors for incomplete chunks
+        }
+      }
+    }
+  }
+}
+
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    const { message, history, images, ragContext } = req.body;
+    const { message, history, images, ragContext, modelProvider, model } = req.body;
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -1043,23 +1129,6 @@ ${ragContext}`;
     // Apenas para o Dr. Michel (não para o Arquivista)
     const tools = isStorageRequest ? [] : [{ googleSearch: {} }, { urlContext: {} }];
 
-    const responseStream = await callGeminiStream({
-      model: "gemini-3-flash-preview",
-      contents: contents,
-      config: {
-        systemInstruction: selectedSystemPrompt,
-        temperature: temperature,
-        maxOutputTokens: 16384,
-        tools: tools,
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-        ]
-      }
-    });
-
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -1070,6 +1139,29 @@ ${ragContext}`;
     }, 5000);
 
     try {
+      let responseStream;
+      
+      if (modelProvider === 'openrouter') {
+        responseStream = callOpenRouterStream(model || 'qwen/qwen-2.5-72b-instruct', contents, selectedSystemPrompt, temperature);
+      } else {
+        responseStream = await callGeminiStream({
+          model: model || "gemini-3-flash-preview",
+          contents: contents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: temperature,
+            maxOutputTokens: 16384,
+            tools: tools,
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          }
+        });
+      }
+
       for await (const chunk of responseStream) {
         let text = "";
         try {
@@ -1107,7 +1199,7 @@ ${ragContext}`;
 
 app.post("/api/dra-luana/chat", async (req, res) => {
   try {
-    const { message, history, images, minWage = '1621.00', ragContext } = req.body;
+    const { message, history, images, minWage = '1621.00', ragContext, modelProvider, model } = req.body;
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -1204,23 +1296,6 @@ ${ragContext}`;
     // Configuração de Tools (Google Search Grounding + URL Context)
     const tools = isStorageRequest ? [] : [{ googleSearch: {} }, { urlContext: {} }];
 
-    const responseStream = await callGeminiStream({
-      model: "gemini-3-flash-preview",
-      contents: contents,
-      config: {
-        systemInstruction: selectedSystemPrompt,
-        temperature: temperature,
-        maxOutputTokens: 16384,
-        tools: tools,
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-        ]
-      }
-    });
-
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -1231,6 +1306,29 @@ ${ragContext}`;
     }, 5000);
 
     try {
+      let responseStream;
+      
+      if (modelProvider === 'openrouter') {
+        responseStream = callOpenRouterStream(model || 'qwen/qwen-2.5-72b-instruct', contents, selectedSystemPrompt, temperature);
+      } else {
+        responseStream = await callGeminiStream({
+          model: model || "gemini-3-flash-preview",
+          contents: contents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: temperature,
+            maxOutputTokens: 16384,
+            tools: tools,
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          }
+        });
+      }
+
       for await (const chunk of responseStream) {
         let text = "";
         try {
