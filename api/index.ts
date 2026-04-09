@@ -30,7 +30,7 @@ app.post("/api/ocr", async (req, res) => {
     });
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
@@ -472,9 +472,9 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
 let currentKeyIndex = Math.floor(Math.random() * 10);
 
 const MODEL_HIERARCHY = [
+  "gemini-3.1-pro-preview",
   "gemini-3-flash-preview",
-  "gemini-2.5-flash-preview",
-  "gemini-2.5-flash"
+  "gemini-3.1-flash-lite-preview"
 ];
 
 function getApiKeys() {
@@ -943,7 +943,7 @@ app.post("/api/marketing/generate", async (req, res) => {
     ${jsonFormat}`;
 
     const response = await callGemini({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -1155,7 +1155,7 @@ ${ragContext}`;
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
+          model: model || "gemini-3.1-pro-preview",
           contents: contents,
           config: {
             systemInstruction: selectedSystemPrompt,
@@ -1344,7 +1344,7 @@ ${ragContext}`;
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
+          model: model || "gemini-3.1-pro-preview",
           contents: contents,
           config: {
             systemInstruction: selectedSystemPrompt,
