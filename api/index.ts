@@ -1143,14 +1143,14 @@ ${ragContext}`;
       
       if (modelProvider === 'openrouter') {
         const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus-preview',
-          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct:free',
-          'deepseek-chat-free': 'deepseek/deepseek-chat:free',
+          'qwen-plus': 'qwen/qwen-plus',
+          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
+          'deepseek-chat-free': 'deepseek/deepseek-chat',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
         };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus-preview';
+        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
@@ -1329,14 +1329,14 @@ ${ragContext}`;
       
       if (modelProvider === 'openrouter') {
         const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus-preview',
-          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct:free',
-          'deepseek-chat-free': 'deepseek/deepseek-chat:free',
+          'qwen-plus': 'qwen/qwen-plus',
+          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
+          'deepseek-chat-free': 'deepseek/deepseek-chat',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
         };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus-preview';
+        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
