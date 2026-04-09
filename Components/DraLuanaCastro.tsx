@@ -1209,17 +1209,18 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
-                    <optgroup label="Google Gemini (Recomendado)">
+                    <optgroup label="Google Gemini (100% Gratuito no App)">
                       <option value="gemini-3-flash-preview">Gemini 3.1 Flash (1 Milhão de Tokens - Ultra Rápido)</option>
                       <option value="gemini-3-pro-preview">Gemini 3.1 Pro (2 Milhões de Tokens - Alta Complexidade)</option>
                     </optgroup>
-                    <optgroup label="OpenRouter (Modelos Alternativos)">
-                      <option value="qwen-plus">Qwen 3.6 Plus Preview (1M Tokens - Gratuito)</option>
-                      <option value="llama-3-3-70b-free">Llama 3.3 70B (128k Tokens - Gratuito)</option>
-                      <option value="deepseek-chat-free">DeepSeek V3 (64k Tokens - Gratuito)</option>
-                      <option value="openrouter-free">Auto-Router (Modelos Gratuitos Aleatórios)</option>
-                      <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (200k Tokens - Qualidade Superior)</option>
-                      <option value="gemini-pro-1.5">Gemini 1.5 Pro via OR (2M Tokens - Contexto Infinito)</option>
+                    <optgroup label="OpenRouter (Gratuitos)">
+                      <option value="openrouter-free">Auto-Router (Modelos Aleatórios)</option>
+                      <option value="llama-3-3-70b-free">Llama 3.3 70B Free (128k Tokens)</option>
+                    </optgroup>
+                    <optgroup label="OpenRouter (Pagos - Requer Saldo)">
+                      <option value="qwen-plus">Qwen 3.6 Plus (128k Tokens)</option>
+                      <option value="deepseek-chat">DeepSeek V3 (64k Tokens)</option>
+                      <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (200k Tokens)</option>
                     </optgroup>
                   </select>
                 </div>
