@@ -1217,18 +1217,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
-                    <optgroup label="Google Gemini (100% Gratuito no App)">
+                    <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
                       <option value="gemini-3-flash-preview">Gemini 3.1 Flash (1 Milhão de Tokens - Ultra Rápido)</option>
                       <option value="gemini-3-pro-preview">Gemini 3.1 Pro (2 Milhões de Tokens - Alta Complexidade)</option>
-                    </optgroup>
-                    <optgroup label="OpenRouter (Gratuitos)">
-                      <option value="openrouter-free">Auto-Router (Modelos Aleatórios)</option>
-                      <option value="llama-3-3-70b-free">Llama 3.3 70B Free (128k Tokens)</option>
-                    </optgroup>
-                    <optgroup label="OpenRouter (Pagos - Requer Saldo)">
-                      <option value="qwen-plus">Qwen 3.6 Plus (128k Tokens)</option>
-                      <option value="deepseek-chat">DeepSeek V3 (64k Tokens)</option>
-                      <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (200k Tokens)</option>
                     </optgroup>
                   </select>
                 </div>
