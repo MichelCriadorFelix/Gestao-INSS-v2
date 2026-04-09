@@ -1142,14 +1142,13 @@ ${ragContext}`;
       let responseStream;
       
       if (modelProvider === 'openrouter') {
-        // Mapeamento de modelos OpenRouter para garantir IDs corretos
         const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus',
+          'qwen-plus': 'qwen/qwen3.6-plus-preview',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
         };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
+        const targetModel = modelMap[model] || model || 'qwen/qwen3.6-plus-preview';
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
@@ -1326,12 +1325,12 @@ ${ragContext}`;
       
       if (modelProvider === 'openrouter') {
         const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus',
+          'qwen-plus': 'qwen/qwen3.6-plus-preview',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
         };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
+        const targetModel = modelMap[model] || model || 'qwen/qwen3.6-plus-preview';
         responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
         responseStream = await callGeminiStream({
