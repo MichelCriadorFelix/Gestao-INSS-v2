@@ -1225,6 +1225,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       <option value="qwen-plus">Qwen 3.6 Plus Preview (1M Tokens - Gratuito)</option>
                       <option value="llama-3-3-70b-free">Llama 3.3 70B (128k Tokens - Gratuito)</option>
                       <option value="deepseek-chat-free">DeepSeek V3 (64k Tokens - Gratuito)</option>
+                      <option value="openrouter-free">Auto-Router (Modelos Gratuitos Aleatórios)</option>
                       <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (200k Tokens - Qualidade Superior)</option>
                       <option value="gemini-pro-1.5">Gemini 1.5 Pro via OR (2M Tokens - Contexto Infinito)</option>
                     </optgroup>

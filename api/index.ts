@@ -1146,6 +1146,7 @@ ${ragContext}`;
           'qwen-plus': 'qwen/qwen-plus',
           'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
           'deepseek-chat-free': 'deepseek/deepseek-chat',
+          'openrouter-free': 'openrouter/free',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
@@ -1332,6 +1333,7 @@ ${ragContext}`;
           'qwen-plus': 'qwen/qwen-plus',
           'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
           'deepseek-chat-free': 'deepseek/deepseek-chat',
+          'openrouter-free': 'openrouter/free',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
