@@ -505,9 +505,9 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   const apiKey = keys[currentKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
-  // Select model from hierarchy
+  // Select model from hierarchy or use the requested model on first try
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const currentModel = MODEL_HIERARCHY[safeModelIndex];
+  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
   // Override model in params
   const finalParams = { ...params, model: currentModel };
@@ -614,7 +614,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const currentModel = MODEL_HIERARCHY[safeModelIndex];
+  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
   const finalParams = { ...params, model: currentModel };
   
