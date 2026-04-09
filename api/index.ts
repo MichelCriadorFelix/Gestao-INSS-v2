@@ -1144,6 +1144,8 @@ ${ragContext}`;
       if (modelProvider === 'openrouter') {
         const modelMap: Record<string, string> = {
           'qwen-plus': 'qwen/qwen-plus-preview',
+          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct:free',
+          'deepseek-chat-free': 'deepseek/deepseek-chat:free',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
@@ -1198,8 +1200,10 @@ ${ragContext}`;
       let errorMessage = streamError.message || "Erro durante a geração do texto.";
       
       // Tratamento amigável para erro de contexto excedido no OpenRouter
-      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded") || errorMessage.includes("400")) {
+      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded")) {
         errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
+      } else if (errorMessage.includes("OpenRouter Error")) {
+        errorMessage = "⚠️ ERRO DO OPENROUTER: " + errorMessage;
       }
 
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
@@ -1326,6 +1330,8 @@ ${ragContext}`;
       if (modelProvider === 'openrouter') {
         const modelMap: Record<string, string> = {
           'qwen-plus': 'qwen/qwen-plus-preview',
+          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct:free',
+          'deepseek-chat-free': 'deepseek/deepseek-chat:free',
           'gemini-pro-1.5': 'google/gemini-pro-1.5',
           'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
           'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
@@ -1379,8 +1385,10 @@ ${ragContext}`;
       
       let errorMessage = streamError.message || "Erro durante a geração do texto.";
       
-      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded") || errorMessage.includes("400")) {
+      if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded")) {
         errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
+      } else if (errorMessage.includes("OpenRouter Error")) {
+        errorMessage = "⚠️ ERRO DO OPENROUTER: " + errorMessage;
       }
 
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
