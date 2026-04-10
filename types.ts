@@ -170,7 +170,7 @@ export interface RecordModalProps {
   onSave: (record: ClientRecord) => void;
   initialData?: ClientRecord | null;
   onOpenScanner?: () => void;
-  onOpenPetition?: (petition: Petition) => void;
+  onOpenPetition?: (petition: Petition, clientId?: string) => void;
 }
 
 export interface MonthlyDetailsModalProps {

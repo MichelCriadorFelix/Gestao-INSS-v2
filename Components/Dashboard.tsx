@@ -1083,8 +1083,20 @@ const Dashboard: React.FC<DashboardProps> = ({
         await saveData('clients', updatedClients, updatedClient);
     };
 
-  const handleOpenPetition = (petition: any) => {
+  const handleOpenPetition = (petition: any, clientId?: string) => {
       setActivePetition(petition);
+      
+      // Se um clientId for fornecido (ex: abrindo do modal do cliente), 
+      // podemos usar isso para garantir que o cliente correto seja selecionado
+      if (clientId) {
+          const client = records.find(c => c.id === clientId);
+          if (client) {
+              // O PetitionEditor vai procurar o cliente baseado no ID da petição
+              // Mas para garantir, podemos passar o cliente selecionado se necessário
+              // (Atualmente o PetitionEditor já faz essa busca no useEffect)
+          }
+      }
+      
       setCurrentView('petition_editor');
       setIsModalOpen(false);
   };

@@ -83,6 +83,32 @@ import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
+(pdfMake as any).fonts = {
+  Roboto: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf'
+  },
+  Courier: {
+    normal: 'Courier',
+    bold: 'Courier-Bold',
+    italics: 'Courier-Oblique',
+    bolditalics: 'Courier-BoldOblique'
+  },
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique'
+  },
+  Times: {
+    normal: 'Times-Roman',
+    bold: 'Times-Bold',
+    italics: 'Times-Italic',
+    bolditalics: 'Times-BoldItalic'
+  }
+};
 import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
@@ -447,8 +473,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           setTitle(initialPetition.title);
           setCategory(initialPetition.category);
           setType(initialPetition.type);
+          
+          // Find the client that owns this petition
           const client = (clients || []).find(c => c.petitions?.some(p => p.id === initialPetition.id));
-          if (client) setSelectedClient(client);
+          if (client) {
+            setSelectedClient(client);
+          }
+          
           loadedPetitionIdRef.current = initialPetition.id;
         }
       } else {
@@ -463,6 +494,17 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       }
     }
   }, [initialPetition, editor, clients]);
+
+  // Efeito adicional para garantir que o cliente seja selecionado se a petição já estiver carregada
+  // mas o cliente não estiver selecionado (ex: ao abrir do modal do cliente)
+  useEffect(() => {
+    if (initialPetition && !selectedClient && clients) {
+        const client = clients.find(c => c.petitions?.some(p => p.id === initialPetition.id));
+        if (client) {
+            setSelectedClient(client);
+        }
+    }
+  }, [initialPetition, selectedClient, clients]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (!editor) return;

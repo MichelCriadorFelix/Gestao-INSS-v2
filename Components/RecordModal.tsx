@@ -943,7 +943,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button 
-                                            onClick={() => onOpenPetition?.(petition)}
+                                            onClick={() => onOpenPetition?.(petition, formData.id)}
                                             className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
                                             title="Editar no Editor"
                                         >
