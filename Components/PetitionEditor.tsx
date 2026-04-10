@@ -363,6 +363,15 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [leftRightMargin, setLeftRightMargin] = useState('2.5cm');
   const [contentChanged, setContentChanged] = useState(0);
 
+  const [selectedFont, setSelectedFont] = useState('"Times New Roman", Times, serif');
+  const fonts = [
+    { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+    { name: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+    { name: 'Courier New', value: '"Courier New", Courier, monospace' },
+    { name: 'Georgia', value: 'Georgia, serif' },
+    { name: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  ];
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -396,7 +405,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-slate-800 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap',
-        style: `font-family: "Times New Roman", Times, serif; line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
+        style: `font-family: ${selectedFont}; line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
       },
     },
     onUpdate: () => {
@@ -416,8 +425,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   useEffect(() => {
     if (editor) {
       editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
+      editor.view.dom.style.fontFamily = selectedFont;
     }
-  }, [topBottomMargin, leftRightMargin, editor]);
+  }, [topBottomMargin, leftRightMargin, selectedFont, editor]);
 
   const loadedPetitionIdRef = React.useRef<string | null>(null);
 
@@ -615,12 +625,50 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       
       applyIndent(pdfMakeContent as any[]);
 
+      const fontMapping: Record<string, string> = {
+        '"Times New Roman", Times, serif': 'Times',
+        'Arial, Helvetica, sans-serif': 'Helvetica',
+        '"Courier New", Courier, monospace': 'Courier',
+        'Georgia, serif': 'Times',
+        'Verdana, Geneva, sans-serif': 'Helvetica',
+      };
+
+      const selectedFontName = fontMapping[selectedFont] || 'Roboto';
+
+      // Configure standard fonts for pdfMake
+      (pdfMake as any).fonts = {
+        Roboto: {
+          normal: 'Roboto-Regular.ttf',
+          bold: 'Roboto-Medium.ttf',
+          italics: 'Roboto-Italic.ttf',
+          bolditalics: 'Roboto-MediumItalic.ttf'
+        },
+        Times: {
+          normal: 'Times-Roman',
+          bold: 'Times-Bold',
+          italics: 'Times-Italic',
+          bolditalics: 'Times-BoldItalic'
+        },
+        Helvetica: {
+          normal: 'Helvetica',
+          bold: 'Helvetica-Bold',
+          italics: 'Helvetica-Oblique',
+          bolditalics: 'Helvetica-BoldOblique'
+        },
+        Courier: {
+          normal: 'Courier',
+          bold: 'Courier-Bold',
+          italics: 'Courier-Oblique',
+          bolditalics: 'Courier-BoldOblique'
+        }
+      };
+
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
         pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
-          font: 'Roboto', // pdfmake default, we can change to Times if we load custom fonts
+          font: selectedFontName,
           fontSize: 12,
           lineHeight: 1.5,
           color: '#000000'
@@ -1014,6 +1062,18 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               active={editor.isActive({ textAlign: 'justify' })}
               icon={<AlignJustify className="w-4 h-4" />}
             />
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+
+            <select 
+              value={selectedFont}
+              onChange={(e) => setSelectedFont(e.target.value)}
+              className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
+            >
+              {fonts.map(f => (
+                <option key={f.name} value={f.value} style={{ fontFamily: f.value }}>{f.name}</option>
+              ))}
+            </select>
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
 
