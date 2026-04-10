@@ -43,6 +43,28 @@ const styles = `
     margin-top: 1.5rem !important;
     margin-bottom: 1rem !important;
   }
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    .ProseMirror, .ProseMirror * {
+      visibility: visible;
+    }
+    .ProseMirror {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100% !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    @page {
+      size: auto;
+      margin: 2cm;
+    }
+  }
 `;
 
 const PasteImageExtension = ResizableImage.extend({
@@ -625,50 +647,12 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       
       applyIndent(pdfMakeContent as any[]);
 
-      const fontMapping: Record<string, string> = {
-        '"Times New Roman", Times, serif': 'Times',
-        'Arial, Helvetica, sans-serif': 'Helvetica',
-        '"Courier New", Courier, monospace': 'Courier',
-        'Georgia, serif': 'Times',
-        'Verdana, Geneva, sans-serif': 'Helvetica',
-      };
-
-      const selectedFontName = fontMapping[selectedFont] || 'Roboto';
-
-      // Configure standard fonts for pdfMake
-      (pdfMake as any).fonts = {
-        Roboto: {
-          normal: 'Roboto-Regular.ttf',
-          bold: 'Roboto-Medium.ttf',
-          italics: 'Roboto-Italic.ttf',
-          bolditalics: 'Roboto-MediumItalic.ttf'
-        },
-        Times: {
-          normal: 'Times-Roman',
-          bold: 'Times-Bold',
-          italics: 'Times-Italic',
-          bolditalics: 'Times-BoldItalic'
-        },
-        Helvetica: {
-          normal: 'Helvetica',
-          bold: 'Helvetica-Bold',
-          italics: 'Helvetica-Oblique',
-          bolditalics: 'Helvetica-BoldOblique'
-        },
-        Courier: {
-          normal: 'Courier',
-          bold: 'Courier-Bold',
-          italics: 'Courier-Oblique',
-          bolditalics: 'Courier-BoldOblique'
-        }
-      };
-
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
         pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
-          font: selectedFontName,
+          font: 'Roboto',
           fontSize: 12,
           lineHeight: 1.5,
           color: '#000000'
@@ -834,7 +818,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               onClick={generatePDF}
               className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
-              <FileDown className="w-4 h-4 text-red-500" /> Baixar PDF Direto (KB)
+              <FileDown className="w-4 h-4 text-red-500" /> Baixar PDF (Padrão)
+            </button>
+            <button 
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
+            >
+              <Palette className="w-4 h-4 text-indigo-500" /> Imprimir com Fonte Real
             </button>
             <button 
               onClick={() => setIsHeaderFooterModalOpen(true)}
