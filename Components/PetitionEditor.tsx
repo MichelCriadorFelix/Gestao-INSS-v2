@@ -83,36 +83,27 @@ import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
-(pdfMake as any).fonts = {
-  Roboto: {
-    normal: 'Roboto-Regular.ttf',
-    bold: 'Roboto-Medium.ttf',
-    italics: 'Roboto-Italic.ttf',
-    bolditalics: 'Roboto-MediumItalic.ttf'
-  },
-  Courier: {
-    normal: 'Courier',
-    bold: 'Courier-Bold',
-    italics: 'Courier-Oblique',
-    bolditalics: 'Courier-BoldOblique'
-  },
-  Helvetica: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique'
-  },
-  Times: {
-    normal: 'Times-Roman',
-    bold: 'Times-Bold',
-    italics: 'Times-Italic',
-    bolditalics: 'Times-BoldItalic'
-  }
-};
 import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
+
+const loadFontAsBase64 = async (url: string): Promise<string> => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result.split(',')[1]);
+      } else {
+        reject(new Error('Failed to load font'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
 
 interface ChatDocument {
   id: string;
@@ -163,6 +154,7 @@ interface PetitionEditorProps {
   clients: ClientRecord[];
   onBack: () => void;
   initialPetition?: Petition | null;
+  initialClientId?: string | null;
   onSavePetition?: (clientId: string, petition: Petition, isAutoSave: boolean) => void;
 }
 
@@ -179,9 +171,10 @@ interface HeaderFooterConfig {
   template: 'losangos' | 'tramitacao' | 'lumina';
 }
 
-const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initialPetition, onSavePetition }) => {
+const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initialPetition, initialClientId, onSavePetition }) => {
   const [title, setTitle] = useState(initialPetition?.title || 'NOVA PETIÇÃO SEM TÍTULO');
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(
+    initialClientId ? (clients || []).find(c => c.id === initialClientId) || null :
     initialPetition ? (clients || []).find(c => c.petitions?.some(p => p.id === initialPetition.id)) || null : null
   );
   const [category, setCategory] = useState(initialPetition?.category || 'Petição inicial');
@@ -475,7 +468,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           setType(initialPetition.type);
           
           // Find the client that owns this petition
-          const client = (clients || []).find(c => c.petitions?.some(p => p.id === initialPetition.id));
+          let client = null;
+          if (initialClientId) {
+            client = (clients || []).find(c => c.id === initialClientId);
+          }
+          if (!client) {
+            client = (clients || []).find(c => c.petitions?.some(p => p.id === initialPetition.id));
+          }
           if (client) {
             setSelectedClient(client);
           }
@@ -493,18 +492,24 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       }
     }
-  }, [initialPetition, editor, clients]);
+  }, [initialPetition, initialClientId, editor, clients]);
 
   // Efeito adicional para garantir que o cliente seja selecionado se a petição já estiver carregada
   // mas o cliente não estiver selecionado (ex: ao abrir do modal do cliente)
   useEffect(() => {
     if (initialPetition && !selectedClient && clients) {
-        const client = clients.find(c => c.petitions?.some(p => p.id === initialPetition.id));
+        let client = null;
+        if (initialClientId) {
+          client = clients.find(c => c.id === initialClientId);
+        }
+        if (!client) {
+          client = clients.find(c => c.petitions?.some(p => p.id === initialPetition.id));
+        }
         if (client) {
             setSelectedClient(client);
         }
     }
-  }, [initialPetition, selectedClient, clients]);
+  }, [initialPetition, initialClientId, selectedClient, clients]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (!editor) return;
@@ -685,6 +690,27 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       const selectedFontName = fontMapping[selectedFont] || 'Roboto';
 
+      // Load fonts into VFS if not already present
+      const vfs = (pdfMake as any).vfs;
+      if (selectedFontName === 'Times' && !vfs['Times-Roman']) {
+        vfs['Times-Roman'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ_BNEH3XZhJ0qS2zKMo28.ttf');
+        vfs['Times-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
+        vfs['Times-Italic'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf'); // fallback to bold for italic if needed, or fetch italic
+        vfs['Times-BoldItalic'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
+      }
+      if (selectedFontName === 'Helvetica' && !vfs['Helvetica']) {
+        vfs['Helvetica'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sMzZcdf9_T_20ezyw.ttf');
+        vfs['Helvetica-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+        vfs['Helvetica-Oblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+        vfs['Helvetica-BoldOblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+      }
+      if (selectedFontName === 'Courier' && !vfs['Courier']) {
+        vfs['Courier'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lKkaajS8G0-N98K92w.ttf');
+        vfs['Courier-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+        vfs['Courier-Oblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+        vfs['Courier-BoldOblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+      }
+
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
@@ -731,7 +757,34 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       };
 
-      pdfMake.createPdf(docDefinition).download(`${title}.pdf`);
+      const pdfFontsConfig = {
+        Roboto: {
+          normal: 'Roboto-Regular.ttf',
+          bold: 'Roboto-Medium.ttf',
+          italics: 'Roboto-Italic.ttf',
+          bolditalics: 'Roboto-MediumItalic.ttf'
+        },
+        Courier: {
+          normal: 'Courier',
+          bold: 'Courier-Bold',
+          italics: 'Courier-Oblique',
+          bolditalics: 'Courier-BoldOblique'
+        },
+        Helvetica: {
+          normal: 'Helvetica',
+          bold: 'Helvetica-Bold',
+          italics: 'Helvetica-Oblique',
+          bolditalics: 'Helvetica-BoldOblique'
+        },
+        Times: {
+          normal: 'Times-Roman',
+          bold: 'Times-Bold',
+          italics: 'Times-Italic',
+          bolditalics: 'Times-BoldItalic'
+        }
+      };
+
+      pdfMake.createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
       setIsSaving(false);
 
     } catch (error) {

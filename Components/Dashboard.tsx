@@ -91,6 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [lastSavedType, setLastSavedType] = useState<string | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
+  const [activePetitionClientId, setActivePetitionClientId] = useState<string | null>(null);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
@@ -1085,6 +1086,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleOpenPetition = (petition: any, clientId?: string) => {
       setActivePetition(petition);
+      setActivePetitionClientId(clientId || null);
       
       // Se um clientId for fornecido (ex: abrindo do modal do cliente), 
       // podemos usar isso para garantir que o cliente correto seja selecionado
@@ -1513,8 +1515,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                      onBack={() => {
                          setCurrentView('clients');
                          setActivePetition(null);
+                         setActivePetitionClientId(null);
                      }}
                      initialPetition={activePetition}
+                     initialClientId={activePetitionClientId}
                      onSavePetition={handleSavePetition}
                   />
              ) : currentView === 'labor_calc' ? (
@@ -1858,7 +1862,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             onClose={() => setIsModalOpen(false)} 
             onSave={handleSaveClient}
             initialData={currentRecord}
-            onOpenPetition={handleOpenPetition}
+            onOpenPetition={(petition, clientId) => handleOpenPetition(petition, clientId)}
         />
         
         <ContractModal 
