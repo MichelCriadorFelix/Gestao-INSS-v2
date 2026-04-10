@@ -89,21 +89,27 @@ import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 
-const loadFontAsBase64 = async (url: string): Promise<string> => {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result.split(',')[1]);
-      } else {
-        reject(new Error('Failed to load font'));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+const loadFontAsBase64 = async (url: string): Promise<string | null> => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result.split(',')[1]);
+        } else {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn('Failed to load font from URL:', url, error);
+    return null;
+  }
 };
 
 interface ChatDocument {
@@ -695,28 +701,52 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         'Verdana, Geneva, sans-serif': 'Helvetica',
       };
 
-      const selectedFontName = fontMapping[selectedFont] || 'Roboto';
+      let selectedFontName = fontMapping[selectedFont] || 'Roboto';
 
       // Load fonts into VFS if not already present
       const vfs = (pdfMake as any).vfs || {};
       
-      if (selectedFontName === 'Times' && !vfs['Times-Roman.ttf']) {
-        vfs['Times-Roman.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ_BNEH3XZhJ0qS2zKMo28.ttf');
-        vfs['Times-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
-        vfs['Times-Italic.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
-        vfs['Times-BoldItalic.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
+      let fontsLoaded = true;
+
+      const loadFonts = async (fontMap: Record<string, string>) => {
+        for (const [filename, url] of Object.entries(fontMap)) {
+          if (!vfs[filename]) {
+            const base64 = await loadFontAsBase64(url);
+            if (base64) {
+              vfs[filename] = base64;
+            } else {
+              fontsLoaded = false;
+            }
+          }
+        }
+      };
+
+      if (selectedFontName === 'Times') {
+        await loadFonts({
+          'Times-Roman.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Regular.ttf',
+          'Times-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Bold.ttf',
+          'Times-Italic.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Italic.ttf',
+          'Times-BoldItalic.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-BoldItalic.ttf'
+        });
+      } else if (selectedFontName === 'Helvetica') {
+        await loadFonts({
+          'Helvetica.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Regular.ttf',
+          'Helvetica-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Bold.ttf',
+          'Helvetica-Oblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Italic.ttf',
+          'Helvetica-BoldOblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-BoldItalic.ttf'
+        });
+      } else if (selectedFontName === 'Courier') {
+        await loadFonts({
+          'Courier.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Regular.ttf',
+          'Courier-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Bold.ttf',
+          'Courier-Oblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Italic.ttf',
+          'Courier-BoldOblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-BoldItalic.ttf'
+        });
       }
-      if (selectedFontName === 'Helvetica' && !vfs['Helvetica.ttf']) {
-        vfs['Helvetica.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sMzZcdf9_T_20ezyw.ttf');
-        vfs['Helvetica-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
-        vfs['Helvetica-Oblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
-        vfs['Helvetica-BoldOblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
-      }
-      if (selectedFontName === 'Courier' && !vfs['Courier.ttf']) {
-        vfs['Courier.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lKkaajS8G0-N98K92w.ttf');
-        vfs['Courier-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
-        vfs['Courier-Oblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
-        vfs['Courier-BoldOblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+
+      if (!fontsLoaded) {
+        console.warn(`Failed to load some files for ${selectedFontName}, falling back to Roboto`);
+        selectedFontName = 'Roboto';
       }
 
       const docDefinition: any = {
@@ -795,8 +825,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       pdfMake.createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
       setIsSaving(false);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating PDF:', error);
+      alert(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}`);
       setIsSaving(false);
     }
   };
