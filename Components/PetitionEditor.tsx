@@ -44,25 +44,11 @@ const styles = `
     margin-bottom: 1rem !important;
   }
   @media print {
-    body * {
-      visibility: hidden;
-    }
-    .ProseMirror, .ProseMirror * {
-      visibility: visible;
-    }
-    .ProseMirror {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100% !important;
-      border: none !important;
-      box-shadow: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-    }
     @page {
-      size: auto;
       margin: 2cm;
+    }
+    body {
+      background: white !important;
     }
   }
 `;
@@ -426,7 +412,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     ],
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-slate-800 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap',
+        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-slate-800 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap print:w-full print:min-h-0 print:shadow-none print:border-none print:m-0 print:bg-transparent',
         style: `font-family: ${selectedFont}; line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
       },
     },
@@ -714,9 +700,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-200 dark:bg-slate-950 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-200 dark:bg-slate-950 overflow-hidden print:overflow-visible print:h-auto print:bg-white">
       {/* Header */}
-      <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-4 flex-shrink-0 z-10 shadow-sm">
+      <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-4 flex-shrink-0 z-10 shadow-sm print:hidden">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition">
           <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </button>
@@ -732,9 +718,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden print:overflow-visible">
         {/* Sidebar */}
-        <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-4 gap-6 flex-shrink-0 overflow-y-auto z-10">
+        <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-4 gap-6 flex-shrink-0 overflow-y-auto z-10 print:hidden">
           {/* Client Info */}
           <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
             <div className="flex items-center justify-between mb-2">
@@ -892,7 +878,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         </aside>
 
         {/* Editor Area */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative print:overflow-visible print:block">
           {/* AI Panel */}
           <AnimatePresence>
             {isAiPanelOpen && (
@@ -900,7 +886,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
-                className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-20 flex flex-col"
+                className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-20 flex flex-col print:hidden"
               >
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
                   <div className="flex items-center gap-2">
@@ -1004,7 +990,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           </AnimatePresence>
 
           {/* Toolbar */}
-          <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm print:hidden">
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive('bold')}
@@ -1140,8 +1126,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           </div>
 
           {/* Editor Content */}
-          <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white">
-            <div className="relative print:shadow-none">
+          <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
+            <div className="relative print:shadow-none print:w-full print:max-w-none print:block">
               <EditorContent editor={editor} />
             </div>
           </div>
