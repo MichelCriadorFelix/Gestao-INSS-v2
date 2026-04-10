@@ -575,12 +575,25 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       });
 
-      // Apply text-indent to paragraphs (pdfmake doesn't support text-indent directly via html-to-pdfmake easily without custom parsing, 
-      // but html-to-pdfmake handles inline styles. We'll add a leadingIndent to paragraphs manually if they don't have center/right alignment)
+      // Recursively remove any 'font' property to force pdfmake to use defaultStyle font
+      const removeFontProperty = (obj: any) => {
+        if (Array.isArray(obj)) {
+          obj.forEach(removeFontProperty);
+        } else if (obj !== null && typeof obj === 'object') {
+          if (obj.font) {
+            delete obj.font;
+          }
+          Object.values(obj).forEach(removeFontProperty);
+        }
+      };
+      removeFontProperty(pdfMakeContent);
+
+      // Apply text-indent to paragraphs
       const applyIndent = (nodes: any[], inBlockquote = false, inTable = false) => {
         if (!Array.isArray(nodes)) return;
         nodes.forEach(node => {
-          if (node.font) { delete node.font; }
+          if (!node || typeof node !== 'object') return;
+          
           const isBlockquote = node.nodeName === 'BLOCKQUOTE' || inBlockquote;
           const isTable = node.nodeName === 'TABLE' || inTable;
           
@@ -630,20 +643,10 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           }
 
           if (node.nodeName === 'IMG' || node.image) {
-            // A4 width is ~595pt. Margins are 50pt left and right. Max width = 495pt.
-            // If we only set 'width' and leave 'height' undefined, pdfmake scales it proportionally.
-            // If we use 'fit', it bounds it within a box. Sometimes 'fit' with a large height causes issues if the image is very wide.
-            // Let's set a max width and let it scale proportionally.
-            
-            // Remove any existing hardcoded dimensions from the HTML
             delete node.width;
             delete node.height;
             delete node.fit;
-
-            // Set a maximum width to fit the page, pdfmake will auto-calculate height proportionally
             node.width = 495;
-            
-            // Center images by default
             node.alignment = 'center';
             node.margin = [0, 12, 0, 12];
           }
@@ -654,9 +657,11 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           if (node.ol) applyIndent(node.ol, isBlockquote, isTable);
           if (node.table && node.table.body) {
             node.table.body.forEach((row: any[]) => {
-              row.forEach(cell => {
-                if (cell.stack) applyIndent(cell.stack, isBlockquote, true);
-                if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true);
+              row.forEach((cell: any) => {
+                if (cell && typeof cell === 'object') {
+                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true);
+                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true);
+                }
               });
             });
           }
@@ -754,7 +759,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Erro ao gerar PDF.');
       setIsSaving(false);
     }
   };
