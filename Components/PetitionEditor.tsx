@@ -633,12 +633,22 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       
       applyIndent(pdfMakeContent as any[]);
 
+      const fontMapping: Record<string, string> = {
+        '"Times New Roman", Times, serif': 'Times',
+        'Arial, Helvetica, sans-serif': 'Helvetica',
+        '"Courier New", Courier, monospace': 'Courier',
+        'Georgia, serif': 'Times',
+        'Verdana, Geneva, sans-serif': 'Helvetica',
+      };
+
+      const selectedFontName = fontMapping[selectedFont] || 'Roboto';
+
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
         pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
-          font: 'Roboto',
+          font: selectedFontName,
           fontSize: 12,
           lineHeight: 1.5,
           color: '#000000'
@@ -804,13 +814,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               onClick={generatePDF}
               className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
-              <FileDown className="w-4 h-4 text-red-500" /> Baixar PDF (Padrão)
-            </button>
-            <button 
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
-            >
-              <Palette className="w-4 h-4 text-indigo-500" /> Imprimir com Fonte Real
+              <FileDown className="w-4 h-4 text-red-500" /> Baixar PDF
             </button>
             <button 
               onClick={() => setIsHeaderFooterModalOpen(true)}
