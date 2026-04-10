@@ -89,29 +89,6 @@ import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 
-const loadFontAsBase64 = async (url: string): Promise<string | null> => {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result.split(',')[1]);
-        } else {
-          resolve(null);
-        }
-      };
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.warn('Failed to load font from URL:', url, error);
-    return null;
-  }
-};
-
 interface ChatDocument {
   id: string;
   name: string;
@@ -397,15 +374,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [leftRightMargin, setLeftRightMargin] = useState('2.5cm');
   const [contentChanged, setContentChanged] = useState(0);
 
-  const [selectedFont, setSelectedFont] = useState('"Times New Roman", Times, serif');
-  const fonts = [
-    { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
-    { name: 'Arial', value: 'Arial, Helvetica, sans-serif' },
-    { name: 'Courier New', value: '"Courier New", Courier, monospace' },
-    { name: 'Georgia', value: 'Georgia, serif' },
-    { name: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
-  ];
-
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -439,7 +407,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-slate-800 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap print:w-full print:min-h-0 print:shadow-none print:border-none print:m-0 print:bg-transparent',
-        style: `font-family: ${selectedFont}; line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
+        style: `line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
       },
     },
     onUpdate: () => {
@@ -459,9 +427,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   useEffect(() => {
     if (editor) {
       editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
-      editor.view.dom.style.fontFamily = selectedFont;
     }
-  }, [topBottomMargin, leftRightMargin, selectedFont, editor]);
+  }, [topBottomMargin, leftRightMargin, editor]);
 
   const loadedPetitionIdRef = React.useRef<string | null>(null);
 
@@ -693,68 +660,15 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       
       applyIndent(pdfMakeContent as any[]);
 
-      const fontMapping: Record<string, string> = {
-        '"Times New Roman", Times, serif': 'Times',
-        'Arial, Helvetica, sans-serif': 'Helvetica',
-        '"Courier New", Courier, monospace': 'Courier',
-        'Georgia, serif': 'Times',
-        'Verdana, Geneva, sans-serif': 'Helvetica',
-      };
-
-      let selectedFontName = fontMapping[selectedFont] || 'Roboto';
-
       // Load fonts into VFS if not already present
       const vfs = (pdfMake as any).vfs || {};
       
-      let fontsLoaded = true;
-
-      const loadFonts = async (fontMap: Record<string, string>) => {
-        for (const [filename, url] of Object.entries(fontMap)) {
-          if (!vfs[filename]) {
-            const base64 = await loadFontAsBase64(url);
-            if (base64) {
-              vfs[filename] = base64;
-            } else {
-              fontsLoaded = false;
-            }
-          }
-        }
-      };
-
-      if (selectedFontName === 'Times') {
-        await loadFonts({
-          'Times-Roman.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Regular.ttf',
-          'Times-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Bold.ttf',
-          'Times-Italic.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-Italic.ttf',
-          'Times-BoldItalic.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/tinos/Tinos-BoldItalic.ttf'
-        });
-      } else if (selectedFontName === 'Helvetica') {
-        await loadFonts({
-          'Helvetica.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Regular.ttf',
-          'Helvetica-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Bold.ttf',
-          'Helvetica-Oblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-Italic.ttf',
-          'Helvetica-BoldOblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/static/Arimo-BoldItalic.ttf'
-        });
-      } else if (selectedFontName === 'Courier') {
-        await loadFonts({
-          'Courier.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Regular.ttf',
-          'Courier-Bold.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Bold.ttf',
-          'Courier-Oblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-Italic.ttf',
-          'Courier-BoldOblique.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/cousine/Cousine-BoldItalic.ttf'
-        });
-      }
-
-      if (!fontsLoaded) {
-        console.warn(`Failed to load some files for ${selectedFontName}, falling back to Roboto`);
-        selectedFontName = 'Roboto';
-      }
-
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
         pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
-          font: selectedFontName,
+          font: 'Roboto',
           fontSize: 12,
           lineHeight: 1.5,
           color: '#000000'
@@ -801,24 +715,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           bold: 'Roboto-Medium.ttf',
           italics: 'Roboto-Italic.ttf',
           bolditalics: 'Roboto-MediumItalic.ttf'
-        },
-        Helvetica: {
-          normal: 'Helvetica.ttf',
-          bold: 'Helvetica-Bold.ttf',
-          italics: 'Helvetica-Oblique.ttf',
-          bolditalics: 'Helvetica-BoldOblique.ttf'
-        },
-        Times: {
-          normal: 'Times-Roman.ttf',
-          bold: 'Times-Bold.ttf',
-          italics: 'Times-Italic.ttf',
-          bolditalics: 'Times-BoldItalic.ttf'
-        },
-        Courier: {
-          normal: 'Courier.ttf',
-          bold: 'Courier-Bold.ttf',
-          italics: 'Courier-Oblique.ttf',
-          bolditalics: 'Courier-BoldOblique.ttf'
         }
       };
 
@@ -1175,18 +1071,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               active={editor.isActive({ textAlign: 'justify' })}
               icon={<AlignJustify className="w-4 h-4" />}
             />
-
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
-
-            <select 
-              value={selectedFont}
-              onChange={(e) => setSelectedFont(e.target.value)}
-              className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
-            >
-              {fonts.map(f => (
-                <option key={f.name} value={f.value} style={{ fontFamily: f.value }}>{f.name}</option>
-              ))}
-            </select>
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
 
