@@ -79,10 +79,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
+import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
-(pdfMake as any).vfs = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
+const vfsFonts = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
+(pdfMake as any).vfs = vfsFonts || {};
 import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
@@ -692,23 +693,24 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       // Load fonts into VFS if not already present
       const vfs = (pdfMake as any).vfs;
-      if (selectedFontName === 'Times' && !vfs['Times-Roman']) {
-        vfs['Times-Roman'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ_BNEH3XZhJ0qS2zKMo28.ttf');
-        vfs['Times-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
-        vfs['Times-Italic'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf'); // fallback to bold for italic if needed, or fetch italic
-        vfs['Times-BoldItalic'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
+      
+      if (selectedFontName === 'Times' && !vfs['Times-Roman.ttf']) {
+        vfs['Times-Roman.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ_BNEH3XZhJ0qS2zKMo28.ttf');
+        vfs['Times-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
+        vfs['Times-Italic.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf'); // fallback to bold for italic if needed, or fetch italic
+        vfs['Times-BoldItalic.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/tinos/v26/ndZ-BNEH3XZhJ0qS2zKMo28T2iM.ttf');
       }
-      if (selectedFontName === 'Helvetica' && !vfs['Helvetica']) {
-        vfs['Helvetica'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sMzZcdf9_T_20ezyw.ttf');
-        vfs['Helvetica-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
-        vfs['Helvetica-Oblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
-        vfs['Helvetica-BoldOblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+      if (selectedFontName === 'Helvetica' && !vfs['Helvetica.ttf']) {
+        vfs['Helvetica.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sMzZcdf9_T_20ezyw.ttf');
+        vfs['Helvetica-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+        vfs['Helvetica-Oblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
+        vfs['Helvetica-BoldOblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/arimo/v28/P5sBzZcdf9_T_10c5CQ20A.ttf');
       }
-      if (selectedFontName === 'Courier' && !vfs['Courier']) {
-        vfs['Courier'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lKkaajS8G0-N98K92w.ttf');
-        vfs['Courier-Bold'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
-        vfs['Courier-Oblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
-        vfs['Courier-BoldOblique'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+      if (selectedFontName === 'Courier' && !vfs['Courier.ttf']) {
+        vfs['Courier.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lKkaajS8G0-N98K92w.ttf');
+        vfs['Courier-Bold.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+        vfs['Courier-Oblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
+        vfs['Courier-BoldOblique.ttf'] = await loadFontAsBase64('https://fonts.gstatic.com/s/cousine/v26/d6lMkaajS8G0-N98K92wT2A.ttf');
       }
 
       const docDefinition: any = {
@@ -765,22 +767,22 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           bolditalics: 'Roboto-MediumItalic.ttf'
         },
         Courier: {
-          normal: 'Courier',
-          bold: 'Courier-Bold',
-          italics: 'Courier-Oblique',
-          bolditalics: 'Courier-BoldOblique'
+          normal: 'Courier.ttf',
+          bold: 'Courier-Bold.ttf',
+          italics: 'Courier-Oblique.ttf',
+          bolditalics: 'Courier-BoldOblique.ttf'
         },
         Helvetica: {
-          normal: 'Helvetica',
-          bold: 'Helvetica-Bold',
-          italics: 'Helvetica-Oblique',
-          bolditalics: 'Helvetica-BoldOblique'
+          normal: 'Helvetica.ttf',
+          bold: 'Helvetica-Bold.ttf',
+          italics: 'Helvetica-Oblique.ttf',
+          bolditalics: 'Helvetica-BoldOblique.ttf'
         },
         Times: {
-          normal: 'Times-Roman',
-          bold: 'Times-Bold',
-          italics: 'Times-Italic',
-          bolditalics: 'Times-BoldItalic'
+          normal: 'Times-Roman.ttf',
+          bold: 'Times-Bold.ttf',
+          italics: 'Times-Italic.ttf',
+          bolditalics: 'Times-BoldItalic.ttf'
         }
       };
 
