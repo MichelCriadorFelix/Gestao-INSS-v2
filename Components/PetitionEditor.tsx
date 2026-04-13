@@ -228,12 +228,21 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
 
         // Generate Summary
-        setAiProgressText(`Sintetizando ${file.name}...`);
+        setAiProgressText(`Extraindo dados de ${file.name}...`);
         const response = await fetch('/api/dr-michel/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: `RESUMA ESTE DOCUMENTO PARA O EDITOR DE PETIÇÕES:\n${fileText.substring(0, 50000)}`,
+            message: `EXTRAIA OS DADOS TÉCNICOS DESTE DOCUMENTO PARA UMA PETIÇÃO PADRÃO OURO. 
+            Identifique: 
+            1. Datas (DIB, DER, DCB, DII, Óbito).
+            2. Valores (RMI, Salário de Benefício, Descontos, Consignações, Rubricas).
+            3. Nomes e CPFs.
+            4. Números de Benefício (NB).
+            5. Histórico de indeferimentos ou cessações.
+            6. Trechos relevantes para fundamentação.
+            
+            DOCUMENTO:\n${fileText.substring(0, 50000)}`,
             history: [],
             isIngestion: true
           })
