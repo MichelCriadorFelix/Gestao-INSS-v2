@@ -296,14 +296,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     if (!aiPrompt.trim() && uploadedDocs.length === 0) return;
     
     setIsAiGenerating(true);
-    setAiProgressText('Gerando petição com IA...');
+    setAiProgressText('Gerando petição padrão ouro...');
     
     try {
       const docContext = uploadedDocs.map(doc => 
-        `DOCUMENTO: ${doc.name}\nRESUMO: ${doc.summary}`
+        `DOCUMENTO: ${doc.name}\nCONTEÚDO TÉCNICO:\n${(doc.fullText || doc.summary || '').substring(0, 15000)}`
       ).join('\n\n---\n\n');
 
-      const fullPrompt = `[CONTEXTO DO PROCESSO]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: Gere o conteúdo da petição em formato de texto plano, seguindo as regras do Dr. Michel Felix.`;
+      const fullPrompt = `[CONTEXTO INTEGRAL DOS DOCUMENTOS]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: 'GERAR PEÇA'. Use os dados técnicos acima (valores, datas, rubricas) e fundamente com base nos documentos citados.`;
 
       const response = await fetch('/api/dr-michel/chat', {
         method: 'POST',
