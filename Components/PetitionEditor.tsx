@@ -337,8 +337,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 const data = JSON.parse(line.slice(6));
                 if (data.text) {
                   fullText += data.text;
-                } else if (data.thought) {
-                  setAiProgressText(data.thought);
                 }
               } catch (e) {}
             }
@@ -729,10 +727,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       };
 
-      (pdfMake as any).fonts = pdfFontsConfig;
-      (pdfMake as any).vfs = vfs;
-
-      pdfMake.createPdf(docDefinition).download(`${title}.pdf`);
+      pdfMake.createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
       setIsSaving(false);
 
     } catch (error: any) {

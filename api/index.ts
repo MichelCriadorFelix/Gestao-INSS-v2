@@ -2,7 +2,6 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import dotenv from "dotenv";
-import { chatWithDrMichelStream } from "./aiService";
 
 dotenv.config();
 
@@ -48,7 +47,7 @@ app.post("/api/ocr", async (req, res) => {
 
 // AI Service Logic Integrated
 const DR_MICHEL_SYSTEM_PROMPT = `
-PERFIL: Você é uma BANCA DE ADVOGADOS VIRTUAIS (Multi-Agentes) liderada pelo Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ). Vocês atuam de forma coordenada para redigir petições de altíssima complexidade e densidade.
+PERFIL: Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ).
 ESPECIALIDADE: Direito Previdenciário (RGPS) e Processo Civil Federal.
 
 BASE DE CONHECIMENTO JURÍDICO OBRIGATÓRIA (HARD SKILLS):
@@ -98,26 +97,7 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - CADA PARÁGRAFO DE MÉRITO deve ter entre 5 a 7 linhas.
    - O texto não pode perder densidade no final. Mantenha o nível técnico alto do início ao fim.
 
-4.1. FLUXO MULTI-AGENTES DE REDAÇÃO DE PETIÇÃO (PASSO A PASSO - OBRIGATÓRIO):
-   Quando o usuário pedir para "GERAR PEÇA", "CRIAR PETIÇÃO" ou similar, você NÃO DEVE entregar a peça inteira de uma vez. Você deve seguir este fluxo interativo e pausado:
-
-   👉 PASSO 1: O INVESTIGADOR (Foco nos Fatos)
-   - Ação: Gere APENAS a seção "DOS FATOS".
-   - Estilo: Seja extremamente detalhista, longo (mínimo de 5 a 8 parágrafos). Conte a história de vida e sofrimento do cliente. Destaque a arbitrariedade do INSS.
-   - Encerramento do Passo 1: Pare de escrever a petição e pergunte ao usuário: "🕵️‍♂️ **Agente Investigador:** Aqui está a minuta dos Fatos. Você aprova esta redação ou deseja adicionar/alterar algum detalhe antes de passarmos para a fundamentação jurídica?"
-
-   👉 PASSO 2: O PARECERISTA (Foco no Direito)
-   - Gatilho: Inicia APENAS QUANDO o usuário aprovar os Fatos (ex: "Pode continuar", "Aprovado").
-   - Ação: Gere APENAS a seção "DO DIREITO".
-   - Estilo: Fundamentação robusta e exaustiva (mínimo de 8 a 12 parágrafos). Transcreva os artigos de lei e súmulas aplicáveis e explique detalhadamente a subsunção ao caso concreto.
-   - Encerramento do Passo 2: Pare de escrever e pergunte: "📚 **Agente Parecerista:** Esta é a fundamentação jurídica. Posso submeter ao nosso Revisor Sênior para a montagem final da peça com os pedidos e preliminares?"
-
-   👉 PASSO 3: O ADVOGADO DO DIABO E A MONTAGEM FINAL (Revisão e Fechamento)
-   - Gatilho: Inicia APENAS QUANDO o usuário aprovar o Direito.
-   - Ação: Faça uma auto-revisão silenciosa (Advogado do Diabo) garantindo que não faltou Juízo 100% Digital, Gratuidade, e os valores corretos.
-   - Entrega: Entregue a PETIÇÃO COMPLETA E FINALIZADA em Markdown, juntando as Preliminares, Fatos, Direito, Tutela e Pedidos, seguindo ESTRITAMENTE a estrutura obrigatória abaixo.
-
-4.2. RACIOCÍNIO JURÍDICO EXAUSTIVO (TRÍADE FATO-VALOR-NORMA):
+4. RACIOCÍNIO JURÍDICO EXAUSTIVO (TRÍADE FATO-VALOR-NORMA):
    - CONEXÃO OBRIGATÓRIA: Não cite apenas "nos termos da lei". Cite: "nos termos do Art. X, inciso Y da Lei Z, que dispõe [paráfrase fiel do dispositivo]".
    - ANTI-ALUCINAÇÃO (GROUNDING OBRIGATÓRIO): Use a ferramenta de busca (Google Search) para verificar a redação ATUALIZADA de cada artigo citado no site do Planalto. Não confie na sua memória. Se a lei mudou, use a nova.
    - INTEGRAÇÃO PROFUNDA: Não apenas cite a lei. Explique COMO a lei se aplica ao caso concreto. Desenvolva o raciocínio.
@@ -1159,78 +1139,58 @@ ${ragContext}`;
     }, 5000);
 
     try {
-      if (isGenerationRequest && modelProvider !== 'openrouter') {
-        // Usa o novo Cérebro Autônomo (Agentic Loop)
-        try {
-          const responseStream = chatWithDrMichelStream(finalMessage, history, model || "gemini-3.1-pro-preview", selectedSystemPrompt);
-          
-          for await (const chunk of responseStream) {
-            if (chunk.type === 'thought') {
-               res.write(`data: ${JSON.stringify({ thought: chunk.text })}\n\n`);
-            } else if (chunk.type === 'text') {
-               res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
-            }
-          }
-        } catch (generatorError: any) {
-          console.error("Erro no gerador chatWithDrMichelStream:", generatorError);
-          throw generatorError;
-        }
+      let responseStream;
+      
+      if (modelProvider === 'openrouter') {
+        const modelMap: Record<string, string> = {
+          'qwen-plus': 'qwen/qwen-plus',
+          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
+          'deepseek-chat-free': 'deepseek/deepseek-chat',
+          'openrouter-free': 'openrouter/free',
+          'gemini-pro-1.5': 'google/gemini-pro-1.5',
+          'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
+          'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
+        };
+        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
+        responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
       } else {
-        // Fluxo normal (Arquivista ou OpenRouter)
-        let responseStream;
+        responseStream = await callGeminiStream({
+          model: model || "gemini-3.1-pro-preview",
+          contents: contents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: temperature,
+            maxOutputTokens: 16384,
+            tools: tools,
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          }
+        });
+      }
+
+      for await (const chunk of responseStream) {
+        let text = "";
+        try {
+          text = chunk.text || "";
+        } catch (e) {
+          // ignore
+        }
         
-        if (modelProvider === 'openrouter') {
-          const modelMap: Record<string, string> = {
-            'qwen-plus': 'qwen/qwen-plus',
-            'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
-            'deepseek-chat-free': 'deepseek/deepseek-chat',
-            'openrouter-free': 'openrouter/free',
-            'gemini-pro-1.5': 'google/gemini-pro-1.5',
-            'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
-            'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
-          };
-          const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
-          responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
-        } else {
-          responseStream = await callGeminiStream({
-            model: model || "gemini-3.1-pro-preview",
-            contents: contents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: temperature,
-              maxOutputTokens: 16384,
-              tools: tools,
-              safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-              ]
-            }
-          });
+        if (!text && chunk.candidates && chunk.candidates.length > 0) {
+          const candidate = chunk.candidates[0];
+          if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+            text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+          }
         }
 
-        for await (const chunk of responseStream) {
-          let text = "";
-          try {
-            text = chunk.text || "";
-          } catch (e) {
-            // ignore
-          }
-          
-          if (!text && chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-              text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
-            }
-          }
-
-          if (text) {
-            res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
-          }
+        if (text) {
+          res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
         }
       }
-      
       clearInterval(heartbeat);
       res.write(`data: [DONE]\n\n`);
       res.end();
