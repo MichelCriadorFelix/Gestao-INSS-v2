@@ -729,7 +729,10 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       };
 
-      pdfMake.createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
+      (pdfMake as any).fonts = pdfFontsConfig;
+      (pdfMake as any).vfs = vfs;
+
+      pdfMake.createPdf(docDefinition).download(`${title}.pdf`);
       setIsSaving(false);
 
     } catch (error: any) {

@@ -76,6 +76,33 @@ async function callGemini(params: any) {
   throw new Error("Todas as chaves Gemini falharam ou atingiram o limite de cota.");
 }
 
+async function callGeminiStream(params: any) {
+  const keys = getGeminiKeys();
+  if (keys.length === 0) {
+    console.error("ERRO: Nenhuma chave Gemini encontrada no ambiente.");
+    throw new Error("Nenhuma chave Gemini configurada. Verifique as variáveis de ambiente (API_KEY_1, API_KEY_2, etc.).");
+  }
+
+  for (let i = 0; i < keys.length; i++) {
+    const index = (currentKeyIndex + i) % keys.length;
+    const apiKey = keys[index];
+    const ai = new GoogleGenAI({ apiKey });
+
+    try {
+      const responseStream = await ai.models.generateContentStream(params);
+      currentKeyIndex = index;
+      return responseStream;
+    } catch (error: any) {
+      const status = error.status || (error.message?.includes('429') ? 429 : 500);
+      if (status === 429 || error.message?.includes('quota') || error.message?.includes('limit') || status === 401 || status === 403 || error.message?.includes('API key not valid')) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("Todas as chaves Gemini falharam ou atingiram o limite de cota.");
+}
+
 // --- FASE 1 e 3: DEFINIÇÃO DE FERRAMENTAS (TOOLS) ---
 
 // 1.1 Declaração das Ferramentas para a IA (O que ela pode fazer)
@@ -241,7 +268,7 @@ ESTILO DE RESPOSTA:
 `;
 
 export async function* chatWithDrMichelStream(message: string, history: any[], modelName: string = "gemini-3.1-pro-preview", systemPrompt: string = "") {
-  const contents = [
+  const contents: any[] = [
     ...history
       .filter((h: any) => h.content && h.content.trim() !== '')
       .map((h: any) => ({
@@ -280,7 +307,7 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
 
     try {
       // Chamada ao Gemini passando as ferramentas disponíveis
-      const response = await callGemini({
+      const responseStream = await callGeminiStream({
         model: modelName,
         contents,
         config: {
@@ -289,8 +316,22 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
         }
       });
 
-      // Verifica se o modelo decidiu chamar uma ferramenta (Function Calling)
-      const functionCalls = response.functionCalls;
+      let fullText = "";
+      let functionCalls: any[] = [];
+      let isFirstChunk = true;
+
+      for await (const chunk of responseStream) {
+        if (isFirstChunk && chunk.functionCalls && chunk.functionCalls.length > 0) {
+          functionCalls = chunk.functionCalls;
+          break; // Se for chamada de função, interrompe o stream para executar a ferramenta
+        }
+        isFirstChunk = false;
+        
+        if (chunk.text) {
+          fullText += chunk.text;
+          yield { type: 'text', text: chunk.text }; // Stream do texto em tempo real!
+        }
+      }
 
       if (functionCalls && functionCalls.length > 0) {
         // O modelo quer usar uma ferramenta!
@@ -299,7 +340,7 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
         // Adiciona a resposta do modelo (o pedido da ferramenta) ao histórico do contexto
         contents.push({
           role: 'model',
-          parts: response.candidates[0].content.parts
+          parts: functionCalls.map(call => ({ functionCall: { name: call.name, args: call.args } }))
         });
 
         const toolResponsesParts = [];
@@ -336,7 +377,7 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
       } else {
         // O modelo NÃO pediu ferramenta. Ele gerou a resposta final em texto.
         console.log(`[Agente] O modelo gerou a resposta final em texto.`);
-        yield { type: 'text', text: response.text };
+        // O texto já foi yieldado no loop for await acima!
         isDone = true; // Sai do loop
       }
 
