@@ -1161,14 +1161,19 @@ ${ragContext}`;
     try {
       if (isGenerationRequest && modelProvider !== 'openrouter') {
         // Usa o novo Cérebro Autônomo (Agentic Loop)
-        const responseStream = chatWithDrMichelStream(finalMessage, history, model || "gemini-3.1-pro-preview", selectedSystemPrompt);
-        
-        for await (const chunk of responseStream) {
-          if (chunk.type === 'thought') {
-             res.write(`data: ${JSON.stringify({ thought: chunk.text })}\n\n`);
-          } else if (chunk.type === 'text') {
-             res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+        try {
+          const responseStream = chatWithDrMichelStream(finalMessage, history, model || "gemini-3.1-pro-preview", selectedSystemPrompt);
+          
+          for await (const chunk of responseStream) {
+            if (chunk.type === 'thought') {
+               res.write(`data: ${JSON.stringify({ thought: chunk.text })}\n\n`);
+            } else if (chunk.type === 'text') {
+               res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+            }
           }
+        } catch (generatorError: any) {
+          console.error("Erro no gerador chatWithDrMichelStream:", generatorError);
+          throw generatorError;
         }
       } else {
         // Fluxo normal (Arquivista ou OpenRouter)

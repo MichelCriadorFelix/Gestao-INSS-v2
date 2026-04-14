@@ -93,6 +93,7 @@ async function callGeminiStream(params: any) {
       currentKeyIndex = index;
       return responseStream;
     } catch (error: any) {
+      console.error(`[callGeminiStream] Erro na chave ${index}:`, error.message);
       const status = error.status || (error.message?.includes('429') ? 429 : 500);
       if (status === 429 || error.message?.includes('quota') || error.message?.includes('limit') || status === 401 || status === 403 || error.message?.includes('API key not valid')) {
         continue;
@@ -327,9 +328,16 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
         }
         isFirstChunk = false;
         
-        if (chunk.text) {
-          fullText += chunk.text;
-          yield { type: 'text', text: chunk.text }; // Stream do texto em tempo real!
+        let chunkText = "";
+        try {
+          chunkText = chunk.text || "";
+        } catch (e) {
+          // ignore
+        }
+
+        if (chunkText) {
+          fullText += chunkText;
+          yield { type: 'text', text: chunkText }; // Stream do texto em tempo real!
         }
       }
 
@@ -361,7 +369,7 @@ REGRAS RÍGIDAS DE OPERAÇÃO (AGENTE AUTÔNOMO):
           toolResponsesParts.push({
             functionResponse: {
               name: call.name,
-              response: result
+              response: { result }
             }
           });
         }
