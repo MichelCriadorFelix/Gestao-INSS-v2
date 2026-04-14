@@ -2,7 +2,7 @@
   "name": "gestao-inss-juridico",
   "private": true,
   "version": "0.0.0",
-  "description": "Calculadora Previdenciária",
+  "description": "Calculadora Previdenciária ",
   "type": "module",
   "scripts": {
     "dev": "tsx api/index.ts",
