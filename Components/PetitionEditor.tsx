@@ -337,6 +337,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 const data = JSON.parse(line.slice(6));
                 if (data.text) {
                   fullText += data.text;
+                } else if (data.thought) {
+                  setAiProgressText(data.thought);
                 }
               } catch (e) {}
             }
