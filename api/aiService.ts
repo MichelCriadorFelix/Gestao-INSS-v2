@@ -1,5 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
+// Helper para injetar a data atual nos prompts
+const getCurrentDateContext = () => {
+  const date = new Date();
+  const formatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
+  return `\n\n[CONTEXTO TEMPORAL CRÍTICO]: Hoje é ${formatter.format(date)}. O ano atual é ${date.getFullYear()}. Você DEVE usar esta data como o "hoje" para todos os cálculos de idade, tempo de contribuição, prescrição, decadência e aplicação de leis no tempo (ex: regras de transição da EC 103/2019). Nunca assuma que estamos em 2023 ou 2024.`;
+};
+
 // Load balancing for Gemini API Keys
 const getGeminiKeys = () => {
   const keys: string[] = [];
@@ -121,7 +128,7 @@ export async function chatWithDrMichel(message: string, history: any[]) {
       model: "gemini-1.5-flash-latest",
       contents,
       config: {
-        systemInstruction: DR_MICHEL_SYSTEM_PROMPT,
+        systemInstruction: DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext(),
       }
     });
 
@@ -193,7 +200,7 @@ export async function analyzeCNIS(cnisText: string) {
         parts: [{ text: cnisText }]
       },
       config: {
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: SYSTEM_PROMPT + getCurrentDateContext(),
         responseMimeType: "application/json"
       }
     });

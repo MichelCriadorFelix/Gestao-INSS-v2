@@ -40,6 +40,13 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
+// Helper para injetar a data atual nos prompts
+const getCurrentDateContext = () => {
+  const date = new Date();
+  const formatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
+  return `\n\n[CONTEXTO TEMPORAL CRÍTICO]: Hoje é ${formatter.format(date)}. O ano atual é ${date.getFullYear()}. Você DEVE usar esta data como o "hoje" para todos os cálculos de idade, tempo de contribuição, prescrição, decadência e aplicação de leis no tempo (ex: regras de transição da EC 103/2019). Nunca assuma que estamos em 2023 ou 2024.`;
+};
+
 // Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
   if (req.path === "/health" || req.path === "/config") return next();
@@ -127,13 +134,14 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - O sistema converterá esse Markdown automaticamente para o editor de petições.
    - GRAMÁTICA: Acentuação e pontuação rigorosas (Norma Culta).
    - NUMERAÇÃO: Tópicos (1., 2.) e Pedidos (a), b)) obrigatórios.
-4. EXTENSÃO E DENSIDADE (CRUCIAL - AUMENTO DE 25%):
-   - A petição deve ser ROBUSTA, LONGA e DETALHADA (Mínimo de 8 a 12 páginas).
+4. EXTENSÃO E DENSIDADE ABSOLUTA (PROIBIDO RESUMIR):
+   - A petição deve ser EXTREMAMENTE ROBUSTA, LONGA e DETALHADA. Você tem um limite de saída gigante (16.000 tokens), então NÃO ECONOMIZE PALAVRAS. Escreva no mínimo 3000 a 5000 palavras.
+   - ANÁLISE EXAUSTIVA DE PROVAS: Se o usuário enviar 20 ou 30 documentos, você DEVE analisar, citar e correlacionar CADA UM DELES na seção "DOS FATOS". É terminantemente proibido agrupar provas, ignorar documentos ou fazer resumos genéricos.
    - DISTRIBUIÇÃO INTELIGENTE DE CONTEÚDO:
      - TÓPICOS PROCEDIMENTAIS (Gratuidade, Juízo Digital, Resumo): MÁXIMO de 1 a 2 parágrafos curtos. Seja direto.
-     - TÓPICOS DE MÉRITO (DOS FATOS e DO DIREITO): AQUI deve estar a densidade. Mínimo de 8 a 12 parágrafos por tópico.
-   - CADA PARÁGRAFO DE MÉRITO deve ter entre 5 a 7 linhas.
-   - O texto não pode perder densidade no final. Mantenha o nível técnico alto do início ao fim.
+     - TÓPICOS DE MÉRITO (DOS FATOS e DO DIREITO): AQUI deve estar a densidade. Mínimo de 15 a 20 parágrafos por tópico.
+   - CADA PARÁGRAFO DE MÉRITO deve ter entre 6 a 10 linhas.
+   - O texto não pode perder densidade no final. Mantenha o nível técnico e a profundidade argumentativa do início ao fim.
 
 4. RACIOCÍNIO JURÍDICO EXAUSTIVO (TRÍADE FATO-VALOR-NORMA):
    - CONEXÃO OBRIGATÓRIA: Não cite apenas "nos termos da lei". Cite: "nos termos do Art. X, inciso Y da Lei Z, que dispõe [paráfrase fiel do dispositivo]".
@@ -406,19 +414,14 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - PERMITIDO: Símbolos essenciais (%, /, $, º, ª, -).
    - GRAMÁTICA: Acentuação e pontuação rigorosas (Norma Culta).
    - NUMERAÇÃO: Tópicos (I., II.) e Pedidos (a), b)) obrigatórios.
-4. EXTENSÃO E DENSIDADE (CRUCIAL - PROIBIDO RESUMIR):
-   - A petição deve ser ROBUSTA, LONGA e DETALHADA (Mínimo de 3000 a 6000 palavras, cerca de 8 a 15 páginas).
-   - MÉTODO DE ENTREGA FRACIONADA (OBRIGATÓRIO): 
-     - Você deve planejar a peça INTEIRA (todos os tópicos do início ao fim) antes de começar a escrever.
-     - Você entregará a petição em PARTES de aproximadamente 2000 palavras por vez.
-     - Ao atingir o limite de 2000 palavras (ou o limite técnico de saída), pare IMEDIATAMENTE, mesmo que seja no meio de um parágrafo ou frase.
-     - O usuário dará o comando "CONTINUAR" para que você prossiga.
-     - Ao receber "CONTINUAR", você deve retomar a escrita EXATAMENTE do ponto onde parou na mensagem anterior, sem repetir nenhuma palavra, sem saudações e sem introduções.
+4. EXTENSÃO E DENSIDADE ABSOLUTA (CRUCIAL - PROIBIDO RESUMIR):
+   - A petição deve ser EXTREMAMENTE ROBUSTA, LONGA e DETALHADA (Mínimo de 3000 a 6000 palavras). Você tem um limite de saída gigante (16.000 tokens), então NÃO ECONOMIZE PALAVRAS.
+   - ANÁLISE EXAUSTIVA DE PROVAS: Se o usuário enviar dezenas de documentos, você DEVE analisar, citar e correlacionar CADA UM DELES. É terminantemente proibido agrupar provas ou fazer resumos genéricos.
    - PROIBIDO RESUMIR: Escreva a petição completa, com toda a densidade exigida. Não abrevie e não pule tópicos.
    - DISTRIBUIÇÃO INTELIGENTE DE CONTEÚDO:
      - TÓPICOS PROCEDIMENTAIS (Gratuidade, Resumo): MÁXIMO de 1 a 2 parágrafos curtos. Seja direto.
-     - TÓPICOS DE MÉRITO (DOS FATOS e DO DIREITO): AQUI deve estar a densidade. Mínimo de 8 a 12 parágrafos por tópico.
-   - CADA PARÁGRAFO DE MÉRITO deve ter entre 5 a 7 linhas.
+     - TÓPICOS DE MÉRITO (DOS FATOS e DO DIREITO): AQUI deve estar a densidade. Mínimo de 15 a 20 parágrafos por tópico.
+   - CADA PARÁGRAFO DE MÉRITO deve ter entre 6 a 10 linhas.
    - O texto não pode perder densidade no final. Mantenha o nível técnico alto do início ao fim.
 4. RACIOCÍNIO JURÍDICO EXAUSTIVO (TRÍADE FATO-VALOR-NORMA):
    - CONEXÃO OBRIGATÓRIA: Não cite apenas "nos termos da lei". Cite: "nos termos do Art. X, inciso Y da CLT, que dispõe [paráfrase fiel do dispositivo]".
@@ -823,7 +826,7 @@ app.post("/api/analyze-cnis", async (req, res) => {
       model: "gemini-3-flash-preview",
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
-        systemInstruction: CNIS_SYSTEM_PROMPT,
+        systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
         responseMimeType: "application/json"
       }
     });
@@ -1094,12 +1097,12 @@ app.post("/api/dr-michel/chat", async (req, res) => {
                                 message.includes("GERAR PEÇA");
 
     // Seleciona o "Cérebro" adequado
-    let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT;
+    let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
       console.log("Modo Arquivista Ativado (Rápido)");
-      selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT;
+      selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
       temperature = 0.1; // Temperatura mínima para resposta robótica e rápida
     } else {
       console.log("Modo Dr. Michel Ativado (Completo)");
@@ -1270,7 +1273,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                                 message.includes("GERAR PEÇA");
 
     // Seleciona o "Cérebro" adequado
-    let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT;
+    let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
     
     // Injeta regras de Rito Processual
     const RITE_RULES = `
@@ -1301,7 +1304,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     if (isStorageRequest && !isGenerationRequest) {
       console.log("Modo Arquivista Ativado (Rápido) - Dra. Luana");
-      selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT;
+      selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
       temperature = 0.1;
     } else {
       console.log("Modo Dra. Luana Ativado (Completo)");
