@@ -1498,6 +1498,13 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/api/config", (req, res) => {
+  res.json({
+    url: process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE,
+    key: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+  });
+});
+
 // Development server setup - ONLY runs locally, NOT on Vercel
 if (process.env.NODE_ENV !== "production") {
   const PORT = 3000;

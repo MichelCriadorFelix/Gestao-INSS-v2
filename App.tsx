@@ -4,7 +4,7 @@ import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
 import Dashboard from './Components/Dashboard'; 
 import SettingsModal from './Components/SettingsModal';
-import { getDbConfig, supabase } from './supabaseClient';
+import { getDbConfig, supabase, DB_CONFIG_KEY } from './supabaseClient';
 import { safeSetLocalStorage } from './utils';
 
 export default function App() {
@@ -19,10 +19,34 @@ export default function App() {
     setDarkMode(isDark);
     if (isDark) { document.documentElement.classList.add('dark'); }
     
+    // Auto-configuração da nuvem para novos dispositivos
+    const autoConfigCloud = async () => {
+      const config = getDbConfig();
+      if (!config) {
+        try {
+          const response = await fetch('/api/config');
+          const data = await response.json();
+          if (data.url && data.key) {
+            safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
+              url: data.url,
+              key: data.key,
+              isEnv: true
+            }));
+            // Recarrega para inicializar o cliente Supabase com as novas chaves
+            window.location.reload();
+          }
+        } catch (error) {
+          console.error("Falha na auto-configuração da nuvem:", error);
+        }
+      }
+    };
+    autoConfigCloud();
+    
     // Inicializar sessão do Supabase
     const initAuth = async () => {
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
+      const supabaseInstance = supabase;
+      if (supabaseInstance) {
+        const { data: { session } } = await supabaseInstance.auth.getSession();
         if (session?.user) {
           const email = session.user.email?.toLowerCase();
           const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
@@ -37,14 +61,14 @@ export default function App() {
             setUser(userData);
           } else {
             // Se não estiver na lista, desloga
-            await supabase.auth.signOut();
+            await supabaseInstance.auth.signOut();
             setUser(null);
             alert("Acesso não autorizado para este e-mail.");
           }
         }
 
         // Ouvir mudanças na autenticação
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabaseInstance.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
             const email = session.user.email?.toLowerCase();
             const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
@@ -58,7 +82,7 @@ export default function App() {
               };
               setUser(userData);
             } else {
-              await supabase.auth.signOut();
+              await supabaseInstance.auth.signOut();
               setUser(null);
               alert("Acesso não autorizado para este e-mail.");
             }
