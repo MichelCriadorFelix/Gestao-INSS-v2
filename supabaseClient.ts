@@ -16,8 +16,9 @@ const GLOBAL_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 
 const getEnvVar = (key: string): string | undefined => {
     try {
-        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-            return import.meta.env[key];
+        const meta = import.meta as any;
+        if (typeof meta !== 'undefined' && meta.env && meta.env[key]) {
+            return meta.env[key];
         }
         if (typeof process !== 'undefined' && process.env && process.env[key]) {
             return process.env[key];

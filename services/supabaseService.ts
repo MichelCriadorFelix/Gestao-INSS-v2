@@ -1,7 +1,7 @@
-import { initSupabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
 import LZString from 'lz-string';
 
-const getSupabase = () => initSupabase();
+const getSupabase = () => supabase;
 
 export interface Message {
   id: string;

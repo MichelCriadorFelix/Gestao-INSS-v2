@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User } from './types';
+import { User, UserRole } from './types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
 import Dashboard from './Components/Dashboard'; 
@@ -84,11 +84,11 @@ export default function App() {
   const handleSettingsSave = () => { checkCloudStatus(); };
   
   const handleRestoreBackup = () => {
-        const supabase = initSupabase();
-        if(supabase) {
+        const supabaseInstance = supabase;
+        if(supabaseInstance) {
              const restore = async () => {
-                 await supabase.from('clients').upsert({ id: 1, data: INITIAL_DATA });
-                 await supabase.from('clients').upsert({ id: 2, data: INITIAL_CONTRACTS_LIST });
+                 await supabaseInstance.from('clients').upsert({ id: 1, data: INITIAL_DATA });
+                 await supabaseInstance.from('clients').upsert({ id: 2, data: INITIAL_CONTRACTS_LIST });
                  alert("Dados restaurados com sucesso!");
                  window.location.reload();
              };
