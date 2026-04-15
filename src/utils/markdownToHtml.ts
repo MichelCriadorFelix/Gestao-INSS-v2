@@ -1,8 +1,9 @@
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 /**
  * Robust Markdown to HTML converter for legal documents.
- * Uses the 'marked' library for standard markdown support.
+ * Uses the 'marked' library for standard markdown support and DOMPurify for XSS protection.
  */
 export const markdownToHtml = (text: string): string => {
   if (!text) return '';
@@ -28,14 +29,16 @@ export const markdownToHtml = (text: string): string => {
       .replace(/(^|[^\*\n])\*([^\*\n]+)\*/g, '$1<em>$2</em>')
       .replace(/(^|[^_\n])_([^_\n]+)_/g, '$1<em>$2</em>');
       
-    return result;
+    // Sanitize the HTML to prevent XSS attacks
+    return DOMPurify.sanitize(result);
   } catch (error) {
     console.error('Error parsing markdown:', error);
     // Fallback to simple replacement if marked fails
-    return text
+    const fallbackHtml = text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/__(.*?)__/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/\n/g, '<br>');
+    return DOMPurify.sanitize(fallbackHtml);
   }
 };
