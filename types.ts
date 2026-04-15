@@ -79,6 +79,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  email?: string | null;
 }
 
 export const AUTHORIZED_USERS = [

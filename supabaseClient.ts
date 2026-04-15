@@ -16,14 +16,10 @@ const GLOBAL_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 
 const getEnvVar = (key: string): string | undefined => {
     try {
-        // @ts-ignore
         if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-             // @ts-ignore
             return import.meta.env[key];
         }
-        // @ts-ignore
         if (typeof process !== 'undefined' && process.env && process.env[key]) {
-            // @ts-ignore
             return process.env[key];
         }
     } catch (e) {}
@@ -44,49 +40,30 @@ export const getDbConfig = () => {
     const stored = localStorage.getItem(DB_CONFIG_KEY);
     if (stored) return JSON.parse(stored);
 
-    const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+    const envUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
+    const envKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
 
-    if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
+    if (isValidUrl(envUrl) && envKey) {
         return { url: envUrl as string, key: envKey, isEnv: true };
-    }
-
-    if (GLOBAL_SUPABASE_URL && GLOBAL_SUPABASE_KEY) {
-        return { url: GLOBAL_SUPABASE_URL, key: GLOBAL_SUPABASE_KEY, isEnv: true };
-    }
-
-    return null;
-};
-
-export const initSupabase = () => {
-    try {
-        // Prioridade 1: Configuração salva pelo usuário na interface (localStorage)
-        const stored = localStorage.getItem(DB_CONFIG_KEY);
-        if (stored) {
-            const config = JSON.parse(stored);
-            if (config && isValidUrl(config.url) && config.key) {
-                return createClient(config.url, config.key);
-            }
-        }
-
-        // Prioridade 2: Variáveis de ambiente
-        const envUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-        const envKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
-        
-        if (isValidUrl(envUrl) && envKey && envKey !== 'undefined' && envKey !== 'null') {
-            return createClient(envUrl as string, envKey);
-        }
-
-        // Prioridade 3: Configuração global (fallback)
-        if (GLOBAL_SUPABASE_URL && GLOBAL_SUPABASE_KEY) {
-            return createClient(GLOBAL_SUPABASE_URL, GLOBAL_SUPABASE_KEY);
-        }
-    } catch (e) {
-        console.error("Erro ao inicializar Supabase:", e);
-    }
-
-    return null;
-};
+      }
+  
+      return { url: GLOBAL_SUPABASE_URL, key: GLOBAL_SUPABASE_KEY, isEnv: true };
+  };
+  
+  export const supabase = (() => {
+      const config = getDbConfig();
+      if (!config) return null;
+      return createClient(config.url, config.key, {
+          auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: true
+          }
+      });
+  })();
+  
+  // Função legada para manter compatibilidade com componentes antigos
+  export const initSupabase = () => supabase;
 
 /**
  * Valida a conexão com o Supabase tentando buscar um registro simples.

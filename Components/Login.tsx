@@ -1,25 +1,48 @@
 
 import React, { useState } from 'react';
 import { Cog6ToothIcon, ScaleIcon, SignalIcon, SignalSlashIcon, ExclamationTriangleIcon, LockClosedIcon } from '@heroicons/react/24/outline';
-import { LoginProps, AUTHORIZED_USERS } from '../types';
+import { LoginProps, UserRole, User } from '../types';
 import InstallPrompt from './InstallPrompt';
+import { supabase } from '../supabaseClient';
 
 const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigured }) => {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const foundUser = AUTHORIZED_USERS.find(
-      u => u.firstName.toLowerCase() === firstName.trim().toLowerCase() && 
-           u.lastName.toLowerCase() === lastName.trim().toLowerCase()
-    );
+    setError('');
+    setLoading(true);
 
-    if (foundUser) {
-      onLogin(foundUser);
-    } else {
-      setError('Acesso negado. Credenciais inválidas.');
+    if (!supabase) {
+      setError('Erro de configuração do banco de dados.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (authError) {
+        setError('E-mail ou senha incorretos.');
+      } else if (data.user) {
+        const userData: User = {
+          firstName: data.user.user_metadata.firstName || data.user.email?.split('@')[0] || 'Usuário',
+          lastName: data.user.user_metadata.lastName || '',
+          role: data.user.user_metadata.role || UserRole.ADVOGADO,
+          email: data.user.email
+        };
+        onLogin(userData);
+      }
+    } catch (err) {
+      setError('Ocorreu um erro ao tentar acessar o sistema.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,25 +80,25 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-4">
             <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Nome</label>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">E-mail</label>
                 <input
-                type="text"
+                type="email"
                 required
                 className="w-full px-5 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition text-white placeholder-slate-500"
-                placeholder="Ex: Michel"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 />
             </div>
             <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Sobrenome</label>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Senha</label>
                 <input
-                type="text"
+                type="password"
                 required
                 className="w-full px-5 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition text-white placeholder-slate-500"
-                placeholder="Ex: Felix"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 />
             </div>
           </div>
@@ -89,10 +112,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-bold py-3.5 rounded-xl transition duration-300 shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 group"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-bold py-3.5 rounded-xl transition duration-300 shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 group disabled:opacity-50"
           >
             <LockClosedIcon className="h-5 w-5 group-hover:scale-110 transition-transform" />
-            Acessar Sistema
+            {loading ? 'Acessando...' : 'Acessar Sistema'}
           </button>
         </form>
         

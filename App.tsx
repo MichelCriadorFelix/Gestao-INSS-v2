@@ -4,7 +4,7 @@ import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
 import Dashboard from './Components/Dashboard'; 
 import SettingsModal from './Components/SettingsModal';
-import { getDbConfig, initSupabase } from './supabaseClient';
+import { getDbConfig, supabase } from './supabaseClient';
 import { safeSetLocalStorage } from './utils';
 
 export default function App() {
@@ -12,20 +12,49 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const isDark = localStorage.getItem('inss_theme') === 'dark';
     setDarkMode(isDark);
     if (isDark) { document.documentElement.classList.add('dark'); }
     
-    const savedUser = localStorage.getItem('inss_user');
-    if (savedUser) {
-        try {
-            setUser(JSON.parse(savedUser));
-        } catch (e) {
-            console.error("Failed to parse saved user", e);
+    // Inicializar sessão do Supabase
+    const initAuth = async () => {
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Mapear usuário do Supabase para o nosso tipo User
+          const userData: User = {
+            firstName: session.user.user_metadata.firstName || session.user.email?.split('@')[0] || 'Usuário',
+            lastName: session.user.user_metadata.lastName || '',
+            role: session.user.user_metadata.role || UserRole.ADVOGADO,
+            email: session.user.email
+          };
+          setUser(userData);
         }
-    }
+
+        // Ouvir mudanças na autenticação
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            const userData: User = {
+              firstName: session.user.user_metadata.firstName || session.user.email?.split('@')[0] || 'Usuário',
+              lastName: session.user.user_metadata.lastName || '',
+              role: session.user.user_metadata.role || UserRole.ADVOGADO,
+              email: session.user.email
+            };
+            setUser(userData);
+          } else {
+            setUser(null);
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
   
   const checkCloudStatus = () => {
@@ -44,12 +73,13 @@ export default function App() {
 
   const handleLogin = (authenticatedUser: User) => { 
       setUser(authenticatedUser); 
-      safeSetLocalStorage('inss_user', JSON.stringify(authenticatedUser));
   };
   
-  const handleLogout = () => { 
+  const handleLogout = async () => { 
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
       setUser(null); 
-      localStorage.removeItem('inss_user');
   };
   const handleSettingsSave = () => { checkCloudStatus(); };
   
