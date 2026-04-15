@@ -23,38 +23,41 @@ export default function App() {
     // Auto-configuração da nuvem para novos dispositivos
     const autoConfigCloud = async () => {
       const config = getDbConfig();
-      if (!config) {
-        // Verifica se já tentamos configurar para evitar loop infinito
-        const hasAttempted = sessionStorage.getItem('inss_config_attempted');
-        if (hasAttempted) {
-          setConfigError("Não foi possível configurar a nuvem automaticamente. Por favor, configure manualmente nas engrenagens.");
-          setLoading(false);
-          return;
-        }
+      
+      // Se já estiver configurado e for uma configuração válida, não faz nada
+      if (config && config.url && config.key && config.url.includes('supabase.co')) {
+        setLoading(false);
+        return;
+      }
 
-        try {
-          const response = await fetch('/api/config');
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          const data = await response.json();
-          
-          if (data.url && data.key) {
-            safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
-              url: data.url,
-              key: data.key,
-              isEnv: true
-            }));
-            sessionStorage.setItem('inss_config_attempted', 'true');
-            // Pequeno delay antes de recarregar para garantir o salvamento
-            setTimeout(() => window.location.reload(), 500);
-          } else {
-            console.warn("Configuração da nuvem retornou dados vazios.");
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error("Falha na auto-configuração da nuvem:", error);
+      // Verifica se já tentamos configurar nesta sessão para evitar loop infinito
+      const hasAttempted = sessionStorage.getItem('inss_config_attempted');
+      if (hasAttempted) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        
+        if (data.url && data.key) {
+          console.log("Configuração da nuvem recebida com sucesso.");
+          safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
+            url: data.url,
+            key: data.key,
+            isEnv: true
+          }));
+          sessionStorage.setItem('inss_config_attempted', 'true');
+          // Pequeno delay antes de recarregar para garantir o salvamento
+          setTimeout(() => window.location.reload(), 300);
+        } else {
+          console.warn("Configuração da nuvem retornou dados vazios do servidor.");
           setLoading(false);
         }
-      } else {
+      } catch (error) {
+        console.error("Falha na auto-configuração da nuvem:", error);
         setLoading(false);
       }
     };

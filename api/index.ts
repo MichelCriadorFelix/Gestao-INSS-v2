@@ -1499,8 +1499,16 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/config", (req, res) => {
-  const url = process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE;
-  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  // Tenta buscar por diversos nomes comuns para garantir que encontre
+  const url = process.env.VITE_SUPABASE_URL || 
+              process.env.SUPABASE_URL || 
+              process.env.URL_SUPABASE ||
+              process.env.NEXT_PUBLIC_SUPABASE_URL;
+              
+  const key = process.env.VITE_SUPABASE_ANON_KEY || 
+              process.env.SUPABASE_ANON_KEY || 
+              process.env.ANON_KEY_SUPABASE ||
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
   console.log(`[DEBUG] /api/config chamado. URL presente: ${!!url}, Key presente: ${!!key}`);
   
