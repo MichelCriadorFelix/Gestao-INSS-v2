@@ -29,7 +29,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
       });
 
       if (authError) {
-        setError('E-mail ou senha incorretos.');
+        setError(authError.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : authError.message);
       } else if (data.user) {
         const userData: User = {
           firstName: data.user.user_metadata.firstName || data.user.email?.split('@')[0] || 'Usuário',
@@ -39,8 +39,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
         };
         onLogin(userData);
       }
-    } catch (err) {
-      setError('Ocorreu um erro ao tentar acessar o sistema.');
+    } catch (err: any) {
+      console.error('Erro de login:', err);
+      setError(`Erro de conexão: ${err.message || 'Verifique sua internet ou se o Supabase está ativo.'}`);
     } finally {
       setLoading(false);
     }
