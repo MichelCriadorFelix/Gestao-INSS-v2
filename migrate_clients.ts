@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import LZString from 'lz-string';
 
-const SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 

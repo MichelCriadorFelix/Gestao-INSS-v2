@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { ClientRecord } from './types';
 import { formatCurrency, safeSetLocalStorage } from './utils';
+import { apiFetch } from './services/apiService';
 import BenefitAnalysisModal from './Components/BenefitAnalysisModal';
 import SavedCalculationsModal from './Components/SavedCalculationsModal';
 import { supabaseService } from './services/supabaseService';
@@ -717,7 +718,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
     const analyzeCNISWithAI = async (text: string): Promise<Partial<SocialSecurityData> | null> => {
         try {
-            const response = await fetch('/api/analyze-cnis', {
+            const response = await apiFetch('/api/analyze-cnis', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ cnisContent: text })

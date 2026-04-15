@@ -24,6 +24,7 @@ import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
+import { apiFetch } from '../services/apiService';
 
 interface ChatDocument {
   id: string;
@@ -401,7 +402,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         const recentHistory = currentSession?.messages.slice(-2) || [];
         const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText;
 
-        const embedResponse = await fetch('/api/rag/embed', {
+        const embedResponse = await apiFetch('/api/rag/embed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: contextText }),
@@ -434,7 +435,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const contextPrompt = docSummaries ? 
         `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
 
-      const response = await fetch('/api/dra-luana/chat', {
+      const response = await apiFetch('/api/dra-luana/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -642,7 +643,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             4. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
             5. Responda com a confirmação de ciência e o mapeamento detalhado por página.`;
 
-            const response = await fetch('/api/dra-luana/chat', {
+            const response = await apiFetch('/api/dra-luana/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -805,7 +806,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
   const generateDocx = async (content: string) => {
     try {
-      const response = await fetch('/api/dr-michel/generate-docx', {
+      const response = await apiFetch('/api/dr-michel/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })

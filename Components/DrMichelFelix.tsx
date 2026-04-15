@@ -27,6 +27,7 @@ import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
+import { apiFetch } from '../services/apiService';
 
 interface ChatDocument {
   id: string;
@@ -405,7 +406,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         const recentHistory = currentSession?.messages.slice(-2) || [];
         const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText;
 
-        const embedResponse = await fetch('/api/rag/embed', {
+        const embedResponse = await apiFetch('/api/rag/embed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: contextText }),
@@ -438,7 +439,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const contextPrompt = docSummaries ? 
         `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
 
-      const response = await fetch('/api/dr-michel/chat', {
+      const response = await apiFetch('/api/dr-michel/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -645,7 +646,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             4. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
             5. Responda com a confirmação de ciência e o mapeamento detalhado por página.`;
 
-            const response = await fetch('/api/dr-michel/chat', {
+            const response = await apiFetch('/api/dr-michel/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -875,7 +876,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
   const generateDocx = async (content: string) => {
     try {
-      const response = await fetch('/api/dr-michel/generate-docx', {
+      const response = await apiFetch('/api/dr-michel/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })

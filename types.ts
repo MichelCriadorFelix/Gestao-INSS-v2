@@ -83,9 +83,9 @@ export interface User {
 }
 
 export const AUTHORIZED_USERS = [
-  { firstName: 'Michel', lastName: 'Felix', role: UserRole.ADVOGADO },
-  { firstName: 'Luana', lastName: 'Castro', role: UserRole.ADVOGADO },
-  { firstName: 'Fabrícia', lastName: 'Sousa', role: UserRole.SECRETARIA },
+  { firstName: 'Michel', lastName: 'Felix', role: UserRole.ADVOGADO, email: 'michel.advprev@gmail.com' },
+  { firstName: 'Luana', lastName: 'Castro', role: UserRole.ADVOGADO, email: 'luanacadvogada@gmail.com' },
+  { firstName: 'Fabrícia', lastName: 'Sousa', role: UserRole.SECRETARIA, email: 'fabriciasousa2025@outlook.com' },
 ];
 
 export interface FocusTask {

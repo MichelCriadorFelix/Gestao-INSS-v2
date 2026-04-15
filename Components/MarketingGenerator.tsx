@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { apiFetch } from '../services/apiService';
 import { 
   PhotoIcon, 
   ArrowDownTrayIcon, 
@@ -177,7 +178,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
     setIsGeneratingStrategies(true);
     try {
-      const response = await fetch('/api/marketing/generate', {
+      const response = await apiFetch('/api/marketing/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -218,7 +219,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/marketing/generate', {
+      const response = await apiFetch('/api/marketing/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -323,7 +324,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
     setIsGeneratingImage(true);
     try {
-      const response = await fetch('/api/marketing/generate-image', {
+      const response = await apiFetch('/api/marketing/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

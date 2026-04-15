@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from './types';
+import { User, UserRole, AUTHORIZED_USERS } from './types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
 import Dashboard from './Components/Dashboard'; 
@@ -24,26 +24,44 @@ export default function App() {
       if (supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // Mapear usuário do Supabase para o nosso tipo User
-          const userData: User = {
-            firstName: session.user.user_metadata.firstName || session.user.email?.split('@')[0] || 'Usuário',
-            lastName: session.user.user_metadata.lastName || '',
-            role: session.user.user_metadata.role || UserRole.ADVOGADO,
-            email: session.user.email
-          };
-          setUser(userData);
-        }
+          const email = session.user.email?.toLowerCase();
+          const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
 
-        // Ouvir mudanças na autenticação
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
+          if (authorizedUser) {
             const userData: User = {
-              firstName: session.user.user_metadata.firstName || session.user.email?.split('@')[0] || 'Usuário',
-              lastName: session.user.user_metadata.lastName || '',
-              role: session.user.user_metadata.role || UserRole.ADVOGADO,
+              firstName: authorizedUser.firstName,
+              lastName: authorizedUser.lastName,
+              role: authorizedUser.role,
               email: session.user.email
             };
             setUser(userData);
+          } else {
+            // Se não estiver na lista, desloga
+            await supabase.auth.signOut();
+            setUser(null);
+            alert("Acesso não autorizado para este e-mail.");
+          }
+        }
+
+        // Ouvir mudanças na autenticação
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          if (session?.user) {
+            const email = session.user.email?.toLowerCase();
+            const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
+
+            if (authorizedUser) {
+              const userData: User = {
+                firstName: authorizedUser.firstName,
+                lastName: authorizedUser.lastName,
+                role: authorizedUser.role,
+                email: session.user.email
+              };
+              setUser(userData);
+            } else {
+              await supabase.auth.signOut();
+              setUser(null);
+              alert("Acesso não autorizado para este e-mail.");
+            }
           } else {
             setUser(null);
           }

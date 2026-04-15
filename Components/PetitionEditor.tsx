@@ -88,6 +88,7 @@ import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
+import { apiFetch } from '../services/apiService';
 
 interface ChatDocument {
   id: string;
@@ -208,7 +209,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             } else {
               if (result.isScanned && images.length > 0) {
                 setAiProgressText(`Realizando OCR em ${file.name}...`);
-                const ocrResponse = await fetch('/api/ocr', {
+                const ocrResponse = await apiFetch('/api/ocr', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ images })
@@ -229,7 +230,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
         // Generate Summary
         setAiProgressText(`Extraindo dados de ${file.name}...`);
-        const response = await fetch('/api/dr-michel/chat', {
+        const response = await apiFetch('/api/dr-michel/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -305,7 +306,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       const fullPrompt = `[CONTEXTO INTEGRAL DOS DOCUMENTOS]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: 'GERAR PEÇA'. Use os dados técnicos acima (valores, datas, rubricas) e fundamente com base nos documentos citados.`;
 
-      const response = await fetch('/api/dr-michel/chat', {
+      const response = await apiFetch('/api/dr-michel/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

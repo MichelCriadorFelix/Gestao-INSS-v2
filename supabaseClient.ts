@@ -11,8 +11,8 @@ export const DB_CONFIG_KEY = 'inss_db_config';
 // ------------------------------------------------------------------
 // CONFIGURAÇÃO GLOBAL DO BANCO DE DADOS (AUTO-CONFIG)
 // ------------------------------------------------------------------
-const GLOBAL_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
-const GLOBAL_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
+const GLOBAL_SUPABASE_URL = "";
+const GLOBAL_SUPABASE_KEY = "";
 
 const getEnvVar = (key: string): string | undefined => {
     try {
@@ -46,9 +46,13 @@ export const getDbConfig = () => {
 
     if (isValidUrl(envUrl) && envKey) {
         return { url: envUrl as string, key: envKey, isEnv: true };
-      }
+    }
   
-      return { url: GLOBAL_SUPABASE_URL, key: GLOBAL_SUPABASE_KEY, isEnv: true };
+    if (isValidUrl(GLOBAL_SUPABASE_URL) && GLOBAL_SUPABASE_KEY) {
+        return { url: GLOBAL_SUPABASE_URL, key: GLOBAL_SUPABASE_KEY, isEnv: true };
+    }
+
+    return null;
   };
   
   export const supabase = (() => {

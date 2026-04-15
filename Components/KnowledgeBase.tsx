@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
+import { apiFetch } from '../services/apiService';
 import { CheckCircle2, Plus, Trash2, BookOpen, Loader2 } from 'lucide-react';
 
 export default function KnowledgeBase() {
@@ -121,7 +122,7 @@ export default function KnowledgeBase() {
 
         setMessage({ text: `Processando trecho ${i + 1} de ${chunks.length}... (Isso pode levar alguns minutos para leis grandes)`, type: 'info' });
 
-        const response = await fetch('/api/rag/embed', {
+        const response = await apiFetch('/api/rag/embed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: chunk })

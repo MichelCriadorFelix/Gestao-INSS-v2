@@ -2,11 +2,49 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import dotenv from "dotenv";
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
+
+// Supabase Admin Client for Auth Verification
+const supabaseAdmin = createClient(
+  process.env.VITE_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
+);
+
+// Authentication Middleware
+const authenticate = async (req: any, res: any, next: any) => {
+  // Skip auth for health check
+  if (req.path === "/api/health") return next();
+  
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: "Acesso não autorizado. Token ausente." });
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Sessão inválida ou expirada." });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Falha na autenticação." });
+  }
+};
+
+// Apply authentication to all /api routes except health
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health") return next();
+  authenticate(req, res, next);
+});
 
 // OCR Endpoint
 app.post("/api/ocr", async (req, res) => {
