@@ -13,6 +13,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
     const isDark = localStorage.getItem('inss_theme') === 'dark';
@@ -23,21 +24,38 @@ export default function App() {
     const autoConfigCloud = async () => {
       const config = getDbConfig();
       if (!config) {
+        // Verifica se já tentamos configurar para evitar loop infinito
+        const hasAttempted = sessionStorage.getItem('inss_config_attempted');
+        if (hasAttempted) {
+          setConfigError("Não foi possível configurar a nuvem automaticamente. Por favor, configure manualmente nas engrenagens.");
+          setLoading(false);
+          return;
+        }
+
         try {
           const response = await fetch('/api/config');
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const data = await response.json();
+          
           if (data.url && data.key) {
             safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
               url: data.url,
               key: data.key,
               isEnv: true
             }));
-            // Recarrega para inicializar o cliente Supabase com as novas chaves
-            window.location.reload();
+            sessionStorage.setItem('inss_config_attempted', 'true');
+            // Pequeno delay antes de recarregar para garantir o salvamento
+            setTimeout(() => window.location.reload(), 500);
+          } else {
+            console.warn("Configuração da nuvem retornou dados vazios.");
+            setLoading(false);
           }
         } catch (error) {
           console.error("Falha na auto-configuração da nuvem:", error);
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     };
     autoConfigCloud();
@@ -143,8 +161,23 @@ export default function App() {
         }
     };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mb-4"></div>
+        <p className="text-slate-400 animate-pulse">Iniciando sistema jurídico...</p>
+      </div>
+    );
+  }
+
   return (
     <>
+      {configError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-red-500 text-white px-6 py-3 rounded-full shadow-lg text-sm font-bold flex items-center gap-2">
+          <span>⚠️ {configError}</span>
+          <button onClick={() => setConfigError(null)} className="hover:opacity-70">✕</button>
+        </div>
+      )}
       {user ? (
         <Dashboard 
             user={user} 

@@ -56,15 +56,20 @@ export const getDbConfig = () => {
   };
   
   export const supabase = (() => {
-      const config = getDbConfig();
-      if (!config) return null;
-      return createClient(config.url, config.key, {
-          auth: {
-              persistSession: true,
-              autoRefreshToken: true,
-              detectSessionInUrl: true
-          }
-      });
+      try {
+          const config = getDbConfig();
+          if (!config || !isValidUrl(config.url)) return null;
+          return createClient(config.url, config.key, {
+              auth: {
+                  persistSession: true,
+                  autoRefreshToken: true,
+                  detectSessionInUrl: true
+              }
+          });
+      } catch (e) {
+          console.error("Erro ao inicializar cliente Supabase:", e);
+          return null;
+      }
   })();
   
   // Função legada para manter compatibilidade com componentes antigos

@@ -40,9 +40,9 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
-// Apply authentication to all /api routes except health
+// Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health") return next();
+  if (req.path === "/health" || req.path === "/config") return next();
   authenticate(req, res, next);
 });
 
@@ -1499,10 +1499,12 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/config", (req, res) => {
-  res.json({
-    url: process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE,
-    key: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
-  });
+  const url = process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE;
+  const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  
+  console.log(`[DEBUG] /api/config chamado. URL presente: ${!!url}, Key presente: ${!!key}`);
+  
+  res.json({ url, key });
 });
 
 // Development server setup - ONLY runs locally, NOT on Vercel
