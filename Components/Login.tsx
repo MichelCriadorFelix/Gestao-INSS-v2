@@ -41,9 +41,34 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
       }
     } catch (err: any) {
       console.error('Erro de login:', err);
-      setError(`Erro de conexão: ${err.message || 'Verifique sua internet ou se o Supabase está ativo.'}`);
+      if (err.message?.includes('quota') || err.name === 'QuotaExceededError') {
+        setError('O armazenamento do seu navegador está cheio. Isso impede o login.');
+      } else {
+        setError(`Erro de conexão: ${err.message || 'Verifique sua internet ou se o Supabase está ativo.'}`);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearStorage = () => {
+    if (confirm('Isso irá limpar os dados temporários do navegador para liberar espaço. Seus dados na nuvem (Supabase) NÃO serão afetados. Deseja continuar?')) {
+      // Limpar chaves pesadas conhecidas
+      const keysToRemove = ['inss_records', 'inss_contracts', 'inss_user'];
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      
+      // Limpar backups antigos (se houver)
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('inss_backup_') || key.startsWith('sb-'))) {
+           // Não removemos o config do banco para não perder a conexão
+           if (key !== 'inss_db_config') {
+             localStorage.removeItem(key);
+           }
+        }
+      }
+      alert('Espaço liberado! Tente logar novamente.');
+      window.location.reload();
     }
   };
 
@@ -105,9 +130,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
           </div>
 
           {error && (
-            <div className="p-4 bg-red-500/10 text-red-200 text-sm rounded-xl border border-red-500/20 flex items-center gap-3 animate-pulse">
-              <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0" />
-              {error}
+            <div className="space-y-3">
+              <div className="p-4 bg-red-500/10 text-red-200 text-sm rounded-xl border border-red-500/20 flex items-center gap-3 animate-pulse">
+                <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0" />
+                {error}
+              </div>
+              {error.includes('armazenamento') && (
+                <button
+                  type="button"
+                  onClick={handleClearStorage}
+                  className="w-full py-2 text-xs font-bold text-primary-400 hover:text-primary-300 underline transition"
+                >
+                  Limpar Espaço do Navegador
+                </button>
+              )}
             </div>
           )}
 
