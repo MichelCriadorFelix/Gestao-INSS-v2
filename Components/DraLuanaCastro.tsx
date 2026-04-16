@@ -34,6 +34,7 @@ interface ChatDocument {
   pages?: number;
   fileUri?: string;
   mimeType?: string;
+  keyIndex?: number;
 }
 
 interface Message {
@@ -50,6 +51,7 @@ interface ChatSession {
   date: string;
   messages: Message[];
   documents?: ChatDocument[];
+  uploadKeyIndex?: number | null;
 }
 
 interface DraLuanaCastroProps {
@@ -452,7 +454,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
-          model: selectedModel
+          model: selectedModel,
+          keyIndex: session?.uploadKeyIndex
         }),
         signal: abortController.signal
       });
@@ -578,39 +581,72 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
     let currentIdx = startFileIndex;
     try {
+      // Obter o índice da chave preferida da sessão, se já existir
+      const currentSession = sessionsRef.current.find(s => s.id === activeSessionId);
+      let preferredKeyIndex = currentSession?.uploadKeyIndex;
+
       for (let i = startFileIndex; i < fileArray.length; i++) {
         currentIdx = i;
         const file = fileArray[i];
-        setProgressText(`Enviando ${file.name} para a IA (${i + 1}/${fileArray.length})...`);
+        setProgressText(`Preparando ${file.name} (${i + 1}/${fileArray.length})...`);
         setProgress(Math.round(((i) / fileArray.length) * 100));
 
-        const formData = new FormData();
-        formData.append('file', file);
+        let uploadData;
 
-        const uploadResponse = await apiFetch('/api/upload-file', {
-          method: 'POST',
-          body: formData
-        });
+        // Bypass Vercel 4.5MB limit if file is large
+        if (file.size > 4 * 1024 * 1024) {
+          setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
+          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${file.name}`, file);
+          
+          if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
 
-        if (!uploadResponse.ok) {
-          const errText = await uploadResponse.text();
-          let errMessage = "Falha no upload";
-          try {
-            const errJson = JSON.parse(errText);
-            errMessage = errJson.error || errMessage;
-          } catch(e) {
-            errMessage = "Erro no servidor (não é um JSON válido). Ex: " + errText.substring(0, 100);
+          const urlResponse = await apiFetch('/api/upload-from-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: storageUrl,
+              mimeType: file.type,
+              fileName: file.name,
+              keyIndex: preferredKeyIndex
+            })
+          });
+
+          if (!urlResponse.ok) {
+            const errText = await urlResponse.text();
+            throw new Error(`Falha no processamento via URL: ${errText}`);
           }
-          throw new Error(errMessage);
+          uploadData = await urlResponse.json();
+        } else {
+          setProgressText(`Enviando ${file.name} para a IA...`);
+          const formData = new FormData();
+          formData.append('file', file);
+          if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
+            formData.append('keyIndex', preferredKeyIndex.toString());
+          }
+
+          const uploadResponse = await apiFetch('/api/upload-file', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!uploadResponse.ok) {
+            const errText = await uploadResponse.text();
+            let errMessage = "Falha no upload";
+            try {
+              const errJson = JSON.parse(errText);
+              errMessage = errJson.error || errMessage;
+            } catch(e) {
+              errMessage = "Erro no servidor: " + errText.substring(0, 100);
+            }
+            throw new Error(errMessage);
+          }
+          uploadData = await uploadResponse.json();
         }
 
-        const dataText = await uploadResponse.text();
-        let uploadData;
-        try {
-          uploadData = JSON.parse(dataText);
-        } catch (e) {
-          console.error("Erro ao analisar resposta de upload:", dataText);
-          throw new Error("Erro na comunicação com o servidor. A resposta não é um JSON válido. Verifique se o backend está ativo.");
+        // Se for o primeiro upload da sessão, fixamos a chave para o resto da sessão
+        if (preferredKeyIndex === undefined || preferredKeyIndex === null) {
+          preferredKeyIndex = uploadData.keyIndex;
+          setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, uploadKeyIndex: preferredKeyIndex } : s));
         }
 
         // --- NEW: Detailed AI Analysis for each document ---
@@ -626,7 +662,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               history: [],
               files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
               minWage: localStorage.getItem('app_min_wage') || '1621.00',
-              model: "gemini-3-flash-preview" // Use flash for mapping
+              model: "gemini-3-flash-preview",
+              keyIndex: preferredKeyIndex
             })
           });
 
@@ -671,7 +708,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           type: file.type,
           fileUri: uploadData.fileUri,
           mimeType: uploadData.mimeType,
-          summary: fileSummary
+          summary: fileSummary,
+          keyIndex: uploadData.keyIndex
         };
 
         setSessions(prev => prev.map(s => 
@@ -733,12 +771,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Verificar se algum arquivo excede o limite do servidor (4.5MB no Vercel)
-    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+    // Verificar se algum arquivo excede o limite do servidor (Aceitamos até 20MB via Storage bypass)
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
     const largeFiles = Array.from(files).filter(f => f.size > MAX_FILE_SIZE);
     
     if (largeFiles.length > 0) {
-      alert(`Os seguintes arquivos excedem o limite de 4.5MB e podem falhar no envio: ${largeFiles.map(f => f.name).join(', ')}. Por favor, reduza o tamanho desses arquivos antes de enviar.`);
+      alert(`Os seguintes arquivos são muito grandes (> 20MB): ${largeFiles.map(f => f.name).join(', ')}. Por favor, reduza o tamanho desses arquivos.`);
+      return;
     }
 
     setIsUploading(true);
@@ -1162,7 +1201,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     onClick={resumeAudit}
                     className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
                   >
-                    <RefreshCw className="w-3 h-3" /> Retomar Auditoria
+                    <History className="w-3 h-3" /> Retomar Auditoria
                   </button>
                 </div>
               </div>

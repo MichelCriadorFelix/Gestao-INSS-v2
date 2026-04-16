@@ -59,11 +59,12 @@ app.use("/api", (req, res, next) => {
 // File Upload Endpoint for Gemini File API
 const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30): Promise<any> {
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
-  const apiKey = keys[currentKeyIndex % keys.length];
+  const keyToUseIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : (currentKeyIndex % keys.length);
+  const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
   try {
@@ -74,7 +75,8 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
         displayName: originalname,
       }
     });
-    return uploadResult;
+    // Adiciona o index da chave usada ao resultado
+    return { ...uploadResult, keyIndex: keyToUseIndex % keys.length };
   } catch (error: any) {
     const errorMessage = error.message || String(error);
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
@@ -84,9 +86,9 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
       invalidKeys.add(apiKey);
     }
     
-    console.error(`Erro no upload com chave ${currentKeyIndex}:`, errorMessage);
+    console.error(`Erro no upload com chave ${keyToUseIndex}:`, errorMessage);
     
-    if ((isInvalidKey || isOverloaded) && retries > 0) {
+    if ((isInvalidKey || isOverloaded) && retries > 0 && forcedKeyIndex === undefined) {
       currentKeyIndex++;
       let delay = isInvalidKey ? 500 : 3000;
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -103,11 +105,15 @@ app.post("/api/upload-file", upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo enviado" });
     }
 
+    const forcedKeyIndex = req.body.keyIndex ? parseInt(req.body.keyIndex) : undefined;
+
     // Upload to Gemini
     const uploadResult = await uploadFileToGeminiWithRetry(
       req.file.path,
       req.file.mimetype,
-      req.file.originalname
+      req.file.originalname,
+      30,
+      forcedKeyIndex
     );
 
     // Clean up temp file
@@ -119,6 +125,7 @@ app.post("/api/upload-file", upload.single('file'), async (req, res) => {
       fileUri: uploadResult.uri,
       name: uploadResult.name,
       mimeType: uploadResult.mimeType,
+      keyIndex: uploadResult.keyIndex
     });
   } catch (error: any) {
     console.error("Error uploading file to Gemini:", error);
@@ -126,6 +133,48 @@ app.post("/api/upload-file", upload.single('file'), async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
     res.status(500).json({ error: error.message || "Falha no upload do arquivo" });
+  }
+});
+
+// Novo endpoint para upload via URL (Bypass Vercel Payload Limit)
+app.post("/api/upload-from-url", async (req: any, res) => {
+  let tmpPath = "";
+  try {
+    const { url, mimeType, fileName, keyIndex } = req.body;
+    if (!url) return res.status(400).json({ error: "URL é obrigatória" });
+
+    const forcedKeyIndex = keyIndex !== undefined ? parseInt(keyIndex) : undefined;
+
+    // Download file to /tmp
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Falha ao baixar arquivo da URL: ${response.statusText}`);
+    
+    const buffer = await response.arrayBuffer();
+    tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
+    fs.writeFileSync(tmpPath, Buffer.from(buffer));
+
+    // Upload to Gemini
+    const uploadResult = await uploadFileToGeminiWithRetry(
+      tmpPath,
+      mimeType || 'application/pdf',
+      fileName || 'imported_file.pdf',
+      30,
+      forcedKeyIndex
+    );
+
+    res.json({
+      fileUri: uploadResult.uri,
+      name: uploadResult.name,
+      mimeType: uploadResult.mimeType,
+      keyIndex: uploadResult.keyIndex
+    });
+  } catch (error: any) {
+    console.error("Erro no upload via URL:", error);
+    res.status(500).json({ error: error.message || "Falha no upload via URL" });
+  } finally {
+    if (tmpPath && fs.existsSync(tmpPath)) {
+      fs.unlinkSync(tmpPath);
+    }
   }
 });
 
@@ -675,28 +724,40 @@ const MODEL_HIERARCHY = [
 
 function getApiKeys() {
   const envKeys = Object.keys(process.env);
-  const keyVars = envKeys.filter(k => k.startsWith('API_KEY_'));
   
-  const keys = keyVars
+  // Buscar chaves que começam com API_KEY_ ou GEMINI_API_KEY_
+  const keyVars = envKeys.filter(k => k.startsWith('API_KEY_') || k.startsWith('GEMINI_API_KEY_'));
+  
+  let keys = keyVars
     .map(k => process.env[k])
     .filter(Boolean) as string[];
   
+  // Adiciona a chave padrão se existir
   if (process.env.GEMINI_API_KEY) keys.push(process.env.GEMINI_API_KEY);
+  
+  // Adiciona chaves da lista GEMINI_KEYS se existir
   if (process.env.GEMINI_KEYS) {
     keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(Boolean));
   }
   
-  const uniqueKeys = [...new Set(keys)]; // Remove duplicates
-  const validKeys = uniqueKeys.filter(k => !invalidKeys.has(k));
+  const uniqueKeys = [...new Set(keys)]; // Remove duplicatas
+  const filteredValidKeys = uniqueKeys.filter(k => !invalidKeys.has(k));
   
-  // Log para depuração (apenas no servidor)
-  console.log(`[DEBUG] Chaves encontradas (${uniqueKeys.length}). Chaves válidas ativas: ${validKeys.length}.`);
-  
-  if (validKeys.length === 0) {
-    return uniqueKeys; // Fallback to all keys if all are marked invalid (avoids immediate crash)
+  // Log detalhado para diagnóstico no console da Vercel
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keyVars.length} variáveis de ambiente seguindo o padrão API_KEY_X.`);
+    console.log(`[AUTH] Total de chaves únicas carregadas: ${uniqueKeys.length}. Chaves operacionais: ${filteredValidKeys.length}.`);
   }
   
-  return validKeys;
+  if (filteredValidKeys.length === 0 && uniqueKeys.length > 0) {
+    // Se todas as chaves foram marcadas como inválidas, limpa o cache de erro e tenta novamente 
+    // Isso evita bloqueio total caso o erro de permissão seja temporário
+    console.warn("[AUTH] Todas as chaves marcadas como inválidas. Resetando cache para nova tentativa.");
+    invalidKeys.clear();
+    return uniqueKeys;
+  }
+  
+  return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
 async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0) {
@@ -1180,7 +1241,7 @@ app.post("/api/marketing/generate", async (req, res) => {
 
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    const { message, history, images, ragContext, modelProvider, model } = req.body;
+    const { message, history, images, ragContext, modelProvider, model, keyIndex } = req.body;
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -1293,7 +1354,7 @@ ${ragContext}`;
         config: {
           systemInstruction: selectedSystemPrompt,
           temperature: temperature,
-          maxOutputTokens: 16384,
+          maxOutputTokens: 16383, // Slightly reduced to avoid context issues occasionally
           tools: tools,
           safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -1302,7 +1363,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      });
+      }, 30, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = "";
@@ -1344,7 +1405,7 @@ ${ragContext}`;
 
 app.post("/api/dra-luana/chat", async (req, res) => {
   try {
-    const { message, history, images, minWage = '1621.00', ragContext, modelProvider, model } = req.body;
+    const { message, history, images, minWage = '1621.00', ragContext, modelProvider, model, keyIndex } = req.body;
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -1473,7 +1534,7 @@ ${ragContext}`;
         config: {
           systemInstruction: selectedSystemPrompt,
           temperature: temperature,
-          maxOutputTokens: 16384,
+          maxOutputTokens: 16383,
           tools: tools,
           safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -1482,7 +1543,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      });
+      }, 30, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = "";
