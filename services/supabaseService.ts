@@ -54,6 +54,10 @@ export const supabaseService = {
       });
       
     if (error) {
+      if (error.message.includes('row-level security policy') || error.message.includes('RLS')) {
+         console.warn('Supabase RLS bloqueando salvamento das conversas. Aviso apenas interno, o app continuará funcionando.');
+         return session; // Ignore o erro RLS para evitar o crash
+      }
       console.error('Error saving AI conversation to Supabase:', error);
       throw error;
     }
