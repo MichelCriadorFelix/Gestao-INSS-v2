@@ -63,7 +63,8 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
-  const keyToUseIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : (currentKeyIndex % keys.length);
+  // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
@@ -86,13 +87,13 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
       invalidKeys.add(apiKey);
     }
     
-    console.error(`Erro no upload com chave ${keyToUseIndex}:`, errorMessage);
+    console.error(`Erro no upload com chave ${keyToUseIndex % keys.length}:`, errorMessage);
     
-    if ((isInvalidKey || isOverloaded) && retries > 0 && forcedKeyIndex === undefined) {
+    if ((isInvalidKey || isOverloaded) && retries > 0) {
       currentKeyIndex++;
       let delay = isInvalidKey ? 500 : 3000;
       await new Promise(resolve => setTimeout(resolve, delay));
-      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1);
+      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1, forcedKeyIndex);
     }
     
     throw error;
@@ -760,12 +761,13 @@ function getApiKeys() {
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
-async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0) {
+async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  // Select key using round-robin
-  const apiKey = keys[currentKeyIndex % keys.length];
+  // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
   // Select model from hierarchy or use the requested model on first try
@@ -859,7 +861,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, nextModelIndex, nextFailures);
+      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
     
     // Critical Failure
@@ -874,11 +876,12 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   }
 }
 
-async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0): Promise<any> {
+async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const apiKey = keys[currentKeyIndex % keys.length];
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
@@ -936,7 +939,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures);
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
     
     if (retries === 0) {
@@ -1363,7 +1366,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      }, 30, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = "";
@@ -1543,7 +1546,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      }, 30, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = "";

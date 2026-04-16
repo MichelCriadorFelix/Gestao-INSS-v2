@@ -756,8 +756,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       });
 
       let friendlyError = error.message;
-      if (friendlyError.includes("PAYLOAD_TOO_LARGE") || friendlyError.includes("Too Large")) {
-        friendlyError = "O arquivo é muito grande para o servidor (limite de 4.5MB). Por favor, tente dividir o PDF em arquivos menores ou use um compressor de PDF.";
+      if (friendlyError.includes("429") || friendlyError.includes("RESOURCE_EXHAUSTED")) {
+        friendlyError = "Limite de cota atingido na IA. Todas as chaves foram tentadas. Por favor, aguarde alguns segundos e clique em 'Retomar Auditoria'.";
+      } else if (friendlyError.includes("PAYLOAD_TOO_LARGE") || friendlyError.includes("Too Large") || friendlyError.includes("413")) {
+        friendlyError = "O arquivo é muito grande. Estamos tentando via Storage, mas o Google ainda encontrou limites. Tente comprimir o PDF para menos de 20MB.";
       }
       
       alert(`Erro ao ler os arquivos: ${friendlyError}`);
