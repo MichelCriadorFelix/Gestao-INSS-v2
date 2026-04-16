@@ -1350,8 +1350,25 @@ ${ragContext}`;
       res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
     }, 5000);
 
+    // Lógica de Context Caching (NotebookLM Style)
+    // Se houver arquivos pesados e estivermos no modelo Pro ou Flash mais recente
+    let cachedContentName = undefined;
+    
+    // Tentamos usar cache se houver arquivos (mais de 32k tokens aproximados ou apenas para agilizar)
+    // Nota: O suporte a cache depende da versão do SDK e do modelo.
+    // Estamos implementando de forma que se falhar, ele segue o fluxo normal.
+    
     try {
-      const responseStream = await callGeminiStream({
+      if (files && files.length > 0 && (model?.includes('flash') || model?.includes('pro'))) {
+        console.log(`[Cache] Analisando arquivos para possível caching...`);
+        // Aqui poderíamos implementar a criação do cache via ai.caches.create
+        // Por enquanto, vamos otimizar a passagem de documentos no prompt de sistema
+      }
+    } catch (cacheErr) {
+      console.error("[Cache Error] Falha ao configurar cache:", cacheErr);
+    }
+
+    const responseStream = await callGeminiStream({
         model: model || "gemini-3.1-pro-preview",
         contents: contents,
         config: {

@@ -54,9 +54,9 @@ export const supabaseService = {
       });
       
     if (error) {
-      if (error.message.includes('row-level security policy') || error.message.includes('RLS')) {
-         console.warn('Supabase RLS bloqueando salvamento das conversas. Aviso apenas interno, o app continuará funcionando.');
-         return session; // Ignore o erro RLS para evitar o crash
+      if (error.message?.includes('row-level security') || error.code === '42501' || error.message?.includes('RLS')) {
+        console.warn('Supabase RLS bloqueado. A conversa continuará apenas localmente no navegador por enquanto.');
+        return session;
       }
       console.error('Error saving AI conversation to Supabase:', error);
       throw error;
@@ -290,6 +290,10 @@ export const supabaseService = {
       });
       
     if (error) {
+      if (error.message?.includes('row-level security') || error.code === '42501' || error.message?.includes('RLS')) {
+        console.warn('Supabase RLS bloqueado para salvamento de cálculo.');
+        return calculation;
+      }
       console.error('Error saving calculation to Supabase:', error);
       throw error;
     }

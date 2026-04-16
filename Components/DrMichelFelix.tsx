@@ -440,9 +440,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
         }
 
-        // Include as much full text as possible within safety limits (increased to 500k)
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 500000)}` : '';
-        return `${header}${summaryPart}${fullTextPart}`;
+        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
+        const textLimit = doc.fileUri ? 1000 : 500000; // If we have the file, send only a small preview to save tokens
+        const fullTextPart = doc.fullText ? `CONTEÚDO (EXCERTOS):\n${doc.fullText.substring(0, textLimit)}` : '';
+        return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Gemini File API Habilitado]' : ''}`;
       }).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
