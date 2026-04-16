@@ -27,6 +27,7 @@ import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 import { apiFetch } from '../services/apiService';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
 interface ChatDocument {
   id: string;
@@ -101,6 +102,14 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncedSessionsRef = useRef<Record<string, string>>({});
 
+  useEffect(() => {
+    if (pendingAudit) {
+      idbSet('pending_audit_dr_michel', pendingAudit).catch(console.error);
+    } else {
+      idbDel('pending_audit_dr_michel').catch(console.error);
+    }
+  }, [pendingAudit]);
+
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
   useEffect(() => {
@@ -116,6 +125,14 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   useEffect(() => {
     const loadFromSupabase = async () => {
       try {
+        // Load pending audit from IndexedDB
+        idbGet('pending_audit_dr_michel').then(saved => {
+          if (saved) {
+            console.log("Audit pendente recuperado:", saved);
+            setPendingAudit(saved);
+          }
+        }).catch(console.error);
+
         const dbSessions = await supabaseService.getAIConversations('michel');
         let formattedSessions = dbSessions && dbSessions.length > 0 ? dbSessions.map(s => ({
           id: s.id,
@@ -600,7 +617,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         // Bypass Vercel 4.5MB limit if file is large
         if (file.size > 4 * 1024 * 1024) {
           setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
-          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${file.name}`, file);
+          
+          // Sanitize filename to avoid "Invalid key" errors in Supabase
+          const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
           
           if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
 

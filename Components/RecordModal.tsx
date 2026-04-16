@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
 import { parseDate, addDays, formatDate } from '../utils';
+import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
 import { supabaseService } from '../services/supabaseService';
 
@@ -17,7 +18,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDocName, setEditDocName] = useState('');
-  const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success'>>({});
+  const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,6 +57,69 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   }, [formData.der]);
 
   if (!isOpen) return null;
+
+  const handleCompressDocument = async (doc: ScannedDocument) => {
+    if (!doc.url) return;
+    
+    setSyncStatus(prev => ({ ...prev, [doc.id]: 'compressing' }));
+    
+    try {
+      // 1. Download document if it's a URL
+      let file: File;
+      if (doc.url.startsWith('http')) {
+        const response = await fetch(doc.url);
+        const blob = await response.body ? await response.blob() : null;
+        if (!blob) throw new Error("Falha ao baixar arquivo para compressão.");
+        file = new File([blob], doc.name, { type: doc.type });
+      } else {
+        // Base64
+        const res = await fetch(doc.url);
+        const blob = await res.blob();
+        file = new File([blob], doc.name, { type: doc.type });
+      }
+
+      // 2. Compress based on type
+      let compressedFile: File;
+      if (file.type === 'application/pdf') {
+        compressedFile = await compressPDF(file);
+      } else if (file.type.startsWith('image/')) {
+        compressedFile = await compressImage(file);
+      } else {
+        throw new Error("Formato não suportado para compressão.");
+      }
+
+      // 3. Upload compressed version
+      const clientId = formData.id || 'temp';
+      const timestamp = Date.now();
+      const sanitizedName = compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/${timestamp}_${sanitizedName}`, compressedFile);
+      
+      if (!storageUrl) throw new Error("Falha ao salvar arquivo comprimido.");
+
+      // 4. Update state
+      const newDoc: ScannedDocument = {
+        ...doc,
+        id: Math.random().toString(36).substr(2, 9),
+        name: `${doc.name} (Comprimido)`,
+        url: storageUrl,
+        date: new Date().toLocaleDateString('pt-BR')
+      };
+
+      const updatedDocs = [...(formData.documents || []), newDoc];
+      const updatedFormData = { ...formData, documents: updatedDocs };
+      setFormData(updatedFormData);
+      
+      // Attempt to save to master list if possible
+      await onSave(updatedFormData as ClientRecord);
+      
+      setSyncStatus(prev => ({ ...prev, [doc.id]: 'success' }));
+      alert("Documento comprimido com sucesso! A nova versão foi adicionada à lista.");
+    } catch (error: any) {
+      console.error("Erro na compressão:", error);
+      alert(`Falha ao comprimir documento: ${error.message}`);
+      setSyncStatus(prev => ({ ...prev, [doc.id]: 'error' }));
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -875,8 +939,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     </div>
                                     <div className="flex items-center gap-2 sm:ml-auto">
                                         {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
+                                        {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
                                         {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Tentar Novamente</button>}
                                         
+                                        <button 
+                                            onClick={() => handleCompressDocument(doc)} 
+                                            className="p-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg" 
+                                            title="Comprimir Documento"
+                                            disabled={syncStatus[doc.id] === 'compressing'}
+                                        >
+                                            <BoltIcon className="h-5 w-5" />
+                                        </button>
+
                                         <div className="relative">
                                             <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg" title="Etiquetas">
                                                 <TagIcon className="h-5 w-5" />
