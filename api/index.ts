@@ -3,6 +3,9 @@ import { GoogleGenAI } from "@google/genai";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import dotenv from "dotenv";
 import { createClient } from '@supabase/supabase-js';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -51,6 +54,79 @@ const getCurrentDateContext = () => {
 app.use("/api", (req, res, next) => {
   if (req.path === "/health" || req.path === "/config") return next();
   authenticate(req, res, next);
+});
+
+// File Upload Endpoint for Gemini File API
+const upload = multer({ dest: '/tmp/uploads/' });
+
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30): Promise<any> {
+  const keys = getApiKeys();
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
+
+  const apiKey = keys[currentKeyIndex % keys.length];
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const uploadResult = await ai.files.upload({
+      file: filePath,
+      config: {
+        mimeType: mimetype,
+        displayName: originalname,
+      }
+    });
+    return uploadResult;
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+    
+    console.error(`Erro no upload com chave ${currentKeyIndex}:`, errorMessage);
+    
+    if ((isInvalidKey || isOverloaded) && retries > 0) {
+      currentKeyIndex++;
+      let delay = isInvalidKey ? 500 : 3000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1);
+    }
+    
+    throw error;
+  }
+}
+
+app.post("/api/upload-file", upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    }
+
+    // Upload to Gemini
+    const uploadResult = await uploadFileToGeminiWithRetry(
+      req.file.path,
+      req.file.mimetype,
+      req.file.originalname
+    );
+
+    // Clean up temp file
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.json({
+      fileUri: uploadResult.uri,
+      name: uploadResult.name,
+      mimeType: uploadResult.mimeType,
+    });
+  } catch (error: any) {
+    console.error("Error uploading file to Gemini:", error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message || "Falha no upload do arquivo" });
+  }
 });
 
 // OCR Endpoint
@@ -115,11 +191,12 @@ PERSONALIDADE E ESTILO DE ESCRITA (SOFT SKILLS):
 - COMBATIVO E TÉCNICO: Não aceite "não" do INSS. Se o laudo administrativo diz "apto", você deve destruí-lo tecnicamente usando os laudos particulares e a IN 128/2022.
 - BASEADO EM PROVAS (DATA-DRIVEN): Cada parágrafo deve citar uma prova (Doc. X) ou uma lei. Não faça alegações vazias.
 - GESTÃO DE CONTEXTO INTEGRAL: Quando o processo for dividido em múltiplos arquivos, você deve manter a linha do tempo e a coerência entre eles. Se o usuário pedir um recurso, você deve considerar as informações de TODOS os arquivos processados na sessão.
+- INTEGRAÇÃO COM GEMINI FILE API: Você tem acesso direto aos arquivos PDF/Documentos enviados via Gemini File API. Use esse acesso para realizar uma leitura nativa e profunda. Você DEVE extrair nomes, CPFs, datas e valores diretamente dos arquivos anexados. É ESTRITAMENTE PROIBIDO usar placeholders se a informação puder ser encontrada nos arquivos.
 - LINGUAGEM: Formal, culta, persuasiva, mas direta. Evite "juridiquês" arcaico (ex: "data venia", "outrossim"). Use português jurídico moderno e limpo.
 - FOCO NO RESULTADO: Sua missão é garantir o benefício. Se houver dúvida, peça o benefício mais vantajoso (fungibilidade).
 
 REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
-1. FIDELIDADE ABSOLUTA ÀS PROVAS: Use EXCLUSIVAMENTE os dados dos documentos enviados.
+1. FIDELIDADE ABSOLUTA ÀS PROVAS: Use EXCLUSIVAMENTE os dados dos documentos enviados. Se um documento está anexado via File API, abra-o e transcreva os dados reais (Nomes, Datas, Valores). O uso de colchetes "[...]" só é permitido para dados que realmente não constam em NENHUM dos arquivos enviados.
 2. REGRAS DE SEGURANÇA E EVITAÇÃO DE RECITATION (OBRIGATÓRIO):
    - PROIBIDO REPRODUZIR TEXTOS LEGAIS OU JURISPRUDENCIAIS VERBATIM (ipsis litteris) EM EXTENSÃO.
    - Sempre PARAFRASEIE os artigos de lei, súmulas e decisões.
@@ -439,10 +516,11 @@ PERSONALIDADE E ESTILO DE ESCRITA (SOFT SKILLS):
 - PROTETIVA, MAS TÉCNICA: Defenda o trabalhador com base no princípio *in dubio pro operario*, mas fundamente cada centavo pedido.
 - COMBATIVA: Ataque as teses de defesa da empresa (ex: "cargo de confiança" falso, "PJotização", "justa causa" forjada).
 - BASEADA EM PROVAS (DATA-DRIVEN): Cada parágrafo deve citar uma prova (Doc. X, Planilha de Cálculos, Cartão de Ponto) ou uma lei. Não faça alegações vazias.
+- INTEGRAÇÃO COM GEMINI FILE API: Você tem acesso direto aos arquivos PDF/Documentos enviados via Gemini File API. Use esse acesso para realizar uma leitura nativa e profunda. Você DEVE extrair nomes, CPFs, datas e valores diretamente dos arquivos anexados. É ESTRITAMENTE PROIBIDO usar placeholders se a informação puder ser encontrada nos arquivos. A planilha de cálculos é sua bíblia.
 - LINGUAGEM: Formal, culta, persuasiva, mas direta. Evite "juridiquês" arcaico. Use português jurídico moderno e limpo.
 
 REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
-1. FIDELIDADE ABSOLUTA AOS CÁLCULOS: A petição e o relatório nascem do cálculo. Se existe uma VERBA DEVIDA no cálculo, DEVE haver um tópico de fundamentação na peça. Se NÃO existe no cálculo (ou se já foi 100% paga), NÃO peça na peça. O cálculo é a sua planta baixa.
+1. FIDELIDADE ABSOLUTA AOS CÁLCULOS: A petição e o relatório nascem do cálculo. Se um documento está anexado via File API, abra-o e transcreva os dados reais. O uso de colchetes "[...]" só é permitido para dados que realmente não constam em NENHUM dos arquivos enviados. O cálculo é a sua planta baixa.
 2. REGRAS DE SEGURANÇA E EVITAÇÃO DE RECITATION (RECOMENDADO):
    - Priorize a análise técnica e a aplicação da lei ao caso concreto.
    - Evite transcrições literais longas de artigos de lei ou súmulas, preferindo a explicação do conteúdo normativo com suas próprias palavras.
@@ -587,6 +665,7 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
 
 // Logic for API Key Rotation (Round-Robin)
 let currentKeyIndex = Math.floor(Math.random() * 10);
+const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.1-pro-preview",
@@ -603,15 +682,21 @@ function getApiKeys() {
     .filter(Boolean) as string[];
   
   if (process.env.GEMINI_API_KEY) keys.push(process.env.GEMINI_API_KEY);
+  if (process.env.GEMINI_KEYS) {
+    keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(Boolean));
+  }
   
   const uniqueKeys = [...new Set(keys)]; // Remove duplicates
+  const validKeys = uniqueKeys.filter(k => !invalidKeys.has(k));
   
   // Log para depuração (apenas no servidor)
-  console.log(`[DEBUG] Chaves encontradas (${uniqueKeys.length}):`, 
-    uniqueKeys.map(k => k.substring(0, 5) + '...').join(', ')
-  );
+  console.log(`[DEBUG] Chaves encontradas (${uniqueKeys.length}). Chaves válidas ativas: ${validKeys.length}.`);
   
-  return uniqueKeys;
+  if (validKeys.length === 0) {
+    return uniqueKeys; // Fallback to all keys if all are marked invalid (avoids immediate crash)
+  }
+  
+  return validKeys;
 }
 
 async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0) {
@@ -672,13 +757,18 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isEmpty = errorMessage.includes('EMPTY_RESPONSE');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     
-    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey) && retries > 0) {
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+    
+    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied) && retries > 0) {
       currentKeyIndex++; // Rotate key immediately
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
-      let delay = isInvalidKey ? 500 : 2000;
+      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
       if (isNotFound) {
          // 404: Switch model immediately
@@ -750,13 +840,18 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
     const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     
-    if ((isOverloaded || isNotFound || isInvalidKey) && retries > 0) {
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+
+    if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied) && retries > 0) {
       currentKeyIndex++;
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
-      let delay = isInvalidKey ? 500 : 2000;
+      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
       if (isNotFound) {
          nextModelIndex++;
@@ -808,6 +903,12 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
     return result.embeddings?.[0]?.values || [];
   } catch (error: any) {
     const errorMessage = error.message || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+
     console.error(`Erro ao gerar embedding com a chave ${currentKeyIndex}:`, errorMessage);
     
     // Rotate key
@@ -919,18 +1020,19 @@ VOCÊ É UM AUDITOR JURÍDICO E ANALISTA VISUAL DE ALTA PRECISÃO (MODO ARQUIVIS
 SUA MISSÃO: Realizar a ciência integral de documentos, mapeando cada detalhe textual e VISUAL para uso posterior.
 
 DIRETRIZES OBRIGATÓRIAS:
-1. EXTRAÇÃO EXAUSTIVA: Você receberá lotes de páginas. Extraia TODOS os dados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e, principalmente, PROPOSTAS DE ACORDO e LAUDOS PERICIAIS.
-2. ANÁLISE VISUAL (CRÍTICO): Se houver imagens (fotos de pessoas, partes do corpo, exames escaneados, carimbos), você DEVE descrevê-las detalhadamente.
+1. LEITURA NATIVA (GEMINI FILE API): Você está recebendo arquivos diretamente via Gemini File API. Use sua capacidade nativa de processamento de documentos para ler o conteúdo integral com máxima precisão.
+2. EXTRAÇÃO EXAUSTIVA: Extraia TODOS os dados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e, principalmente, PROPOSTAS DE ACORDO e LAUDOS PERICIAIS.
+3. ANÁLISE VISUAL (CRÍTICO): Se houver imagens (fotos de pessoas, partes do corpo, exames escaneados, carimbos) dentro dos documentos, você DEVE descrevê-las detalhadamente.
    - Ex: "Página 230: Foto colorida mostrando as mãos do autor com sinais de [descrever]."
    - Ex: "Página 241: Imagem de Ultrassonografia do Abdome com conclusão de [descrever]."
-3. MAPEAMENTO POR PÁGINA: Cite sempre a página de cada achado.
-4. FIDELIDADE: Não resuma demais. Se houver um parágrafo decisivo sobre a incapacidade, extraia-o.
-5. FORMATO DE RESPOSTA:
-   "✅ Ciência tomada das Páginas X a Y do documento [Nome].
+4. MAPEAMENTO POR PÁGINA: Cite sempre a página de cada achado.
+5. FIDELIDADE: Não resuma demais. Se houver um parágrafo decisivo sobre a incapacidade, extraia-o.
+6. FORMATO DE RESPOSTA:
+   "✅ Ciência tomada do documento [Nome] via Gemini File API.
    **Mapeamento de Dados e Evidências Visuais:**
    * [Página Z]: [Informação ou descrição da imagem]
    * ...
-   Aguardando próximo lote."
+   Aguardando próximo comando."
 
 ATENÇÃO: Se você ignorar uma imagem ou responder apenas "Recebido", o sistema falhará. Você DEVE ser os olhos do advogado.
 `;
@@ -1074,91 +1176,7 @@ app.post("/api/marketing/generate", async (req, res) => {
   }
 });
 
-async function* callOpenRouterStream(model: string, contents: any[], systemInstruction: string, temperature: number) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY não configurada na Vercel.");
 
-  const orMessages = [];
-  if (systemInstruction) {
-    orMessages.push({ role: 'system', content: systemInstruction });
-  }
-
-  for (const msg of contents) {
-    const role = msg.role === 'model' ? 'assistant' : 'user';
-    let content: any[] = [];
-    
-    for (const part of msg.parts) {
-      if (part.text) {
-        content.push({ type: 'text', text: part.text });
-      } else if (part.inlineData) {
-        content.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-          }
-        });
-      }
-    }
-    
-    if (content.length === 1 && content[0].type === 'text') {
-      orMessages.push({ role, content: content[0].text });
-    } else {
-      orMessages.push({ role, content });
-    }
-  }
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://ais.studio',
-      'X-Title': 'Gestão INSS Jurídico',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: orMessages,
-      temperature: temperature,
-      stream: true
-    })
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter Error: ${response.status} ${err}`);
-  }
-
-  const reader = response.body?.getReader();
-  const decoder = new TextDecoder('utf-8');
-
-  if (!reader) throw new Error("Sem reader do OpenRouter");
-
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    
-    for (const line of lines) {
-      if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.choices && data.choices.length > 0) {
-            const delta = data.choices[0].delta;
-            if (delta && delta.content) {
-              yield { text: delta.content };
-            }
-          }
-        } catch (e) {
-          // Ignore parsing errors for incomplete chunks
-        }
-      }
-    }
-  }
-}
 
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
@@ -1187,9 +1205,10 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     // REFORÇO DE CONTEXTO (ANTI-VÍCIO) - Só necessário no modo Dr. Michel
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [LEMBRETE DO SISTEMA - PRIORIDADE MÁXIMA]
-    Dr. Michel, você deve utilizar TODO o contexto fornecido no [MAPEAMENTO DA AUDITORIA DETALHADA] e no [CONTEÚDO INTEGRAL].
-    Se o usuário perguntar sobre uma página específica (ex: Página 168), procure-a no conteúdo integral.
-    Se o usuário perguntar sobre o Laudo ou Acordo, verifique o mapeamento.
+    Dr. Michel, você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API). 
+    PROIBIDO USAR PLACEHOLDERS como "[NOME DO AUTOR]", "[DATA]" ou "[NB]" se a informação estiver em qualquer um dos arquivos.
+    Abra cada arquivo anexado, leia os nomes, CPFs, datas de cessação, números de benefício e diagnósticos.
+    Se não encontrar um dado, escreva [DADO NÃO LOCALIZADO NOS DOCUMENTOS] em vez de um placeholder genérico.
     Mantenha a norma culta e a estrutura da Lei 14.331/2022.
     `;
 
@@ -1237,6 +1256,18 @@ ${ragContext}`;
       });
     }
 
+    // Add files if present
+    if (req.body.files && Array.isArray(req.body.files)) {
+      req.body.files.forEach((file: any) => {
+        currentMessageParts.push({
+          fileData: {
+            mimeType: file.mimeType,
+            fileUri: file.fileUri
+          }
+        });
+      });
+    }
+
     const contents = [
       ...historyParts,
       { role: 'user', parts: currentMessageParts }
@@ -1256,38 +1287,22 @@ ${ragContext}`;
     }, 5000);
 
     try {
-      let responseStream;
-      
-      if (modelProvider === 'openrouter') {
-        const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus',
-          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
-          'deepseek-chat-free': 'deepseek/deepseek-chat',
-          'openrouter-free': 'openrouter/free',
-          'gemini-pro-1.5': 'google/gemini-pro-1.5',
-          'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
-          'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
-        };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
-        responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
-      } else {
-        responseStream = await callGeminiStream({
-          model: model || "gemini-3.1-pro-preview",
-          contents: contents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: temperature,
-            maxOutputTokens: 16384,
-            tools: tools,
-            safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
-          }
-        });
-      }
+      const responseStream = await callGeminiStream({
+        model: model || "gemini-3.1-pro-preview",
+        contents: contents,
+        config: {
+          systemInstruction: selectedSystemPrompt,
+          temperature: temperature,
+          maxOutputTokens: 16384,
+          tools: tools,
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
+        }
+      });
 
       for await (const chunk of responseStream) {
         let text = "";
@@ -1317,15 +1332,6 @@ ${ragContext}`;
       
       let errorMessage = streamError.message || "Erro durante a geração do texto.";
       
-      // Tratamento amigável para erro de contexto excedido no OpenRouter
-      if (errorMessage.includes("No endpoints found that support image input")) {
-        errorMessage = "⚠️ MODELO INCOMPATÍVEL COM IMAGENS: O modelo selecionado não suporta leitura de imagens ou PDFs escaneados. \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo, pois eles possuem visão computacional avançada.";
-      } else if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded")) {
-        errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
-      } else if (errorMessage.includes("OpenRouter Error")) {
-        errorMessage = "⚠️ ERRO DO OPENROUTER: " + errorMessage;
-      }
-
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
@@ -1389,8 +1395,10 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // REFORÇO DE CONTEXTO (ANTI-VÍCIO)
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [LEMBRETE DO SISTEMA - PRIORIDADE MÁXIMA]
-    Dra. Luana, você deve utilizar TODO o contexto fornecido no [MAPEAMENTO DA AUDITORIA DETALHADA] e no [CONTEÚDO INTEGRAL].
-    Se o usuário perguntar sobre uma página específica, procure-a no conteúdo integral.
+    Dra. Luana, você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API) e da Planilha de Cálculos.
+    PROIBIDO USAR PLACEHOLDERS como "[NOME DO RECLAMANTE]", "[DATA]" ou "[VALOR]" se a informação estiver nos arquivos.
+    Abra cada arquivo anexado e transcreva nomes, datas de admissão/demissão e valores exatos.
+    Se não encontrar um dado, escreva [DADO NÃO LOCALIZADO NOS DOCUMENTOS] em vez de um placeholder genérico.
     Mantenha a norma culta e a estrutura da CLT.
     `;
 
@@ -1427,6 +1435,18 @@ ${ragContext}`;
       });
     }
 
+    // Add files if present
+    if (req.body.files && Array.isArray(req.body.files)) {
+      req.body.files.forEach((file: any) => {
+        currentMessageParts.push({
+          fileData: {
+            mimeType: file.mimeType,
+            fileUri: file.fileUri
+          }
+        });
+      });
+    }
+
     const contents = [
       ...historyParts,
       { role: 'user', parts: currentMessageParts }
@@ -1447,36 +1467,22 @@ ${ragContext}`;
     try {
       let responseStream;
       
-      if (modelProvider === 'openrouter') {
-        const modelMap: Record<string, string> = {
-          'qwen-plus': 'qwen/qwen-plus',
-          'llama-3-3-70b-free': 'meta-llama/llama-3.3-70b-instruct',
-          'deepseek-chat-free': 'deepseek/deepseek-chat',
-          'openrouter-free': 'openrouter/free',
-          'gemini-pro-1.5': 'google/gemini-pro-1.5',
-          'claude-3-5-sonnet': 'anthropic/claude-3.5-sonnet',
-          'llama-3-1-405b': 'meta-llama/llama-3.1-405b'
-        };
-        const targetModel = modelMap[model] || model || 'qwen/qwen-plus';
-        responseStream = callOpenRouterStream(targetModel, contents, selectedSystemPrompt, temperature);
-      } else {
-        responseStream = await callGeminiStream({
-          model: model || "gemini-3.1-pro-preview",
-          contents: contents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: temperature,
-            maxOutputTokens: 16384,
-            tools: tools,
-            safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
-          }
-        });
-      }
+      responseStream = await callGeminiStream({
+        model: model || "gemini-3.1-pro-preview",
+        contents: contents,
+        config: {
+          systemInstruction: selectedSystemPrompt,
+          temperature: temperature,
+          maxOutputTokens: 16384,
+          tools: tools,
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
+        }
+      });
 
       for await (const chunk of responseStream) {
         let text = "";
@@ -1506,14 +1512,6 @@ ${ragContext}`;
       
       let errorMessage = streamError.message || "Erro durante a geração do texto.";
       
-      if (errorMessage.includes("No endpoints found that support image input")) {
-        errorMessage = "⚠️ MODELO INCOMPATÍVEL COM IMAGENS: O modelo selecionado não suporta leitura de imagens ou PDFs escaneados. \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo, pois eles possuem visão computacional avançada.";
-      } else if (errorMessage.includes("32768 tokens") || errorMessage.includes("context_length_exceeded")) {
-        errorMessage = "⚠️ LIMITE DE CONTEXTO EXCEDIDO: Este processo é muito grande para o modelo selecionado (Qwen). \n\nSUGESTÃO: Troque o modelo para 'Gemini 3.1 Flash' ou 'Gemini 3.1 Pro' no seletor abaixo. Eles suportam até 1 milhão de tokens e conseguirão ler este processo completo sem erros.";
-      } else if (errorMessage.includes("OpenRouter Error")) {
-        errorMessage = "⚠️ ERRO DO OPENROUTER: " + errorMessage;
-      }
-
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
@@ -1592,6 +1590,20 @@ app.get("/api/config", (req, res) => {
   console.log(`[DEBUG] /api/config chamado. URL presente: ${!!url}, Key presente: ${!!key}`);
   
   res.json({ url, key });
+});
+
+// Manipulador de erros global para garantir que erros retornem JSON em vez de HTML
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global error handler:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Erro interno do servidor",
+    stack: process.env.NODE_ENV === "production" ? undefined : err.stack
+  });
+});
+
+// Manipulador 404 para rotas /api que não foram encontradas
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
 });
 
 // Development server setup - ONLY runs locally, NOT on Vercel

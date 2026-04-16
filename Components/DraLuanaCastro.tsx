@@ -21,7 +21,6 @@ import {
   XMarkIcon as XMark
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
-import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 import { apiFetch } from '../services/apiService';
@@ -33,6 +32,8 @@ interface ChatDocument {
   fullText?: string;
   type: string;
   pages?: number;
+  fileUri?: string;
+  mimeType?: string;
 }
 
 interface Message {
@@ -427,6 +428,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const docSummaries = session?.documents?.map(doc => {
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
+        
+        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
+        if (doc.fileUri) {
+          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
+        }
+
         // Include as much full text as possible within safety limits (increased to 500k)
         const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 500000)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
@@ -442,9 +449,9 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
+          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
-          modelProvider: selectedModelProvider,
           model: selectedModel
         }),
         signal: abortController.signal
@@ -569,176 +576,123 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   };
 
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
-    const startTime = Date.now();
-    const CHUNK_SIZE = 20;
-
     try {
       for (let i = startFileIndex; i < fileArray.length; i++) {
         const file = fileArray[i];
-        setProgressText(`Lendo ${file.name} (${i + 1}/${fileArray.length})...`);
+        setProgressText(`Enviando ${file.name} para a IA (${i + 1}/${fileArray.length})...`);
+        setProgress(Math.round(((i) / fileArray.length) * 100));
 
-        if (file.type === 'application/pdf') {
-          const result = await extractTextFromPDF(file, (current, total, status) => {
-            const fileProgress = Math.round((current / total) * 100);
-            setProgress(Math.round(((i + (fileProgress / 100)) / fileArray.length) * 100));
-            setProgressText(`Lendo ${file.name}: ${status}`);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const uploadResponse = await apiFetch('/api/upload-file', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          const errText = await uploadResponse.text();
+          let errMessage = "Falha no upload";
+          try {
+            const errJson = JSON.parse(errText);
+            errMessage = errJson.error || errMessage;
+          } catch(e) {
+            errMessage = "Erro no servidor (não é um JSON válido). Ex: " + errText.substring(0, 100);
+          }
+          throw new Error(errMessage);
+        }
+
+        const dataText = await uploadResponse.text();
+        let uploadData;
+        try {
+          uploadData = JSON.parse(dataText);
+        } catch (e) {
+          console.error("Erro ao analisar resposta de upload:", dataText);
+          throw new Error("Erro na comunicação com o servidor. A resposta não é um JSON válido. Verifique se o backend está ativo.");
+        }
+
+        // --- NEW: Detailed AI Analysis for each document ---
+        setProgressText(`Analisando conteúdo de ${file.name}...`);
+        
+        let fileSummary = `Arquivo enviado e processado pela IA: ${file.name}`;
+        try {
+          const aiResponse = await apiFetch('/api/dra-luana/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+              history: [],
+              files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
+              minWage: localStorage.getItem('app_min_wage') || '1621.00',
+              model: "gemini-3-flash-preview" // Use flash for mapping
+            })
           });
 
-          const totalPages = result.totalPages;
-          const pages = result.pages;
-          
-          // OTIMIZAÇÃO: Filtrar APENAS páginas que são comprovadamente de separação e sem conteúdo
-          const filteredPages = pages.filter(page => {
-            const text = page.text.toUpperCase();
-            const isSeparationPage = (text.includes("PÁGINA DE SEPARAÇÃO") || 
-                                     text.includes("PAGINA DE SEPARACAO") ||
-                                     text.includes("FOLHA DE SEPARAÇÃO")) && 
-                                     page.text.trim().length < 80; 
-            // Se tiver imagem, NUNCA filtra (pode ser um carimbo ou assinatura importante)
-            if (page.image) return true;
-            return !isSeparationPage;
-          });
-
-          const totalFilteredPages = filteredPages.length;
-          let fullFileText = result.text;
-          let allSummaries = "";
-          
-          const initialP = (i === startFileIndex) ? startPageIndex : 0;
-
-          for (let p = initialP; p < totalFilteredPages; p += CHUNK_SIZE) {
-            const chunkPages = filteredPages.slice(p, p + CHUNK_SIZE);
-            const chunkText = chunkPages.map(page => page.text).join('\n');
-            const chunkImages = chunkPages.map(page => page.image).filter(Boolean) as string[];
-
-            // Check global timeout
-            if (Date.now() - startTime > PHASE_TIMEOUT) {
-              const currentPageNum = chunkPages[0]?.pageNumber || p;
-              const timeoutMsg: Message = {
-                id: generateId(),
-                role: 'assistant',
-                content: `⚠️ **Tempo máximo de auditoria (3 min) atingido.**\n\nConcluí a ciência até a página ${currentPageNum} do arquivo **${file.name}**. Para continuar a leitura de onde parei, por favor, envie o comando "CONTINUAR AUDITORIA".`,
-                timestamp: new Date().toISOString()
-              };
-              setSessions(prev => prev.map(s => 
-                s.id === activeSessionId ? { ...s, messages: [...s.messages, timeoutMsg] } : s
-              ));
-              setPendingAudit({ fileIndex: i, pageIndex: p, files: fileArray, activeSessionId });
-              setIsUploading(false);
-              return;
-            }
-
-            setProgressText(`Auditoria: ${file.name} (Páginas ${chunkPages[0].pageNumber} a ${chunkPages[chunkPages.length-1].pageNumber})...`);
-
-            const phasePrompt = `[FASE DE TOMADA DE CIÊNCIA - AUDITORIA DETALHADA]
-            ARQUIVO: ${file.name}
-            PÁGINAS DO LOTE: ${chunkPages[0].pageNumber} a ${chunkPages[chunkPages.length-1].pageNumber} de ${totalPages}
+          if (aiResponse.ok) {
+            const reader = aiResponse.body?.getReader();
+            const decoder = new TextDecoder();
+            let fullAiResText = "";
             
-            CONTEÚDO DAS PÁGINAS:
-            ${chunkText}
-            
-            INSTRUÇÃO CRÍTICA: Você deve agir como um auditor jurídico e ANALISTA VISUAL. 
-            1. Leia cada página com atenção.
-            2. Se houver IMAGENS neste lote, descreva-as detalhadamente (fotos, exames, assinaturas).
-            3. Extraia nomes, datas, CIDs, valores e propostas de acordo.
-            4. Se encontrar um Laudo Pericial ou Proposta de Acordo, DESTAQUE IMEDIATAMENTE.
-            5. Responda com a confirmação de ciência e o mapeamento detalhado por página.`;
-
-            const response = await apiFetch('/api/dra-luana/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                message: phasePrompt,
-                history: [], 
-                images: chunkImages,
-                isIngestion: true,
-                modelProvider: selectedModelProvider,
-                model: selectedModel
-              })
-            });
-
-            if (response.ok) {
-              const reader = response.body?.getReader();
-              const decoder = new TextDecoder();
-              let phaseSummary = '';
-              if (reader) {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  const chunk = decoder.decode(value);
-                  const lines = chunk.split('\n\n');
-                  for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                      try {
-                        const data = JSON.parse(line.slice(6));
-                        if (data.text) phaseSummary += data.text;
-                      } catch (e) {}
-                    }
+            if (reader) {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const dataStr = line.replace('data: ', '');
+                    if (dataStr === '[DONE]') continue;
+                    try {
+                      const data = JSON.parse(dataStr);
+                      if (data.text) fullAiResText += data.text;
+                    } catch(e) {}
                   }
                 }
               }
-              allSummaries += `\n\n--- PÁGINAS ${p + 1}-${Math.min(p + CHUNK_SIZE, totalPages)} ---\n${phaseSummary}`;
             }
+            
+            if (fullAiResText) {
+              fileSummary = fullAiResText;
+            }
+          } else {
+            const errText = await aiResponse.text();
+            console.warn("IA falhou na análise inicial:", errText);
           }
-
-          const newDoc: ChatDocument = {
-            id: generateId(),
-            name: file.name,
-            summary: allSummaries,
-            fullText: fullFileText,
-            type: file.type,
-            pages: totalPages
-          };
-
-          setSessions(prev => prev.map(s => 
-            s.id === activeSessionId ? { 
-              ...s, 
-              documents: [...(s.documents || []), newDoc],
-              messages: [...s.messages, {
-                id: generateId(),
-                role: 'assistant',
-                content: `✅ **Ciência Integral Tomada: ${file.name}**\n\n${allSummaries}`,
-                timestamp: new Date().toISOString()
-              }]
-            } : s
-          ));
-        } else {
-          const reader = new FileReader();
-          const fileText = await new Promise<string>((resolve) => {
-            reader.onload = (e) => resolve(e.target?.result as string || "");
-            reader.readAsText(file);
-          });
-
-          const newDoc: ChatDocument = {
-            id: generateId(),
-            name: file.name,
-            summary: `Arquivo de texto processado: ${file.name}`,
-            fullText: fileText,
-            type: file.type
-          };
-
-          setSessions(prev => prev.map(s => 
-            s.id === activeSessionId ? { 
-              ...s, 
-              documents: [...(s.documents || []), newDoc],
-              messages: [...s.messages, {
-                id: generateId(),
-                role: 'assistant',
-                content: `✅ **Arquivo Processado: ${file.name}**`,
-                timestamp: new Date().toISOString()
-              }]
-            } : s
-          ));
+        } catch (e) {
+          console.warn("Falha na análise inicial do arquivo:", e);
         }
+
+        const newDoc: ChatDocument = {
+          id: generateId(),
+          name: file.name,
+          type: file.type,
+          fileUri: uploadData.fileUri,
+          mimeType: uploadData.mimeType,
+          summary: fileSummary
+        };
+
+        setSessions(prev => prev.map(s => 
+          s.id === activeSessionId ? { 
+            ...s, 
+            documents: [...(s.documents || []), newDoc],
+            messages: [...s.messages, {
+              id: generateId(),
+              role: 'assistant',
+              content: fileSummary,
+              timestamp: new Date().toISOString()
+            }]
+          } : s
+        ));
       }
 
       setProgress(100);
       setProgressText('Concluído!');
       
-      // Only send final message if no audit is pending (it didn't return early)
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados. O processo foi mapeado e estou pronto para gerar o recurso ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
+        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. O processo foi mapeado e estou pronto para gerar a petição ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
         timestamp: new Date().toISOString()
       };
       
@@ -788,7 +742,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou processar o processo em lotes de 20 páginas para garantir máxima precisão e ciência integral de cada folha, respeitando o tempo de qualidade solicitado. Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento via Gemini File API para garantir máxima precisão técnica. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -864,7 +818,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED por fases em lotes de 20 páginas, garantindo ciência integral de cada folha. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED via Gemini File API, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -1197,16 +1151,9 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                   </button>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
-                    value={selectedModelProvider === 'gemini' ? selectedModel : selectedModel}
+                    value={selectedModel}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.startsWith('gemini-')) {
-                        setSelectedModelProvider('gemini');
-                        setSelectedModel(val);
-                      } else {
-                        setSelectedModelProvider('openrouter');
-                        setSelectedModel(val);
-                      }
+                      setSelectedModel(e.target.value);
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
