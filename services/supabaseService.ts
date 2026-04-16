@@ -292,7 +292,7 @@ export const supabaseService = {
     if (error) {
       if (error.message?.includes('row-level security') || error.code === '42501' || error.message?.includes('RLS')) {
         console.warn('Supabase RLS bloqueado para salvamento de cálculo.');
-        return calculation;
+        return calc;
       }
       console.error('Error saving calculation to Supabase:', error);
       throw error;

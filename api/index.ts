@@ -144,6 +144,28 @@ app.post("/api/upload-from-url", async (req: any, res) => {
     const { url, mimeType, fileName, keyIndex } = req.body;
     if (!url) return res.status(400).json({ error: "URL é obrigatória" });
 
+    // SSRF Protection: Bloqueia acesso a endereços locais e IP internos
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      
+      const isInternal = 
+        hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname === '0.0.0.0' ||
+        hostname.startsWith('192.168.') || 
+        hostname.startsWith('10.') || 
+        hostname.startsWith('172.') || // Abordagem simplificada para ranges privados
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal');
+
+      if (isInternal || !['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return res.status(403).json({ error: "URL não permitida por motivos de segurança (SSRF Protection)." });
+      }
+    } catch (e) {
+      return res.status(400).json({ error: "URL inválida." });
+    }
+
     const forcedKeyIndex = keyIndex !== undefined ? parseInt(keyIndex) : undefined;
 
     // Download file to /tmp
@@ -1244,7 +1266,7 @@ app.post("/api/marketing/generate", async (req, res) => {
 
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    const { message, history, images, ragContext, modelProvider, model, keyIndex } = req.body;
+    const { message, history, images, files, ragContext, modelProvider, model, keyIndex } = req.body;
     
     // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
     const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -1368,7 +1390,8 @@ ${ragContext}`;
       console.error("[Cache Error] Falha ao configurar cache:", cacheErr);
     }
 
-    const responseStream = await callGeminiStream({
+    try {
+      const responseStream = await callGeminiStream({
         model: model || "gemini-3.1-pro-preview",
         contents: contents,
         config: {
