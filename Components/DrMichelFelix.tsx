@@ -579,8 +579,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   };
 
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
+    let currentIdx = startFileIndex;
     try {
       for (let i = startFileIndex; i < fileArray.length; i++) {
+        currentIdx = i;
         const file = fileArray[i];
         setProgressText(`Enviando ${file.name} para a IA (${i + 1}/${fileArray.length})...`);
         setProgress(Math.round(((i) / fileArray.length) * 100));
@@ -691,6 +693,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
       setProgress(100);
       setProgressText('Concluído!');
+      setPendingAudit(null); // Limpa o progresso pendente se terminou com sucesso
       
       const finalMsg: Message = {
         id: generateId(),
@@ -705,7 +708,21 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
     } catch (error: any) {
       console.error("Erro ao processar arquivos:", error);
-      alert(`Erro ao ler os arquivos: ${error.message}`);
+      
+      // Salva o progresso para permitir retomada
+      setPendingAudit({
+        fileIndex: currentIdx, // Agora usa o índice atual correto
+        pageIndex: startPageIndex,
+        files: fileArray,
+        activeSessionId: activeSessionId
+      });
+
+      let friendlyError = error.message;
+      if (friendlyError.includes("PAYLOAD_TOO_LARGE") || friendlyError.includes("Too Large")) {
+        friendlyError = "O arquivo é muito grande para o servidor (limite de 4.5MB). Por favor, tente dividir o PDF em arquivos menores ou use um compressor de PDF.";
+      }
+      
+      alert(`Erro ao ler os arquivos: ${friendlyError}`);
     } finally {
       setIsUploading(false);
       setTimeout(() => {
@@ -718,6 +735,14 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+
+    // Verificar se algum arquivo excede o limite do servidor (4.5MB no Vercel)
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+    const largeFiles = Array.from(files).filter(f => f.size > MAX_FILE_SIZE);
+    
+    if (largeFiles.length > 0) {
+      alert(`Os seguintes arquivos excedem o limite de 4.5MB e podem falhar: ${largeFiles.map(f => f.name).join(', ')}. Por favor, reduza o tamanho desses arquivos antes de enviar.`);
+    }
 
     setIsUploading(true);
     setProgress(0);
@@ -1117,6 +1142,38 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         {/* INPUT AREA */}
         <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <div className="max-w-4xl mx-auto relative">
+            
+            {/* Resume Audit Notification */}
+            {pendingAudit && !isUploading && (
+              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 dark:bg-amber-800/40 rounded-full flex items-center justify-center">
+                    <History className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Auditoria Interrompida</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Restam {pendingAudit.files.length - pendingAudit.fileIndex} arquivos. Deseja continuar?
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setPendingAudit(null)}
+                    className="px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/40 rounded-lg transition-colors"
+                  >
+                    Descartar
+                  </button>
+                  <button 
+                    onClick={resumeAudit}
+                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Retomar Auditoria
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 
                 id="chat-input-michel"
