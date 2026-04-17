@@ -447,8 +447,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
-            // 2. Query Supabase (lower threshold to 0.5 and increase count to 10 for better recall)
-            const results = await supabaseService.searchLegalDocuments(embedding, 0.5, 10);
+            // 2. Query Supabase (threshold 0.75 and max 5 results to save tokens on irrelevant queries)
+            const results = await supabaseService.searchLegalDocuments(embedding, 0.75, 5);
             if (results && results.length > 0) {
               ragContext = results.map((r: any) => r.content).join('\n\n---\n\n');
             }

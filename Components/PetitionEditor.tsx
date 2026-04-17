@@ -1031,7 +1031,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
                 <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                   <button
-                    onClick={handleAiGenerate}
+                    onClick={() => handleAiGenerate()}
                     disabled={isAiGenerating || (!aiPrompt.trim() && uploadedDocs.length === 0)}
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition flex items-center justify-center gap-2"
                   >

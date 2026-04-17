@@ -238,6 +238,41 @@ app.post("/api/ocr", async (req, res) => {
   }
 });
 
+// --- PROMPTS PARA OTIMIZAÇÃO (REFATORAÇÃO PADRÃO OURO) ---
+const INTENT_DETECTOR_PROMPT = `
+Você é um Classificador de Intenção Jurídica de alta velocidade.
+Analise a mensagem do usuário e responda APENAS um dos comandos abaixo, sem nenhuma outra palavra ou explicação:
+
+[CASUAL] - Para cumprimentos (Oi, bom dia), agradecimentos (Obrigado), ou conversas de cortesia.
+[DÚVIDA] - Para perguntas sobre leis, prazos, detalhes de processos ou dúvidas técnicas rápidas.
+[GERAÇÃO] - Para pedidos explícitos de "GERAR PEÇA", "GERAR RELATÓRIO", "FAZER PETIÇÃO" ou redação jurídica.
+[ARQUIVO] - Para avisos de envio de documentos ou pedidos de armazenamento/ciência.
+`;
+
+const DR_MICHEL_IDENTITY = `PERFIL: Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ). ESPECIALIDADE: Direito Previdenciário (RGPS) e Processo Civil Federal.`;
+const DRA_LUANA_IDENTITY = `PERFIL: Dra. Luana Castro - Advogada Trabalhista de Elite. ESPECIALIDADE: Direito e Processo do Trabalho (CLT e Reforma Trabalhista).`;
+
+const DR_MICHEL_CASUAL_PROMPT = `${DR_MICHEL_IDENTITY}\nVocê está em modo de conversação leve. Responda de forma breve, educada, formal e prestativa. Não utilize o manual completo de redação agora. Se o usuário quiser gerar uma peça, aguarde o comando específico ou sugira que ele peça para "Gerar Relatório".`;
+const DRA_LUANA_CASUAL_PROMPT = `${DRA_LUANA_IDENTITY}\nVocê está em modo de conversação leve. Responda de forma breve, empática, formal e prestativa. Não utilize o manual completo de redação agora. Se o usuário quiser gerar uma peça, aguarde o comando específico ou sugira que ele peça para "Gerar Relatório".`;
+
+async function detectUserIntent(message: string): Promise<string> {
+  try {
+    const response = await callGemini({
+      model: "gemini-3-flash-preview",
+      contents: { role: "user", parts: [{ text: message }] },
+      config: {
+        systemInstruction: INTENT_DETECTOR_PROMPT,
+        temperature: 0
+      }
+    });
+    const intent = (response.text || "[DÚVIDA]").trim().toUpperCase();
+    return intent;
+  } catch (error) {
+    console.warn("Falha na detecção de intenção, assumindo [DÚVIDA]:", error);
+    return "[DÚVIDA]";
+  }
+}
+
 // AI Service Logic Integrated
 const DR_MICHEL_SYSTEM_PROMPT = `
 PERFIL: Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ).
@@ -1193,7 +1228,6 @@ ATENÇÃO: Se você ignorar uma imagem ou responder apenas "Recebido", o sistema
 `;
 
 // Marketing Endpoints
-// Enhanced with didactic language and AI image generation
 app.post("/api/marketing/generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -1201,15 +1235,8 @@ app.post("/api/marketing/generate-image", async (req, res) => {
 
     const response = await callGemini({
       model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: prompt }]
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1",
-          imageSize: "1K"
-        }
-      }
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
     });
 
     let base64Image = "";
@@ -1222,7 +1249,6 @@ app.post("/api/marketing/generate-image", async (req, res) => {
         }
       }
     }
-
     res.json({ image: `data:image/png;base64,${base64Image}` });
   } catch (error: any) {
     console.error("Erro na geração de imagem:", error);
@@ -1233,323 +1259,152 @@ app.post("/api/marketing/generate-image", async (req, res) => {
 app.post("/api/marketing/generate", async (req, res) => {
   try {
     const { topic, persona, mode = 'full', currentData, strategy = 'educacional', assetDescription } = req.body;
-    
-    if (!topic) {
-      return res.status(400).json({ error: "Topic is required" });
-    }
+    if (!topic) return res.status(400).json({ error: "Topic is required" });
 
     const personaDesc = persona === 'michel' 
-      ? 'Dr. Michel Felix: Estilo direto, estratégico, focado em resultados e direitos previdenciários.'
-      : 'Dra. Luana Castro: Estilo acolhedor, detalhista, focado em explicar os direitos trabalhistas e previdenciários com empatia.';
+      ? 'Dr. Michel Felix: Estilo direto, estratégico.'
+      : 'Dra. Luana Castro: Estilo acolhedor, empático.';
 
     let strategyDesc = "";
     if (mode !== 'strategies') {
-      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional: Explique o conceito de forma simples, didática e direta, traduzindo o 'juridiquês' para o público leigo.";
-      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta/Urgência: Destaque prazos, risks de perda de direitos ou erros comuns que as pessoas cometem. Crie um senso de atenção (sem ser sensacionalista).";
-      else if (strategy === 'mito_verdade') strategyDesc = "Abordagem Mito vs Verdade: Desminta uma crença popular errada sobre o tema e apresente a realidade jurídica.";
-      else if (strategy === 'passo_a_passo') strategyDesc = "Abordagem Passo a Passo: Estruture o conteúdo como um guia prático, mostrando as etapas para alcançar o direito ou benefício.";
-      else if (strategy === 'historia') strategyDesc = "Abordagem de Caso Prático: Use um tom de 'storytelling', relatando um exemplo prático ou situação comum do dia a dia (sem citar nomes reais) para gerar identificação.";
-      else strategyDesc = strategy; // Use custom strategy description generated by AI
+      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional.";
+      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta.";
+      else strategyDesc = strategy;
     }
 
-    let assetContext = "";
-    if (assetDescription) {
-      assetContext = `\n\nINSPIRAÇÃO VISUAL (A imagem que será usada tem esta descrição): ${assetDescription}. Tente alinhar o texto e a abordagem do post com o que está sendo mostrado na imagem para criar uma conexão forte entre o visual e o textual.`;
-    }
-
+    let assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
     let jsonFormat = "";
     let taskDesc = "";
 
     if (mode === 'strategies') {
-      taskDesc = `Crie de 3 a 5 ideias de abordagens/estratégias diferentes para um post de Instagram sobre o tema: "${topic}". As estratégias devem variar o ângulo (ex: uma focada em alerta, outra em passo a passo, outra em quebra de mito, história prática, etc).`;
-      jsonFormat = `{
-      "strategies": [
-        {
-          "title": "Nome da Estratégia (ex: Alerta de Prazo)",
-          "description": "Descrição de como o post será conduzido e qual o foco principal."
-        }
-      ]
-    }`;
+      taskDesc = `Ideias de abordagens para post sobre: "${topic}".`;
+      jsonFormat = `{ "strategies": [{ "title": "string", "description": "string" }] }`;
     } else if (mode === 'template') {
-      taskDesc = `Crie APENAS o texto para a arte (imagem) do post de Instagram sobre o tema: "${topic}". Mantenha o mesmo tema, mas crie uma nova abordagem para a imagem.`;
-      jsonFormat = `{
-      "title": "Título curto e chamativo (máximo 4 palavras)",
-      "highlight": "Subtítulo de destaque em caixa alta (ex: REQUISITOS, ATENÇÃO, POR IDADE URBANA)",
-      "points": ["Ponto 1 curto", "Ponto 2 curto", "Ponto 3 curto"],
-      "ctaCaption": "Frase curta chamando para ler a legenda (ex: Leia a legenda para entender melhor)"
-    }`;
-    } else if (mode === 'caption') {
-      taskDesc = `Crie APENAS a legenda para o Instagram sobre o tema: "${topic}". A legenda deve ser altamente engajadora, formatada para o melhor post de Instagram, com parágrafos curtos.`;
-      if (currentData) {
-        taskDesc += `\n\nConsidere que a arte do post tem o seguinte conteúdo:\nTítulo: ${currentData.title}\nDestaque: ${currentData.highlight}\nPontos: ${currentData.points.join(', ')}`;
-      }
-      jsonFormat = `{
-      "caption": "Legenda completa para o Instagram, educativa, explicando o tema com clareza, incluindo emojis discretos e hashtags relevantes (#advocaciaprevidenciaria #inss #direitoprevidenciario)."
-    }`;
+      taskDesc = `Texto para a arte do post sobre: "${topic}".`;
+      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
-      taskDesc = `Crie o conteúdo completo para um post de Instagram sobre o seguinte tema: "${topic}".`;
-      jsonFormat = `{
-      "title": "Título curto e chamativo (máximo 4 palavras)",
-      "highlight": "Subtítulo de destaque em caixa alta (ex: REQUISITOS, ATENÇÃO, POR IDADE URBANA)",
-      "points": ["Ponto 1 curto", "Ponto 2 curto", "Ponto 3 curto"],
-      "ctaCaption": "Frase curta chamando para ler a legenda (ex: Leia a legenda para entender melhor)",
-      "caption": "Legenda completa para o Instagram, educativa, explicando o tema com clareza, incluindo emojis discretos e hashtags relevantes (#advocaciaprevidenciaria #inss #direitoprevidenciario).",
-      "imagePrompt": "Prompt detalhado para geração de imagem realista e respeitosa sobre o tema. INSPIRAÇÃO VISUAL: Estilo fotográfico natural, luz do dia, cores quentes, foco em pessoas reais brasileiras. TEMAS: 1. Idosos (casais ou sozinhos) em parques ou bancos de praça. 2. Famílias brasileiras diversas (ex: piquenique com bebê). 3. Contexto de saúde/deficiência (médicos atenciosos, pessoas com gesso, andador ou cadeira de rodas, próteses). 4. Contexto jurídico (martelo de juiz sobre mármore com inscrições). 5. Realidade social (casais simples em frente a casas humildes em cidades do interior). NÃO inclua textos na imagem, foque na emoção e autenticidade."
-    }`;
+      taskDesc = `Conteúdo completo para Instagram sobre: "${topic}".`;
+      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
 
-    const prompt = `Você é um especialista em marketing jurídico para o escritório "Felix & Castro Advocacia Previdenciária e Consumerista".
-    ${taskDesc}${assetContext}
-    
-    PÚBLICO-ALVO: Pessoas simples, muitas vezes com baixo grau de instrução.
-    REQUISITO DE LINGUAGEM: Use uma linguagem EXTREMAMENTE CLARA, DIDÁTICA e ACESSÍVEL. Não use "juridiquês". Explique os conceitos como se estivesse conversando com um avô ou um vizinho, mas mantendo a seriedade e o respeito. O conteúdo não deve ser raso, mas sim fácil de entender por qualquer pessoa.
-    
-    ${mode !== 'strategies' ? `Estratégia Escolhida: ${strategyDesc}\n` : ''}Tom de voz (${personaDesc}).
-    
-    REGRAS CRÍTICAS DA OAB (NÃO VIOLAR):
-    - O conteúdo DEVE ser estritamente INFORMATIVO e EDUCACIONAL.
-    - É PROIBIDO qualquer tipo de captação de clientela, mercantilização ou tom comercial.
-    - NÃO use frases como "consulte um advogado", "entre em contato", "agende uma consulta", "garanta seu direito", "não perca tempo", ou "não admite amadorismo".
-    - O tom deve ser sóbrio, elegante e focado em explicar o direito, sem promessas de resultados ou autoengrandecimento.
-    - Termine o texto de forma neutra, apenas com a informação jurídica.
-    
-    Responda EXATAMENTE no formato JSON abaixo, sem formatação markdown extra, apenas o JSON puro:
-    ${jsonFormat}`;
+    const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
+    Público: Pessoas simples. Linguagem CLARA.
+    Estratégia: ${strategyDesc}. Tom: ${personaDesc}.
+    Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
       model: 'gemini-3.1-pro-preview',
       contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
+      config: { responseMimeType: 'application/json' }
     });
-
     res.json({ text: response.text });
   } catch (error: any) {
-    console.error("Erro na geração de marketing:", error);
-    res.status(500).json({ error: error.message || "Erro interno do servidor" });
+    console.error("Marketing error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-
-
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    const { message, history, images, files, ragContext, modelProvider, model, keyIndex } = req.body;
-    
-    // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
-    const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
-                             message.includes("Enviei os seguintes documentos") ||
-                             message.includes("[FASE DE TOMADA DE CIÊNCIA]");
-    
-    const isGenerationRequest = message.includes("GERAR RELATÓRIO") || 
-                                message.includes("GERAR PEÇA");
+    let { message, history, images, files, ragContext, modelProvider, model, keyIndex } = req.body;
+    const intent = await detectUserIntent(message);
+    const isGenerationIntent = intent === "[GERAÇÃO]";
+    const isCasualIntent = intent === "[CASUAL]";
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    // Seleciona o "Cérebro" adequado
+    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
+    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
+
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
-      console.log("Modo Arquivista Ativado (Rápido)");
       selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
-      temperature = 0.1; // Temperatura mínima para resposta robótica e rápida
-    } else {
-      console.log("Modo Dr. Michel Ativado (Completo)");
+      temperature = 0.1;
+    } else if (isCasualIntent) {
+      selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
+      if (!req.body.forceRag) ragContext = ""; 
     }
 
-    // REFORÇO DE CONTEXTO (ANTI-VÍCIO) - Só necessário no modo Dr. Michel
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
-    [LEMBRETE DO SISTEMA - PRIORIDADE MÁXIMA]
-    Dr. Michel, você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API). 
-    PROIBIDO USAR PLACEHOLDERS como "[NOME DO AUTOR]", "[DATA]" ou "[NB]" se a informação estiver em qualquer um dos arquivos.
-    Abra cada arquivo anexado, leia os nomes, CPFs, datas de cessação, números de benefício e diagnósticos.
-    Se não encontrar um dado, escreva [DADO NÃO LOCALIZADO NOS DOCUMENTOS] em vez de um placeholder genérico.
-    Mantenha a norma culta e a estrutura da Lei 14.331/2022.
-    `;
+    if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
 
-    const PHASED_SCIENCE_PROMPT = `
-    [MODO DE TOMADA DE CIÊNCIA PARCELADA]
-    Você está recebendo uma PARTE de um documento longo para AUDITORIA DETALHADA.
-    SUA TAREFA:
-    1. Analise o texto e as imagens fornecidas nesta fase com foco total em detalhes.
-    2. Extraia TODOS os dados cruciais (Datas, Nomes, CIDs, Valores, OABs).
-    3. Se houver divergência entre o texto e a imagem, a IMAGEM prevalece.
-    4. Responda seguindo o protocolo: "✅ Ciência tomada da Parte X do documento [Nome]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."
-    5. NÃO gere relatórios completos ainda. Apenas acumule o conhecimento para a fase final.
-    `;
-
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `dr_michel_system_hint: Extraia dados reais.`;
     const historyParts = history.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
-    if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
-    }
-    if (ragContext) {
-      finalMessage += `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO (RAG)]
-ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
-Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
-NUNCA afirme algo que contradiga o texto abaixo.
-ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO (ex: "Revogado pela Lei...", "Revogado pela Emenda..."), você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
-Leis/jurisprudências recuperadas:
-${ragContext}`;
-    }
+    if (ragContext) finalMessage += `\n\n[RAG]:\n${ragContext}`;
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
-
-    // Add images if present
     if (images && Array.isArray(images)) {
-      images.forEach((base64Image: string) => {
-        currentMessageParts.push({
-          inlineData: {
-            mimeType: "image/jpeg",
-            data: base64Image
-          }
-        });
-      });
+      images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
+    }
+    if (files && Array.isArray(files)) {
+      files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
     }
 
-    // Add files if present
-    if (req.body.files && Array.isArray(req.body.files)) {
-      req.body.files.forEach((file: any) => {
-        currentMessageParts.push({
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.fileUri
-          }
-        });
-      });
-    }
-
-    const contents = [
-      ...historyParts,
-      { role: 'user', parts: currentMessageParts }
-    ];
-
-    // Configuração de Tools (Google Search Grounding + URL Context)
-    // Apenas para o Dr. Michel (não para o Arquivista)
+    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? [] : [{ googleSearch: {} }, { urlContext: {} }];
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
 
     if (modelProvider === 'openrouter') {
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
-      for (const h of history) {
-        orMessages.push({ role: h.role, content: h.content });
-      }
-      
-      const userContent: any[] = [{ type: "text", text: finalMessage }];
-      if (images && images.length > 0) {
-        images.forEach((img: string) => {
-          userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
-        });
-      }
-      orMessages.push({ role: "user", content: userContent });
-
-      await callOpenRouterStream({
-        model: model || "deepseek/deepseek-chat",
-        messages: orMessages,
-        temperature: temperature
-      }, res);
+      for (const h of history) orMessages.push({ role: h.role, content: h.content });
+      orMessages.push({ role: "user", content: [{ type: "text", text: finalMessage }] });
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-chat", messages: orMessages, temperature }, res);
       return;
     }
 
-    const heartbeat = setInterval(() => {
-      res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-    }, 5000);
-
-    // Lógica de Context Caching (NotebookLM Style)
-    // Se houver arquivos pesados e estivermos no modelo Pro ou Flash mais recente
-    let cachedContentName = undefined;
-    
-    // Tentamos usar cache se houver arquivos (mais de 32k tokens aproximados ou apenas para agilizar)
-    // Nota: O suporte a cache depende da versão do SDK e do modelo.
-    // Estamos implementando de forma que se falhar, ele segue o fluxo normal.
-    
-    try {
-      if (files && files.length > 0 && (model?.includes('flash') || model?.includes('pro'))) {
-        console.log(`[Cache] Analisando arquivos para possível caching...`);
-        // Aqui poderíamos implementar a criação do cache via ai.caches.create
-        // Por enquanto, vamos otimizar a passagem de documentos no prompt de sistema
-      }
-    } catch (cacheErr) {
-      console.error("[Cache Error] Falha ao configurar cache:", cacheErr);
-    }
+    const heartbeat = setInterval(() => res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`), 5000);
 
     try {
       const responseStream = await callGeminiStream({
         model: model || "gemini-3.1-pro-preview",
-        contents: contents,
-        config: {
-          systemInstruction: selectedSystemPrompt,
-          temperature: temperature,
-          maxOutputTokens: 16383, // Slightly reduced to avoid context issues occasionally
-          tools: tools,
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-          ]
-        }
+        contents,
+        config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens: 16383, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
-        let text = "";
-        try {
-          text = chunk.text || "";
-        } catch (e) {
-          // ignore
-        }
-        
-        if (!text && chunk.candidates && chunk.candidates.length > 0) {
-          const candidate = chunk.candidates[0];
-          if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-            text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
-          }
-        }
-
-        if (text) {
-          res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
-        }
+        let text = chunk.text || "";
+        if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
       clearInterval(heartbeat);
       res.write(`data: [DONE]\n\n`);
       res.end();
-    } catch (streamError: any) {
+    } catch (err: any) {
       clearInterval(heartbeat);
-      console.error("Stream error:", streamError);
-      
-      let errorMessage = streamError.message || "Erro durante a geração do texto.";
-      
-      res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
       res.end();
     }
-  } catch (error: any) {
-    console.error("Error in chat:", error);
-    res.write(`data: ${JSON.stringify({ error: error.message || "Falha no chat" })}\n\n`);
+  } catch (err: any) {
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
   }
 });
 
 app.post("/api/dra-luana/chat", async (req, res) => {
   try {
-    const { message, history, images, minWage = '1621.00', ragContext, modelProvider, model, keyIndex } = req.body;
+    let { message, history, images, minWage = '1621.00', ragContext, modelProvider, model, keyIndex } = req.body;
     
-    // DETECÇÃO DE INTENÇÃO (TROCA DE CÉREBRO)
-    const isStorageRequest = message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
-                             message.includes("Enviei os seguintes documentos") ||
-                             message.includes("[FASE DE TOMADA DE CIÊNCIA]");
-    
-    const isGenerationRequest = message.includes("GERAR RELATÓRIO") || 
-                                message.includes("GERAR PEÇA");
+    // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
+    const intent = await detectUserIntent(message);
+    const isGenerationIntent = intent === "[GERAÇÃO]";
+    const isCasualIntent = intent === "[CASUAL]";
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    // Seleciona o "Cérebro" adequado
+    const isStorageRequest = isStorageIntent || 
+                             message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
+                             message.includes("Enviei os seguintes documentos");
+    
+    const isGenerationRequest = isGenerationIntent || 
+                                 message.includes("GERAR RELATÓRIO") || 
+                                 message.includes("GERAR PEÇA");
+
+    // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
     
     // Injeta regras de Rito Processual
@@ -1580,11 +1435,21 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
-      console.log("Modo Arquivista Ativado (Rápido) - Dra. Luana");
+      console.log("Modo Arquivista Ativado (Rápido/Econômico) - Dra. Luana");
       selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
       temperature = 0.1;
+    } else if (isCasualIntent) {
+      console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
+      selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
+      if (!req.body.forceRag) ragContext = "";
     } else {
       console.log("Modo Dra. Luana Ativado (Completo)");
+    }
+
+    // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4
+    if (!isGenerationRequest && history.length > 6) {
+      console.log(`Pilar 4: Limitando histórico de ${history.length} para 6 turnos para redução de custos.`);
+      history = history.slice(-6);
     }
 
     // REFORÇO DE CONTEXTO (ANTI-VÍCIO)
