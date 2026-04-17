@@ -375,9 +375,12 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
 
    ### ⚖️ FASE 3: REDAÇÃO DA PEÇA (EXECUÇÃO BLINDADA)
    - Redija a petição aplicando as regras de EXTENSÃO E DENSIDADE ABSOLUTA.
-   - APLICAÇÃO DA ESTRUTURA OBRIGATÓRIA: Você DEVE, obrigatoriamente, usar TODOS os tópicos e subtópicos da estrutura identificada na Fase 1. É terminantemente proibido pular tópicos ou alterar a ordem da estrutura obrigatória.
+   - RIGIDEZ DA ESTRUTURA: Você DEVE, obrigatoriamente, seguir a "ESTRUTURA OBRIGATÓRIA" listada neste prompt para o tipo de ação identificado. É terminantemente proibido pular tópicos da estrutura fixa.
+   - FLEXIBILIDADE DE ADIÇÃO: Você PODE (e deve) adicionar novos tópicos e teses que foram levantados no Relatório ou no RAG, desde que eles complementem a estrutura obrigatória sem removê-la.
+   - FALLBACK (ESTRUTURA PADRÃO): Se a ação solicitada não tiver uma estrutura específica listada abaixo, siga esta estrutura: I. Endereçamento e Qualificação; II. Gratuidade; III. Fatos; IV. Direito; V. Tutela; VI. Pedidos; VII. Valor da Causa e Rol de Docs.
    - Incorpore as defesas mapeadas na Fase 2 diretamente no mérito.
    - Siga o método de entrega fracionada (pare a cada 2000 palavras).
+   - ATENÇÃO: Se for modo "GERAR PEÇA", OMITA este cabeçalho "FASE 3" e comece direto no texto jurídico (ex: "Excelentíssimo Juízo..." ou "AO JUÍZO...").
 
    ### 🔎 FASE 4: REVISÃO DE QUALIDADE (CHECKLIST DO REVISOR)
    - Ao final da peça (ou da parte atual), atue como um Revisor Sênior e verifique internamente se todos os requisitos foram cumpridos.
@@ -699,9 +702,12 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
 
    ### ⚖️ FASE 3: REDAÇÃO DA PEÇA (EXECUÇÃO BLINDADA)
    - Redija a petição aplicando as regras de EXTENSÃO E DENSIDADE ABSOLUTA.
-   - APLICAÇÃO DA ESTRUTURA OBRIGATÓRIA: Você DEVE, obrigatoriamente, usar TODOS os tópicos e subtópicos da estrutura identificada na Fase 1. É terminantemente proibido pular tópicos ou alterar a ordem da estrutura obrigatória.
+   - RIGIDEZ DA ESTRUTURA: Você DEVE, obrigatoriamente, seguir a "ESTRUTURA OBRIGATÓRIA" listada neste prompt para o tipo de ação identificado. É proibido omitir tópicos da estrutura fixa.
+   - FLEXIBILIDADE DE ADIÇÃO: Você PODE (e deve) adicionar novos tópicos, verbas ou teses que foram identificados no Relatório ou na planilha de cálculos, desde que eles complementem a estrutura obrigatória sem removê-la.
+   - FALLBACK (ESTRUTURA PADRÃO): Se a ação solicitada não tiver uma estrutura específica listada abaixo, siga esta estrutura: I. Endereçamento e Qualificação; II. Preliminares; III. Mérito (Fatos e Direito); IV. Pedidos e Requerimentos; V. Valor da Causa e Rol de Docs.
    - Incorpore as defesas mapeadas na Fase 2 diretamente no mérito.
    - Siga o método de entrega fracionada (pare a cada 2000 palavras).
+   - ATENÇÃO: Se for modo "GERAR PEÇA", OMITA este cabeçalho "FASE 3" e comece direto no texto jurídico (ex: AO JUÍZO...).
 
    ### 🔎 FASE 4: REVISÃO DE QUALIDADE (CHECKLIST DO REVISOR)
    - Ao final da peça (ou da parte atual), atue como um Revisor Sênior e verifique internamente se todos os requisitos foram cumpridos.
