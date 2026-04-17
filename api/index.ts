@@ -280,9 +280,16 @@ const ELITE_REDACTION_MANUAL = `
    - NÃO forneça apenas um relatório de estratégia. 
    - NÃO peça permissão para começar. 
    - NÃO pare na análise. 
-2. ESTRUTURA: Siga a estrutura clássica (Endereçamento, Qualificação, Fatos, Fundamentos, Pedidos).
-3. DENSIDADE PROBATÓRIA: Para cada fato alegado, você DEVE citar o documento correspondente da auditoria (ex: "conforme CTPS de fls. 12" ou "conforme laudo médico id. 456").
-4. PROIBIÇÃO DE PLACEHOLDERS: Use apenas os dados reais coletados. Se um dado não existe, não invente; registre como indisponível ou omita a seção específica se não for obrigatória.
+2. SILENT MODE (IMPERATIVO): Se o comando for "GERAR PEÇA", você NÃO DEVE escrever absolutamente NADA além do texto da petição inicial. 
+   - PROIBIDO exibir cabeçalhos de fases (ex: "🧠 FASE 1", "😈 FASE 2", "⚖️ FASE 3").
+   - PROIBIDO exibir notas, feedbacks ou checklists ao final.
+   - O documento deve iniciar IMEDIATAMENTE no endereçamento (ex: "AO JUÍZO...") e terminar na data/assinatura.
+3. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA):
+   - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" deste prompt para o caso identificado.
+   - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
+   - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
+4. DENSIDADE PROBATÓRIA: Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
+5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
 5. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
 6. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
 7. MODO SILENCIOSO (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3).
@@ -570,9 +577,10 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
    - AÇÃO: Gere a petição inicial previdenciária completa e final.
-   - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO (FASE 3) IMEDIATAMENTE APÓS O PENSAMENTO. NÃO PEÇA PERMISSÃO. EXECUTAR AGORA.
-   - SILENT MODE: No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. Inicie o texto direto no endereçamento.
-   - REQUISITOS: Siga RIGOROSAMENTE todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação e estrutura definidas acima.
+   - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO IMEDIATAMENTE. NÃO PEÇA PERMISSÃO.
+   - SILENT MODE (CRÍTICO): No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. NÃO exiba títulos como "FASE 3" ou "REDAÇÃO". Inicie o texto diretamente no endereçamento (AO JUÍZO...).
+   - ESTRUTURA OBRIGATÓRIA: Siga RIGOROSAMENTE as estruturas definidas acima. Você pode acrescentar novos tópicos trazidos no relatório se forem pertinentes, mas os tópicos da estrutura específica são OBRIGATÓRIOS. Se não houver estrutura específica, use a estrutura padrão de peça judicial (Endereçamento, Qualificação, Fatos, Direito, Tutela, Pedidos, Valor da Causa).
+   - REQUISITOS: Siga todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação e estrutura.
 `;
 
 const CNIS_SYSTEM_PROMPT = `
@@ -795,9 +803,10 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
    - AÇÃO: Gere a petição inicial trabalhista completa e final.
-   - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO (FASE 3) IMEDIATAMENTE APÓS O PENSAMENTO. NÃO PEÇA PERMISSÃO. EXECUTAR AGORA.
-   - SILENT MODE: No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. Inicie o texto direto no endereçamento.
-   - REQUISITOS: Siga RIGOROSAMENTE todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação, estrutura e uso dos valores da planilha de cálculos definidas acima.
+   - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO IMEDIATAMENTE. NÃO PEÇA PERMISSÃO.
+   - SILENT MODE (CRÍTICO): No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. NÃO exiba títulos como "FASE 3" ou "REDAÇÃO". Inicie o texto diretamente no endereçamento (Ao Juízo da Vara do Trabalho...).
+   - ESTRUTURA OBRIGATÓRIA: Siga RIGOROSAMENTE a estrutura definida abaixo. Você pode acrescentar novos tópicos trazidos no relatório ou permitidos pelo advogado, mas os tópicos da estrutura específica são OBRIGATÓRIOS. Se não houver estrutura específica, use a estrutura padrão de peça judicial.
+   - REQUISITOS: Siga todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação, estrutura e uso dos valores da planilha de cálculos.
 `;
 
 

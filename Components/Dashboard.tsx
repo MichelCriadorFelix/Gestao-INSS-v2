@@ -104,6 +104,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         const fullDetails = await supabaseService.getClientDetails(record.id);
         if (fullDetails) {
             setCurrentRecord(fullDetails);
+            // Cache full details in records list to avoid re-fetching in other places
+            setRecords(prev => prev.map(r => r.id === record.id ? fullDetails : r));
         } else {
             setCurrentRecord(record);
         }
@@ -1036,9 +1038,24 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
   };
 
-  const handleSavePetition = (clientId: string, petition: any) => {
-      const client = records.find(c => c.id === clientId);
+  const handleSavePetition = async (clientId: string, petition: any) => {
+      let client = records.find(c => c.id === clientId);
       if (!client) return;
+
+      // Se o cliente não tiver petições preenchidas (está em modo 'summary'),
+      // ou se quisermos garantir que temos a lista mais atualizada do servidor
+      if (!client.petitions || client.petitions.length === 0) {
+          try {
+              const fullClient = await supabaseService.getClientDetails(clientId);
+              if (fullClient) {
+                  client = fullClient;
+                  // Atualiza o estado records com os dados completos
+                  setRecords(prev => prev.map(r => r.id === clientId ? fullClient : r));
+              }
+          } catch (err) {
+              console.error("Erro ao buscar detalhes do cliente para salvar petição:", err);
+          }
+      }
 
       const existingPetitions = client.petitions || [];
       const index = existingPetitions.findIndex(p => 
@@ -1056,6 +1073,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       const updatedClient = { ...client, petitions: updatedPetitions };
       const updatedClients = records.map(c => c.id === clientId ? updatedClient : c);
+      
+      // Salva na nuvem e atualiza estado local
+      setRecords(updatedClients);
       saveData('clients', updatedClients, updatedClient);
       
       if (!activePetition || activePetition.id === petition.id || !activePetition.id) {

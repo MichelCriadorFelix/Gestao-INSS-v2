@@ -421,9 +421,9 @@ export const supabaseService = {
     const clientId = String(client.id || Date.now());
 
     // Map to new schema
-    const record = {
+    const record: any = {
       id: clientId,
-      name: client.name || 'Sem Nome', // Evita 'EMPTY'
+      name: client.name || 'Sem Nome',
       cpf: client.cpf || '',
       password: client.password || '',
       nationality: client.nationality,
@@ -451,8 +451,12 @@ export const supabaseService = {
       referrer_percentage: client.referrerPercentage || 0,
       total_fee: client.totalFee || 0,
       documents: client.documents || [],
-      petitions: client.petitions || []
     };
+
+    // Only include petitions if they are provided (prevent overwriting with empty array from summaries)
+    if (client.petitions !== undefined) {
+      record.petitions = client.petitions;
+    }
 
     console.log('Salvando cliente no Supabase:', record);
 
@@ -474,7 +478,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, documents');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, documents, petitions');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -512,7 +516,7 @@ export const supabaseService = {
       totalFee: c.total_fee,
       documents: c.documents || [],
       documentCount: (c.documents || []).length,
-      petitions: []  // Keep petitions empty for summary
+      petitionCount: (c.petitions || []).length
     }));
   },
 
