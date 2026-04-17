@@ -970,6 +970,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
+        currentModel={selectedModel}
+        currentProvider={selectedModelProvider}
         onConfirm={(provider, model) => {
           setShowEliteModal(false);
           if (pendingEliteTask) {

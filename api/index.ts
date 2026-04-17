@@ -1355,7 +1355,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) orMessages.push({ role: h.role, content: h.content });
       orMessages.push({ role: "user", content: [{ type: "text", text: finalMessage }] });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-chat", messages: orMessages, temperature }, res);
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature }, res);
       return;
     }
 
@@ -1535,7 +1535,7 @@ ${ragContext}`;
       orMessages.push({ role: "user", content: userContent });
 
       await callOpenRouterStream({
-        model: model || "deepseek/deepseek-chat",
+        model: model || "deepseek/deepseek-v3.2",
         messages: orMessages,
         temperature: temperature
       }, res);
