@@ -1019,6 +1019,75 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   }
 }
 
+async function callOpenRouterStream(params: any, res: any): Promise<void> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    res.write(`data: ${JSON.stringify({ error: "OPENROUTER_API_KEY não configurada no servidor." })}\n\n`);
+    res.write(`data: [DONE]\n\n`);
+    res.end();
+    return;
+  }
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://gestao-inss-juridico.app", 
+        "X-Title": "Felix & Castro Advocacia"
+      },
+      body: JSON.stringify({
+        model: params.model || "deepseek/deepseek-chat",
+        messages: params.messages,
+        temperature: params.temperature || 0.7,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
+    }
+
+    if (!response.body) throw new Error("No response body");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+
+    while (!done) {
+      const { value, done: readerDone } = await reader.read();
+      done = readerDone;
+      if (value) {
+        const chunkStr = decoder.decode(value, { stream: true });
+        const lines = chunkStr.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+            try {
+              const data = JSON.parse(line.slice(6));
+              const text = data.choices[0]?.delta?.content || "";
+              if (text) {
+                res.write(`data: ${JSON.stringify({ text })}\n\n`);
+              }
+            } catch (e) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+    }
+
+    res.write(`data: [DONE]\n\n`);
+    res.end();
+  } catch (error: any) {
+    console.error("OpenRouter stream error:", error);
+    res.write(`data: ${JSON.stringify({ error: error.message || "Erro na geração do OpenRouter" })}\n\n`);
+    res.write(`data: [DONE]\n\n`);
+    res.end();
+  }
+}
+
 // API Routes
 app.post("/api/rag/process", async (req, res) => {
   try {
@@ -1368,6 +1437,28 @@ ${ragContext}`;
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
+    if (modelProvider === 'openrouter') {
+      const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
+      for (const h of history) {
+        orMessages.push({ role: h.role, content: h.content });
+      }
+      
+      const userContent: any[] = [{ type: "text", text: finalMessage }];
+      if (images && images.length > 0) {
+        images.forEach((img: string) => {
+          userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+        });
+      }
+      orMessages.push({ role: "user", content: userContent });
+
+      await callOpenRouterStream({
+        model: model || "deepseek/deepseek-chat",
+        messages: orMessages,
+        temperature: temperature
+      }, res);
+      return;
+    }
+
     const heartbeat = setInterval(() => {
       res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
     }, 5000);
@@ -1563,6 +1654,28 @@ ${ragContext}`;
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+
+    if (modelProvider === 'openrouter') {
+      const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
+      for (const h of history) {
+        orMessages.push({ role: h.role, content: h.content });
+      }
+      
+      const userContent: any[] = [{ type: "text", text: finalMessage }];
+      if (images && images.length > 0) {
+        images.forEach((img: string) => {
+          userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+        });
+      }
+      orMessages.push({ role: "user", content: userContent });
+
+      await callOpenRouterStream({
+        model: model || "deepseek/deepseek-chat",
+        messages: orMessages,
+        temperature: temperature
+      }, res);
+      return;
+    }
 
     const heartbeat = setInterval(() => {
       res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);

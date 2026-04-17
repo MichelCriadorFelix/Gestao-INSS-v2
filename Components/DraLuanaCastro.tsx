@@ -25,6 +25,7 @@ import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
+import EliteRedactionModal from './EliteRedactionModal';
 
 interface ChatDocument {
   id: string;
@@ -84,6 +85,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     files: File[];
     activeSessionId: string;
   } | null>(null);
+  
+  // Elite Redaction Modal State
+  const [showEliteModal, setShowEliteModal] = useState(false);
+  const [pendingEliteTask, setPendingEliteTask] = useState<{messageText: string, images?: string[]} | null>(null);
+
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
@@ -359,13 +365,19 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     setEditingSessionId(null);
   };
 
-  const handleSendMessage = async (overrideInput?: string, images?: string[]) => {
+  const handleSendMessage = async (overrideInput?: string, images?: string[], skipEliteCheck = false, eliteProviderOverride?: string, eliteModelOverride?: string) => {
     const messageText = overrideInput || input;
     if ((!messageText.trim() && (!images || images.length === 0)) || isLoading) return;
 
     if (messageText.toUpperCase().includes("CONTINUAR AUDITORIA") && pendingAudit) {
       resumeAudit();
       setInput('');
+      return;
+    }
+
+    if (!skipEliteCheck && /gerar peça|redigir petição|redigir peça|fazer petição|fazer inicial|redigir inicial/i.test(messageText)) {
+      setPendingEliteTask({ messageText, images });
+      setShowEliteModal(true);
       return;
     }
 
@@ -471,7 +483,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
-          model: selectedModel,
+          modelProvider: eliteProviderOverride || selectedModelProvider,
+          model: eliteModelOverride || selectedModel,
           keyIndex: session?.uploadKeyIndex
         }),
         signal: abortController.signal
@@ -954,6 +967,16 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
   return (
     <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+      <EliteRedactionModal 
+        isOpen={showEliteModal} 
+        onClose={() => setShowEliteModal(false)}
+        onConfirm={(provider, model) => {
+          setShowEliteModal(false);
+          if (pendingEliteTask) {
+             handleSendMessage(pendingEliteTask.messageText, pendingEliteTask.images, true, provider, model);
+          }
+        }}
+      />
       
       {/* SIDEBAR: HISTÓRICO */}
       <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
@@ -1271,7 +1294,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                   <select
                     value={selectedModel}
                     onChange={(e) => {
-                      setSelectedModel(e.target.value);
+                      const val = e.target.value;
+                      setSelectedModel(val);
+                      if (val.includes('deepseek') || val.includes('qwen')) {
+                        setSelectedModelProvider('openrouter');
+                      } else {
+                        setSelectedModelProvider('gemini');
+                      }
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
@@ -1279,6 +1308,10 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (2 Milhões de Tokens - Alta Complexidade)</option>
                       <option value="gemini-3-flash-preview">Gemini 3.1 Flash (1 Milhão de Tokens - Ultra Rápido)</option>
                       <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Segurança e Estabilidade)</option>
+                    </optgroup>
+                    <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>
                 </div>

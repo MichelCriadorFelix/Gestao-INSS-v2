@@ -89,6 +89,7 @@ import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 import { apiFetch } from '../services/apiService';
+import EliteRedactionModal from './EliteRedactionModal';
 
 interface ChatDocument {
   id: string;
@@ -175,6 +176,10 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [aiProgress, setAiProgress] = useState(0);
   const [aiProgressText, setAiProgressText] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
+  
+  // Elite Redaction Modal State
+  const [showEliteModal, setShowEliteModal] = useState(false);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -293,8 +298,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     }
   };
 
-  const handleAiGenerate = async () => {
+  const handleAiGenerate = async (eliteProviderOverride?: string, eliteModelOverride?: string) => {
     if (!aiPrompt.trim() && uploadedDocs.length === 0) return;
+    
+    if (!eliteProviderOverride) {
+      setShowEliteModal(true);
+      return;
+    }
     
     setIsAiGenerating(true);
     setAiProgressText('Gerando petição padrão ouro...');
@@ -312,7 +322,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         body: JSON.stringify({
           message: fullPrompt,
           history: [],
-          images: []
+          images: [],
+          modelProvider: eliteProviderOverride,
+          model: eliteModelOverride
         })
       });
 
@@ -750,6 +762,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
   return (
     <div className="flex flex-col h-full bg-slate-200 dark:bg-slate-950 overflow-hidden print:overflow-visible print:h-auto print:bg-white">
+      <EliteRedactionModal
+        isOpen={showEliteModal}
+        onClose={() => setShowEliteModal(false)}
+        onConfirm={(provider, model) => {
+          setShowEliteModal(false);
+          handleAiGenerate(provider, model);
+        }}
+      />
       {/* Header */}
       <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-4 flex-shrink-0 z-10 shadow-sm print:hidden">
         <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition">
