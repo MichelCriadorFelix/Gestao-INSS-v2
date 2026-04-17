@@ -816,9 +816,7 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash"
+  "gemini-3.1-pro-preview"
 ];
 
 function getApiKeys() {
@@ -1399,7 +1397,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const tools = isStorageRequest ? [] : [{ googleSearch: {} }, { urlContext: {} }];
+    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -1573,7 +1571,7 @@ ${ragContext}`;
     ];
 
     // Configuração de Tools (Google Search Grounding + URL Context)
-    const tools = isStorageRequest ? [] : [{ googleSearch: {} }, { urlContext: {} }];
+    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
