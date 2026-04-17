@@ -227,7 +227,7 @@ app.post("/api/ocr", async (req, res) => {
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
-        maxOutputTokens: 16384
+        maxOutputTokens: 8192
       }
     });
 
@@ -816,7 +816,9 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview"
+  "gemini-3.1-pro-preview",
+  "gemini-1.5-pro",
+  "gemini-1.5-flash"
 ];
 
 function getApiKeys() {
@@ -915,26 +917,27 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
     const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isEmpty = errorMessage.includes('EMPTY_RESPONSE');
-    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+    const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
     }
     
-    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied) && retries > 0) {
-      currentKeyIndex++; // Rotate key immediately
+    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
+      if (!isBadRequest) currentKeyIndex++; // Rotate key for auth/quota errors, but for 400 we might want to stay on key but switch model or config
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
       let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
-      if (isNotFound) {
-         // 404: Switch model immediately
+      if (isBadRequest || isNotFound) {
+         // Bad Request or Not Found: Switch model immediately as the config/model is likely the problem
          nextModelIndex++;
          nextFailures = 0;
-         delay = 500; // Small delay
-         console.log(`[Tentativa ${30 - retries}] Modelo ${currentModel} não encontrado (404). Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         delay = 500;
+         console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
       } else if (isEmpty) {
          delay = 1000;
          console.log(`[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
@@ -999,25 +1002,26 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
     
     const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
-    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+    const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
     }
 
-    if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied) && retries > 0) {
-      currentKeyIndex++;
+    if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
+      if (!isBadRequest) currentKeyIndex++;
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
       let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
-      if (isNotFound) {
+      if (isBadRequest || isNotFound) {
          nextModelIndex++;
          nextFailures = 0;
          delay = 500;
-         console.log(`[Stream Tentativa ${30 - retries}] Modelo ${currentModel} não encontrado (404). Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
@@ -1410,11 +1414,13 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     const heartbeat = setInterval(() => res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`), 5000);
 
+    const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
+
     try {
       const responseStream = await callGeminiStream({
         model: model || "gemini-3-flash-preview",
         contents,
-        config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens: 16383, tools }
+        config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
@@ -1600,6 +1606,8 @@ ${ragContext}`;
       res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
     }, 5000);
 
+    const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
+
     try {
       let responseStream;
       
@@ -1609,7 +1617,7 @@ ${ragContext}`;
         config: {
           systemInstruction: selectedSystemPrompt,
           temperature: temperature,
-          maxOutputTokens: 16383,
+          maxOutputTokens: maxOutputTokens,
           tools: tools,
           safetySettings: [
             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
