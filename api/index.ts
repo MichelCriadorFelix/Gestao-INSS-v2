@@ -932,10 +932,15 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
 
       if (isBadRequest || isNotFound) {
          // Bad Request or Not Found: Switch model immediately as the config/model is likely the problem
-         nextModelIndex++;
-         nextFailures = 0;
-         delay = 500;
-         console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         if (!params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             delay = 500;
+             console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         } else {
+             delay = 500;
+             console.log(`[Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
+         }
       } else if (isEmpty) {
          delay = 1000;
          console.log(`[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
@@ -943,15 +948,15 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
          // 429/503: Retry logic
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         // Switch model faster on quota errors
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+         // Switch model faster on quota errors if all keys are exhausted.
+         if (errorMessage.includes('Quota exceeded') && failuresOnCurrentModel >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[nextModelIndex]}...`);
-         } else if (nextFailures >= 2 && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+             console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[nextModelIndex]}...`);
+             console.log(`[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
              console.log(`[Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
@@ -1016,21 +1021,26 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
       let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
       if (isBadRequest || isNotFound) {
-         nextModelIndex++;
-         nextFailures = 0;
-         delay = 500;
-         console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         if (!params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             delay = 500;
+             console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         } else {
+             delay = 500;
+             console.log(`[Stream Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
+         }
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+         if (errorMessage.includes('Quota exceeded') && nextFailures >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[nextModelIndex]}...`);
-         } else if (nextFailures >= 2 && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+             console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[nextModelIndex]}...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
          } else {
              console.log(`[Stream Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
