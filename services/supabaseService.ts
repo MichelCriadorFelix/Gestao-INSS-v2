@@ -704,14 +704,23 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return null;
     
+    console.log(`Tentando inserir ${chunks.length} trechos na tabela 'legal_documents'...`);
+    
     const { data, error } = await supabase
       .from('legal_documents')
       .insert(chunks);
       
     if (error) {
-      console.error('Error saving legal documents to Supabase:', error);
-      throw error;
+      console.error('Erro detalhado ao salvar documentos legais no Supabase:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw new Error(`Erro no banco de dados (${error.code}): ${error.message}`);
     }
+    
+    console.log('Documentos legais salvos com sucesso.');
     return data;
   },
 
