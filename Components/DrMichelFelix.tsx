@@ -1317,8 +1317,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   >
                     <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
                       <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (2 Milhões de Tokens - Alta Complexidade)</option>
-                      <option value="gemini-3-flash-preview">Gemini 3.1 Flash (1 Milhão de Tokens - Ultra Rápido)</option>
-                      <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite (Segurança e Estabilidade)</option>
+                      <option value="gemini-3-flash-preview">Gemini 3 flash preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>

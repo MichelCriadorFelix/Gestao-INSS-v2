@@ -223,7 +223,7 @@ app.post("/api/ocr", async (req, res) => {
     });
 
     const response = await callGemini({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
@@ -787,9 +787,8 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3.1-pro-preview",
   "gemini-3-flash-preview",
-  "gemini-3.1-flash-lite-preview"
+  "gemini-3.1-pro-preview"
 ];
 
 function getApiKeys() {
