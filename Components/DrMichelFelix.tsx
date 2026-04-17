@@ -727,15 +727,20 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               }
             }
             
-            if (fullAiResText) {
+            if (fullAiResText && !fullAiResText.includes('"error":')) {
               fileSummary = fullAiResText;
+            } else {
+              fileSummary = `[FALHA DE LEITURA] O arquivo ${file.name} foi recebido, mas os limites de cota da API (Erro 429) impediram a extração automática do texto e dos cálculos pela IA nesta etapa. Recomenda-se reenviar a planilha de cálculos se a peça gerada falhar em apontar os devidos valores.`;
+              console.warn("Retorno mascarado com erro da IA ou vazio:", fullAiResText);
             }
           } else {
             const errText = await aiResponse.text();
             console.warn("IA falhou na análise inicial:", errText);
+            fileSummary = `[FALHA DE COMUNICAÇÃO] O servidor recursou a análise inicial do documento ${file.name} (Erro API). A IA arquivista não pôde ler seus dados.`;
           }
         } catch (e) {
           console.warn("Falha na análise inicial do arquivo:", e);
+          fileSummary = `[FALHA DE ANÁLISE INTERNA] Erro de sistema ao tentar extrair conteúdo de ${file.name}.`;
         }
 
         const newDoc: ChatDocument = {

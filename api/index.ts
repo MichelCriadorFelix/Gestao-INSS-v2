@@ -1522,12 +1522,12 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     // REFORÇO DE CONTEXTO (ANTI-VÍCIO)
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dra. Luana, você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API) e da Planilha de Cálculos.
-    É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME DO RECLAMANTE]", "[DATA]" ou "[VALOR]" se a informação estiver nos arquivos.
-    Abra cada arquivo anexado e transcreva nomes, datas de admissão/demissão e valores exatos.
-    Se não encontrar um dado crucial, escreva [DADO NÃO LOCALIZADO NOS DOCUMENTOS] em vez de um placeholder genérico.
-    Mantenha a norma culta, a estrutura da CLT e fundamente cada pedido em uma prova documental específica anexada.
+    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
+    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados (busque no histórico desta conversa pelas extrações da Fase de Ciência).
+    O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
+    É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
+    É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
+    Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
     `;
 
     const historyParts = history.map((h: any) => ({
