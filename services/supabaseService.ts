@@ -762,11 +762,12 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return [];
     
-    // Select unique titles from metadata
-    // We fetch more rows to ensure we get all unique titles even if there are many chunks
+    // Select unique titles from metadata. 
+    // Added .order to ensure consistent results, and fetching 10000 limit.
     const { data, error } = await supabase
       .from('legal_documents')
       .select('metadata')
+      .order('id', { ascending: false })
       .limit(10000);
       
     if (error) {
@@ -780,6 +781,7 @@ export const supabaseService = {
       return metadata?.title ? String(metadata.title) : null;
     }).filter(Boolean) as string[];
     
+    // Use Set to get unique titles
     return [...new Set(titles)].sort();
   },
 
