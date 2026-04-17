@@ -1293,7 +1293,7 @@ app.post("/api/marketing/generate", async (req, res) => {
     Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
     });
@@ -1363,7 +1363,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     try {
       const responseStream = await callGeminiStream({
-        model: model || "gemini-3.1-pro-preview",
+        model: model || "gemini-3-flash-preview",
         contents,
         config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens: 16383, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
@@ -1550,7 +1550,7 @@ ${ragContext}`;
       let responseStream;
       
       responseStream = await callGeminiStream({
-        model: model || "gemini-3.1-pro-preview",
+        model: model || "gemini-3-flash-preview",
         contents: contents,
         config: {
           systemInstruction: selectedSystemPrompt,
