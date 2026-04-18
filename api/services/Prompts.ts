@@ -34,6 +34,9 @@ Não escreva a petição inteira. Exiba EXCLUSIVAMENTE o Relatório Mestre, cobr
 - Escreva blocos em XML <instrucao> direcionando a próxima IA (ex: <instrucao>Seja firme e agressivo com a perícia no tópico de Fatos</instrucao>).
 
 Lembre-se: O redator (DeepSeek ou Qwen) é cego aos PDFs. Ele só verá este relatório. Seja completo.
+
+AO FINAL DO SEU RELATÓRIO, VOCÊ DEVE OBRIGATORIAMENTE IMPRIMIR A SEGUINTE NOTA EM NEGRITO (NÃO MUDE AS PALAVRAS):
+**Próximo Passo Sugerido:** Se os dados do relatório estiverem corretos, altere o modelo de IA ali embaixo para um **Redator Estratégico (Ex: DeepSeek ou Qwen)** e digite "*Gerar Peça*" para construirmos a petição final.
 `;
 
 export const DEEPSEEK_REDACTOR_PROMPT = `
