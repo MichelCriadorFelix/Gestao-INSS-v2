@@ -60,45 +60,56 @@ app.use("/api", (req, res, next) => {
 // File Upload Endpoint for Gemini File API
 const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
+async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, originalname: string): Promise<any> {
   const keys = getApiKeys();
-  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
 
-  // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
-  const apiKey = keys[keyToUseIndex % keys.length];
-  const ai = new GoogleGenAI({ apiKey });
+  const uris: Record<number, string> = {};
+  let defaultUri = "";
+  let defaultKeyIndex = 0;
 
-  try {
-    const uploadResult = await ai.files.upload({
-      file: filePath,
-      config: {
-        mimeType: mimetype,
-        displayName: originalname,
+  const uploadPromises = keys.map(async (apiKey, index) => {
+    if (invalidKeys.has(apiKey)) return null;
+    const ai = new GoogleGenAI({ apiKey });
+    try {
+      const uploadResult = await ai.files.upload({
+        file: filePath,
+        config: { mimeType: mimetype, displayName: originalname }
+      });
+      return { index, uri: uploadResult.uri, result: uploadResult };
+    } catch (e: any) {
+      console.warn(`[UPLOAD MULTI-KEY] Fallha na chave ${index}:`, e.message);
+      if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
+        invalidKeys.add(apiKey);
       }
-    });
-    // Adiciona o index da chave usada ao resultado
-    return { ...uploadResult, keyIndex: keyToUseIndex % keys.length };
-  } catch (error: any) {
-    const errorMessage = error.message || String(error);
-    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
-    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
-    
-    if (isInvalidKey) {
-      invalidKeys.add(apiKey);
+      return null;
     }
-    
-    console.error(`Erro no upload com chave ${keyToUseIndex % keys.length}:`, errorMessage);
-    
-    if ((isInvalidKey || isOverloaded) && retries > 0) {
-      currentKeyIndex++;
-      let delay = isInvalidKey ? 500 : 3000;
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1, forcedKeyIndex);
+  });
+
+  const results = await Promise.all(uploadPromises);
+  
+  let primaryResult = null;
+  for (const res of results) {
+    if (res) {
+      uris[res.index] = res.uri;
+      if (!primaryResult) {
+         primaryResult = res.result;
+         defaultUri = res.uri;
+         defaultKeyIndex = res.index;
+      }
     }
-    
-    throw error;
   }
+
+  if (!primaryResult) {
+    throw new Error("Falha no upload do arquivo. Todas as chaves (" + keys.length + ") falharam ou esgotaram a cota.");
+  }
+
+  return { 
+    ...primaryResult, 
+    uri: defaultUri, 
+    keyIndex: defaultKeyIndex,
+    uris // Novo mapa multi-key
+  };
 }
 
 app.post("/api/upload-file", upload.single('file'), async (req, res) => {
@@ -107,34 +118,27 @@ app.post("/api/upload-file", upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo enviado" });
     }
 
-    const forcedKeyIndex = req.body.keyIndex ? parseInt(req.body.keyIndex) : undefined;
-
-    // Upload to Gemini
-    const uploadResult = await uploadFileToGeminiWithRetry(
+    // Upload to ALL valid Gemini keys concurrently
+    const uploadResult = await uploadFileToAllGeminiKeys(
       req.file.path,
       req.file.mimetype,
-      req.file.originalname,
-      30,
-      forcedKeyIndex
+      req.file.originalname
     );
 
     // Clean up temp file
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
     res.json({
       fileUri: uploadResult.uri,
       name: uploadResult.name,
       mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex
+      keyIndex: uploadResult.keyIndex,
+      uris: uploadResult.uris
     });
   } catch (error: any) {
     console.error("Error uploading file to Gemini:", error);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ error: error.message || "Falha no upload do arquivo" });
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: error.message || "Falha no upload" });
   }
 });
 
@@ -177,20 +181,19 @@ app.post("/api/upload-from-url", async (req: any, res) => {
     tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
     fs.writeFileSync(tmpPath, Buffer.from(buffer));
 
-    // Upload to Gemini
-    const uploadResult = await uploadFileToGeminiWithRetry(
+    // Upload to ALL valid Gemini keys concurrently
+    const uploadResult = await uploadFileToAllGeminiKeys(
       tmpPath,
       mimeType || 'application/pdf',
-      fileName || 'imported_file.pdf',
-      30,
-      forcedKeyIndex
+      fileName || 'imported_file.pdf'
     );
 
     res.json({
       fileUri: uploadResult.uri,
       name: uploadResult.name,
       mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex
+      keyIndex: uploadResult.keyIndex,
+      uris: uploadResult.uris
     });
   } catch (error: any) {
     console.error("Erro no upload via URL:", error);
@@ -858,7 +861,7 @@ function getApiKeys() {
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
-async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
+async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, originalFilesArray?: any[]) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -872,7 +875,26 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
   // Override model in params
-  const finalParams = { ...params, model: currentModel };
+  const clonedContents = params.contents ? JSON.parse(JSON.stringify(params.contents)) : params.contents;
+  
+  if (originalFilesArray && originalFilesArray.length > 0 && Array.isArray(clonedContents)) {
+      clonedContents.forEach((content: any) => {
+          if (content.parts) {
+             content.parts.forEach((part: any) => {
+                 if (part.fileData && part.fileData.fileUri) {
+                     const origFile = originalFilesArray.find((f: any) => f.fileUri === part.fileData.fileUri || (f.uris && Object.values(f.uris).includes(part.fileData.fileUri)));
+                     if (origFile && origFile.uris) {
+                         const currentKeyIndexForThisRun = keyToUseIndex % keys.length;
+                         const newUri = origFile.uris[currentKeyIndexForThisRun];
+                         if (newUri) part.fileData.fileUri = newUri;
+                     }
+                 }
+             });
+          }
+      });
+  }
+  
+  const finalParams = { ...params, model: currentModel, contents: clonedContents || params.contents };
   
   // Fallback: Remove tools if not on the primary model or if retrying heavily
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
@@ -979,7 +1001,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   }
 }
 
-async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
+async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, originalFilesArray?: any[]): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -990,7 +1012,26 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
-  const finalParams = { ...params, model: currentModel };
+  const clonedContents = params.contents ? JSON.parse(JSON.stringify(params.contents)) : params.contents;
+  
+  if (originalFilesArray && originalFilesArray.length > 0 && Array.isArray(clonedContents)) {
+      clonedContents.forEach((content: any) => {
+          if (content.parts) {
+             content.parts.forEach((part: any) => {
+                 if (part.fileData && part.fileData.fileUri) {
+                     const origFile = originalFilesArray.find((f: any) => f.fileUri === part.fileData.fileUri || (f.uris && Object.values(f.uris).includes(part.fileData.fileUri)));
+                     if (origFile && origFile.uris) {
+                         const currentKeyIndexForThisRun = keyToUseIndex % keys.length;
+                         const newUri = origFile.uris[currentKeyIndexForThisRun];
+                         if (newUri) part.fileData.fileUri = newUri;
+                     }
+                 }
+             });
+          }
+      });
+  }
+  
+  const finalParams = { ...params, model: currentModel, contents: clonedContents || params.contents };
   
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -1048,7 +1089,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, originalFilesArray);
     }
     
     if (retries === 0) {
@@ -1444,7 +1485,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
         model: model || "gemini-3-flash-preview",
         contents,
         config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined, files);
 
       for await (const chunk of responseStream) {
         let text = chunk.text || "";
@@ -1667,7 +1708,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined, req.body.files);
 
       for await (const chunk of responseStream) {
         let text = "";

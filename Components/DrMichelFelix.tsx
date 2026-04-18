@@ -40,6 +40,7 @@ interface ChatDocument {
   fileUri?: string;
   mimeType?: string;
   keyIndex?: number;
+  uris?: Record<number, string>;
 }
 
 interface Message {
@@ -485,7 +486,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
-          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
+          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType, uris: d.uris })) || [],
           ragContext,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
@@ -750,7 +751,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           fileUri: uploadData.fileUri,
           mimeType: uploadData.mimeType,
           summary: fileSummary,
-          keyIndex: uploadData.keyIndex
+          keyIndex: uploadData.keyIndex,
+          uris: uploadData.uris
         };
 
         setSessions(prev => prev.map(s => 
