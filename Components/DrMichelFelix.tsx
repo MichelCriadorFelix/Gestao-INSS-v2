@@ -930,7 +930,7 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
   );
 
   return (
-    <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="flex h-full min-h-[500px] md:h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -944,14 +944,22 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
         }}
       />
       
+      {/* SIDEBAR OVERLAY MOBILE */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
       {/* SIDEBAR: HISTÓRICO */}
-      <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <aside className={`fixed md:relative inset-y-0 left-0 z-[60] transform ${isSidebarOpen ? 'translate-x-0 w-72 md:w-80' : '-translate-x-full w-0 md:translate-x-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900 shadow-2xl md:shadow-none`}>
+        <div className="h-16 flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <History className="w-4 h-4" /> Histórico
           </h3>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
-            <ChevronLeft className="w-4 h-4" />
+          <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors">
+            <ChevronLeft className="w-5 h-5" />
           </button>
         </div>
 
