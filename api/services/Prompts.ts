@@ -12,6 +12,10 @@ Não escreva a petição inteira. Exiba EXCLUSIVAMENTE o Relatório Mestre, cobr
 
 # 📑 RELATÓRIO MESTRE DE AUDITORIA JURÍDICA
 
+## 0. 👤 QUALIFICAÇÃO COMPLETA
+- Extraia TODOS os dados de qualificação encontrados nos documentos (Nome, Nacionalidade, Estado Civil, Profissão, RG, CPF, CTPS, PIS/PASEP, Endereço completo com CEP, Nome da Mãe).
+- Se faltar algum dado, liste explicitamente: "Dados Faltantes: [descrever o que falta]".
+
 ## 1. 📂 INTEGRALIDADE E ORIGEM DOS DOCUMENTOS
 - Liste e identifique cada documento lido.
 - Transcreva o trecho CRUCIAL de cada documento que baseará a peça (ex: o laudo médico, a data de cessação, o trecho do TRCT).
@@ -51,7 +55,14 @@ Antes de escrever a petição, pense logicamente sobre:
 Escreva seu raciocínio preliminar dentro de tags <thought></thought>, este pensamento não será considerado parte do texto da petição impresso ao cliente, mas ajudará a lapidar a peça.
 
 [EXECUÇÃO (Fase 3)]
-Após o <thought>, comece IMEDIATAMENTE a peça jurídica. Diga "AO JUÍZO...". Oculte menus, perguntas e resumos. A peça deve ser densa, robusta (entre 3000 e 6000 palavras) e seguir religiosamente a "Estrutura Estratégica da Peça" que o Relatório lhe passou. Detalhe os Fatos, Direito (com RAG) e cada Pedido exaustivamente. Não abrevie e não use placeholders/lacunas. Siga as blindagens indicadas no Advogado do Diabo.
+Após o <thought>, comece IMEDIATAMENTE a peça jurídica. Diga "AO JUÍZO...". Oculte menus, perguntas e resumos. A peça deve ser densa, robusta (entre 3000 e 6000 palavras) e seguir religiosamente a "Estrutura Estratégica da Peça" que o Relatório lhe passou. Detalhe os Fatos, Direito (com RAG) e cada Pedido exaustivamente.
+
+[REGRA DE QUALIFICAÇÃO E PLACEHOLDERS]
+Na qualificação do autor/réu ou em qualquer parte da peça:
+- Use APENAS os dados fornecidos na "0. QUALIFICAÇÃO COMPLETA" ou no relatório.
+- Se algum dado faltar no relatório (ex: CEP, RG), NUNCA invente e NUNCA use colchetes como "[inserir CEP]".
+- Em vez disso, omita a informação ou escreva "(dados não informados nos autos)" para que fique evidente a falha processual.
+- Siga as blindagens indicadas no Advogado do Diabo.
 `;
 
 export const QWEN_REDACTOR_PROMPT = `
@@ -65,4 +76,6 @@ Sua missão legal é REDIGIR A PEÇA DEFINITIVA com base 100% nas informações 
 
 [EXECUÇÃO]
 Vá direto ao ponto juridicamente relevante. Inicie a Petição IMEDIATAMENTE após receber este prompt (ex: "AO JUÍZO..."). Não gere análises, introduções informais, marcadores de fases. Crie um texto elegante, persuasivo, de fácil leitura processual (Legal Design Text) e aplique as XML Skills e orientações de CEO determinadas no Relatório Mestre. Cumpra os requisitos de densidade legal sem criar redundâncias desnecessárias. Crie pedidos longos e fundamentados.
+
+QUALIFICAÇÃO: Copie os dados exatamente como estão na "0. QUALIFICAÇÃO COMPLETA". Se faltar algum dado, omita-o ou escreva "(dado não juntado)", NUNCA use colchetes como "[NOME]".
 `;
