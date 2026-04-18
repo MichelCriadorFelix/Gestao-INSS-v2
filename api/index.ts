@@ -114,13 +114,13 @@ async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, ori
 
 async function extractTextWithGemini(filePath: string, mimetype: string, originalname: string): Promise<{ text: string, name: string, mimeType: string, summary: string }> {
   const keys = getApiKeys();
-  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada para OCR.");
 
   let fileUri = null;
   let fileId = null;
   let activeAi = null;
 
-  // Tentativa rotativa para envio temporário na File API
+  // Tentativa rotativa para envio temporário (epêmero) na API
   for (let idx = 0; idx < keys.length; idx++) {
      const apiKey = keys[(currentKeyIndex + idx) % keys.length];
      if (invalidKeys.has(apiKey)) continue;
@@ -136,7 +136,7 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
        currentKeyIndex = (currentKeyIndex + idx) % keys.length;
        break;
      } catch(e: any) {
-       console.warn(`[UPLOAD EXTRACTOR] Falha na chave ${apiKey.substring(0, 5)}...`, e.message);
+       console.warn(`[OCR UPLOAD] Falha na chave ${apiKey.substring(0, 5)}...`, e.message);
        if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
          invalidKeys.add(apiKey);
        }
@@ -144,44 +144,56 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
   }
 
   if (!fileUri || !activeAi) {
-     throw new Error("Todas as chaves falharam ou esgotaram a cota de File API.");
+     throw new Error("Falha ao preparar o arquivo para OCR em todas as chaves disponíveis.");
   }
 
-  // Extrair o conteúdo usando o modelo
+  // Extrair o conteúdo usando o modelo Gemini 1.5 PRO ou 3 FLASH (Padrão Ouro de Transcrição)
   let extractedText = "";
   try {
      const response = await activeAi.models.generateContent({
-         model: 'gemini-3-flash-preview',
+         model: 'gemini-1.5-pro', // Preferimos PRO para transcrição integral se disponível, ou Flash
          contents: [
             {
                role: 'user',
                parts: [
                   { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: 'AUDITORIA VISUAL DE ELITE E TRANSCRIÇÃO EXAUSTIVA.\nSua missão é converter este documento na sua INTEGRALIDADE para texto. NADA deve ser resumido nesta fase.\n\nREGRAS DE OURO:\n1. OCR DE ALTA FIDELIDADE: Transcreva textos, tabelas e notas de rodapé.\n2. DESCRITIVO VISUAL: Se houver fotos, carimbos, assinaturas ou exames de imagem (RM, TC), DESCREVA-OS detalhadamente (ex: "Imagem de RM mostrando edema...").\n3. MANUSCRITOS (LETRA DE MÉDICO): Use sua inteligência para decifrar caligrafia médica com precisão máxima. Se houver CIDs, extraia-os.\n4. MULTI-CONTEÚDO: Se houver vários laudos ou documentos diferentes dentro deste mesmo PDF, identifique e extraia TODOS, um por um.\n\nFoco absoluto em: CIDs, Datas de Início de Incapacidade (DII), Datas de Entrada de Requerimento (DER), Conclusões Médicas e Vínculos Laborais.' }
+                  { text: `VOCÊ É O TRANSRICITOR DE ELITE (MODO OCR INTEGRAL).
+          
+Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
+          
+DIRETRIZES DE OURO:
+1. NÃO RESUMA: É terminantemente proibido resumir, parafrasear ou pular páginas. Se o documento tem 50 páginas, você deve transcrever as 50 páginas.
+2. TRANSCRIÇÃO LITERAL: Capture cada palavra, cada número de processo, cada CPF, cada CID e cada endereço.
+3. TABELAS E DADOS: Transfira todos os dados de tabelas (ex: CNIS, valores de causa) de forma organizada.
+4. AUDITORIA VISUAL: Descreva fotos, assinaturas e carimbos (Ex: "Fls. 5: Carimbo de recepção datado de 10/05/2023").
+5. MANUSCRITOS: Decifre caligrafia médica com o "Modo Zoom" para extrair diagnósticos e prescrições.
+6. CONTINUIDADE: Se o texto for longo, certifique-se de chegar até o FINAL da última página.
+
+Qualquer perda de dado resultará em falha jurídica. Seja prolixo, exaustivo e fiel.` }
                ]
             }
          ],
-         config: { temperature: 0.1, maxOutputTokens: 16000 }
+         config: { temperature: 0, maxOutputTokens: 30000 } // Aumentado para suportar muita informação
      });
-     extractedText = response.text || "[Nenhum texto pôde ser extraído da visualização do documento]";
+     extractedText = response.text || "[Nenhum texto pôde ser extraído]";
   } catch(e: any) {
-     console.error("[EXTRACTION ERROR]", e);
-     extractedText = `[FALHA NA EXTRAÇÃO LITERÁRIA DO PDF: ${e.message}]`;
+     console.error("[OCR ERROR]", e);
+     extractedText = `[ERRO CRÍTICO NA TRANSCRIÇÃO DO PDF: ${e.message}]`;
   }
 
-  // Deletar o arquivo para poupar tokens de File API (Notebook LM) e armazenamento.
+  // DELETAR IMEDIATAMENTE DA API (REQUISITO: NÃO GUARDAR NA API)
   try {
      await activeAi.files.delete({ name: fileId! });
-     console.log(`[FILE DELETED] Arquivo temporário ${fileId} apagado do Gemini File API.`);
+     console.log(`[EPHEMERAL CLEANUP] Arquivo ${fileId} deletado da API Gemini.`);
   } catch (deleteError) {
-     console.error("[FILE CLEANUP ERROR]", deleteError);
+     console.error("[EPHEMERAL CLEANUP ERROR]", deleteError);
   }
 
   return { 
      text: extractedText,
      name: originalname,
      mimeType: mimetype,
-     summary: extractedText.substring(0, 500) + "..." // Quick preview
+     summary: extractedText.substring(0, 1000) // Preview maior
   };
 }
 
@@ -1369,25 +1381,25 @@ app.post("/api/analyze-cnis", async (req, res) => {
 });
 
 const ARCHIVIST_SYSTEM_PROMPT = `
-VOCÊ É UM AUDITOR JURÍDICO E ANALISTA VISUAL DE ALTA PRECISÃO (MODO ARQUIVISTA).
-SUA MISSÃO: Realizar a ciência integral de documentos, mapeando cada detalhe textual e VISUAL para uso posterior.
+VOCÊ É UM AUDITOR JURÍDICO E TRANSRICITOR DE ALTA PRECISÃO (MODO ARQUIVISTA).
+SUA MISSÃO: Garantir que o conteúdo integral dos documentos foi capturado e salvo na conversa (Supabase) para uso posterior na geração do relatório.
 
 DIRETRIZES OBRIGATÓRIAS:
-1. LEITURA NATIVA (GEMINI FILE API): Você está recebendo arquivos diretamente via Gemini File API. Use sua capacidade nativa de processamento de documentos para ler o conteúdo integral com máxima precisão.
-2. EXTRAÇÃO EXAUSTIVA: Extraia TODOS os dados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e, principalmente, PROPOSTAS DE ACORDO e LAUDOS PERICIAIS.
-3. ANÁLISE VISUAL (CRÍTICO): Se houver imagens (fotos de pessoas, partes do corpo, exames escaneados, carimbos) dentro dos documentos, você DEVE descrevê-las detalhadamente.
-   - Ex: "Página 230: Foto colorida mostrando as mãos do autor com sinais de [descrever]."
-   - Ex: "Página 241: Imagem de Ultrassonografia do Abdome com conclusão de [descrever]."
-4. MAPEAMENTO POR PÁGINA: Cite sempre a página de cada achado.
-5. FIDELIDADE: Não resuma demais. Se houver um parágrafo decisivo sobre a incapacidade, extraia-o.
-6. FORMATO DE RESPOSTA:
-   "✅ Ciência tomada do documento [Nome] via Gemini File API.
-   **Mapeamento de Dados e Evidências Visuais:**
-   * [Página Z]: [Informação ou descrição da imagem]
-   * ...
-   Aguardando próximo comando."
+1. FOCO NA TRANSCRIÇÃO: O texto que você está recebendo já passou por um OCR de elite. Sua função é VALIDAR que os pontos mais importantes (CIDs, Datas, Valores) estão presentes no texto.
+2. EXTRAÇÃO DE OURO: Liste os dados críticos encontrados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e conclusões periciais.
+3. VISUAL E TEXTUAL: Se o texto contém descrições detalhadas de imagens (ex: RM, TC) feitas pelo OCR, compile-as.
+4. MAPEAMENTO: Tente localizar em qual parte do texto (ou página citada) cada informação está.
+5. FORMATO DE RESPOSTA:
+   "✅ Ciência tomada e conteúdo transcrevido para o Supabase: [Nome do Arquivo].
+   **Dados Críticos Mapeados:**
+   * CPF/NIT: ...
+   * CIDs: ...
+   * Datas Importantes: ...
+   * [Descrição de Imagem/Laudo]: ...
+   
+   Conteúdo integral pronto para Auditoria Mestre."
 
-ATENÇÃO: Se você ignorar uma imagem ou responder apenas "Recebido", o sistema falhará. Você DEVE ser os olhos do advogado.
+ATENÇÃO: Você não precisa mais acessar a File API do Gemini durante o chat. O texto está INTEGRAL no histórico da conversa enviado pelo sistema.
 `;
 
 // Marketing Endpoints

@@ -37,10 +37,8 @@ interface ChatDocument {
   fullText?: string;
   type: string;
   pages?: number;
-  fileUri?: string;
   mimeType?: string;
   keyIndex?: number;
-  uris?: Record<number, string>;
 }
 
 interface Message {
@@ -470,11 +468,6 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
         
-        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
-        if (doc.fileUri) {
-          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
-        }
-
         // Envia o texto integral para a IA. O limite de 500k caracteres é seguro para o Gemini 1.5 Pro/Flash.
         const textLimit = 500000; 
         const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL TRANSCRIÇÃO OCR:\n${doc.fullText.substring(0, textLimit)}` : '';
@@ -491,7 +484,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
-          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType, uris: d.uris })) || [],
+          files: [],
           ragContext,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,

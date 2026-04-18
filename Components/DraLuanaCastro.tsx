@@ -34,10 +34,8 @@ interface ChatDocument {
   fullText?: string;
   type: string;
   pages?: number;
-  fileUri?: string;
   mimeType?: string;
   keyIndex?: number;
-  uris?: Record<number, string>;
 }
 
 interface Message {
@@ -481,7 +479,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
-          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType, uris: d.uris })) || [],
+          files: [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
           modelProvider: eliteProviderOverride || selectedModelProvider,
