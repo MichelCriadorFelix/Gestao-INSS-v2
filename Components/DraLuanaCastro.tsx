@@ -466,11 +466,6 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
         
-        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
-        if (doc.fileUri) {
-          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
-        }
-
         // Include as much full text as possible within safety limits (increased to 500k)
         const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 500000)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
@@ -713,11 +708,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           id: generateId(),
           name: file.name,
           type: file.type,
-          fullText: uploadData.fullText, // Usa OCR extraído via backend
+          fullText: uploadData.fullText, // Texto integral extraído via OCR no backend
           mimeType: uploadData.mimeType,
           summary: fileSummary,
-          fileUri: uploadData.uri, // RESTORE fileUri to allow multi-modal analysis in chat
           keyIndex: uploadData.keyIndex || preferredKeyIndex
+          // fileUri removido: o usuário quer o texto integral salvo na conversa (Supabase) e enviado como texto para a IA
         };
 
         const displayMessage = `✅ OCR e Ciência Integral concluída para o documento: **${file.name}**.\n\nExtraídos ${(uploadData.fullText || "").length} caracteres nativamente via Gemini 3 Flash.`;

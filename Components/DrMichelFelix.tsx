@@ -475,10 +475,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
         }
 
-        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
-        const textLimit = doc.fileUri ? 1000 : 500000; // If we have the file, send only a small preview to save tokens
-        const fullTextPart = doc.fullText ? `CONTEÚDO (EXCERTOS):\n${doc.fullText.substring(0, textLimit)}` : '';
-        return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Gemini File API Habilitado]' : ''}`;
+        // Envia o texto integral para a IA. O limite de 500k caracteres é seguro para o Gemini 1.5 Pro/Flash.
+        const textLimit = 500000; 
+        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL TRANSCRIÇÃO OCR:\n${doc.fullText.substring(0, textLimit)}` : '';
+        return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -716,11 +716,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           id: generateId(),
           name: file.name,
           type: file.type,
-          fullText: uploadData.fullText, // Usa o texto extraído nativamente no backend
+          fullText: uploadData.fullText, // Texto integral extraído via OCR no backend
           mimeType: uploadData.mimeType,
           summary: fileSummary, 
-          fileUri: uploadData.uri, // RESTORE fileUri to allow multi-modal analysis in chat
           keyIndex: uploadData.keyIndex || preferredKeyIndex
+          // fileUri removido: o usuário quer o texto integral salvo na conversa (Supabase) e enviado como texto para a IA
         };
 
         const displayMessage = `✅ OCR e Ciência Integral concluída para o documento: **${file.name}**.\n\nExtraídos ${(uploadData.fullText || "").length} caracteres nativamente via Gemini 3 Flash.`;
