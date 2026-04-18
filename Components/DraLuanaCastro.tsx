@@ -932,7 +932,7 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
   );
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-[500px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+    <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -1045,7 +1045,7 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
+      <div className="flex-1 flex flex-col min-h-0 relative bg-white dark:bg-slate-950">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}

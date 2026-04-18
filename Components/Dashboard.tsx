@@ -1519,7 +1519,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
+        <main className={`flex-1 flex flex-col min-h-0 ${['dr_michel', 'dra_luana', 'petition_editor'].includes(currentView) ? 'overflow-hidden' : 'overflow-y-auto p-4 md:p-6 scroll-smooth'}`}>
              
              {/* CONTENT SWITCHER */}
              {currentView === 'dr_michel' ? (

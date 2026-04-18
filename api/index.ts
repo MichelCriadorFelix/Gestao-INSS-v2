@@ -90,7 +90,7 @@ async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, ori
   
   let primaryResult = null;
   for (const res of results) {
-    if (res) {
+    if (res && res.uri) {
       uris[res.index] = res.uri;
       if (!primaryResult) {
          primaryResult = res.result;
