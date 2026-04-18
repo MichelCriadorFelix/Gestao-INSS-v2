@@ -77,7 +77,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  useEffect(() => {
+    setIsSidebarOpen(window.innerWidth > 768);
+  }, []);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -325,6 +329,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     };
     setSessions([newSession, ...sessions]);
     setCurrentSessionId(newSession.id);
+    if (window.innerWidth <= 768) setIsSidebarOpen(false);
   };
 
   const copyToClipboard = (text: string, msgId: string) => {
@@ -930,7 +935,7 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
   );
 
   return (
-    <div className="flex h-full min-h-[500px] md:h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+    <div className="flex flex-col md:flex-row h-full min-h-[500px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -986,7 +991,10 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
             {filteredSessions.map(session => (
               <div 
                 key={session.id}
-                onClick={() => setCurrentSessionId(session.id)}
+                onClick={() => {
+                  setCurrentSessionId(session.id);
+                  if (window.innerWidth <= 768) setIsSidebarOpen(false);
+                }}
                 className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-slate-800 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
               >
                 {editingSessionId === session.id ? (
