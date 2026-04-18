@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
+import { apiFetch } from '../services/apiService';
 import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
@@ -20,7 +21,49 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [editDocName, setEditDocName] = useState('');
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProcessOCR = async (doc: ScannedDocument) => {
+    if (!doc.url) return;
+    
+    setOcrLoading(prev => ({ ...prev, [doc.id]: true }));
+    try {
+        const response = await apiFetch('/api/upload-from-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: doc.url,
+                fileName: doc.name,
+                mimeType: doc.type
+            })
+        });
+
+        if (!response.ok) throw new Error("Falha ao processar OCR no servidor.");
+        
+        const result = await response.json();
+        const fullText = result.fullText;
+
+        if (!fullText) throw new Error("Nenhum texto extraído.");
+
+        const updatedDocs = (formData.documents || []).map(d => 
+            d.id === doc.id ? { ...d, ocrText: fullText } : d
+        );
+
+        const updatedFormData = { ...formData, documents: updatedDocs };
+        setFormData(updatedFormData);
+        
+        // Save to master list
+        await onSave(updatedFormData as ClientRecord);
+        
+        alert(`OCR concluído com sucesso para: ${doc.name}`);
+    } catch (err: any) {
+        console.error("OCR Error:", err);
+        alert(`Erro ao processar OCR: ${err.message}`);
+    } finally {
+        setOcrLoading(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
 
   const AVAILABLE_TAGS = [
       { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -937,6 +980,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             </div>
                                         </div>
                                     </div>
+                                    {doc.ocrText && (
+                                        <div className="mt-2 text-[10px] text-slate-500 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2 rounded-lg max-h-24 overflow-y-auto w-full italic">
+                                            <strong>Transcrição OCR (Trecho):</strong> {doc.ocrText.substring(0, 300)}...
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-2 sm:ml-auto">
                                         {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
                                         {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
@@ -949,6 +997,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             disabled={syncStatus[doc.id] === 'compressing'}
                                         >
                                             <BoltIcon className="h-5 w-5" />
+                                        </button>
+
+                                        <button 
+                                            onClick={() => handleProcessOCR(doc)} 
+                                            className={`p-2 rounded-lg transition-colors ${doc.ocrText ? 'text-emerald-600 hover:bg-emerald-50' : 'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`} 
+                                            title={doc.ocrText ? "OCR Realizado (Ver texto abaixo)" : "Ativar OCR (Transcrição Gemini)"}
+                                            disabled={ocrLoading[doc.id]}
+                                        >
+                                            {ocrLoading[doc.id] ? (
+                                                <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                                            ) : (
+                                                <SparklesIcon className="h-5 w-5" />
+                                            )}
                                         </button>
 
                                         <div className="relative">

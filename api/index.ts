@@ -147,11 +147,11 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
      throw new Error("Falha ao preparar o arquivo para OCR em todas as chaves disponíveis.");
   }
 
-  // Extrair o conteúdo usando o modelo Gemini 1.5 PRO ou 3 FLASH (Padrão Ouro de Transcrição)
+  // Extrair o conteúdo usando o modelo Gemini 3 FLASH (Padrão Ouro de Transcrição)
   let extractedText = "";
   try {
      const response = await activeAi.models.generateContent({
-         model: 'gemini-1.5-pro', // Preferimos PRO para transcrição integral se disponível, ou Flash
+         model: 'gemini-3-flash-preview', 
          contents: [
             {
                role: 'user',
@@ -901,8 +901,7 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview"
+  "gemini-3-flash-preview"
 ];
 
 function getApiKeys() {

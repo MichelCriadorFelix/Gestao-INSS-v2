@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { XMarkIcon, CameraIcon, PhotoIcon, ArrowsPointingOutIcon, CheckIcon, DocumentDuplicateIcon, TrashIcon, PlusIcon, ArrowPathIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CameraIcon, PhotoIcon, ArrowsPointingOutIcon, CheckIcon, DocumentDuplicateIcon, TrashIcon, PlusIcon, ArrowPathIcon, DocumentTextIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ScannedDocument, ScannerModalProps } from '../types';
+import { apiFetch } from '../services/apiService';
 
 const DOCUMENT_TYPES = [
     "Identidade", "CPF", "Comprovante de residência", "Laudos", 
@@ -218,11 +219,27 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
         }
     };
 
-    const handleFinalizePDF = async () => {
+    const handleFinalizePDF = async (withOcr: boolean = false) => {
         if (pages.length === 0) return;
         setIsProcessing(true);
 
         try {
+            let ocrContent = "";
+            if (withOcr) {
+                // Remove data:image/jpeg;base64, prefix for the API
+                const cleanImages = pages.map(img => img.split(',')[1]);
+                const ocrResponse = await apiFetch('/api/ocr', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: cleanImages })
+                });
+
+                if (ocrResponse.ok) {
+                    const ocrData = await ocrResponse.json();
+                    ocrContent = ocrData.text || "";
+                }
+            }
+
             // @ts-ignore
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = 210;
@@ -257,7 +274,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                 name: docType || 'Documento Digitalizado',
                 type: 'application/pdf',
                 url: pdfBase64,
-                date: new Date().toLocaleDateString('pt-BR')
+                date: new Date().toLocaleDateString('pt-BR'),
+                ocrText: ocrContent
             };
             
             onSave(newDoc);
@@ -410,9 +428,24 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                     </button>
                                 </div>
                             </div>
-                            <div className="shrink-0 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <button onClick={handleFinalizePDF} disabled={isProcessing || pages.length === 0} className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
-                                    {isProcessing ? <><ArrowPathIcon className="h-5 w-5 animate-spin" /> Gerando PDF...</> : <><DocumentTextIcon className="h-5 w-5" /> Salvar Arquivo PDF</>}
+                            <div className="shrink-0 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+                                <button 
+                                    onClick={() => handleFinalizePDF(false)} 
+                                    disabled={isProcessing || pages.length === 0} 
+                                    className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition disabled:opacity-50"
+                                >
+                                    PDF Simples
+                                </button>
+                                <button 
+                                    onClick={() => handleFinalizePDF(true)} 
+                                    disabled={isProcessing || pages.length === 0} 
+                                    className="flex-[2] py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+                                >
+                                    {isProcessing ? (
+                                        <><ArrowPathIcon className="h-5 w-5 animate-spin" /> Processando...</>
+                                    ) : (
+                                        <><SparklesIcon className="h-5 w-5" /> Finalizar com OCR</>
+                                    )}
                                 </button>
                             </div>
                         </div>
