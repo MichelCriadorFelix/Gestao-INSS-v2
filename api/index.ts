@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { GEMINI_AUDITOR_PROMPT, DEEPSEEK_REDACTOR_PROMPT, QWEN_REDACTOR_PROMPT } from './services/Prompts';
+import { GEMINI_AUDITOR_PROMPT, DEEPSEEK_REDACTOR_PROMPT, QWEN_REDACTOR_PROMPT } from './services/Prompts.js';
 
 dotenv.config();
 
@@ -1378,8 +1378,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       if (!req.body.forceRag) ragContext = ""; 
     }
 
-    const isReportRequest = message.toUpperCase().includes("GERAR RELATÓRIO") || message.toUpperCase().includes("AUDITORIA") || message.toUpperCase().includes("RELATÓRIO MESTRE") || message.toUpperCase().includes("NOVO E OTIMIZADO");
-    const isPieceRequest = message.toUpperCase().includes("GERAR PEÇA") || message.toUpperCase().includes("GERAR PETIÇÃO") || message.toUpperCase().includes("REDIGIR PEÇA");
+    const msgForChecks = message || "";
+    const isReportRequest = msgForChecks.toUpperCase().includes("GERAR RELATÓRIO") || msgForChecks.toUpperCase().includes("AUDITORIA") || msgForChecks.toUpperCase().includes("RELATÓRIO MESTRE") || msgForChecks.toUpperCase().includes("NOVO E OTIMIZADO");
+    const isPieceRequest = msgForChecks.toUpperCase().includes("GERAR PEÇA") || msgForChecks.toUpperCase().includes("GERAR PETIÇÃO") || msgForChecks.toUpperCase().includes("REDIGIR PEÇA");
 
     if (isReportRequest) {
       selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + GEMINI_AUDITOR_PROMPT;
@@ -1523,8 +1524,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       console.log("Modo Dra. Luana Ativado (Completo)");
     }
 
-    const isReportRequest = message.toUpperCase().includes("GERAR RELATÓRIO") || message.toUpperCase().includes("AUDITORIA") || message.toUpperCase().includes("RELATÓRIO MESTRE") || message.toUpperCase().includes("NOVO E OTIMIZADO");
-    const isPieceRequest = message.toUpperCase().includes("GERAR PEÇA") || message.toUpperCase().includes("GERAR PETIÇÃO") || message.toUpperCase().includes("REDIGIR PEÇA");
+    const msgForChecks = message || "";
+    const isReportRequest = msgForChecks.toUpperCase().includes("GERAR RELATÓRIO") || msgForChecks.toUpperCase().includes("AUDITORIA") || msgForChecks.toUpperCase().includes("RELATÓRIO MESTRE") || msgForChecks.toUpperCase().includes("NOVO E OTIMIZADO");
+    const isPieceRequest = msgForChecks.toUpperCase().includes("GERAR PEÇA") || msgForChecks.toUpperCase().includes("GERAR PETIÇÃO") || msgForChecks.toUpperCase().includes("REDIGIR PEÇA");
 
     if (isReportRequest) {
       console.log("Injetando Módulo Auditor (Padrão Ouro) - Dra. Luana");
