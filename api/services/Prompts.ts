@@ -31,14 +31,8 @@ REGRA DE OURO: O relatório abaixo deverá relatar CADA arquivo enviado, fazer c
 
 ## 3. ⚖️ ESTRATÉGIAS JURÍDICAS E ESTRUTURA DA PEÇA
 - **Opções Estratégicas:** Não trace apenas um caminho. Apresente ao menos DUAS ou TRÊS estratégias jurídicas possíveis para o advogado escolher (Ex: Tese Principal vs. Pedido Subsidiário). Explique os prós e contras de cada uma.
-- **Esqueleto Base Obrigatório:** (Ao definir a peça, você OBRIGATORIAMENTE DEVE INCLUIR A ESTRUTURA BASE. Adicione tópicos extras, mas NUNCA omita a base):
-    [ESTRUTURAS PREVIDENCIÁRIAS]
-    * BENEFÍCIO POR INCAPACIDADE: Fatos; Do Direito - Da Incapacidade (Súmula 47 TNU); Da Observância à Lei 14.331/2022 (Doença/Limitações/Atividade/Inconsistência/Ações Anteriores); Tutela de Urgência.
-    * BPC/LOAS (DEFICIENTE): A Deficiência e Barreiras Funcionais; O Grupo Familiar e Miserabilidade (Renda per capita e Custo da Deficiência); Do Direito (Art. 20 Lei 8.742/93); Tutela.
-    * BPC/LOAS (IDOSO): Tramitação Prioritária; Idade (65+); Requisito Socioeconômico e Flexibilização (1/2 salário); Art. 20 §14.
-    * APOSENTADORIA POR IDADE / TEMPO / ESPECIAL / PENSÃO. (Mapeie todos os tópicos de mérito exigidos, carência, reafirmação da DER, súmulas).
-    [ESTRUTURAS TRABALHISTAS]
-    * RECLAMAÇÃO TRABALHISTA: Justiça Gratuita; Intimações; Valor Estimado (IN 41/2018); Contrato; FATOS E DIREITO (Um tópico exclusivo para cada verba/violação); Juntada (Art. 396 CPC); Pedidos Líquidos.
+- **Esqueleto Base Obrigatório (CRÍTICO):** Identifique o tipo de ação. Após identificar, VOCÊ É OBRIGADO a buscar no seu prompt principal (acima) a "ESTRUTURA OBRIGATÓRIA" completa para esta ação (Ex: "ESTRUTURA OBRIGATÓRIA PARA BENEFÍCIO POR INCAPACIDADE" ou "ESTRUTURA OBRIGATÓRIA PARA RECLAMAÇÃO TRABALHISTA").
+- Transcreva TODOS os tópicos e subtópicos dessa estrutura base para o relatório. Você pode adicionar tópicos novos baseados nas provas, mas NUNCA pode omitir os tópicos e subtópicos cruciais detalhados nas suas regras de perfil (ex: A Lei 14.331, as Instruções Normativas, os 5 requisitos de vínculo, etc).
 
 ## 4. 😈 ADVOGADO DO DIABO E BLINDAGEM DA TESE
 - Antecipe TODO E QUALQUER argumento defensivo do INSS ou da Empresa reclamada.
