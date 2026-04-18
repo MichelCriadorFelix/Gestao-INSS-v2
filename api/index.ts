@@ -58,7 +58,11 @@ app.use("/api", (req, res, next) => {
 });
 
 // File Upload Endpoint for Gemini File API
-const upload = multer({ dest: '/tmp/uploads/' });
+const ocrUploadDir = path.join(process.cwd(), 'ocr-tmp', 'uploads');
+if (!fs.existsSync(ocrUploadDir)) {
+  fs.mkdirSync(ocrUploadDir, { recursive: true });
+}
+const upload = multer({ dest: ocrUploadDir });
 
 async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, originalname: string): Promise<any> {
   const keys = getApiKeys();
@@ -249,32 +253,67 @@ app.post("/api/upload-from-url", async (req: any, res) => {
         hostname === '0.0.0.0' ||
         hostname.startsWith('192.168.') || 
         hostname.startsWith('10.') || 
-        hostname.startsWith('172.') || // Abordagem simplificada para ranges privados
+        hostname.startsWith('172.') || 
         hostname.endsWith('.local') ||
         hostname.endsWith('.internal');
 
       if (isInternal || !['http:', 'https:'].includes(parsedUrl.protocol)) {
-        return res.status(403).json({ error: "URL não permitida por motivos de segurança (SSRF Protection)." });
+        console.error("[SSRF] Bloqueado:", url);
+        return res.status(403).json({ error: "URL não permitida por motivos de segurança." });
       }
     } catch (e) {
       return res.status(400).json({ error: "URL inválida." });
     }
 
-    const forcedKeyIndex = keyIndex !== undefined ? parseInt(keyIndex) : undefined;
-
-    // Download file to /tmp
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Falha ao baixar arquivo da URL: ${response.statusText}`);
+    // Download file with timeout and browser-like user agent
+    console.log(`[URL DOWNLOAD] Iniciando download de: ${url}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout (increased for slow supabse)
     
-    const buffer = await response.arrayBuffer();
-    tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
-    fs.writeFileSync(tmpPath, Buffer.from(buffer));
+    let response;
+    try {
+      response = await fetch(url, { 
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+    } catch (e: any) {
+      console.error("[URL DOWNLOAD ERROR]", e.message);
+      return res.status(500).json({ error: `Erro de rede ao baixar: ${e.message}. Verifique a conexão com ${new URL(url).hostname}` });
+    } finally {
+      clearTimeout(timeout);
+    }
 
-    // Extrair via Gemini 3 Flash e deletar da nuvem
+    if (!response.ok) {
+      console.error(`[URL DOWNLOAD FAILED] ${response.status} ${response.statusText}`);
+      return res.status(500).json({ 
+        error: `O servidor de arquivos retornou erro ${response.status}. Se for um PDF do Supabase, certifique-se de que a URL não expirou ou que o bucket é público.` 
+      });
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      return res.status(500).json({ error: "Arquivo baixado está vazio (0 bytes)." });
+    }
+    
+    const safeFileName = (fileName || 'file').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
+    // Use directory relative to project root
+    const ocrTmpDir = path.join(process.cwd(), 'ocr-tmp');
+    if (!fs.existsSync(ocrTmpDir)) {
+      fs.mkdirSync(ocrTmpDir, { recursive: true });
+    }
+    
+    tmpPath = path.join(ocrTmpDir, `proxy_${Date.now()}_${safeFileName}.pdf`);
+    fs.writeFileSync(tmpPath, Buffer.from(arrayBuffer));
+    console.log(`[URL DOWNLOAD SUCCESS] Salvo em: ${tmpPath} (${arrayBuffer.byteLength} bytes)`);
+
+    // Extrair via Gemini 3 Flash
     const extractedData = await extractTextWithGemini(
       tmpPath,
       mimeType || 'application/pdf',
-      fileName || 'imported_file.pdf'
+      safeFileName + '.pdf'
     );
 
     res.json({
@@ -284,8 +323,8 @@ app.post("/api/upload-from-url", async (req: any, res) => {
       summary: extractedData.summary
     });
   } catch (error: any) {
-    console.error("Erro no upload via URL:", error);
-    res.status(500).json({ error: error.message || "Falha no upload via URL" });
+    console.error("Erro no upload via URL [DETALHADO]:", error);
+    res.status(500).json({ error: error.message || "Falha no processar arquivo da nuvem" });
   } finally {
     if (tmpPath && fs.existsSync(tmpPath)) {
       fs.unlinkSync(tmpPath);
@@ -1884,8 +1923,14 @@ app.post("/api/dr-michel/generate-docx", async (req, res) => {
   }
 });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+app.get("/api/debug-keys", (req, res) => {
+  const keys = getApiKeys();
+  res.json({
+    count: keys.length,
+    invalidCount: invalidKeys.size,
+    firstKeyPrefix: keys[0] ? keys[0].substring(0, 8) : 'none',
+    keysAvailable: keys.filter(k => !invalidKeys.has(k)).length
+  });
 });
 
 app.get("/api/config", (req, res) => {

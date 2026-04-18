@@ -39,9 +39,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
             })
         });
 
-        if (!response.ok) throw new Error("Falha ao processar OCR no servidor.");
+        const result = await response.json().catch(() => ({ error: "Falha ao ler resposta do servidor." }));
+        if (!response.ok) throw new Error(result.error || "Falha ao processar OCR no servidor.");
         
-        const result = await response.json();
         const fullText = result.fullText;
 
         if (!fullText) throw new Error("Nenhum texto extraído.");
