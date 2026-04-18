@@ -614,8 +614,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     await processFilesPhased(files, activeSessionId, fileIndex, pageIndex);
   };
 
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
     let currentIdx = startFileIndex;
+    setIsUploading(true);
     try {
       // Obter o índice da chave preferida da sessão, se já existir
       const currentSession = sessionsRef.current.find(s => s.id === activeSessionId);
@@ -624,60 +627,75 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       for (let i = startFileIndex; i < fileArray.length; i++) {
         currentIdx = i;
         const file = fileArray[i];
+        
         setProgressText(`Preparando ${file.name} (${i + 1}/${fileArray.length})...`);
         setProgress(Math.round(((i) / fileArray.length) * 100));
 
         let uploadData;
+        let retryCount = 0;
+        const MAX_RETRIES = 2;
 
-        // Bypass Vercel 4.5MB limit if file is large
-        if (file.size > 4 * 1024 * 1024) {
-          setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
-          const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
-          
-          if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
+        while (retryCount <= MAX_RETRIES) {
+          try {
+            // Bypass Vercel 4.5MB limit if file is large
+            if (file.size > 4 * 1024 * 1024) {
+              setProgressText(`Enviando ${file.name} via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ''}`);
+              
+              const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+              const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
+              
+              if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
 
-          const urlResponse = await apiFetch('/api/upload-from-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              url: storageUrl,
-              mimeType: file.type,
-              fileName: file.name,
-              keyIndex: preferredKeyIndex
-            })
-          });
+              const urlResponse = await apiFetch('/api/upload-from-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  url: storageUrl,
+                  mimeType: file.type,
+                  fileName: file.name,
+                  keyIndex: preferredKeyIndex
+                })
+              });
 
-          if (!urlResponse.ok) {
-            const errText = await urlResponse.text();
-            throw new Error(`Falha no processamento via URL: ${errText}`);
-          }
-          uploadData = await urlResponse.json();
-        } else {
-          setProgressText(`Enviando ${file.name} para a IA...`);
-          const formData = new FormData();
-          formData.append('file', file);
-          if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
-            formData.append('keyIndex', preferredKeyIndex.toString());
-          }
+              if (!urlResponse.ok) {
+                const errText = await urlResponse.text();
+                throw new Error(errText);
+              }
+              uploadData = await urlResponse.json();
+            } else {
+              setProgressText(`Enviando ${file.name} para a IA...${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ''}`);
+              const formData = new FormData();
+              formData.append('file', file);
+              if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
+                formData.append('keyIndex', preferredKeyIndex.toString());
+              }
 
-          const uploadResponse = await apiFetch('/api/upload-file', {
-            method: 'POST',
-            body: formData
-          });
+              const uploadResponse = await apiFetch('/api/upload-file', {
+                method: 'POST',
+                body: formData
+              });
 
-          if (!uploadResponse.ok) {
-            const errText = await uploadResponse.text();
-            let errMessage = "Falha no upload";
-            try {
-              const errJson = JSON.parse(errText);
-              errMessage = errJson.error || errMessage;
-            } catch(e) {
-              errMessage = "Erro no servidor: " + errText.substring(0, 100);
+              if (!uploadResponse.ok) {
+                const errText = await uploadResponse.text();
+                throw new Error(errText);
+              }
+              uploadData = await uploadResponse.json();
             }
-            throw new Error(errMessage);
+            break; // Sucesso
+          } catch (err: any) {
+            const isQuota = err.message.includes("429") || err.message.includes("quota") || err.message.includes("limit") || err.message.includes("has been exhausted");
+            if (isQuota && retryCount < MAX_RETRIES) {
+              retryCount++;
+              setProgressText(`Cota atingida. Aguardando ${retryCount * 10}s...`);
+              await delay(retryCount * 10000);
+            } else {
+              throw err;
+            }
           }
-          uploadData = await uploadResponse.json();
+        }
+
+        if (i < fileArray.length - 1) {
+          await delay(2000); // Delay preventivo
         }
 
         // Se for o primeiro upload da sessão, fixamos a chave para o resto da sessão
@@ -698,8 +716,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           fullText: uploadData.fullText, // Usa OCR extraído via backend
           mimeType: uploadData.mimeType,
           summary: fileSummary,
+          fileUri: uploadData.uri, // RESTORE fileUri to allow multi-modal analysis in chat
           keyIndex: uploadData.keyIndex || preferredKeyIndex
-          // Removemos fileUri e uris de propósito para abandonar o File API e passar a usar fullText nas mensagens
         };
 
         const displayMessage = `✅ OCR e Ciência Integral concluída para o documento: **${file.name}**.\n\nExtraídos ${(uploadData.fullText || "").length} caracteres nativamente via Gemini 3 Flash.`;

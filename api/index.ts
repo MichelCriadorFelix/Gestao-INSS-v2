@@ -157,7 +157,7 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
                role: 'user',
                parts: [
                   { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: 'TRANSCRIÇÃO E EXTRAÇÃO EXAUSTIVA DE DADOS.\nRequisito 1: Faça uma transcrição exaustiva e literal (OCR perfeito) do documento anexo. Preserve o máximo de informações.\nRequisito 2: Destaque criticamente valores, nomes, CIDs, datas, registros do INSS (como DER, DIP, NIT), laudos periciais e sentenças.\nRequisito 3: Você NÃO deve fazer um resumo curto. Faça uma "tradução integral" do PDF para texto de máquina garantindo que nenhum dado real ou número se perca.' }
+                  { text: 'AUDITORIA VISUAL DE ELITE E TRANSCRIÇÃO EXAUSTIVA.\nSua missão é converter este documento na sua INTEGRALIDADE para texto. NADA deve ser resumido nesta fase.\n\nREGRAS DE OURO:\n1. OCR DE ALTA FIDELIDADE: Transcreva textos, tabelas e notas de rodapé.\n2. DESCRITIVO VISUAL: Se houver fotos, carimbos, assinaturas ou exames de imagem (RM, TC), DESCREVA-OS detalhadamente (ex: "Imagem de RM mostrando edema...").\n3. MANUSCRITOS (LETRA DE MÉDICO): Use sua inteligência para decifrar caligrafia médica com precisão máxima. Se houver CIDs, extraia-os.\n4. MULTI-CONTEÚDO: Se houver vários laudos ou documentos diferentes dentro deste mesmo PDF, identifique e extraia TODOS, um por um.\n\nFoco absoluto em: CIDs, Datas de Início de Incapacidade (DII), Datas de Entrada de Requerimento (DER), Conclusões Médicas e Vínculos Laborais.' }
                ]
             }
          ],
