@@ -71,13 +71,13 @@ async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, ori
   const uploadPromises = keys.map(async (apiKey, index) => {
     if (invalidKeys.has(apiKey)) return null;
     const ai = new GoogleGenAI({ apiKey });
-    try {
-      const uploadResult = await ai.files.upload({
-        file: filePath,
-        config: { mimeType: mimetype, displayName: originalname }
-      });
-      return { index, uri: uploadResult.uri, result: uploadResult };
-    } catch (e: any) {
+      try {
+        const uploadResult = (await ai.files.upload({
+          file: filePath,
+          config: { mimeType: mimetype, displayName: originalname }
+        })) as any;
+        return { index, uri: uploadResult.uri || uploadResult.file?.uri, result: uploadResult };
+      } catch (e: any) {
       console.warn(`[UPLOAD MULTI-KEY] Fallha na chave ${index}:`, e.message);
       if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
         invalidKeys.add(apiKey);
@@ -126,16 +126,21 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
      if (invalidKeys.has(apiKey)) continue;
      
      activeAi = new GoogleGenAI({ apiKey });
-     try {
-       const uploadResult = await activeAi.files.upload({
-         file: filePath,
-         config: { mimeType: mimetype, displayName: originalname }
-       });
-       fileUri = uploadResult.uri;
-       fileId = uploadResult.name;
-       currentKeyIndex = (currentKeyIndex + idx) % keys.length;
-       break;
-     } catch(e: any) {
+      try {
+        const uploadResult = (await activeAi.files.upload({
+          file: filePath,
+          config: { mimeType: mimetype, displayName: originalname }
+        })) as any;
+        
+        console.log("[OCR UPLOAD SUCCESS]", uploadResult);
+        fileUri = uploadResult.uri || uploadResult.file?.uri;
+        fileId = uploadResult.name || uploadResult.file?.name;
+        
+        if (fileUri) {
+          currentKeyIndex = (currentKeyIndex + idx) % keys.length;
+          break;
+        }
+      } catch(e: any) {
        console.warn(`[OCR UPLOAD] Falha na chave ${apiKey.substring(0, 5)}...`, e.message);
        if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
          invalidKeys.add(apiKey);
@@ -157,23 +162,24 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
                role: 'user',
                parts: [
                   { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: `VOCÊ É O TRANSRICITOR DE ELITE (MODO OCR INTEGRAL).
+                  { text: `VOCÊ É O TRANSRICITOR DE ELITE (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
           
 Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
           
-DIRETRIZES DE OURO:
+DIRETRIZES DE OURO (NÍVEL ESPECIALISTA):
 1. NÃO RESUMA: É terminantemente proibido resumir, parafrasear ou pular páginas. Se o documento tem 50 páginas, você deve transcrever as 50 páginas.
 2. TRANSCRIÇÃO LITERAL: Capture cada palavra, cada número de processo, cada CPF, cada CID e cada endereço.
-3. TABELAS E DADOS: Transfira todos os dados de tabelas (ex: CNIS, valores de causa) de forma organizada.
-4. AUDITORIA VISUAL: Descreva fotos, assinaturas e carimbos (Ex: "Fls. 5: Carimbo de recepção datado de 10/05/2023").
-5. MANUSCRITOS: Decifre caligrafia médica com o "Modo Zoom" para extrair diagnósticos e prescrições.
-6. CONTINUIDADE: Se o texto for longo, certifique-se de chegar até o FINAL da última página.
+3. CALIGRAFIA MÉDICA (CRÍTICO): Decifre com precisão máxima caligrafias cursivas de médicos (letra de médico). Utilize visão computacional avançada para extrair diagnósticos, prescrições, evoluções clínicas e carimbos. Se uma palavra for ilegível, use "[ilegível]" mas tente ao máximo o contexto.
+4. DOCUMENTOS ESCANEADOS E FOTOS: Trate fotos de documentos, digitalizações de baixa qualidade ou documentos antigos/amarelados. Sua visão deve ser capaz de ignorar sombras, dobras e ruídos para focar no conteúdo.
+5. TABELAS E DADOS: Transfira todos os dados de tabelas (ex: CNIS, valores de causa, datas) de forma organizada.
+6. AUDITORIA VISUAL: Descreva fotos, assinaturas e carimbos relevantes (Ex: "Fls. 5: Carimbo de recepção datado de 10/05/2023").
+7. CONTINUIDADE: Certifique-se de chegar até o FINAL da última página sem cortes.
 
 Qualquer perda de dado resultará em falha jurídica. Seja prolixo, exaustivo e fiel.` }
                ]
             }
          ],
-         config: { temperature: 0, maxOutputTokens: 30000 } // Aumentado para suportar muita informação
+         config: { temperature: 0, maxOutputTokens: 8192 } // Flash 3 tem limite de 8192 na saída
      });
      extractedText = response.text || "[Nenhum texto pôde ser extraído]";
   } catch(e: any) {
