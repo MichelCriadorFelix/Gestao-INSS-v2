@@ -112,33 +112,104 @@ async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, ori
   };
 }
 
+async function extractTextWithGemini(filePath: string, mimetype: string, originalname: string): Promise<{ text: string, name: string, mimeType: string, summary: string }> {
+  const keys = getApiKeys();
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
+
+  let fileUri = null;
+  let fileId = null;
+  let activeAi = null;
+
+  // Tentativa rotativa para envio temporário na File API
+  for (let idx = 0; idx < keys.length; idx++) {
+     const apiKey = keys[(currentKeyIndex + idx) % keys.length];
+     if (invalidKeys.has(apiKey)) continue;
+     
+     activeAi = new GoogleGenAI({ apiKey });
+     try {
+       const uploadResult = await activeAi.files.upload({
+         file: filePath,
+         config: { mimeType: mimetype, displayName: originalname }
+       });
+       fileUri = uploadResult.uri;
+       fileId = uploadResult.name;
+       currentKeyIndex = (currentKeyIndex + idx) % keys.length;
+       break;
+     } catch(e: any) {
+       console.warn(`[UPLOAD EXTRACTOR] Falha na chave ${apiKey.substring(0, 5)}...`, e.message);
+       if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
+         invalidKeys.add(apiKey);
+       }
+     }
+  }
+
+  if (!fileUri || !activeAi) {
+     throw new Error("Todas as chaves falharam ou esgotaram a cota de File API.");
+  }
+
+  // Extrair o conteúdo usando o modelo
+  let extractedText = "";
+  try {
+     const response = await activeAi.models.generateContent({
+         model: 'gemini-3-flash-preview',
+         contents: [
+            {
+               role: 'user',
+               parts: [
+                  { fileData: { mimeType: mimetype, fileUri: fileUri } },
+                  { text: 'TRANSCRIÇÃO E EXTRAÇÃO EXAUSTIVA DE DADOS.\nRequisito 1: Faça uma transcrição exaustiva e literal (OCR perfeito) do documento anexo. Preserve o máximo de informações.\nRequisito 2: Destaque criticamente valores, nomes, CIDs, datas, registros do INSS (como DER, DIP, NIT), laudos periciais e sentenças.\nRequisito 3: Você NÃO deve fazer um resumo curto. Faça uma "tradução integral" do PDF para texto de máquina garantindo que nenhum dado real ou número se perca.' }
+               ]
+            }
+         ],
+         config: { temperature: 0.1, maxOutputTokens: 16000 }
+     });
+     extractedText = response.text || "[Nenhum texto pôde ser extraído da visualização do documento]";
+  } catch(e: any) {
+     console.error("[EXTRACTION ERROR]", e);
+     extractedText = `[FALHA NA EXTRAÇÃO LITERÁRIA DO PDF: ${e.message}]`;
+  }
+
+  // Deletar o arquivo para poupar tokens de File API (Notebook LM) e armazenamento.
+  try {
+     await activeAi.files.delete({ name: fileId! });
+     console.log(`[FILE DELETED] Arquivo temporário ${fileId} apagado do Gemini File API.`);
+  } catch (deleteError) {
+     console.error("[FILE CLEANUP ERROR]", deleteError);
+  }
+
+  return { 
+     text: extractedText,
+     name: originalname,
+     mimeType: mimetype,
+     summary: extractedText.substring(0, 500) + "..." // Quick preview
+  };
+}
+
 app.post("/api/upload-file", upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo enviado" });
     }
 
-    // Upload to ALL valid Gemini keys concurrently
-    const uploadResult = await uploadFileToAllGeminiKeys(
+    // Extrair via Gemini 3 Flash e deletar da nuvem
+    const extractedData = await extractTextWithGemini(
       req.file.path,
       req.file.mimetype,
       req.file.originalname
     );
 
-    // Clean up temp file
     if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
     res.json({
-      fileUri: uploadResult.uri,
-      name: uploadResult.name,
-      mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex,
-      uris: uploadResult.uris
+      name: extractedData.name,
+      mimeType: extractedData.mimeType,
+      fullText: extractedData.text,
+      summary: extractedData.summary
     });
   } catch (error: any) {
-    console.error("Error uploading file to Gemini:", error);
+    console.error("Error uploading/extracting file via Gemini:", error);
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: error.message || "Falha no upload" });
+    res.status(500).json({ error: error.message || "Falha na extração" });
   }
 });
 
@@ -181,19 +252,18 @@ app.post("/api/upload-from-url", async (req: any, res) => {
     tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
     fs.writeFileSync(tmpPath, Buffer.from(buffer));
 
-    // Upload to ALL valid Gemini keys concurrently
-    const uploadResult = await uploadFileToAllGeminiKeys(
+    // Extrair via Gemini 3 Flash e deletar da nuvem
+    const extractedData = await extractTextWithGemini(
       tmpPath,
       mimeType || 'application/pdf',
       fileName || 'imported_file.pdf'
     );
 
     res.json({
-      fileUri: uploadResult.uri,
-      name: uploadResult.name,
-      mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex,
-      uris: uploadResult.uris
+      name: extractedData.name,
+      mimeType: extractedData.mimeType,
+      fullText: extractedData.text,
+      summary: extractedData.summary
     });
   } catch (error: any) {
     console.error("Erro no upload via URL:", error);

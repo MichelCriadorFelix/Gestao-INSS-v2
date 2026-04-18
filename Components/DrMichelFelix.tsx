@@ -690,70 +690,19 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         // --- Detailed AI Analysis for each document ---
         setProgressText(`Analisando conteúdo de ${file.name}...`);
         
-        let fileSummary = `Arquivo enviado e processado pela IA: ${file.name}`;
-        try {
-          const aiResponse = await apiFetch('/api/dr-michel/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
-              history: [],
-              files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
-              model: "gemini-3-flash-preview", // Use flash for mapping to be faster and cheaper
-              keyIndex: preferredKeyIndex
-            })
-          });
-
-          if (aiResponse.ok) {
-            const reader = aiResponse.body?.getReader();
-            const decoder = new TextDecoder();
-            let fullAiResText = "";
-            
-            if (reader) {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    const dataStr = line.replace('data: ', '');
-                    if (dataStr === '[DONE]') continue;
-                    try {
-                      const data = JSON.parse(dataStr);
-                      if (data.text) fullAiResText += data.text;
-                    } catch(e) {}
-                  }
-                }
-              }
-            }
-            
-            if (fullAiResText && !fullAiResText.includes('"error":')) {
-              fileSummary = fullAiResText;
-            } else {
-              fileSummary = `[FALHA DE LEITURA] O arquivo ${file.name} foi recebido, mas os limites de cota da API (Erro 429) impediram a extração automática do texto e dos cálculos pela IA nesta etapa. Recomenda-se reenviar a planilha de cálculos se a peça gerada falhar em apontar os devidos valores.`;
-              console.warn("Retorno mascarado com erro da IA ou vazio:", fullAiResText);
-            }
-          } else {
-            const errText = await aiResponse.text();
-            console.warn("IA falhou na análise inicial:", errText);
-            fileSummary = `[FALHA DE COMUNICAÇÃO] O servidor recursou a análise inicial do documento ${file.name} (Erro API). A IA arquivista não pôde ler seus dados.`;
-          }
-        } catch (e) {
-          console.warn("Falha na análise inicial do arquivo:", e);
-          fileSummary = `[FALHA DE ANÁLISE INTERNA] Erro de sistema ao tentar extrair conteúdo de ${file.name}.`;
-        }
-
+        const fileSummary = uploadData.summary || `Arquivo enviado e processado pela IA: ${file.name}`;
         const newDoc: ChatDocument = {
           id: generateId(),
           name: file.name,
           type: file.type,
-          fileUri: uploadData.fileUri,
+          fullText: uploadData.fullText, // Usa o texto extraído nativamente no backend
           mimeType: uploadData.mimeType,
-          summary: fileSummary,
-          keyIndex: uploadData.keyIndex,
-          uris: uploadData.uris
+          summary: fileSummary, 
+          // REMOVE fileUri intentionall to force the code to use fullText
+          keyIndex: uploadData.keyIndex || preferredKeyIndex
         };
+
+        const displayMessage = `✅ OCR e Ciência Integral concluída para o documento: **${file.name}**.\n\nExtraídos ${(uploadData.fullText || "").length} caracteres nativamente via Gemini 3 Flash.`;
 
         setSessions(prev => prev.map(s => 
           s.id === activeSessionId ? { 
@@ -762,7 +711,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             messages: [...s.messages, {
               id: generateId(),
               role: 'assistant',
-              content: fileSummary,
+              content: displayMessage,
               timestamp: new Date().toISOString(),
               isSystem: true
             }]
