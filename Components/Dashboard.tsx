@@ -41,7 +41,6 @@ import DraLuanaCastro from './DraLuanaCastro';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
-import KnowledgeBase from './KnowledgeBase';
 import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
@@ -57,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSettingsSaved,
   onRestoreBackup
 }) => {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -1422,8 +1421,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('knowledge_base'); setIsMenuOpen(false); }}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   onClick={() => { setCurrentView('marketing'); setIsMenuOpen(false); }}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <AcademicCapIcon className="h-6 w-6 mr-3" />
                    <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
@@ -1474,7 +1473,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       currentView === 'dr_michel' ? 'Dr. Michel Felix - IA Jurídica' :
                       currentView === 'dra_luana' ? 'Dra. Luana Castro - IA Trabalhista' :
                       currentView === 'agenda' ? 'Agenda' :
-                      currentView === 'knowledge_base' ? 'Base de Conhecimento' :
+                      currentView === 'marketing' ? 'Marketing Jurídico' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
                       'Cálculos Previdenciários'}
                  </h2>

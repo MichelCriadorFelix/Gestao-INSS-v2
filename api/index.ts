@@ -166,29 +166,26 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
                role: 'user',
                parts: [
                   { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: `VOCÊ É O TRANSRICITOR DE ELITE (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
+                  { text: `VOCÊ É O TRANSRICITOR DE ALTA PRECISÃO (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
           
 Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
           
-DIRETRIZES DE OURO (NÍVEL ESPECIALISTA):
-1. NÃO RESUMA: É terminantemente proibido resumir, parafrasear ou pular páginas. Se o documento tem 50 páginas, você deve transcrever as 50 páginas.
-2. TRANSCRIÇÃO LITERAL: Capture cada palavra, cada número de processo, cada CPF, cada CID e cada endereço.
-3. CALIGRAFIA MÉDICA (CRÍTICO): Decifre com precisão máxima caligrafias cursivas de médicos (letra de médico). Utilize visão computacional avançada para extrair diagnósticos, prescrições, evoluções clínicas e carimbos. Se uma palavra for ilegível, use "[ilegível]" mas tente ao máximo o contexto.
-4. DOCUMENTOS ESCANEADOS E FOTOS: Trate fotos de documentos, digitalizações de baixa qualidade ou documentos antigos/amarelados. Sua visão deve ser capaz de ignorar sombras, dobras e ruídos para focar no conteúdo.
-5. TABELAS E DADOS: Transfira todos os dados de tabelas (ex: CNIS, valores de causa, datas) de forma organizada.
-6. AUDITORIA VISUAL: Descreva fotos, assinaturas e carimbos relevantes (Ex: "Fls. 5: Carimbo de recepção datado de 10/05/2023").
-7. CONTINUIDADE: Certifique-se de chegar até o FINAL da última página sem cortes.
+DIRETRIZES DE OPERAÇÃO:
+1. NÃO RESUMA: É proibido resumir ou pular páginas. Se o documento for difícil, tome o tempo necessário para decifrar cada caractere.
+2. TRANSCRIÇÃO LITERAL: Capture cada palavra, CPF, CID, datas e valores.
+3. CALIGRAFIA MÉDICA: Decifre com precisão caligrafias cursivas de médicos. Se ilegível, use "[ilegível]" mas tente usar o contexto médico.
+4. INTEGRALIDADE: Garanta que a transcrição chegue até o final do documento sem cortes.
 
-Qualquer perda de dado resultará em falha jurídica. Seja prolixo, exaustivo e fiel.` }
+Seja exaustivo e fiel aos fatos.` }
                ]
             }
          ],
-         config: { temperature: 0, maxOutputTokens: 8192 } // Flash 3 tem limite de 8192 na saída
+         config: { temperature: 0, maxOutputTokens: 16384 }
      });
-     extractedText = response.text || "[Nenhum texto pôde ser extraído]";
+     extractedText = response.text || "[O modelo não retornou texto]";
   } catch(e: any) {
      console.error("[OCR ERROR]", e);
-     extractedText = `[ERRO CRÍTICO NA TRANSCRIÇÃO DO PDF: ${e.message}]`;
+     extractedText = `[ERRO NA TRANSCRIÇÃO: ${e.message}]`;
   }
 
   // DELETAR IMEDIATAMENTE DA API (REQUISITO: NÃO GUARDAR NA API)

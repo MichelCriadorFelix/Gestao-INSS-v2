@@ -716,7 +716,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           // fileUri removido: o usuário quer o texto integral salvo na conversa (Supabase) e enviado como texto para a IA
         };
 
-        const displayMessage = `✅ OCR e Ciência Integral concluída para o documento: **${file.name}**.\n\nExtraídos ${(uploadData.fullText || "").length} caracteres nativamente via Gemini 3 Flash.`;
+        const displayMessage = `✅ Processamento completo para o documento: **${file.name}**.\n\nConteúdo integral extraído e mapeado com sucesso para análise.`;
 
         setSessions(prev => prev.map(s => 
           s.id === activeSessionId ? { 
@@ -735,17 +735,17 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
       setProgress(100);
       setProgressText('Concluído!');
-      setPendingAudit(null); // Limpa o progresso pendente se terminou com sucesso
+      setPendingAudit(null); 
       
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. Processo mapeado.
+        content: `Mapeamento concluído. Todos os arquivos foram processados e os fatos relevantes estão prontos para a estratégia jurídica.
 
 **Próximo Passo Sugerido:** 
-Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
-👉 *"Gerar Relatório"* (Para auditar os documentos antes da peça)
-👉 *"Gerar Peça"* (Para escrever a petição direto, se já houver relatório)`,
+Selecione a ação desejada:
+👉 *"Gerar Relatório"* (Para conferir a auditoria detalhada dos documentos)
+👉 *"Gerar Peça"* (Para redigir a petição inicial/petição com base nestes documentos)`,
         timestamp: new Date().toISOString()
       };
       
