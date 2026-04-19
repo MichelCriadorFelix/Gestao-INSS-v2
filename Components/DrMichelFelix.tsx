@@ -1282,9 +1282,9 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
                 }}
-                className="w-full p-3 md:p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[48px] max-h-32 overflow-y-auto text-sm"
+                className="w-full p-2 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[40px] max-h-20 overflow-y-auto text-sm"
               />
               <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
