@@ -195,7 +195,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                        type: 'text/plain',
                        date: new Date().toLocaleDateString('pt-BR'),
                        url: storageUrl,
-                       tag: 'medico'
+                       tags: ['previdenciario']
                    };
                    const updatedDocs = [...(formData.documents || []), newDoc];
                    const updatedFormData = { ...formData, documents: updatedDocs };

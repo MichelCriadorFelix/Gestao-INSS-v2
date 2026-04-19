@@ -456,7 +456,7 @@ Identifique e destaque com clareza:
 - Qualquer informação que possa ser juridicamente relevante`;
     }
 
-    const systemPrompt = \`Você é um especialista em extração OCR de precisão máxima para documentos jurídicos brasileiros. Sua leitura deve ser perfeita.
+    const systemPrompt = `Você é um especialista em extração OCR de precisão máxima para documentos jurídicos brasileiros. Sua leitura deve ser perfeita.
 
 REGRAS ABSOLUTAS DE EXTRAÇÃO:
 1. FIDELIDADE TOTAL: Transcreva EXATAMENTE o que está escrito no documento. Nunca complete, suponha ou invente dados.
@@ -470,7 +470,7 @@ REGRAS ABSOLUTAS DE EXTRAÇÃO:
 9. SEPARAÇÃO DE SEÇÕES: Use linhas em branco para separar seções distintas do documento.
 10. PARES CAMPO-VALOR: Para formulários, use o formato: Nome do Campo: Valor lido
 
-\${specialInstructions}\`;
+${specialInstructions}`;
 
     const response = await callGemini({
       model: "gemini-3-flash-preview",
@@ -484,7 +484,7 @@ REGRAS ABSOLUTAS DE EXTRAÇÃO:
             }
           },
           {
-            text: \`Realize a extração OCR completa e inteligente deste documento: "\${documentName}". Siga rigorosamente as instruções. Não omita nenhuma informação presente no documento.\`
+            text: `Realize a extração OCR completa e inteligente deste documento: "${documentName}". Siga rigorosamente as instruções. Não omita nenhuma informação presente no documento.`
           }
         ]
       },
