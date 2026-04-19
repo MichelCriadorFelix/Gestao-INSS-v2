@@ -1,4 +1,5 @@
 
+// v1.0.1 - Unified OCR Enabled
 import React, { useState, useEffect, useRef } from 'react';
 import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";

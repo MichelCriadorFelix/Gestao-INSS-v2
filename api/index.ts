@@ -1,4 +1,5 @@
 import express from "express";
+// v1.0.1 - OCR Document Optimized
 import { GoogleGenAI } from "@google/genai";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import dotenv from "dotenv";

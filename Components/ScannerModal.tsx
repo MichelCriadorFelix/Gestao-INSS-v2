@@ -1,4 +1,5 @@
 
+// v1.0.1 - HQ Image OCR Quality (0.95)
 import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, CameraIcon, PhotoIcon, ArrowsPointingOutIcon, CheckIcon, DocumentDuplicateIcon, TrashIcon, PlusIcon, ArrowPathIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
