@@ -156,8 +156,23 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
      throw new Error("Falha ao preparar o arquivo para OCR em todas as chaves disponíveis.");
   }
 
-  // Extrair o conteúdo usando o modelo Gemini 3 FLASH (Padrão Ouro de Transcrição)
+  // Extrair o conteúdo usando o modelo Gemini 3 FLASH
   let extractedText = "";
+  const isText = mimetype.startsWith('text/') || originalname.toLowerCase().endsWith('.txt');
+  const systemInstruction = isText 
+      ? `VOCÊ É UM ASSISTENTE DE ANÁLISE DOCUMENTAL. O documento anexo é um arquivo de texto. Leia-o integralmente e mantenha a fidelidade absoluta ao conteúdo para fins de auditoria jurídica. NÃO RESUMA.`
+      : `VOCÊ É O TRANSRICITOR DE ALTA PRECISÃO (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
+
+Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
+
+DIRETRIZES DE OPERAÇÃO:
+1. NÃO RESUMA: É proibido resumir ou pular páginas. Se o documento for difícil, tome o tempo necessário para decifrar cada caractere.
+2. TRANSCRIÇÃO LITERAL: Capture cada palavra, CPF, CID, datas e valores.
+3. CALIGRAFIA MÉDICA: Decifre com precisão caligrafias cursivas de médicos. Se ilegível, use "[ilegível]" mas tente usar o contexto médico.
+4. INTEGRALIDADE: Garanta que a transcrição chegue até o final do documento sem cortes.
+
+Seja exaustivo e fiel aos fatos.`;
+
   try {
      const response = await activeAi.models.generateContent({
          model: 'gemini-3-flash-preview', 
@@ -166,17 +181,7 @@ async function extractTextWithGemini(filePath: string, mimetype: string, origina
                role: 'user',
                parts: [
                   { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: `VOCÊ É O TRANSRICITOR DE ALTA PRECISÃO (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
-          
-Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
-          
-DIRETRIZES DE OPERAÇÃO:
-1. NÃO RESUMA: É proibido resumir ou pular páginas. Se o documento for difícil, tome o tempo necessário para decifrar cada caractere.
-2. TRANSCRIÇÃO LITERAL: Capture cada palavra, CPF, CID, datas e valores.
-3. CALIGRAFIA MÉDICA: Decifre com precisão caligrafias cursivas de médicos. Se ilegível, use "[ilegível]" mas tente usar o contexto médico.
-4. INTEGRALIDADE: Garanta que a transcrição chegue até o final do documento sem cortes.
-
-Seja exaustivo e fiel aos fatos.` }
+                  { text: systemInstruction }
                ]
             }
          ],
@@ -294,7 +299,8 @@ app.post("/api/upload-from-url", async (req: any, res) => {
       return res.status(500).json({ error: "Arquivo baixado está vazio (0 bytes)." });
     }
     
-    const safeFileName = (fileName || 'file').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safeFileName = (fileName || 'file').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+    const ext = fileName && path.extname(fileName) ? path.extname(fileName) : '.pdf';
     
     // Use directory relative to project root
     const ocrTmpDir = path.join(process.cwd(), 'ocr-tmp');
@@ -302,7 +308,7 @@ app.post("/api/upload-from-url", async (req: any, res) => {
       fs.mkdirSync(ocrTmpDir, { recursive: true });
     }
     
-    tmpPath = path.join(ocrTmpDir, `proxy_${Date.now()}_${safeFileName}.pdf`);
+    tmpPath = path.join(ocrTmpDir, `proxy_${Date.now()}_${safeFileName}`);
     fs.writeFileSync(tmpPath, Buffer.from(arrayBuffer));
     console.log(`[URL DOWNLOAD SUCCESS] Salvo em: ${tmpPath} (${arrayBuffer.byteLength} bytes)`);
 
@@ -310,7 +316,7 @@ app.post("/api/upload-from-url", async (req: any, res) => {
     const extractedData = await extractTextWithGemini(
       tmpPath,
       mimeType || 'application/pdf',
-      safeFileName + '.pdf'
+      fileName || (safeFileName)
     );
 
     res.json({
