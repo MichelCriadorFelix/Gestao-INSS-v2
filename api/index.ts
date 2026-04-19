@@ -1570,9 +1570,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API) e dos resumos de auditoria.
-    É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME]", "[DATA]" ou "[VALOR]" se a informação estiver presente nos documentos.
-    Se um dado for crucial e não for encontrado, escreva [DADO NÃO LOCALIZADO NA AUDITORIA] em vez de um placeholder genérico.
+    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API), dos resumos de auditoria E OBRIGATORIAMENTE DE TODO O HISTÓRICO DA CONVERSA, onde se encontram os textos extraídos (OCR) dos documentos processados.
+    É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME]", "[DATA]" ou "[VALOR]" se a informação estiver presente nos documentos ou no OCR lido.
+    Se um dado for crucial e não for encontrado em NENHUMA fonte, escreva [DADO NÃO LOCALIZADO NA AUDITORIA] em vez de um placeholder genérico.
     Analise cada folha do processo para encontrar datas de DER, valores de benefício e CIDs. Sua redação deve ser densa, citando provas específicas (ex: "conforme laudo de fls. X").
     `;
     const historyParts = history.map((h: any) => ({
