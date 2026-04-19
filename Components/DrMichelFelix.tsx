@@ -974,7 +974,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   );
 
   return (
-    <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="flex h-[80vh] md:h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
