@@ -1281,61 +1281,53 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="file" 
-                    multiple 
-                    ref={fileInputRef} 
-                    onChange={handleFileUpload} 
-                    className="hidden" 
-                  />
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
-                    title="Anexar documentos (CNIS, PPP, etc.)"
-                  >
-                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
-                  </button>
-                  <button 
-                    onClick={() => setIsClientModalOpen(true)}
-                    disabled={isUploading}
-                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
-                    title="Importar Cliente (GED)"
-                  >
-                    <Users className="w-5 h-5" />
-                  </button>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                  <select
-                    value={selectedModel}
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                  <div className="flex items-center gap-1">
+                    <input 
+                      type="file" 
+                      multiple 
+                      ref={fileInputRef} 
+                      onChange={handleFileUpload} 
+                      className="hidden" 
+                    />
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                      title="Anexar documentos"
+                    >
+                      {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
+                    </button>
+                    <button 
+                      onClick={() => setIsClientModalOpen(true)}
+                      disabled={isUploading}
+                      className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                      title="Importar Cliente"
+                    >
+                      <Users className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <textarea 
+                    id="chat-input-michel"
+                    rows={1}
+                    placeholder="Mensagem..."
+                    value={input}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedModel(val);
-                      if (val.includes('deepseek') || val.includes('qwen')) {
-                        setSelectedModelProvider('openrouter');
-                      } else {
-                        setSelectedModelProvider('gemini');
-                      }
+                      setInput(e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
                     }}
-                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
+                    className="flex-1 p-2 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[40px] max-h-[80px] overflow-y-auto text-sm"
+                  />
+                  
+                  <button 
+                    onClick={() => handleSendMessage()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex-shrink-0"
+                    title="Enviar"
                   >
-                    <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
-                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (2 Milhões de Tokens - Alta Complexidade)</option>
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
-                    </optgroup>
-                    <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
-                      <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
-                    </optgroup>
-                  </select>
-                </div>
-                <button 
-                  onClick={() => handleSendMessage()}
-                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white p-3 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex-shrink-0"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+                    <Send className="w-5 h-5" />
+                  </button>
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">
