@@ -514,8 +514,44 @@ app.post("/api/ocr-unified", async (req, res) => {
 
     for (let i = 0; i < documents.length; i++) {
       const doc = documents[i];
+      let currentFileUri = doc.fileUri;
+      let tmpPath = "";
+
+      // Sistemática Robusta: Se o arquivo tem URL, o backend cuida do download e upload p/ IA
+      if (!currentFileUri && doc.url) {
+        try {
+          const downloadResponse = await fetch(doc.url);
+          if (downloadResponse.ok) {
+            const buffer = await downloadResponse.arrayBuffer();
+            const fileNameSanitized = (doc.name || 'file').replace(/[^a-zA-Z0-9.-]/g, '_');
+            tmpPath = path.join('/tmp', `unified_ocr_${Date.now()}_${i}_${fileNameSanitized}`);
+            fs.writeFileSync(tmpPath, Buffer.from(buffer));
+
+            const uploadResult = await uploadFileToGeminiWithRetry(
+              tmpPath,
+              doc.mimeType || 'application/pdf',
+              doc.name || 'document'
+            );
+            currentFileUri = uploadResult.uri;
+          } else {
+            console.warn(`Falha ao baixar doc ${doc.name} da URL.`);
+          }
+        } catch (downloadErr: any) {
+          console.error(`Erro no download/preparo para o Gemini (Doc: ${doc.name}):`, downloadErr);
+        } finally {
+          if (tmpPath && fs.existsSync(tmpPath)) {
+            fs.unlinkSync(tmpPath);
+          }
+        }
+      }
+
       const docHeader = `--- INÍCIO DO DOCUMENTO ${i + 1}: ${doc.name} ---`;
       
+      if (!currentFileUri) {
+        unifiedText += `${docHeader}\n[ERRO: Não foi possível processar este documento - falha no carregamento para a IA]\n\n`;
+        continue;
+      }
+
       const parts: any[] = [
         { text: `Você é um perito em extração de texto (OCR) de documentos jurídicos, médicos e previdenciários.
 Mande o conteúdo do arquivo abaixo em formato puro de texto (TXT inteligente).
@@ -524,7 +560,7 @@ REGRAS:
 2. TRANSCRIÇÃO LIMPA: Oculte lixo de caracteres, marcas de scanners ruins e gere uma leitura coesa.
 3. INSCRIÇÕES ESCANEADAS: Decifre caligrafia médica, atestados e PDFs antigos com foco em CRMs, CIDs, e Datas.
 4. ESTRUTURA: Não gere tabelas Markdown, apenas "Chave: Valor" em texto corrido.` },
-        { fileData: { mimeType: doc.mimeType, fileUri: doc.fileUri } }
+        { fileData: { mimeType: doc.mimeType || 'application/pdf', fileUri: currentFileUri } }
       ];
 
       try {

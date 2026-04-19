@@ -155,27 +155,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                return;
           }
 
-          const uploadedToGemini = [];
-          for (let i = 0; i < docsToProcess.length; i++) {
-               const doc = docsToProcess[i];
-               const res = await fetch('/api/upload-from-url', {
-                   method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify({
-                       url: doc.url,
-                       mimeType: doc.type,
-                       fileName: doc.name
-                   })
-               });
-               if (!res.ok) throw new Error(`Falha ao preparar ${doc.name} para a IA`);
-               const data = await res.json();
-               uploadedToGemini.push({ fileUri: data.fileUri, mimeType: data.mimeType, name: doc.name });
-          }
+          const documentsToProcess = docsToProcess.map(doc => ({
+              url: doc.url,
+              mimeType: doc.type,
+              name: doc.name
+          }));
 
           const ocrRes = await fetch('/api/ocr-unified', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ documents: uploadedToGemini })
+               body: JSON.stringify({ documents: documentsToProcess })
           });
           
           if (!ocrRes.ok) throw new Error("Falha na geração do OCR unificado no servidor.");
