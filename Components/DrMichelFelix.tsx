@@ -625,122 +625,178 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         setProgressText(`Preparando ${file.name} (${i + 1}/${fileArray.length})...`);
         setProgress(Math.round(((i) / fileArray.length) * 100));
 
-        let uploadData;
-
-        // Bypass Vercel 4.5MB limit if file is large
-        if (file.size > 4 * 1024 * 1024) {
-          setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
-          
-          // Sanitize filename to avoid "Invalid key" errors in Supabase
-          const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
-          
-          if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
-
-          const urlResponse = await apiFetch('/api/upload-from-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              url: storageUrl,
-              mimeType: file.type,
-              fileName: file.name,
-              keyIndex: preferredKeyIndex
-            })
-          });
-
-          if (!urlResponse.ok) {
-            const errText = await urlResponse.text();
-            throw new Error(`Falha no processamento via URL: ${errText}`);
-          }
-          uploadData = await urlResponse.json();
-        } else {
-          setProgressText(`Enviando ${file.name} para a IA...`);
-          const formData = new FormData();
-          formData.append('file', file);
-          if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
-            formData.append('keyIndex', preferredKeyIndex.toString());
-          }
-
-          const uploadResponse = await apiFetch('/api/upload-file', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!uploadResponse.ok) {
-            const errText = await uploadResponse.text();
-            let errMessage = "Falha no upload";
-            try {
-              const errJson = JSON.parse(errText);
-              errMessage = errJson.error || errMessage;
-            } catch(e) {
-              errMessage = "Erro no servidor: " + errText.substring(0, 100);
-            }
-            throw new Error(errMessage);
-          }
-          uploadData = await uploadResponse.json();
-        }
-
-        // Se for o primeiro upload da sessão, fixamos a chave para o resto da sessão
-        if (preferredKeyIndex === undefined || preferredKeyIndex === null) {
-          preferredKeyIndex = uploadData.keyIndex;
-          setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, uploadKeyIndex: preferredKeyIndex } : s));
-        }
-
-        // --- Detailed AI Analysis for each document ---
-        setProgressText(`Analisando conteúdo de ${file.name}...`);
-        
+        let uploadData: any = {};
         let fileSummary = `Arquivo enviado e processado pela IA: ${file.name}`;
-        try {
-          const aiResponse = await apiFetch('/api/dr-michel/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
-              history: [],
-              files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
-              model: "gemini-3-flash-preview", // Use flash for mapping to be faster and cheaper
-              keyIndex: preferredKeyIndex
-            })
-          });
+        let fullTextContent = '';
+        
+        const isTxT = file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
-          if (aiResponse.ok) {
-            const reader = aiResponse.body?.getReader();
-            const decoder = new TextDecoder();
-            let fullAiResText = "";
-            
-            if (reader) {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    const dataStr = line.replace('data: ', '');
-                    if (dataStr === '[DONE]') continue;
-                    try {
-                      const data = JSON.parse(dataStr);
-                      if (data.text) fullAiResText += data.text;
-                    } catch(e) {}
+        if (isTxT) {
+          setProgressText(`Lendo texto do arquivo OCR ${file.name}...`);
+          fullTextContent = await file.text();
+          
+          setProgressText(`Analisando conteúdo de ${file.name}...`);
+          try {
+            const aiResponse = await apiFetch('/api/dr-michel/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 20000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                history: [],
+                files: [],
+                model: "gemini-3-flash-preview", 
+                keyIndex: preferredKeyIndex
+              })
+            });
+
+            if (aiResponse.ok) {
+              const reader = aiResponse.body?.getReader();
+              const decoder = new TextDecoder();
+              let fullAiResText = "";
+              if (reader) {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const chunk = decoder.decode(value);
+                  const lines = chunk.split('\n');
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      const dataStr = line.replace('data: ', '');
+                      if (dataStr === '[DONE]') continue;
+                      try {
+                        const data = JSON.parse(dataStr);
+                        if (data.text) fullAiResText += data.text;
+                      } catch(e) {}
+                    }
                   }
                 }
               }
-            }
-            
-            if (fullAiResText && !fullAiResText.includes('"error":')) {
-              fileSummary = fullAiResText;
+              if (fullAiResText && !fullAiResText.includes('"error":')) {
+                fileSummary = fullAiResText;
+              } else {
+                fileSummary = `[LEITURA CONCLUÍDA LOCAMENTE] O texto do OCR foi anexado em memória (tamanho: ${fullTextContent.length} caracteres), mas o resumo IA falhou por cota.`;
+              }
             } else {
-              fileSummary = `[FALHA DE LEITURA] O arquivo ${file.name} foi recebido, mas os limites de cota da API (Erro 429) impediram a extração automática do texto e dos cálculos pela IA nesta etapa. Recomenda-se reenviar a planilha de cálculos se a peça gerada falhar em apontar os devidos valores.`;
-              console.warn("Retorno mascarado com erro da IA ou vazio:", fullAiResText);
+              fileSummary = `[LIDO COM SUCESSO] OCR anexado à memória do Supabase. Resumo ignorado por falha na API.`;
             }
-          } else {
-            const errText = await aiResponse.text();
-            console.warn("IA falhou na análise inicial:", errText);
-            fileSummary = `[FALHA DE COMUNICAÇÃO] O servidor recursou a análise inicial do documento ${file.name} (Erro API). A IA arquivista não pôde ler seus dados.`;
+          } catch (e) {
+            fileSummary = `[LIDO COM SUCESSO] Texto arquivado e disponível para o contexto sem resumo IA.`;
           }
-        } catch (e) {
-          console.warn("Falha na análise inicial do arquivo:", e);
-          fileSummary = `[FALHA DE ANÁLISE INTERNA] Erro de sistema ao tentar extrair conteúdo de ${file.name}.`;
+        } else {
+          // Bypass Vercel 4.5MB limit if file is large
+          if (file.size > 4 * 1024 * 1024) {
+            setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
+            
+            // Sanitize filename to avoid "Invalid key" errors in Supabase
+            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
+            
+            if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
+  
+            const urlResponse = await apiFetch('/api/upload-from-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: storageUrl,
+                mimeType: file.type,
+                fileName: file.name,
+                keyIndex: preferredKeyIndex
+              })
+            });
+  
+            if (!urlResponse.ok) {
+              const errText = await urlResponse.text();
+              throw new Error(`Falha no processamento via URL: ${errText}`);
+            }
+            uploadData = await urlResponse.json();
+          } else {
+            setProgressText(`Enviando ${file.name} para a IA...`);
+            const formData = new FormData();
+            formData.append('file', file);
+            if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
+              formData.append('keyIndex', preferredKeyIndex.toString());
+            }
+  
+            const uploadResponse = await apiFetch('/api/upload-file', {
+              method: 'POST',
+              body: formData
+            });
+  
+            if (!uploadResponse.ok) {
+              const errText = await uploadResponse.text();
+              let errMessage = "Falha no upload";
+              try {
+                const errJson = JSON.parse(errText);
+                errMessage = errJson.error || errMessage;
+              } catch(e) {
+                errMessage = "Erro no servidor: " + errText.substring(0, 100);
+              }
+              throw new Error(errMessage);
+            }
+            uploadData = await uploadResponse.json();
+          }
+  
+          // Se for o primeiro upload da sessão, fixamos a chave para o resto da sessão
+          if (preferredKeyIndex === undefined || preferredKeyIndex === null) {
+            preferredKeyIndex = uploadData.keyIndex;
+            setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, uploadKeyIndex: preferredKeyIndex } : s));
+          }
+  
+          // --- Detailed AI Analysis for each document ---
+          setProgressText(`Analisando conteúdo de ${file.name}...`);
+          
+          try {
+            const aiResponse = await apiFetch('/api/dr-michel/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                history: [],
+                files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
+                model: "gemini-3-flash-preview", // Use flash for mapping to be faster and cheaper
+                keyIndex: preferredKeyIndex
+              })
+            });
+  
+            if (aiResponse.ok) {
+              const reader = aiResponse.body?.getReader();
+              const decoder = new TextDecoder();
+              let fullAiResText = "";
+              
+              if (reader) {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const chunk = decoder.decode(value);
+                  const lines = chunk.split('\n');
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      const dataStr = line.replace('data: ', '');
+                      if (dataStr === '[DONE]') continue;
+                      try {
+                        const data = JSON.parse(dataStr);
+                        if (data.text) fullAiResText += data.text;
+                      } catch(e) {}
+                    }
+                  }
+                }
+              }
+              
+              if (fullAiResText && !fullAiResText.includes('"error":')) {
+                fileSummary = fullAiResText;
+              } else {
+                fileSummary = `[FALHA DE LEITURA] O arquivo ${file.name} foi recebido, mas os limites de cota da API (Erro 429) impediram a extração automática do texto e dos cálculos pela IA nesta etapa. Recomenda-se reenviar a planilha de cálculos se a peça gerada falhar em apontar os devidos valores.`;
+                console.warn("Retorno mascarado com erro da IA ou vazio:", fullAiResText);
+              }
+            } else {
+              const errText = await aiResponse.text();
+              console.warn("IA falhou na análise inicial:", errText);
+              fileSummary = `[FALHA DE COMUNICAÇÃO] O servidor recursou a análise inicial do documento ${file.name} (Erro API). A IA arquivista não pôde ler seus dados.`;
+            }
+          } catch (e) {
+            console.warn("Falha na análise inicial do arquivo:", e);
+            fileSummary = `[FALHA DE ANÁLISE INTERNA] Erro de sistema ao tentar extrair conteúdo de ${file.name}.`;
+          }
         }
 
         const newDoc: ChatDocument = {
@@ -750,7 +806,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           fileUri: uploadData.fileUri,
           mimeType: uploadData.mimeType,
           summary: fileSummary,
-          keyIndex: uploadData.keyIndex
+          fullText: fullTextContent || undefined,
+          keyIndex: preferredKeyIndex || uploadData.keyIndex
         };
 
         setSessions(prev => prev.map(s => 
