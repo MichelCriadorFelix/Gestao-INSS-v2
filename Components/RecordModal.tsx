@@ -264,7 +264,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               const newDoc: ScannedDocument = {
                   id,
                   name: file.name,
-                  type: file.type || 'application/pdf',
+                  type: file.type || (file.name.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf'),
                   url: finalUrl,
                   date: new Date().toISOString()
               };
@@ -922,7 +922,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             <input 
                                 type="file" 
                                 multiple 
-                                accept=".pdf,image/*"
+                                accept=".pdf,image/*,.txt"
                                 ref={fileInputRef} 
                                 onChange={handleFileUpload} 
                                 className="hidden" 
@@ -975,7 +975,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
                                             <button onClick={() => moveDocument(idx, 'down')} disabled={idx === formData.documents!.length - 1} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDownIcon className="h-4 w-4" /></button>
                                         </div>
-                                        <div className="h-10 w-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shrink-0">
+                                        <div className={`h-10 w-10 ${doc.type === 'text/plain' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'} rounded-lg flex items-center justify-center shrink-0`}>
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -1000,7 +1000,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                 </div>
                                             )}
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMG'}</p>
+                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : doc.type === 'text/plain' ? 'TXT' : 'IMG'}</p>
                                                 {doc.tags?.map(tagId => {
                                                     const t = AVAILABLE_TAGS.find(t => t.id === tagId);
                                                     return t ? <span key={tagId} className={`text-[10px] px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span> : null;
