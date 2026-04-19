@@ -76,7 +76,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -974,7 +974,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   );
 
   return (
-    <div className="flex h-[80vh] md:h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="flex h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] w-full bg-white dark:bg-slate-900 rounded-lg md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -989,19 +989,22 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       />
       
       {/* SIDEBAR: HISTÓRICO */}
-      <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
+      <aside className={`${isSidebarOpen ? 'w-full md:w-80' : 'w-0'} absolute md:relative z-20 h-full overflow-hidden shrink-0 transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <History className="w-4 h-4" /> Histórico
           </h3>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
             <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
 
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           <button 
-            onClick={createNewSession}
+            onClick={() => {
+              createNewSession();
+              if (window.innerWidth < 768) setIsSidebarOpen(false);
+            }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" /> Nova Conversa
@@ -1022,7 +1025,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             {filteredSessions.map(session => (
               <div 
                 key={session.id}
-                onClick={() => setCurrentSessionId(session.id)}
+                onClick={() => {
+                  setCurrentSessionId(session.id);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
                 className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-slate-800 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
               >
                 {editingSessionId === session.id ? (
@@ -1076,7 +1082,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950 overflow-hidden">
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950 min-w-0">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1086,8 +1092,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           </button>
         )}
 
-        {/* WELCOME SCREEN OR MESSAGES - Garantindo altura flexível */}
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
+        {/* WELCOME SCREEN OR MESSAGES */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
           {!currentSession || currentSession.messages.length === 0 ? (
             <div className="max-w-4xl mx-auto mt-12 space-y-12">
               <div className="text-center space-y-4">
@@ -1281,53 +1287,62 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
-                  <div className="flex items-center gap-1">
-                    <input 
-                      type="file" 
-                      multiple 
-                      ref={fileInputRef} 
-                      onChange={handleFileUpload} 
-                      className="hidden" 
-                    />
-                    <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
-                      title="Anexar documentos"
-                    >
-                      {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
-                    </button>
-                    <button 
-                      onClick={() => setIsClientModalOpen(true)}
-                      disabled={isUploading}
-                      className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
-                      title="Importar Cliente"
-                    >
-                      <Users className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <textarea 
-                    id="chat-input-michel"
-                    rows={1}
-                    placeholder="Mensagem..."
-                    value={input}
-                    onChange={(e) => {
-                      setInput(e.target.value);
-                      e.target.style.height = 'auto';
-                      e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
-                    }}
-                    className="flex-1 p-2 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[40px] max-h-[80px] overflow-y-auto text-sm"
+              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="file" 
+                    multiple 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    className="hidden" 
                   />
-                  
                   <button 
-                    onClick={() => handleSendMessage()}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex-shrink-0"
-                    title="Enviar"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                    title="Anexar documentos (CNIS, PPP, etc.)"
                   >
-                    <Send className="w-5 h-5" />
+                    {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </button>
+                  <button 
+                    onClick={() => setIsClientModalOpen(true)}
+                    disabled={isUploading}
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
+                    title="Importar Cliente (GED)"
+                  >
+                    <Users className="w-5 h-5" />
+                  </button>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedModel(val);
+                      if (val.includes('deepseek') || val.includes('qwen')) {
+                        setSelectedModelProvider('openrouter');
+                      } else {
+                        setSelectedModelProvider('gemini');
+                      }
+                    }}
+                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
+                  >
+                    <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
+                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (2 Milhões de Tokens - Alta Complexidade)</option>
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
+                    </optgroup>
+                    <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <button 
+                  onClick={() => handleSendMessage()}
+                  disabled={!input.trim() || isLoading}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white p-2.5 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">

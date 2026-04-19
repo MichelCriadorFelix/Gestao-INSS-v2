@@ -72,7 +72,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -971,7 +971,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   );
 
   return (
-    <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+    <div className="flex h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] w-full bg-white dark:bg-slate-900 rounded-lg md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -986,19 +986,22 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       />
       
       {/* SIDEBAR: HISTÓRICO */}
-      <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
+      <aside className={`${isSidebarOpen ? 'w-full md:w-80' : 'w-0'} absolute md:relative z-20 h-full overflow-hidden shrink-0 transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <History className="w-4 h-4" /> Histórico
           </h3>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
             <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
 
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           <button 
-            onClick={createNewSession}
+            onClick={() => {
+              createNewSession();
+              if (window.innerWidth < 768) setIsSidebarOpen(false);
+            }}
             className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" /> Nova Conversa
@@ -1019,7 +1022,10 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             {filteredSessions.map(session => (
               <div 
                 key={session.id}
-                onClick={() => setCurrentSessionId(session.id)}
+                onClick={() => {
+                  setCurrentSessionId(session.id);
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
                 className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-slate-800 border-rose-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
               >
                 {editingSessionId === session.id ? (
@@ -1073,7 +1079,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950 min-w-0">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1268,11 +1274,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${e.target.scrollHeight}px`;
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
                 }}
-                className="w-full p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[56px] max-h-40 overflow-y-auto"
+                className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <input 
                     type="file" 
