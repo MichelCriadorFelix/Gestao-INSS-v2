@@ -1367,7 +1367,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     onChange={(e) => {
                       const val = e.target.value;
                       setSelectedModel(val);
-                      if (val.includes('deepseek') || val.includes('qwen')) {
+                      if (val.includes('/')) {
                         setSelectedModelProvider('openrouter');
                       } else {
                         setSelectedModelProvider('gemini');
@@ -1380,6 +1380,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
