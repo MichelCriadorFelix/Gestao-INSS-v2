@@ -1357,7 +1357,7 @@ app.post("/api/marketing/generate", async (req, res) => {
 
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    let { message, history, images, files, ragContext, modelProvider, model, keyIndex } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex } = req.body;
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
@@ -1379,6 +1379,10 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     if (isGenerationRequest) {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    if (documentContext) {
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
     }
 
     if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
@@ -1451,7 +1455,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
 app.post("/api/dra-luana/chat", async (req, res) => {
   try {
-    let { message, history, images, minWage = '1621.00', ragContext, modelProvider, model, keyIndex } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex } = req.body;
     
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
@@ -1512,6 +1516,10 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     if (isGenerationRequest) {
       console.log("Injetando Manual de Redação de Elite - Dra. Luana");
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    if (documentContext) {
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
     }
 
     // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4

@@ -470,19 +470,18 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         }
 
         // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
-        const textLimit = doc.fileUri ? 1000 : 500000; // If we have the file, send only a small preview to save tokens
+        const activeProvider = eliteProviderOverride || selectedModelProvider;
+        const textLimit = doc.fileUri ? 1000 : (activeProvider === 'openrouter' ? 150000 : 500000); // Reduce limit for paid models to save tokens
         const fullTextPart = doc.fullText ? `CONTEÚDO (EXCERTOS):\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Base de Dados Habilitado]' : ''}`;
       }).join('\n\n---\n\n') || '';
-
-      const contextPrompt = docSummaries ? 
-        `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
 
       const response = await apiFetch('/api/dr-michel/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: contextPrompt + messageText,
+          message: messageText,
+          documentContext: docSummaries,
           history: session?.messages || [],
           images: images || [],
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],

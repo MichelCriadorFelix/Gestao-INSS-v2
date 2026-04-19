@@ -465,19 +465,19 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
         }
 
-        // Include as much full text as possible within safety limits (increased to 500k)
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, 500000)}` : '';
+        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
+        const activeProvider = eliteProviderOverride || selectedModelProvider;
+        const textLimit = doc.fileUri ? 1000 : (activeProvider === 'openrouter' ? 150000 : 500000); // Reduce limit for paid models to save tokens
+        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
-
-      const contextPrompt = docSummaries ? 
-        `[CONTEXTO DO PROCESSO INTEGRAL - USE PARA TODAS AS RESPOSTAS]\n${docSummaries}\n\n` : '';
 
       const response = await apiFetch('/api/dra-luana/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: contextPrompt + messageText,
+          message: messageText,
+          documentContext: docSummaries,
           history: session?.messages || [],
           images: images || [],
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
