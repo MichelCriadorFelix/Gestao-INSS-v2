@@ -178,6 +178,27 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, documents: updatedDocs });
   }
 
+  const handleDownloadAllPDFs = () => {
+    const pdfDocs = (formData.documents || []).filter(d => d.type === 'application/pdf');
+    
+    if (pdfDocs.length === 0) {
+        alert('Nenhum documento PDF disponível para baixar.');
+        return;
+    }
+
+    pdfDocs.forEach((doc, index) => {
+        setTimeout(() => {
+            const link = document.createElement('a');
+            link.href = doc.url;
+            link.download = doc.name;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }, index * 300);
+    });
+  };
+
   const handleScannerSave = async (doc: ScannedDocument) => {
       setSyncStatus(prev => ({ ...prev, [doc.id]: 'syncing' }));
       
@@ -912,6 +933,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
+                            </button>
+                            <button 
+                                onClick={handleDownloadAllPDFs}
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                            >
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                                Baixar PDFs
                             </button>
                             <button 
                                 onClick={() => setIsScannerOpen(true)}
