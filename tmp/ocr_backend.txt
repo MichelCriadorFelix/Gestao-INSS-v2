@@ -1,0 +1,262 @@
+// OCR Avançado para Documentos Jurídicos Individuais
+app.post("/api/ocr-document", async (req, res) => {
+  try {
+    const { fileData, mimeType, documentName, documentType } = req.body;
+    if (!fileData) return res.status(400).json({ error: "fileData is required" });
+
+    // Detecta o tipo de documento para prompt especializado
+    const docTypeLower = (documentType || documentName || '').toLowerCase();
+
+    let specialInstructions = '';
+
+    if (docTypeLower.includes('cnis') || docTypeLower.includes('extrato')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: CNIS (Cadastro Nacional de Informações Sociais)
+FOCO ESPECIAL:
+- Extraia o cabeçalho: Nome completo, CPF, Data de Nascimento, Nome da Mãe, NIT/PIS/PASEP
+- Para cada Vínculo (Seq), extraia em ordem:
+  * Número do Seq
+  * NIT
+  * CNPJ/CEI/CPF do empregador
+  * Nome da Empresa/Empregador
+  * Tipo de filiação (Empregado, CI, Facultativo, Avulso, etc.)
+  * Data de Início do vínculo
+  * Data de Fim do vínculo (ou "Em aberto" se não houver)
+  * Indicadores presentes (IEAN, IFIM, PEMPREG, PEMPFIL, etc.)
+- Para cada vínculo, liste os salários de contribuição por competência (MM/AAAA: R$ valor)
+- Identifique e destaque períodos de benefício:
+  * B31 = Auxílio-Doença Previdenciário
+  * B32 = Aposentadoria por Invalidez Previdenciária
+  * B91 = Auxílio-Doença Acidentário
+  * B92 = Aposentadoria por Invalidez Acidentária
+- Ao final, indique o total de vínculos encontrados`;
+
+    } else if (docTypeLower.includes('laudo') || docTypeLower.includes('médic') || 
+               docTypeLower.includes('medic') || docTypeLower.includes('exame') ||
+               docTypeLower.includes('atestado') || docTypeLower.includes('prontuário')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: DOCUMENTO MÉDICO (Laudo, Atestado, Exame ou Prontuário)
+FOCO ESPECIAL:
+- Dados do Paciente: Nome completo, Data de Nascimento, CPF, Endereço
+- Dados do Médico/Profissional: Nome completo, CRM/CRP/CREFITO e UF, Especialidade
+- Nome do Hospital/Clínica e endereço
+- Data do laudo/atestado/exame
+- CID-10: código e descrição completa da patologia
+- Diagnóstico: transcreva integralmente, incluindo achados
+- Histórico clínico mencionado
+- Limitações funcionais descritas explicitamente
+- Período de afastamento indicado (se houver)
+- Medicamentos prescritos e dosagens
+- Para exames de imagem (Raio-X, Ressonância, Tomografia, Ultrassom):
+  * Técnica utilizada
+  * Achados por estrutura anatômica
+  * Conclusão/Impressão diagnóstica (transcreva integralmente)
+- Para laudos periciais: opinião conclusiva sobre capacidade laboral
+- Assinatura e carimbo (confirme nome e CRM do signatário)`;
+
+    } else if (docTypeLower.includes('ppp') || docTypeLower.includes('profissiográfico')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: PPP (Perfil Profissiográfico Previdenciário)
+FOCO ESPECIAL:
+- Dados do Empregador: Razão Social, CNPJ, CEI/CNO, endereço
+- Dados do Trabalhador: Nome completo, NIT/PIS/PASEP, CPF, Data de Nascimento
+- Função/Cargo exercido e CBO
+- Setor/Departamento
+- Para cada período de trabalho com exposição a agentes nocivos:
+  * Data de início e fim do período
+  * Código do agente nocivo (Decreto 3048/99 ou IN 77/2015)
+  * Descrição completa do agente
+  * Intensidade/Concentração/Dose (com unidade de medida)
+  * Técnica de avaliação utilizada
+  * Limite de tolerância (LT)
+  * EPI fornecido: código CA, descrição, fabricante, eficácia comprovada (Sim/Não)
+  * EPC existente e eficácia
+- Responsável pelos registros ambientais: nome, CPF e assinatura
+- Responsável pelos registros de saúde (PCMSO): nome, CRM, CPF e assinatura
+- Data de emissão do PPP
+- Se a empresa afirma que o EPI reduz a exposição abaixo do limite, destaque isso`;
+
+    } else if (docTypeLower.includes('ctps') || docTypeLower.includes('carteira de trabalho')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: CTPS (Carteira de Trabalho e Previdência Social)
+FOCO ESPECIAL:
+- Número e Série da CTPS, UF emissora, data de emissão
+- Dados pessoais do titular: Nome, Filiação, Data de Nascimento, Naturalidade, CPF, PIS/PASEP
+- Para cada anotação de emprego (registro):
+  * Data de admissão (DD/MM/AAAA)
+  * Nome do empregador e CNPJ/CEI
+  * Tipo de contrato (Prazo indeterminado, determinado, etc.)
+  * Remuneração de admissão (valor e período)
+  * Função/cargo e CBO
+  * Data de saída (se houver)
+  * Motivo da rescisão (se anotado)
+  * Alterações salariais (data e novo valor)
+- Anotações gerais: acidentes de trabalho, licenças, outros
+- Qualificação civil e profissional
+- Foto existente (descreva se presente)`;
+
+    } else if (docTypeLower.includes('trct') || docTypeLower.includes('rescisão') || 
+               docTypeLower.includes('rescisao') || docTypeLower.includes('termo de rescisão')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: TRCT (Termo de Rescisão do Contrato de Trabalho)
+
+ATENÇÃO MÁXIMA NOS CAMPOS DE DATA - LEIA CADA DÍGITO INDIVIDUALMENTE:
+
+Dados do Empregador:
+- Razão Social, CNPJ, endereço completo, ramo de atividade
+
+Dados do Empregado:
+- Nome completo, CPF, PIS/NIT/PASEP, CTPS (número, série, UF), cargo/função, CBO
+
+CAMPOS CRÍTICOS DE DATA (verifique cada dígito com atenção redobrada):
+- Campo 24 - Data de Admissão: DD/MM/AAAA (informe cada dígito lido)
+- Campo 25 - Data do Aviso Prévio: DD/MM/AAAA
+- Campo 26 - Data de Afastamento/Saída: DD/MM/AAAA (informe cada dígito lido)
+- Se qualquer dígito estiver ilegível: informe "Campo X, dígito Y: ILEGÍVEL"
+
+Motivo da Rescisão:
+- Código e descrição do motivo (ex: 01=Sem justa causa; 02=Com justa causa; 03=Pedido; etc.)
+
+Verbas Rescisórias (liste cada linha):
+- Nome da verba
+- Valor bruto
+- Descontos (INSS, IRRF, outros)
+- Valor líquido
+
+Totais:
+- Total de proventos
+- Total de descontos  
+- Total líquido a receber/pagar
+
+FGTS:
+- Saldo do FGTS
+- Multa rescisória (40% ou 20%)
+- Valor a ser sacado
+
+Data do Termo e assinaturas presentes`;
+
+    } else if (docTypeLower.includes('contra-cheque') || docTypeLower.includes('holerite') || 
+               docTypeLower.includes('contracheque') || docTypeLower.includes('folha de pagamento')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: CONTRA-CHEQUE / HOLERITE
+FOCO ESPECIAL:
+- Empresa/Empregador: Razão Social, CNPJ
+- Empregado: Nome completo, CPF, PIS, matrícula, cargo, departamento
+- Mês e ano de referência
+- Período de trabalho (dias)
+- Salário base
+
+Proventos (liste todos):
+- Código, descrição e valor de cada rubrica
+
+Descontos (liste todos):
+- Código, descrição e valor de cada desconto
+
+Totais:
+- Total de proventos
+- Total de descontos
+- Salário líquido
+
+Bases de cálculo:
+- Base INSS e alíquota
+- Base IRRF e alíquota
+- Base FGTS e valor depositado`;
+
+    } else if (docTypeLower.includes('certidão') || docTypeLower.includes('nascimento') || 
+               docTypeLower.includes('casamento') || docTypeLower.includes('óbito') || docTypeLower.includes('obito')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: CERTIDÃO (Nascimento, Casamento ou Óbito)
+FOCO ESPECIAL:
+- Tipo de certidão
+- Cartório: nome, número, comarca, estado
+- Livro, folha e número de registro
+- Data do registro
+
+Para Nascimento: nome do registrado, data/hora/local do nascimento, nome dos pais, nome dos avós, naturalidade dos pais
+Para Casamento: nomes completos dos cônjuges, data/local do casamento, regime de bens, nomes dos pais de ambos, testemunhas
+Para Óbito: nome do falecido, data/hora/local do óbito, causa da morte (se informado), nome dos pais, se era casado/solteiro/viúvo
+- Observações e averbações (separações, reconhecimentos, etc.)
+- Data de expedição da certidão`;
+
+    } else if (docTypeLower.includes('identidade') || docTypeLower.includes('rg')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: DOCUMENTO DE IDENTIDADE (RG)
+FOCO ESPECIAL:
+- Número do RG e órgão expedidor
+- Nome completo
+- Filiação (nome do pai e da mãe)
+- Data de nascimento
+- Naturalidade
+- CPF (se constar)
+- Data de expedição
+- Validade (se houver)
+- Observações`;
+
+    } else if (docTypeLower.includes('comprovante de residência') || docTypeLower.includes('residencia')) {
+      specialInstructions = `
+DOCUMENTO IDENTIFICADO: COMPROVANTE DE RESIDÊNCIA
+FOCO ESPECIAL:
+- Tipo de documento (conta de luz, água, gás, telefone, bancário, etc.)
+- Nome do titular
+- Endereço completo (logradouro, número, complemento, bairro, cidade, estado, CEP)
+- Mês e ano de referência
+- Empresa emissora`;
+
+    } else {
+      specialInstructions = `
+Realize a extração completa de todo o texto do documento.
+Identifique e destaque com clareza:
+- Todos os nomes de pessoas mencionados
+- Todos os CPFs e CNPJs
+- Todas as datas (informe cada dígito lido)
+- Todos os valores monetários
+- Informações de contato (endereços, telefones, emails)
+- Números de processos, benefícios, registros ou protocolos
+- Qualquer informação que possa ser juridicamente relevante`;
+    }
+
+    const systemPrompt = \`Você é um especialista em extração OCR de precisão máxima para documentos jurídicos brasileiros. Sua leitura deve ser perfeita.
+
+REGRAS ABSOLUTAS DE EXTRAÇÃO:
+1. FIDELIDADE TOTAL: Transcreva EXATAMENTE o que está escrito no documento. Nunca complete, suponha ou invente dados.
+2. TEXTO LIMPO: Use apenas texto simples. Proibido usar símbolos de formatação como |, -, =, #, *, /, _, [ ] exceto para indicar dados ilegíveis como [ILEGÍVEL].
+3. LEITURA VISUAL SUPREMA: Se o PDF tiver camada de texto digital, IGNORE-A se divergir do que você vê visualmente. A imagem é a verdade.
+4. DATAS COM PRECISÃO MÁXIMA: Para qualquer data, leia CADA dígito separadamente. Nunca assuma o ano. Diferencie claramente 2014, 2019, 2021, 2024. Se um dígito estiver borrado, escreva [?].
+5. CALIGRAFIA MÉDICA: Para textos manuscritos difíceis, faça sua melhor interpretação e adicione (?) após a palavra quando incerto. Nunca deixe em branco.
+6. ILEGÍVEL: Se uma palavra ou campo inteiro estiver realmente ilegível, escreva: [ILEGÍVEL] - nunca invente.
+7. COMPLETUDE: Não resuma. Transcreva TODO o conteúdo do documento, do início ao fim.
+8. ORDEM: Siga a ordem visual do documento, de cima para baixo e esquerda para direita.
+9. SEPARAÇÃO DE SEÇÕES: Use linhas em branco para separar seções distintas do documento.
+10. PARES CAMPO-VALOR: Para formulários, use o formato: Nome do Campo: Valor lido
+
+${specialInstructions}\`;
+
+    const response = await callGemini({
+      model: "gemini-3-flash-preview",
+      contents: {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType || 'application/pdf',
+              data: fileData
+            }
+          },
+          {
+            text: \`Realize a extração OCR completa e inteligente deste documento: "${documentName}". Siga rigorosamente as instruções. Não omita nenhuma informação presente no documento.\`
+          }
+        ]
+      },
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: 0.05,
+        maxOutputTokens: 8192
+      }
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("Error in OCR document:", error);
+    res.status(500).json({ error: error.message || "Falha no OCR do documento" });
+  }
+});
