@@ -769,12 +769,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. Processo mapeado.
-
-**Próximo Passo Sugerido:** 
-Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
-👉 *"Gerar Relatório"* (Para auditar os documentos antes da peça)
-👉 *"Gerar Peça"* (Para escrever a petição direto, se já houver relatório)`,
+        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. O processo foi mapeado e estou pronto para gerar a petição ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
         timestamp: new Date().toISOString()
       };
       

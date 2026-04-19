@@ -191,6 +191,26 @@ Sua tarefa é analisar o texto extraído de um CNIS (Cadastro Nacional de Inform
 *   Responda APENAS o JSON.
 `;
 
+export async function analyzeDocument(documentText: string, task: string) {
+  try {
+    const response = await callGemini({
+      model: "gemini-3-flash-preview",
+      contents: {
+        role: "user",
+        parts: [{ text: `Tarefa: ${task}\n\nDocumento:\n${documentText}` }]
+      },
+      config: {
+        systemInstruction: `Você é um assistente jurídico avançado. Analise o documento fornecido para o usuário e responda à tarefa solicitada.` + getCurrentDateContext(),
+      }
+    });
+
+    return { text: response.text };
+  } catch (error) {
+    console.error("Error analyzing document with AI:", error);
+    throw error;
+  }
+}
+
 export async function analyzeCNIS(cnisText: string) {
   try {
     const response = await callGemini({

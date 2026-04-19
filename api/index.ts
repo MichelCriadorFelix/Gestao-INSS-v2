@@ -6,7 +6,6 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { GEMINI_AUDITOR_PROMPT, DEEPSEEK_REDACTOR_PROMPT, QWEN_REDACTOR_PROMPT } from './services/Prompts.js';
 
 dotenv.config();
 
@@ -1378,21 +1377,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       if (!req.body.forceRag) ragContext = ""; 
     }
 
-    const msgForChecks = message || "";
-    const isReportRequest = msgForChecks.toUpperCase().includes("GERAR RELATÓRIO") || msgForChecks.toUpperCase().includes("AUDITORIA") || msgForChecks.toUpperCase().includes("RELATÓRIO MESTRE") || msgForChecks.toUpperCase().includes("NOVO E OTIMIZADO");
-    const isPieceRequest = msgForChecks.toUpperCase().includes("GERAR PEÇA") || msgForChecks.toUpperCase().includes("GERAR PETIÇÃO") || msgForChecks.toUpperCase().includes("REDIGIR PEÇA");
-
-    if (isReportRequest) {
-      selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + GEMINI_AUDITOR_PROMPT;
-    } else if (isPieceRequest) {
-      if ((model || "").includes("deepseek")) {
-        selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + DEEPSEEK_REDACTOR_PROMPT;
-      } else if ((model || "").includes("qwen")) {
-        selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + QWEN_REDACTOR_PROMPT;
-      } else {
-        selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
-      }
-    } else if (isGenerationRequest) {
+    if (isGenerationRequest) {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
@@ -1524,25 +1509,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       console.log("Modo Dra. Luana Ativado (Completo)");
     }
 
-    const msgForChecks = message || "";
-    const isReportRequest = msgForChecks.toUpperCase().includes("GERAR RELATÓRIO") || msgForChecks.toUpperCase().includes("AUDITORIA") || msgForChecks.toUpperCase().includes("RELATÓRIO MESTRE") || msgForChecks.toUpperCase().includes("NOVO E OTIMIZADO");
-    const isPieceRequest = msgForChecks.toUpperCase().includes("GERAR PEÇA") || msgForChecks.toUpperCase().includes("GERAR PETIÇÃO") || msgForChecks.toUpperCase().includes("REDIGIR PEÇA");
-
-    if (isReportRequest) {
-      console.log("Injetando Módulo Auditor (Padrão Ouro) - Dra. Luana");
-      selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + GEMINI_AUDITOR_PROMPT;
-    } else if (isPieceRequest) {
-      if ((model || "").includes("deepseek")) {
-        console.log("Injetando Módulo Redactor de Elite DeepSeek - Dra. Luana");
-        selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + DEEPSEEK_REDACTOR_PROMPT;
-      } else if ((model || "").includes("qwen")) {
-        console.log("Injetando Módulo Redactor de Elite Qwen - Dra. Luana");
-        selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext() + "\n\n" + QWEN_REDACTOR_PROMPT;
-      } else {
-        console.log("Injetando Manual de Redação de Elite - Dra. Luana");
-        selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
-      }
-    } else if (isGenerationRequest) {
+    if (isGenerationRequest) {
       console.log("Injetando Manual de Redação de Elite - Dra. Luana");
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }

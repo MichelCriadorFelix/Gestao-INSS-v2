@@ -5,7 +5,7 @@ import {
   ArchiveBoxIcon, MagnifyingGlassIcon, PlusIcon, StarIcon, ArrowUturnLeftIcon, ArrowPathIcon, 
   PencilSquareIcon, TrashIcon, ExclamationTriangleIcon, ChevronUpIcon, ChevronDownIcon, 
   ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckIcon, BookOpenIcon,
-  GlobeAltIcon, AcademicCapIcon, SparklesIcon, XMarkIcon, Bars3Icon
+  GlobeAltIcon, AcademicCapIcon, SparklesIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import Legislation from './Legislation';
@@ -58,7 +58,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   onRestoreBackup
 }) => {
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -1310,17 +1309,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-200 overflow-hidden">
       
       {/* SIDEBAR NAVIGATION */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-transform duration-300 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-           <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
-               <div className="flex items-center">
-                   <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg mr-3 shadow-lg shadow-indigo-500/30">
-                       <ScaleIcon className="h-6 w-6 text-white" />
-                   </div>
-                   <span className="font-bold text-lg tracking-tight">Gestão do Escritório</span>
+      <aside className="w-20 lg:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-all duration-300 z-40">
+           <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800">
+               <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg mr-0 lg:mr-3 shadow-lg shadow-indigo-500/30">
+                   <ScaleIcon className="h-6 w-6 text-white" />
                </div>
-               <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-white">
-                    <XMarkIcon className="h-6 w-6" />
-               </button>
+               <span className="font-bold text-lg hidden lg:block tracking-tight">Gestão do Escritório</span>
            </div>
 
            <div className="flex-1 py-6 px-3 space-y-2">
@@ -1452,9 +1446,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         {/* Navbar (Top) */}
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-6 z-30">
              <div className="flex items-center gap-4">
-                 <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                    <Bars3Icon className="h-6 w-6" />
-                 </button>
                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                      {currentView === 'clients' ? 'Painel de Clientes' : 
                       currentView === 'contracts' ? 'Gestão de Contratos' :

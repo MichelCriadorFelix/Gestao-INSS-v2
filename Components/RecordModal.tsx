@@ -174,12 +174,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
       for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          // Accept pdf and txt
-          if (file.type !== 'application/pdf' && file.type !== 'text/plain') {
-              alert(`Tipo de arquivo não suportado: ${file.name}`);
-              continue;
-          }
-          
+          // Accept pdf or text
+          if (file.type !== 'application/pdf' && file.type !== 'text/plain') continue;
+
           const id = Date.now().toString() + i;
           newSyncStatus[id] = 'syncing';
           
@@ -206,7 +203,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               const newDoc: ScannedDocument = {
                   id,
                   name: file.name,
-                  type: file.type,
+                  type: file.type || 'application/pdf',
                   url: finalUrl,
                   date: new Date().toISOString()
               };
@@ -682,8 +679,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col mx-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
@@ -699,7 +696,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6 overflow-x-auto scrollbar-hide">
+        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6">
             <button 
                 onClick={() => setActiveTab('info')}
                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -861,10 +858,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="flex justify-between items-center">
                         <h4 className="font-bold text-slate-700 dark:text-white">Documentos Digitalizados</h4>
                         <div className="flex items-center gap-2">
+                            {formData.documents?.some(d => d.type === 'application/pdf') && (
+                                <button 
+                                    onClick={() => {
+                                        formData.documents?.filter(d => d.type === 'application/pdf').forEach(doc => {
+                                            const link = document.createElement('a');
+                                            link.href = doc.url;
+                                            link.download = doc.name;
+                                            link.click();
+                                        });
+                                    }}
+                                    className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                >
+                                    <ArrowDownTrayIcon className="h-4 w-4" />
+                                    Baixar PDFs
+                                </button>
+                            )}
                             <input 
                                 type="file" 
                                 multiple 
-                                accept=".pdf,.txt,image/*"
+                                accept=".pdf,image/*,.txt"
                                 ref={fileInputRef} 
                                 onChange={handleFileUpload} 
                                 className="hidden" 
@@ -875,24 +888,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    const pdfs = formData.documents?.filter(d => d.type === 'application/pdf');
-                                    pdfs?.forEach(doc => {
-                                        const link = document.createElement('a');
-                                        link.href = doc.url;
-                                        link.download = doc.name;
-                                        link.target = '_blank';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                    });
-                                }}
-                                className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition"                
-                            >
-                                <ArrowDownTrayIcon className="h-4 w-4" />
-                                Baixar PDFs
                             </button>
                             <button 
                                 onClick={() => setIsScannerOpen(true)}

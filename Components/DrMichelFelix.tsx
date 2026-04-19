@@ -775,12 +775,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. Processo mapeado.
-
-**Próximo Passo Sugerido:** 
-Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
-👉 *"Gerar Relatório"* (Para auditar os documentos antes da peça)
-👉 *"Gerar Peça"* (Para escrever a petição direto, se já houver relatório)`,
+        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. O processo foi mapeado e estou pronto para gerar a petição ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
         timestamp: new Date().toISOString()
       };
       
@@ -1081,22 +1076,22 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950 w-full overflow-hidden">
-        
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
+        {!isSidebarOpen && (
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-slate-800 shadow-md rounded-full border border-slate-200 dark:border-slate-700 hover:scale-110 transition-transform"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+
         {/* WELCOME SCREEN OR MESSAGES */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-          {!isSidebarOpen && (
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-slate-800 shadow-md rounded-full border border-slate-200 dark:border-slate-700 hover:scale-110 transition-transform"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          )}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
           {!currentSession || currentSession.messages.length === 0 ? (
-            <div className="max-w-4xl mx-auto mt-6 md:mt-12 space-y-8 md:space-y-12">
+            <div className="max-w-4xl mx-auto mt-12 space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+                <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
                   Olá, MICHEL!<br />
                   <span className="text-emerald-600">Bem vindo ao Dr. Michel Felix IA</span>
                 </h2>
@@ -1282,9 +1277,9 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
+                  e.target.style.height = `${e.target.scrollHeight}px`;
                 }}
-                className="w-full p-2 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[40px] max-h-20 overflow-y-auto text-sm"
+                className="w-full p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[56px] max-h-40 overflow-y-auto"
               />
               <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">

@@ -704,23 +704,14 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return null;
     
-    console.log(`Tentando inserir ${chunks.length} trechos na tabela 'legal_documents'...`);
-    
     const { data, error } = await supabase
       .from('legal_documents')
       .insert(chunks);
       
     if (error) {
-      console.error('Erro detalhado ao salvar documentos legais no Supabase:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      throw new Error(`Erro no banco de dados (${error.code}): ${error.message}`);
+      console.error('Error saving legal documents to Supabase:', error);
+      throw error;
     }
-    
-    console.log('Documentos legais salvos com sucesso.');
     return data;
   },
 
@@ -762,12 +753,11 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return [];
     
-    // Select unique titles from metadata. 
-    // Added .order to ensure consistent results, and fetching 10000 limit.
+    // Select unique titles from metadata
+    // We fetch more rows to ensure we get all unique titles even if there are many chunks
     const { data, error } = await supabase
       .from('legal_documents')
       .select('metadata')
-      .order('id', { ascending: false })
       .limit(10000);
       
     if (error) {
@@ -781,7 +771,6 @@ export const supabaseService = {
       return metadata?.title ? String(metadata.title) : null;
     }).filter(Boolean) as string[];
     
-    // Use Set to get unique titles
     return [...new Set(titles)].sort();
   },
 
