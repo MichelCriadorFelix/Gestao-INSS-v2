@@ -1081,22 +1081,22 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
-        {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-slate-800 shadow-md rounded-full border border-slate-200 dark:border-slate-700 hover:scale-110 transition-transform"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        )}
-
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950 w-full overflow-hidden">
+        
         {/* WELCOME SCREEN OR MESSAGES */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          {!isSidebarOpen && (
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-slate-800 shadow-md rounded-full border border-slate-200 dark:border-slate-700 hover:scale-110 transition-transform"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
           {!currentSession || currentSession.messages.length === 0 ? (
-            <div className="max-w-4xl mx-auto mt-12 space-y-12">
+            <div className="max-w-4xl mx-auto mt-6 md:mt-12 space-y-8 md:space-y-12">
               <div className="text-center space-y-4">
-                <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+                <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white tracking-tight">
                   Olá, MICHEL!<br />
                   <span className="text-emerald-600">Bem vindo ao Dr. Michel Felix IA</span>
                 </h2>
@@ -1282,9 +1282,9 @@ Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${e.target.scrollHeight}px`;
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                 }}
-                className="w-full p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[56px] max-h-40 overflow-y-auto"
+                className="w-full p-3 md:p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[48px] max-h-32 overflow-y-auto text-sm"
               />
               <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
