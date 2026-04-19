@@ -1076,7 +1076,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
+      <div className="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950 overflow-hidden">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1086,8 +1086,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           </button>
         )}
 
-        {/* WELCOME SCREEN OR MESSAGES */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* WELCOME SCREEN OR MESSAGES - Garantindo altura flexível */}
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
           {!currentSession || currentSession.messages.length === 0 ? (
             <div className="max-w-4xl mx-auto mt-12 space-y-12">
               <div className="text-center space-y-4">
