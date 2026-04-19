@@ -58,155 +58,47 @@ app.use("/api", (req, res, next) => {
 });
 
 // File Upload Endpoint for Gemini File API
-const ocrUploadDir = path.join(process.cwd(), 'ocr-tmp', 'uploads');
-if (!fs.existsSync(ocrUploadDir)) {
-  fs.mkdirSync(ocrUploadDir, { recursive: true });
-}
-const upload = multer({ dest: ocrUploadDir });
+const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToAllGeminiKeys(filePath: string, mimetype: string, originalname: string): Promise<any> {
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
-  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
-  const uris: Record<number, string> = {};
-  let defaultUri = "";
-  let defaultKeyIndex = 0;
-
-  const uploadPromises = keys.map(async (apiKey, index) => {
-    if (invalidKeys.has(apiKey)) return null;
-    const ai = new GoogleGenAI({ apiKey });
-      try {
-        const uploadResult = (await ai.files.upload({
-          file: filePath,
-          config: { mimeType: mimetype, displayName: originalname }
-        })) as any;
-        return { index, uri: uploadResult.uri || uploadResult.file?.uri, result: uploadResult };
-      } catch (e: any) {
-      console.warn(`[UPLOAD MULTI-KEY] Fallha na chave ${index}:`, e.message);
-      if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
-        invalidKeys.add(apiKey);
-      }
-      return null;
-    }
-  });
-
-  const results = await Promise.all(uploadPromises);
-  
-  let primaryResult = null;
-  for (const res of results) {
-    if (res && res.uri) {
-      uris[res.index] = res.uri;
-      if (!primaryResult) {
-         primaryResult = res.result;
-         defaultUri = res.uri;
-         defaultKeyIndex = res.index;
-      }
-    }
-  }
-
-  if (!primaryResult) {
-    throw new Error("Falha no upload do arquivo. Todas as chaves (" + keys.length + ") falharam ou esgotaram a cota.");
-  }
-
-  return { 
-    ...primaryResult, 
-    uri: defaultUri, 
-    keyIndex: defaultKeyIndex,
-    uris // Novo mapa multi-key
-  };
-}
-
-async function extractTextWithGemini(filePath: string, mimetype: string, originalname: string): Promise<{ text: string, name: string, mimeType: string, summary: string }> {
-  const keys = getApiKeys();
-  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada para OCR.");
-
-  let fileUri = null;
-  let fileId = null;
-  let activeAi = null;
-
-  // Tentativa rotativa para envio temporário (epêmero) na API
-  for (let idx = 0; idx < keys.length; idx++) {
-     const apiKey = keys[(currentKeyIndex + idx) % keys.length];
-     if (invalidKeys.has(apiKey)) continue;
-     
-     activeAi = new GoogleGenAI({ apiKey });
-      try {
-        const uploadResult = (await activeAi.files.upload({
-          file: filePath,
-          config: { mimeType: mimetype, displayName: originalname }
-        })) as any;
-        
-        console.log("[OCR UPLOAD SUCCESS]", uploadResult);
-        fileUri = uploadResult.uri || uploadResult.file?.uri;
-        fileId = uploadResult.name || uploadResult.file?.name;
-        
-        if (fileUri) {
-          currentKeyIndex = (currentKeyIndex + idx) % keys.length;
-          break;
-        }
-      } catch(e: any) {
-       console.warn(`[OCR UPLOAD] Falha na chave ${apiKey.substring(0, 5)}...`, e.message);
-       if (e.message?.includes('API key not valid') || e.message?.includes('INVALID_ARGUMENT')) {
-         invalidKeys.add(apiKey);
-       }
-     }
-  }
-
-  if (!fileUri || !activeAi) {
-     throw new Error("Falha ao preparar o arquivo para OCR em todas as chaves disponíveis.");
-  }
-
-  // Extrair o conteúdo usando o modelo Gemini 3 FLASH
-  let extractedText = "";
-  const isText = mimetype.startsWith('text/') || originalname.toLowerCase().endsWith('.txt');
-  const systemInstruction = isText 
-      ? `VOCÊ É UM ASSISTENTE DE ANÁLISE DOCUMENTAL. O documento anexo é um arquivo de texto. Leia-o integralmente e mantenha a fidelidade absoluta ao conteúdo para fins de auditoria jurídica. NÃO RESUMA.`
-      : `VOCÊ É O TRANSRICITOR DE ALTA PRECISÃO (MODO OCR INTEGRAL - CALIGRAFIA MÉDICA E DOCUMENTAÇÃO JURÍDICA).
-
-Sua missão única e absoluta é converter o documento anexo em TEXTO PURO na sua TOTALIDADE.
-
-DIRETRIZES DE OPERAÇÃO:
-1. NÃO RESUMA: É proibido resumir ou pular páginas. Se o documento for difícil, tome o tempo necessário para decifrar cada caractere.
-2. TRANSCRIÇÃO LITERAL: Capture cada palavra, CPF, CID, datas e valores.
-3. CALIGRAFIA MÉDICA: Decifre com precisão caligrafias cursivas de médicos. Se ilegível, use "[ilegível]" mas tente usar o contexto médico.
-4. INTEGRALIDADE: Garanta que a transcrição chegue até o final do documento sem cortes.
-
-Seja exaustivo e fiel aos fatos.`;
+  // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const apiKey = keys[keyToUseIndex % keys.length];
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
-     const response = await activeAi.models.generateContent({
-         model: 'gemini-3-flash-preview', 
-         contents: [
-            {
-               role: 'user',
-               parts: [
-                  { fileData: { mimeType: mimetype, fileUri: fileUri } },
-                  { text: systemInstruction }
-               ]
-            }
-         ],
-         config: { temperature: 0, maxOutputTokens: 16384 }
-     });
-     extractedText = response.text || "[O modelo não retornou texto]";
-  } catch(e: any) {
-     console.error("[OCR ERROR]", e);
-     extractedText = `[ERRO NA TRANSCRIÇÃO: ${e.message}]`;
+    const uploadResult = await ai.files.upload({
+      file: filePath,
+      config: {
+        mimeType: mimetype,
+        displayName: originalname,
+      }
+    });
+    // Adiciona o index da chave usada ao resultado
+    return { ...uploadResult, keyIndex: keyToUseIndex % keys.length };
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+    
+    console.error(`Erro no upload com chave ${keyToUseIndex % keys.length}:`, errorMessage);
+    
+    if ((isInvalidKey || isOverloaded) && retries > 0) {
+      currentKeyIndex++;
+      let delay = isInvalidKey ? 500 : 3000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1, forcedKeyIndex);
+    }
+    
+    throw error;
   }
-
-  // DELETAR IMEDIATAMENTE DA API (REQUISITO: NÃO GUARDAR NA API)
-  try {
-     await activeAi.files.delete({ name: fileId! });
-     console.log(`[EPHEMERAL CLEANUP] Arquivo ${fileId} deletado da API Gemini.`);
-  } catch (deleteError) {
-     console.error("[EPHEMERAL CLEANUP ERROR]", deleteError);
-  }
-
-  return { 
-     text: extractedText,
-     name: originalname,
-     mimeType: mimetype,
-     summary: extractedText.substring(0, 1000) // Preview maior
-  };
 }
 
 app.post("/api/upload-file", upload.single('file'), async (req, res) => {
@@ -215,25 +107,34 @@ app.post("/api/upload-file", upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo enviado" });
     }
 
-    // Extrair via Gemini 3 Flash e deletar da nuvem
-    const extractedData = await extractTextWithGemini(
+    const forcedKeyIndex = req.body.keyIndex ? parseInt(req.body.keyIndex) : undefined;
+
+    // Upload to Gemini
+    const uploadResult = await uploadFileToGeminiWithRetry(
       req.file.path,
       req.file.mimetype,
-      req.file.originalname
+      req.file.originalname,
+      30,
+      forcedKeyIndex
     );
 
-    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    // Clean up temp file
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
 
     res.json({
-      name: extractedData.name,
-      mimeType: extractedData.mimeType,
-      fullText: extractedData.text,
-      summary: extractedData.summary
+      fileUri: uploadResult.uri,
+      name: uploadResult.name,
+      mimeType: uploadResult.mimeType,
+      keyIndex: uploadResult.keyIndex
     });
   } catch (error: any) {
-    console.error("Error uploading/extracting file via Gemini:", error);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: error.message || "Falha na extração" });
+    console.error("Error uploading file to Gemini:", error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: error.message || "Falha no upload do arquivo" });
   }
 });
 
@@ -255,79 +156,45 @@ app.post("/api/upload-from-url", async (req: any, res) => {
         hostname === '0.0.0.0' ||
         hostname.startsWith('192.168.') || 
         hostname.startsWith('10.') || 
-        hostname.startsWith('172.') || 
+        hostname.startsWith('172.') || // Abordagem simplificada para ranges privados
         hostname.endsWith('.local') ||
         hostname.endsWith('.internal');
 
       if (isInternal || !['http:', 'https:'].includes(parsedUrl.protocol)) {
-        console.error("[SSRF] Bloqueado:", url);
-        return res.status(403).json({ error: "URL não permitida por motivos de segurança." });
+        return res.status(403).json({ error: "URL não permitida por motivos de segurança (SSRF Protection)." });
       }
     } catch (e) {
       return res.status(400).json({ error: "URL inválida." });
     }
 
-    // Download file with timeout and browser-like user agent
-    console.log(`[URL DOWNLOAD] Iniciando download de: ${url}`);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout (increased for slow supabse)
-    
-    let response;
-    try {
-      response = await fetch(url, { 
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-    } catch (e: any) {
-      console.error("[URL DOWNLOAD ERROR]", e.message);
-      return res.status(500).json({ error: `Erro de rede ao baixar: ${e.message}. Verifique a conexão com ${new URL(url).hostname}` });
-    } finally {
-      clearTimeout(timeout);
-    }
+    const forcedKeyIndex = keyIndex !== undefined ? parseInt(keyIndex) : undefined;
 
-    if (!response.ok) {
-      console.error(`[URL DOWNLOAD FAILED] ${response.status} ${response.statusText}`);
-      return res.status(500).json({ 
-        error: `O servidor de arquivos retornou erro ${response.status}. Se for um PDF do Supabase, certifique-se de que a URL não expirou ou que o bucket é público.` 
-      });
-    }
+    // Download file to /tmp
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Falha ao baixar arquivo da URL: ${response.statusText}`);
     
-    const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength === 0) {
-      return res.status(500).json({ error: "Arquivo baixado está vazio (0 bytes)." });
-    }
-    
-    const safeFileName = (fileName || 'file').replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-    const ext = fileName && path.extname(fileName) ? path.extname(fileName) : '.pdf';
-    
-    // Use directory relative to project root
-    const ocrTmpDir = path.join(process.cwd(), 'ocr-tmp');
-    if (!fs.existsSync(ocrTmpDir)) {
-      fs.mkdirSync(ocrTmpDir, { recursive: true });
-    }
-    
-    tmpPath = path.join(ocrTmpDir, `proxy_${Date.now()}_${safeFileName}`);
-    fs.writeFileSync(tmpPath, Buffer.from(arrayBuffer));
-    console.log(`[URL DOWNLOAD SUCCESS] Salvo em: ${tmpPath} (${arrayBuffer.byteLength} bytes)`);
+    const buffer = await response.arrayBuffer();
+    tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
+    fs.writeFileSync(tmpPath, Buffer.from(buffer));
 
-    // Extrair via Gemini 3 Flash
-    const extractedData = await extractTextWithGemini(
+    // Upload to Gemini
+    const uploadResult = await uploadFileToGeminiWithRetry(
       tmpPath,
       mimeType || 'application/pdf',
-      fileName || (safeFileName)
+      fileName || 'imported_file.pdf',
+      30,
+      forcedKeyIndex
     );
 
     res.json({
-      name: extractedData.name,
-      mimeType: extractedData.mimeType,
-      fullText: extractedData.text,
-      summary: extractedData.summary
+      fileUri: uploadResult.uri,
+      name: uploadResult.name,
+      mimeType: uploadResult.mimeType,
+      keyIndex: uploadResult.keyIndex
     });
   } catch (error: any) {
-    console.error("Erro no upload via URL [DETALHADO]:", error);
-    res.status(500).json({ error: error.message || "Falha no processar arquivo da nuvem" });
+    console.error("Erro no upload via URL:", error);
+    res.status(500).json({ error: error.message || "Falha no upload via URL" });
   } finally {
     if (tmpPath && fs.existsSync(tmpPath)) {
       fs.unlinkSync(tmpPath);
@@ -949,7 +816,8 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview"
+  "gemini-3-flash-preview",
+  "gemini-3.1-pro-preview"
 ];
 
 function getApiKeys() {
@@ -990,7 +858,7 @@ function getApiKeys() {
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
-async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, originalFilesArray?: any[]) {
+async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -1004,26 +872,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
   // Override model in params
-  const clonedContents = params.contents ? JSON.parse(JSON.stringify(params.contents)) : params.contents;
-  
-  if (originalFilesArray && originalFilesArray.length > 0 && Array.isArray(clonedContents)) {
-      clonedContents.forEach((content: any) => {
-          if (content.parts) {
-             content.parts.forEach((part: any) => {
-                 if (part.fileData && part.fileData.fileUri) {
-                     const origFile = originalFilesArray.find((f: any) => f.fileUri === part.fileData.fileUri || (f.uris && Object.values(f.uris).includes(part.fileData.fileUri)));
-                     if (origFile && origFile.uris) {
-                         const currentKeyIndexForThisRun = keyToUseIndex % keys.length;
-                         const newUri = origFile.uris[currentKeyIndexForThisRun];
-                         if (newUri) part.fileData.fileUri = newUri;
-                     }
-                 }
-             });
-          }
-      });
-  }
-  
-  const finalParams = { ...params, model: currentModel, contents: clonedContents || params.contents };
+  const finalParams = { ...params, model: currentModel };
   
   // Fallback: Remove tools if not on the primary model or if retrying heavily
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
@@ -1130,7 +979,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   }
 }
 
-async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, originalFilesArray?: any[]): Promise<any> {
+async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -1141,26 +990,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
-  const clonedContents = params.contents ? JSON.parse(JSON.stringify(params.contents)) : params.contents;
-  
-  if (originalFilesArray && originalFilesArray.length > 0 && Array.isArray(clonedContents)) {
-      clonedContents.forEach((content: any) => {
-          if (content.parts) {
-             content.parts.forEach((part: any) => {
-                 if (part.fileData && part.fileData.fileUri) {
-                     const origFile = originalFilesArray.find((f: any) => f.fileUri === part.fileData.fileUri || (f.uris && Object.values(f.uris).includes(part.fileData.fileUri)));
-                     if (origFile && origFile.uris) {
-                         const currentKeyIndexForThisRun = keyToUseIndex % keys.length;
-                         const newUri = origFile.uris[currentKeyIndexForThisRun];
-                         if (newUri) part.fileData.fileUri = newUri;
-                     }
-                 }
-             });
-          }
-      });
-  }
-  
-  const finalParams = { ...params, model: currentModel, contents: clonedContents || params.contents };
+  const finalParams = { ...params, model: currentModel };
   
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -1218,7 +1048,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, originalFilesArray);
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
     
     if (retries === 0) {
@@ -1428,25 +1258,25 @@ app.post("/api/analyze-cnis", async (req, res) => {
 });
 
 const ARCHIVIST_SYSTEM_PROMPT = `
-VOCÊ É UM AUDITOR JURÍDICO E TRANSRICITOR DE ALTA PRECISÃO (MODO ARQUIVISTA).
-SUA MISSÃO: Garantir que o conteúdo integral dos documentos foi capturado e salvo na conversa (Supabase) para uso posterior na geração do relatório.
+VOCÊ É UM AUDITOR JURÍDICO E ANALISTA VISUAL DE ALTA PRECISÃO (MODO ARQUIVISTA).
+SUA MISSÃO: Realizar a ciência integral de documentos, mapeando cada detalhe textual e VISUAL para uso posterior.
 
 DIRETRIZES OBRIGATÓRIAS:
-1. FOCO NA TRANSCRIÇÃO: O texto que você está recebendo já passou por um OCR de elite. Sua função é VALIDAR que os pontos mais importantes (CIDs, Datas, Valores) estão presentes no texto.
-2. EXTRAÇÃO DE OURO: Liste os dados críticos encontrados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e conclusões periciais.
-3. VISUAL E TEXTUAL: Se o texto contém descrições detalhadas de imagens (ex: RM, TC) feitas pelo OCR, compile-as.
-4. MAPEAMENTO: Tente localizar em qual parte do texto (ou página citada) cada informação está.
-5. FORMATO DE RESPOSTA:
-   "✅ Ciência tomada e conteúdo transcrevido para o Supabase: [Nome do Arquivo].
-   **Dados Críticos Mapeados:**
-   * CPF/NIT: ...
-   * CIDs: ...
-   * Datas Importantes: ...
-   * [Descrição de Imagem/Laudo]: ...
-   
-   Conteúdo integral pronto para Auditoria Mestre."
+1. LEITURA NATIVA (GEMINI FILE API): Você está recebendo arquivos diretamente via Gemini File API. Use sua capacidade nativa de processamento de documentos para ler o conteúdo integral com máxima precisão.
+2. EXTRAÇÃO EXAUSTIVA: Extraia TODOS os dados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e, principalmente, PROPOSTAS DE ACORDO e LAUDOS PERICIAIS.
+3. ANÁLISE VISUAL (CRÍTICO): Se houver imagens (fotos de pessoas, partes do corpo, exames escaneados, carimbos) dentro dos documentos, você DEVE descrevê-las detalhadamente.
+   - Ex: "Página 230: Foto colorida mostrando as mãos do autor com sinais de [descrever]."
+   - Ex: "Página 241: Imagem de Ultrassonografia do Abdome com conclusão de [descrever]."
+4. MAPEAMENTO POR PÁGINA: Cite sempre a página de cada achado.
+5. FIDELIDADE: Não resuma demais. Se houver um parágrafo decisivo sobre a incapacidade, extraia-o.
+6. FORMATO DE RESPOSTA:
+   "✅ Ciência tomada do documento [Nome] via Gemini File API.
+   **Mapeamento de Dados e Evidências Visuais:**
+   * [Página Z]: [Informação ou descrição da imagem]
+   * ...
+   Aguardando próximo comando."
 
-ATENÇÃO: Você não precisa mais acessar a File API do Gemini durante o chat. O texto está INTEGRAL no histórico da conversa enviado pelo sistema.
+ATENÇÃO: Se você ignorar uma imagem ou responder apenas "Recebido", o sistema falhará. Você DEVE ser os olhos do advogado.
 `;
 
 // Marketing Endpoints
@@ -1570,9 +1400,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API), dos resumos de auditoria E OBRIGATORIAMENTE DE TODO O HISTÓRICO DA CONVERSA, onde se encontram os textos extraídos (OCR) dos documentos processados.
-    É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME]", "[DATA]" ou "[VALOR]" se a informação estiver presente nos documentos ou no OCR lido.
-    Se um dado for crucial e não for encontrado em NENHUMA fonte, escreva [DADO NÃO LOCALIZADO NA AUDITORIA] em vez de um placeholder genérico.
+    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS dos arquivos anexados (Gemini File API) e dos resumos de auditoria.
+    É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME]", "[DATA]" ou "[VALOR]" se a informação estiver presente nos documentos.
+    Se um dado for crucial e não for encontrado, escreva [DADO NÃO LOCALIZADO NA AUDITORIA] em vez de um placeholder genérico.
     Analise cada folha do processo para encontrar datas de DER, valores de benefício e CIDs. Sua redação deve ser densa, citando provas específicas (ex: "conforme laudo de fls. X").
     `;
     const historyParts = history.map((h: any) => ({
@@ -1614,7 +1444,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
         model: model || "gemini-3-flash-preview",
         contents,
         config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined, files);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = chunk.text || "";
@@ -1837,7 +1667,7 @@ ${ragContext}`;
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
           ]
         }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined, req.body.files);
+      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
         let text = "";
@@ -1926,14 +1756,8 @@ app.post("/api/dr-michel/generate-docx", async (req, res) => {
   }
 });
 
-app.get("/api/debug-keys", (req, res) => {
-  const keys = getApiKeys();
-  res.json({
-    count: keys.length,
-    invalidCount: invalidKeys.size,
-    firstKeyPrefix: keys[0] ? keys[0].substring(0, 8) : 'none',
-    keysAvailable: keys.filter(k => !invalidKeys.has(k)).length
-  });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.get("/api/config", (req, res) => {

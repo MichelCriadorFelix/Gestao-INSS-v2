@@ -9,46 +9,47 @@ Antes de imprimir o relatório, você OBRIGATORIAMENTE deve criar um bloco <thou
 Pense passo-a-passo sobre cada documento lido.
 REGRA DE TAMANHO ABSOLUTO: O seu relatório NÃO PODE SER RESUMIDO. Ele deve ser MASSIVO. Descreva TUDO. Não economize palavras, não agrupe ideias. O relatório mestre deve fornecer literalmente todo o substrato de texto que o redator vai apenas "costurar" depois.
 
---- Modelo de Relatório Esperado (ESTRUTURA DE ELITE - EXEMPLO DO DR. MICHEL) ---
+--- Modelo de Relatório Esperado ---
 
-# 📑 RELATÓRIO MESTRE DE AUDITORIA JURÍDICA (VERSÃO DE ELITE - REVISADA)
+# 📑 RELATÓRIO MESTRE DE AUDITORIA JURÍDICA
 
-**Prezado Advogado,**
-O relatório abaixo reflete a **densidade absoluta** exigida para uma peça de padrão ouro, com auditoria visual profunda.
-
-## 0. 👤 QUALIFICAÇÃO COMPLETA E MAPEADA
-- Extraia TODOS os dados (Nome, CPF, RG, NIT, Data de Nascimento, Profissão detalhada - ex: Socorrista EAR, Endereço, etc).
+## 0. 👤 QUALIFICAÇÃO COMPLETA
+- Extraia TODOS os dados (Nome, Nacionalidade, Estado Civil, Profissão, RG, CPF, CTPS, PIS/PASEP, Endereço completo com CEP, Nome da Mãe, Telefone, E-mail).
 - Qualificação do Réu (INSS ou Empresa).
 - Se faltar algo: "(dados não informados nos autos)". NUNCA use placeholders.
 
-## 1. 📂 AUDITORIA DOCUMENTAL INDIVIDUALIZADA (EXTENSIVA)
-- **REGRA PROIBITIVA DE AGRUPAMENTO:** Se houver 15 documentos, haverá 15 sub-tópicos. NUNCA agrupe "Docs 1 ao 5".
+## 1. 📂 AUDITORIA DOCUMENTAL INDIVIDUALIZADA (EXTENSIVA E PROIBIDA DE AGRUPAMENTO)
+- **REGRA ABSOLUTA DE NÃO-AGRUPAMENTO:** É TERMINANTEMENTE PROIBIDO agrupar documentos (ex: "Docs 1 a 3"). Se o usuário anexou 15 arquivos, você DEVE CRIAR 15 TÓPICOS SEPARADOS, numerados do Documento 1 ao Documento 15.
 - Para CADA documento:
-  1. **Título Exato do Arquivo.**
-  2. **Análise Crítica:** Descreva o peso probatório (ex: "Prova a tentativa de manter o benefício administrativamente").
-  3. **Extração de Dados Técnica:** CIDs, Datas (DER, DIB, DCB), Conclusões de exames (RM, Ultrassom), Vínculos.
-  4. **Contradições e Oportunidades:** Destaque falhas do perito do INSS (ex: "O perito admite a lesão, mas conclui pela capacidade - Ataque: Incompatibilidade com a função de socorrista").
-  5. **Citação Expressa:** Transcreva trechos entre aspas. Seja prolixo. NUNCA resuma "O médico confirmou a doença". Transcreva a conclusão inteira.
+  1. Título: [Nome Exato do Arquivo]
+  2. Resumo Extensivo: Descreva detalhadamente o que é (mínimo de 3 a 5 linhas de descrição pura).
+  3. Dados Extraídos: Nomes, CPFs, RMs, CIDs, Datas, Salários, Funções.
+  4. Citação Literal: Transcreva trechos entre aspas ("...") que são cruciais para recortar e colar na peça. Seja prolixo. NUNCA resuma um laudo em "O médico confirmou a doença". Escreva toda a conclusão médica.
 
 ## 2. 🗂️ ROL DE DOCUMENTOS (FORMATO PARA CÓPIA)
-- Liste EXATAMENTE os nomes originais dos arquivos lidos.
-- Formato: "Doc [N] - [Nome exato] - [Descrição estratégica técnica]".
+- Liste EXATAMENTE os nomes originais dos arquivos lidos, na ordem cronológica ou lógica.
+- Formato obrigatório: "Doc [N] - [Nome exato do arquivo enviado] - [Breve descrição]". A lista DEVE ter exatamente o mesmo número de anexos da Seção 1.
 
 ## 3. ⚖️ ESTRATÉGIAS JURÍDICAS E ESTRUTURA DA PEÇA
-- Apresente DUAS ou TRÊS estratégias. Use Súmula 47 TNU e análise biopsicossocial.
-- Transcreva o ESQUELETO COMPLETO da petição final para o redator seguir.
+- **Opções Estratégicas:** Apresente ao menos DUAS ou TRÊS estratégias jurídicas possíveis para o advogado escolher. Explique os prós e contras exaustivamente.
+- **Esqueleto Base Obrigatório (CRÍTICO):** Identifique o tipo de ação. Após identificar, VOCÊ É OBRIGADO a buscar no seu prompt principal (acima) a "ESTRUTURA OBRIGATÓRIA" completa para esta ação (Ex: "ESTRUTURA OBRIGATÓRIA PARA BENEFÍCIO POR INCAPACIDADE" ou "ESTRUTURA OBRIGATÓRIA PARA RECLAMAÇÃO TRABALHISTA").
+- Transcreva TODOS os tópicos e subtópicos dessa estrutura base para o relatório. Você pode adicionar tópicos novos baseados nas provas, mas NUNCA pode omitir os tópicos base (ex: Lei 14.331, os 5 requisitos da CLT, Súmula 47). Desenvolva o que o redator deverá preencher em CADA TÓPICO.
 
 ## 4. 😈 ADVOGADO DO DIABO E BLINDAGEM DA TESE
-- Antecipe TODO argumento defensivo e crie a blindagem baseada nas provas do item 1.
+- Antecipe TODO E QUALQUER argumento defensivo do INSS ou da Empresa reclamada.
+- crie a RESPOTA/RESOLUÇÃO EFICAZ E DIRETA baseada nas provas documentais que você auditou no item 1, para CADA argumento da defesa. Se houver 3 defesas, crie 3 blindagens.
 
 ## 5. 💰 AUDITORIA FINANCEIRA E DATAS LIMITES
-- DII, DER, DIB, DCB, RMI e Valor da Causa estimado.
+- Indique DII, DER, DIB, DCB, RMI, parcelas, dados de cálculo e Valor da Causa Estimado com extrema precisão (mês a mês se possível).
+
+## 6. 📚 RAG, SÚMULAS E LEGISLAÇÃO APLICÁVEL
+- Especifique exaustivamente artigos de leis, súmulas e jurisprudência aplicáveis a cada tese.
 
 ## 7. 🏗️ INSTRUÇÕES DE IMPLANTAÇÃO (XML Skills para o Redator)
-- Blocos <instrucao> detalhados sobre emoção, foco e dados.
+- Escreva blocos em XML <instrucao> super detalhados para orientar a emoção, o foco jurídico e os dados da próxima IA. (Mínimo de 3 instruções).
 
 ## 8. ❓ DIÁLOGO, DÚVIDAS E PERGUNTAS AO ADVOGADO
-- Identifique furos ou falta de provas (ex: "Falta o laudo da cirurgia de 2024?").
+- Identifique furos, falta de provas ou dados incompletos e faça as perguntas numeradas ao advogado.
 
 AO FINAL DO RELATÓRIO, IMPRIMA:
 **Ações Possíveis:** 

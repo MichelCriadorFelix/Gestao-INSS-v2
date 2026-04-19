@@ -6,7 +6,6 @@ export interface ScannedDocument {
   url: string; // Base64
   date: string;
   tags?: string[];
-  ocrText?: string;
 }
 
 export interface AgendaEvent {

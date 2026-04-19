@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, PlusIcon, XMarkIcon, CameraIcon, DocumentTextIcon, ScaleIcon, ClipboardDocumentCheckIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, TrashIcon, DocumentPlusIcon, CheckIcon, ChevronUpIcon, ChevronDownIcon, TagIcon, ArrowPathIcon, CloudIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { jsPDF } from "jspdf";
 import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
-import { apiFetch } from '../services/apiService';
 import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
@@ -21,49 +20,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [editDocName, setEditDocName] = useState('');
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
-  const [ocrLoading, setOcrLoading] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleProcessOCR = async (doc: ScannedDocument) => {
-    if (!doc.url) return;
-    
-    setOcrLoading(prev => ({ ...prev, [doc.id]: true }));
-    try {
-        const response = await apiFetch('/api/upload-from-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                url: doc.url,
-                fileName: doc.name,
-                mimeType: doc.type
-            })
-        });
-
-        const result = await response.json().catch(() => ({ error: "Falha ao ler resposta do servidor." }));
-        if (!response.ok) throw new Error(result.error || "Falha ao processar OCR no servidor.");
-        
-        const fullText = result.fullText;
-
-        if (!fullText) throw new Error("Nenhum texto extraído.");
-
-        const updatedDocs = (formData.documents || []).map(d => 
-            d.id === doc.id ? { ...d, ocrText: fullText } : d
-        );
-
-        const updatedFormData = { ...formData, documents: updatedDocs };
-        setFormData(updatedFormData);
-        
-        // Save to master list
-        await onSave(updatedFormData as ClientRecord);
-        
-        alert(`OCR concluído com sucesso para: ${doc.name}`);
-    } catch (err: any) {
-        console.error("OCR Error:", err);
-        alert(`Erro ao processar OCR: ${err.message}`);
-    } finally {
-        setOcrLoading(prev => ({ ...prev, [doc.id]: false }));
-    }
-  };
 
   const AVAILABLE_TAGS = [
       { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -178,27 +135,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, documents: updatedDocs });
   }
 
-  const handleDownloadAllPDFs = () => {
-    const pdfDocs = (formData.documents || []).filter(d => d.type === 'application/pdf');
-    
-    if (pdfDocs.length === 0) {
-        alert('Nenhum documento PDF disponível para baixar.');
-        return;
-    }
-
-    pdfDocs.forEach((doc, index) => {
-        setTimeout(() => {
-            const link = document.createElement('a');
-            link.href = doc.url;
-            link.download = doc.name;
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }, index * 300);
-    });
-  };
-
   const handleScannerSave = async (doc: ScannedDocument) => {
       setSyncStatus(prev => ({ ...prev, [doc.id]: 'syncing' }));
       
@@ -238,6 +174,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
       for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          // Accept pdf and txt
+          if (file.type !== 'application/pdf' && file.type !== 'text/plain') {
+              alert(`Tipo de arquivo não suportado: ${file.name}`);
+              continue;
+          }
+          
           const id = Date.now().toString() + i;
           newSyncStatus[id] = 'syncing';
           
@@ -264,7 +206,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               const newDoc: ScannedDocument = {
                   id,
                   name: file.name,
-                  type: file.type || (file.name.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf'),
+                  type: file.type,
                   url: finalUrl,
                   date: new Date().toISOString()
               };
@@ -741,7 +683,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col mx-auto">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
@@ -757,7 +699,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6">
+        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6 overflow-x-auto scrollbar-hide">
             <button 
                 onClick={() => setActiveTab('info')}
                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -922,7 +864,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             <input 
                                 type="file" 
                                 multiple 
-                                accept=".pdf,image/*,.txt"
+                                accept=".pdf,.txt,image/*"
                                 ref={fileInputRef} 
                                 onChange={handleFileUpload} 
                                 className="hidden" 
@@ -935,8 +877,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 Upload
                             </button>
                             <button 
-                                onClick={handleDownloadAllPDFs}
-                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                onClick={() => {
+                                    const pdfs = formData.documents?.filter(d => d.type === 'application/pdf');
+                                    pdfs?.forEach(doc => {
+                                        const link = document.createElement('a');
+                                        link.href = doc.url;
+                                        link.download = doc.name;
+                                        link.target = '_blank';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                    });
+                                }}
+                                className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition"                
                             >
                                 <ArrowDownTrayIcon className="h-4 w-4" />
                                 Baixar PDFs
@@ -975,7 +928,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
                                             <button onClick={() => moveDocument(idx, 'down')} disabled={idx === formData.documents!.length - 1} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDownIcon className="h-4 w-4" /></button>
                                         </div>
-                                        <div className={`h-10 w-10 ${doc.type === 'text/plain' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'} rounded-lg flex items-center justify-center shrink-0`}>
+                                        <div className="h-10 w-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shrink-0">
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -1000,7 +953,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                 </div>
                                             )}
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : doc.type === 'text/plain' ? 'TXT' : 'IMG'}</p>
+                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMG'}</p>
                                                 {doc.tags?.map(tagId => {
                                                     const t = AVAILABLE_TAGS.find(t => t.id === tagId);
                                                     return t ? <span key={tagId} className={`text-[10px] px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span> : null;
@@ -1008,11 +961,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             </div>
                                         </div>
                                     </div>
-                                    {doc.ocrText && (
-                                        <div className="mt-2 text-[10px] text-slate-500 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2 rounded-lg max-h-24 overflow-y-auto w-full italic">
-                                            <strong>Transcrição OCR (Trecho):</strong> {doc.ocrText.substring(0, 300)}...
-                                        </div>
-                                    )}
                                     <div className="flex items-center gap-2 sm:ml-auto">
                                         {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
                                         {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
@@ -1025,19 +973,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             disabled={syncStatus[doc.id] === 'compressing'}
                                         >
                                             <BoltIcon className="h-5 w-5" />
-                                        </button>
-
-                                        <button 
-                                            onClick={() => handleProcessOCR(doc)} 
-                                            className={`p-2 rounded-lg transition-colors ${doc.ocrText ? 'text-emerald-600 hover:bg-emerald-50' : 'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`} 
-                                            title={doc.ocrText ? "OCR Realizado (Ver texto abaixo)" : "Ativar OCR (Transcrição Gemini)"}
-                                            disabled={ocrLoading[doc.id]}
-                                        >
-                                            {ocrLoading[doc.id] ? (
-                                                <ArrowPathIcon className="h-5 w-5 animate-spin" />
-                                            ) : (
-                                                <SparklesIcon className="h-5 w-5" />
-                                            )}
                                         </button>
 
                                         <div className="relative">

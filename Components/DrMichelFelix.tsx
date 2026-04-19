@@ -37,6 +37,7 @@ interface ChatDocument {
   fullText?: string;
   type: string;
   pages?: number;
+  fileUri?: string;
   mimeType?: string;
   keyIndex?: number;
 }
@@ -75,11 +76,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  useEffect(() => {
-    setIsSidebarOpen(window.innerWidth > 768);
-  }, []);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -327,7 +324,6 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     };
     setSessions([newSession, ...sessions]);
     setCurrentSessionId(newSession.id);
-    if (window.innerWidth <= 768) setIsSidebarOpen(false);
   };
 
   const copyToClipboard = (text: string, msgId: string) => {
@@ -468,10 +464,15 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
         
-        // Envia o texto integral para a IA. O limite de 500k caracteres é seguro para o Gemini 1.5 Pro/Flash.
-        const textLimit = 500000; 
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL TRANSCRIÇÃO OCR:\n${doc.fullText.substring(0, textLimit)}` : '';
-        return `${header}${summaryPart}${fullTextPart}`;
+        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
+        if (doc.fileUri) {
+          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
+        }
+
+        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
+        const textLimit = doc.fileUri ? 1000 : 500000; // If we have the file, send only a small preview to save tokens
+        const fullTextPart = doc.fullText ? `CONTEÚDO (EXCERTOS):\n${doc.fullText.substring(0, textLimit)}` : '';
+        return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Gemini File API Habilitado]' : ''}`;
       }).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -484,7 +485,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           message: contextPrompt + messageText,
           history: session?.messages || [],
           images: images || [],
-          files: [],
+          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           ragContext,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
@@ -611,11 +612,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     await processFilesPhased(files, activeSessionId, fileIndex, pageIndex);
   };
 
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
   const processFilesPhased = async (fileArray: File[], activeSessionId: string, startFileIndex = 0, startPageIndex = 0) => {
     let currentIdx = startFileIndex;
-    setIsUploading(true);
     try {
       // Obter o índice da chave preferida da sessão, se já existir
       const currentSession = sessionsRef.current.find(s => s.id === activeSessionId);
@@ -624,75 +622,62 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       for (let i = startFileIndex; i < fileArray.length; i++) {
         currentIdx = i;
         const file = fileArray[i];
-        
         setProgressText(`Preparando ${file.name} (${i + 1}/${fileArray.length})...`);
         setProgress(Math.round(((i) / fileArray.length) * 100));
 
         let uploadData;
-        let retryCount = 0;
-        const MAX_RETRIES = 2;
 
-        while (retryCount <= MAX_RETRIES) {
-          try {
-            // Bypass Vercel 4.5MB limit if file is large
-            if (file.size > 4 * 1024 * 1024) {
-              setProgressText(`Enviando ${file.name} via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ''}`);
-              
-              const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-              const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
-              
-              if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
+        // Bypass Vercel 4.5MB limit if file is large
+        if (file.size > 4 * 1024 * 1024) {
+          setProgressText(`Enviando arquivo grande via Storage (${(file.size / (1024 * 1024)).toFixed(1)}MB)...`);
+          
+          // Sanitize filename to avoid "Invalid key" errors in Supabase
+          const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
+          
+          if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
 
-              const urlResponse = await apiFetch('/api/upload-from-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  url: storageUrl,
-                  mimeType: file.type,
-                  fileName: file.name,
-                  keyIndex: preferredKeyIndex
-                })
-              });
+          const urlResponse = await apiFetch('/api/upload-from-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: storageUrl,
+              mimeType: file.type,
+              fileName: file.name,
+              keyIndex: preferredKeyIndex
+            })
+          });
 
-              if (!urlResponse.ok) {
-                const errText = await urlResponse.text();
-                throw new Error(errText);
-              }
-              uploadData = await urlResponse.json();
-            } else {
-              setProgressText(`Enviando ${file.name} para a IA...${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ''}`);
-              const formData = new FormData();
-              formData.append('file', file);
-              if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
-                formData.append('keyIndex', preferredKeyIndex.toString());
-              }
-
-              const uploadResponse = await apiFetch('/api/upload-file', {
-                method: 'POST',
-                body: formData
-              });
-
-              if (!uploadResponse.ok) {
-                const errText = await uploadResponse.text();
-                throw new Error(errText);
-              }
-              uploadData = await uploadResponse.json();
-            }
-            break; // Sucesso
-          } catch (err: any) {
-            const isQuota = err.message.includes("429") || err.message.includes("quota") || err.message.includes("limit") || err.message.includes("has been exhausted");
-            if (isQuota && retryCount < MAX_RETRIES) {
-              retryCount++;
-              setProgressText(`Cota atingida. Aguardando ${retryCount * 10}s...`);
-              await delay(retryCount * 10000);
-            } else {
-              throw err;
-            }
+          if (!urlResponse.ok) {
+            const errText = await urlResponse.text();
+            throw new Error(`Falha no processamento via URL: ${errText}`);
           }
-        }
+          uploadData = await urlResponse.json();
+        } else {
+          setProgressText(`Enviando ${file.name} para a IA...`);
+          const formData = new FormData();
+          formData.append('file', file);
+          if (preferredKeyIndex !== undefined && preferredKeyIndex !== null) {
+            formData.append('keyIndex', preferredKeyIndex.toString());
+          }
 
-        if (i < fileArray.length - 1) {
-          await delay(2000); // Delay preventivo
+          const uploadResponse = await apiFetch('/api/upload-file', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!uploadResponse.ok) {
+            const errText = await uploadResponse.text();
+            let errMessage = "Falha no upload";
+            try {
+              const errJson = JSON.parse(errText);
+              errMessage = errJson.error || errMessage;
+            } catch(e) {
+              errMessage = "Erro no servidor: " + errText.substring(0, 100);
+            }
+            throw new Error(errMessage);
+          }
+          uploadData = await uploadResponse.json();
         }
 
         // Se for o primeiro upload da sessão, fixamos a chave para o resto da sessão
@@ -704,19 +689,69 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         // --- Detailed AI Analysis for each document ---
         setProgressText(`Analisando conteúdo de ${file.name}...`);
         
-        const fileSummary = uploadData.summary || `Arquivo enviado e processado pela IA: ${file.name}`;
+        let fileSummary = `Arquivo enviado e processado pela IA: ${file.name}`;
+        try {
+          const aiResponse = await apiFetch('/api/dr-michel/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+              history: [],
+              files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
+              model: "gemini-3-flash-preview", // Use flash for mapping to be faster and cheaper
+              keyIndex: preferredKeyIndex
+            })
+          });
+
+          if (aiResponse.ok) {
+            const reader = aiResponse.body?.getReader();
+            const decoder = new TextDecoder();
+            let fullAiResText = "";
+            
+            if (reader) {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const dataStr = line.replace('data: ', '');
+                    if (dataStr === '[DONE]') continue;
+                    try {
+                      const data = JSON.parse(dataStr);
+                      if (data.text) fullAiResText += data.text;
+                    } catch(e) {}
+                  }
+                }
+              }
+            }
+            
+            if (fullAiResText && !fullAiResText.includes('"error":')) {
+              fileSummary = fullAiResText;
+            } else {
+              fileSummary = `[FALHA DE LEITURA] O arquivo ${file.name} foi recebido, mas os limites de cota da API (Erro 429) impediram a extração automática do texto e dos cálculos pela IA nesta etapa. Recomenda-se reenviar a planilha de cálculos se a peça gerada falhar em apontar os devidos valores.`;
+              console.warn("Retorno mascarado com erro da IA ou vazio:", fullAiResText);
+            }
+          } else {
+            const errText = await aiResponse.text();
+            console.warn("IA falhou na análise inicial:", errText);
+            fileSummary = `[FALHA DE COMUNICAÇÃO] O servidor recursou a análise inicial do documento ${file.name} (Erro API). A IA arquivista não pôde ler seus dados.`;
+          }
+        } catch (e) {
+          console.warn("Falha na análise inicial do arquivo:", e);
+          fileSummary = `[FALHA DE ANÁLISE INTERNA] Erro de sistema ao tentar extrair conteúdo de ${file.name}.`;
+        }
+
         const newDoc: ChatDocument = {
           id: generateId(),
           name: file.name,
           type: file.type,
-          fullText: uploadData.fullText, // Texto integral extraído via OCR no backend
+          fileUri: uploadData.fileUri,
           mimeType: uploadData.mimeType,
-          summary: fileSummary, 
-          keyIndex: uploadData.keyIndex || preferredKeyIndex
-          // fileUri removido: o usuário quer o texto integral salvo na conversa (Supabase) e enviado como texto para a IA
+          summary: fileSummary,
+          keyIndex: uploadData.keyIndex
         };
-
-        const displayMessage = `✅ Processamento completo para o documento: **${file.name}**.\n\nConteúdo integral extraído e mapeado com sucesso para análise.`;
 
         setSessions(prev => prev.map(s => 
           s.id === activeSessionId ? { 
@@ -725,7 +760,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             messages: [...s.messages, {
               id: generateId(),
               role: 'assistant',
-              content: displayMessage,
+              content: fileSummary,
               timestamp: new Date().toISOString(),
               isSystem: true
             }]
@@ -735,17 +770,17 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
       setProgress(100);
       setProgressText('Concluído!');
-      setPendingAudit(null); 
+      setPendingAudit(null); // Limpa o progresso pendente se terminou com sucesso
       
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Mapeamento concluído. Todos os arquivos foram processados e os fatos relevantes estão prontos para a estratégia jurídica.
+        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. Processo mapeado.
 
 **Próximo Passo Sugerido:** 
-Selecione a ação desejada:
-👉 *"Gerar Relatório"* (Para conferir a auditoria detalhada dos documentos)
-👉 *"Gerar Peça"* (Para redigir a petição inicial/petição com base nestes documentos)`,
+Selecione a ação baseada nesta "fase 1" e digite um dos comandos:
+👉 *"Gerar Relatório"* (Para auditar os documentos antes da peça)
+👉 *"Gerar Peça"* (Para escrever a petição direto, se já houver relatório)`,
         timestamp: new Date().toISOString()
       };
       
@@ -944,7 +979,7 @@ Selecione a ação desejada:
   );
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 relative">
+    <div className="flex h-[calc(100vh-120px)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -958,22 +993,14 @@ Selecione a ação desejada:
         }}
       />
       
-      {/* SIDEBAR OVERLAY MOBILE */}
-      {isSidebarOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[55]" 
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-      
       {/* SIDEBAR: HISTÓRICO */}
-      <aside className={`fixed md:relative inset-y-0 left-0 z-[60] transform ${isSidebarOpen ? 'translate-x-0 w-72 md:w-80' : '-translate-x-full w-0 md:translate-x-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900 shadow-2xl md:shadow-none`}>
-        <div className="h-16 flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <History className="w-4 h-4" /> Histórico
           </h3>
-          <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors">
-            <ChevronLeft className="w-5 h-5" />
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
+            <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
 
@@ -1000,10 +1027,7 @@ Selecione a ação desejada:
             {filteredSessions.map(session => (
               <div 
                 key={session.id}
-                onClick={() => {
-                  setCurrentSessionId(session.id);
-                  if (window.innerWidth <= 768) setIsSidebarOpen(false);
-                }}
+                onClick={() => setCurrentSessionId(session.id)}
                 className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-slate-800 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
               >
                 {editingSessionId === session.id ? (
@@ -1057,7 +1081,7 @@ Selecione a ação desejada:
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col min-h-0 relative bg-white dark:bg-slate-950">
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1302,6 +1326,7 @@ Selecione a ação desejada:
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
+                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (2 Milhões de Tokens - Alta Complexidade)</option>
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">

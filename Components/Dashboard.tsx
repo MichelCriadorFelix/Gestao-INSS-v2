@@ -41,6 +41,7 @@ import DraLuanaCastro from './DraLuanaCastro';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
+import KnowledgeBase from './KnowledgeBase';
 import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
@@ -56,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSettingsSaved,
   onRestoreBackup
 }) => {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'marketing'>('agenda');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -71,7 +72,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [dailyFocusState, setDailyFocusState] = useState<any>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1308,148 +1308,135 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-200 overflow-hidden">
       
-      {/* MOBILE OVERLAY */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
-      
       {/* SIDEBAR NAVIGATION */}
-      <aside className={`fixed inset-y-0 left-0 transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-all duration-300 z-50 shadow-2xl lg:shadow-none`}>
-           <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
-               <div className="flex items-center">
-                   <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg mr-3 shadow-lg shadow-indigo-500/30">
-                       <ScaleIcon className="h-6 w-6 text-white" />
-                   </div>
-                   <span className="font-bold text-lg tracking-tight">Gestão Jurídica</span>
+      <aside className="w-20 lg:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-all duration-300 z-40">
+           <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800">
+               <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg mr-0 lg:mr-3 shadow-lg shadow-indigo-500/30">
+                   <ScaleIcon className="h-6 w-6 text-white" />
                </div>
-               <button onClick={() => setIsMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
-                   <ChevronLeftIcon className="h-6 w-6" />
-               </button>
+               <span className="font-bold text-lg hidden lg:block tracking-tight">Gestão do Escritório</span>
            </div>
 
-           <div className="flex-1 py-6 px-3 space-y-2 overflow-y-auto custom-scrollbar">
+           <div className="flex-1 py-6 px-3 space-y-2">
                <button 
-                   onClick={() => { setCurrentView('clients'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('clients')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'clients' ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <UserGroupIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Clientes</span>
+                   <UserGroupIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Clientes</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('contracts'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('contracts')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'contracts' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BriefcaseIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Contratos & Fin.</span>
+                   <BriefcaseIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Contratos & Fin.</span>
                </button>
 
                 {/* NOVO MENU: CÁLCULOS */}
                <button 
-                   onClick={() => { setCurrentView('labor_calc'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('labor_calc')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'labor_calc' ? 'bg-emerald-600 shadow-lg shadow-emerald-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <CalculatorIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Calc. Trabalhista</span>
+                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Calc. Trabalhista</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('dra_luana'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('dra_luana')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dra_luana' ? 'bg-pink-600 shadow-lg shadow-pink-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <StarIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Dra. Luana Castro (IA)</span>
+                   <StarIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Dra. Luana Castro (IA)</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('social_calc'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('social_calc')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'social_calc' ? 'bg-orange-600 shadow-lg shadow-orange-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <CalculatorIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Calc. Previdenciária</span>
+                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Calc. Previdenciária</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('dr_michel'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('dr_michel')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dr_michel' ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <StarIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Dr. Michel Felix (IA)</span>
+                   <StarIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Dr. Michel Felix (IA)</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('agenda'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('agenda')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'agenda' ? 'bg-slate-600 shadow-lg shadow-slate-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <CalendarIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Agenda</span>
+                   <CalendarIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Agenda</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('petition_editor'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('petition_editor')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'petition_editor' ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <PencilSquareIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Editor de Petições</span>
+                   <PencilSquareIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Editor de Petições</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('legislation'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('legislation')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'legislation' ? 'bg-teal-600 shadow-lg shadow-teal-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BookOpenIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Legislação</span>
+                   <BookOpenIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Legislação</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('jurisprudence'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('jurisprudence')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'jurisprudence' ? 'bg-cyan-600 shadow-lg shadow-cyan-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <ScaleIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Jurisprudência</span>
+                   <ScaleIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Jurisprudência</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('meu_inss'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('meu_inss')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'meu_inss' ? 'bg-amber-600 shadow-lg shadow-amber-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <GlobeAltIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Meu INSS</span>
+                   <GlobeAltIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium">Meu INSS</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('marketing'); setIsMenuOpen(false); }}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   onClick={() => setCurrentView('knowledge_base')}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <AcademicCapIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
+                   <AcademicCapIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium whitespace-nowrap">Base de Conhecimento</span>
                </button>
 
                <button 
-                   onClick={() => { setCurrentView('marketing'); setIsMenuOpen(false); }}
+                   onClick={() => setCurrentView('marketing')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <SparklesIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium whitespace-nowrap">Marketing Jurídico</span>
+                   <SparklesIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="hidden lg:block font-medium whitespace-nowrap">Marketing Jurídico</span>
                </button>
            </div>
            
            <div className="p-4 border-t border-slate-800">
-               <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold border-2 border-slate-600">
+               <div className="flex items-center justify-center lg:justify-start gap-3">
+                   <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
                        {user.firstName[0]}
                    </div>
-                   <div className="flex-1 overflow-hidden">
-                       <p className="text-sm font-bold text-white truncate">{user.firstName}</p>
-                       <p className="text-[10px] text-slate-400 uppercase tracking-widest">{user.role}</p>
+                   <div className="hidden lg:block">
+                       <p className="text-xs font-bold text-white">{user.firstName}</p>
+                       <p className="text-[10px] text-slate-400">{user.role}</p>
                    </div>
                </div>
-               <button onClick={onLogout} className="mt-4 w-full flex items-center p-2.5 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-xl transition group">
-                   <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3 group-hover:translate-x-1 transition-transform" />
-                   <span className="text-xs font-bold uppercase">Sair do Sistema</span>
+               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-center lg:justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
+                   <ArrowRightOnRectangleIcon className="h-5 w-5 lg:mr-2" />
+                   <span className="hidden lg:block text-xs font-bold uppercase">Sair</span>
                </button>
            </div>
       </aside>
@@ -1457,15 +1444,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Navbar (Top) */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 md:px-6 z-30">
-             <div className="flex items-center gap-3">
-                 <button 
-                    onClick={() => setIsMenuOpen(true)}
-                    className="lg:hidden p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-                 >
-                    <ScaleIcon className="h-6 w-6 text-primary-500" />
-                 </button>
-                 <h2 className="text-base md:text-xl font-bold text-slate-800 dark:text-white truncate max-w-[150px] md:max-w-none">
+        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-6 z-30">
+             <div className="flex items-center gap-4">
+                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                      {currentView === 'clients' ? 'Painel de Clientes' : 
                       currentView === 'contracts' ? 'Gestão de Contratos' :
                       currentView === 'labor_calc' ? 'Cálculos Trabalhistas' :
@@ -1473,35 +1454,33 @@ const Dashboard: React.FC<DashboardProps> = ({
                       currentView === 'dr_michel' ? 'Dr. Michel Felix - IA Jurídica' :
                       currentView === 'dra_luana' ? 'Dra. Luana Castro - IA Trabalhista' :
                       currentView === 'agenda' ? 'Agenda' :
-                      currentView === 'marketing' ? 'Marketing Jurídico' :
+                      currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
                       'Cálculos Previdenciários'}
                  </h2>
-                 <div className="hidden sm:flex items-center gap-2">
-                     {isSyncing ? (
-                          <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
-                     ) : saveError ? (
-                          <div className="flex items-center gap-2">
-                              <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
-                              <button 
-                                onClick={handleRetrySync}
-                                className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors font-bold uppercase"
-                              >
-                                Tentar Novamente
-                              </button>
-                              <button 
-                                onClick={() => setSaveError(null)}
-                                className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 transition-colors font-bold uppercase"
-                              >
-                                Limpar
-                              </button>
-                          </div>
-                     ) : isCloudConfigured ? (
-                          <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>
-                     ) : (
-                          <span className="text-xs text-slate-400 flex items-center gap-1">Local</span>
-                     )}
-                 </div>
+                 {isSyncing ? (
+                      <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
+                 ) : saveError ? (
+                      <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
+                          <button 
+                            onClick={handleRetrySync}
+                            className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors font-bold uppercase"
+                          >
+                            Tentar Novamente
+                          </button>
+                          <button 
+                            onClick={() => setSaveError(null)}
+                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 transition-colors font-bold uppercase"
+                          >
+                            Limpar
+                          </button>
+                      </div>
+                 ) : isCloudConfigured ? (
+                     <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>
+                 ) : (
+                     <span className="text-xs text-slate-400 flex items-center gap-1">Local</span>
+                 )}
              </div>
 
              <div className="flex items-center gap-3">
@@ -1518,7 +1497,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              </div>
         </header>
 
-        <main className={`flex-1 flex flex-col min-h-0 ${['dr_michel', 'dra_luana', 'petition_editor'].includes(currentView) ? 'overflow-hidden' : 'overflow-y-auto p-4 md:p-6 scroll-smooth'}`}>
+        <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
              
              {/* CONTENT SWITCHER */}
              {currentView === 'dr_michel' ? (
