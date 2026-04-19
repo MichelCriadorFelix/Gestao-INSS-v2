@@ -210,7 +210,8 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                 0, 0, isRotated ? targetH : targetW, isRotated ? targetW : targetH
             );
             
-            const base64 = canvas.toDataURL('image/jpeg', 0.85);
+            // Aumentando qualidade para 0.95 para garantir máxima clareza no OCR do Gemini
+            const base64 = canvas.toDataURL('image/jpeg', 0.95);
             
             setPages(prev => [...prev, base64]);
             setCurrentImageSrc(null);

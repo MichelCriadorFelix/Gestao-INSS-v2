@@ -238,6 +238,53 @@ app.post("/api/ocr", async (req, res) => {
   }
 });
 
+// Unified Backend OCR for multiple files processing
+app.post("/api/ocr-unified", async (req, res) => {
+  try {
+    const { documents } = req.body;
+    if (!documents || !Array.isArray(documents) || documents.length === 0) {
+      return res.status(400).json({ error: "Documents are required" });
+    }
+
+    let unifiedText = "";
+
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      const docHeader = `--- INÍCIO DO DOCUMENTO ${i + 1}: ${doc.name} ---`;
+      
+      const parts: any[] = [
+        { text: `Você é um perito em extração de texto (OCR) de documentos jurídicos, médicos e previdenciários.
+Mande o conteúdo do arquivo abaixo em formato puro de texto (TXT inteligente).
+REGRAS:
+1. IDENTIFICAÇÃO: Inicie o texto sempre destacando o tipo do documento e seus detalhes vitais.
+2. TRANSCRIÇÃO LIMPA: Oculte lixo de caracteres, marcas de scanners ruins e gere uma leitura coesa.
+3. INSCRIÇÕES ESCANEADAS: Decifre caligrafia médica, atestados e PDFs antigos com foco em CRMs, CIDs, e Datas.
+4. ESTRUTURA: Não gere tabelas Markdown, apenas "Chave: Valor" em texto corrido.` },
+        { fileData: { mimeType: doc.mimeType, fileUri: doc.fileUri } }
+      ];
+
+      try {
+        const response = await callGemini({
+          model: "gemini-3-flash-preview",
+          contents: { role: "user", parts },
+          config: { temperature: 0.1, maxOutputTokens: 8192 }
+        });
+        
+        const extracted = response.text || "[Falha na extração de texto ou conteúdo vazio]";
+        unifiedText += `${docHeader}\n${extracted}\n\n`;
+      } catch (docErr: any) {
+        console.error(`Erro ao processar doc ${doc.name}:`, docErr);
+        unifiedText += `${docHeader}\n[Erro no OCR deste documento: ${docErr.message}]\n\n`;
+      }
+    }
+
+    res.json({ text: unifiedText });
+  } catch (error: any) {
+    console.error("Error in Unified OCR:", error);
+    res.status(500).json({ error: error.message || "Falha no OCR Unificado" });
+  }
+});
+
 // --- PROMPTS PARA OTIMIZAÇÃO (REFATORAÇÃO PADRÃO OURO) ---
 const INTENT_DETECTOR_PROMPT = `
 Você é um Classificador de Intenção Jurídica de alta velocidade.

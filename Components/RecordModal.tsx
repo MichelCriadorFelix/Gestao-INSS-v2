@@ -20,6 +20,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [editDocName, setEditDocName] = useState('');
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
+  const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const AVAILABLE_TAGS = [
@@ -134,6 +135,83 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       const updatedDocs = (formData.documents || []).filter(d => d.id !== docId);
       setFormData({ ...formData, documents: updatedDocs });
   }
+
+  const handleUnifiedOCR = async () => {
+      if (!formData.documents || formData.documents.length === 0) {
+          alert("Nenhum documento disponível para extração de OCR.");
+          return;
+      }
+
+      setIsGeneratingOCR(true);
+      try {
+          const docsToProcess = formData.documents.filter(doc => 
+              doc.type === 'application/pdf' || doc.type.startsWith('image/')
+          );
+
+          if (docsToProcess.length === 0) {
+               alert("Há apenas arquivos impossíveis de executar OCR (ex: outros TXTs ou áudios).");
+               setIsGeneratingOCR(false);
+               return;
+          }
+
+          const uploadedToGemini = [];
+          for (let i = 0; i < docsToProcess.length; i++) {
+               const doc = docsToProcess[i];
+               const res = await fetch('/api/upload-from-url', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                       url: doc.url,
+                       mimeType: doc.type,
+                       fileName: doc.name
+                   })
+               });
+               if (!res.ok) throw new Error(`Falha ao preparar ${doc.name} para a IA`);
+               const data = await res.json();
+               uploadedToGemini.push({ fileUri: data.fileUri, mimeType: data.mimeType, name: doc.name });
+          }
+
+          const ocrRes = await fetch('/api/ocr-unified', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ documents: uploadedToGemini })
+          });
+          
+          if (!ocrRes.ok) throw new Error("Falha na geração do OCR unificado no servidor.");
+          const ocrData = await ocrRes.json();
+          
+          if (ocrData.text) {
+               const blob = new Blob([ocrData.text], { type: 'text/plain' });
+               const file = new File([blob], 'OCR_Unificado.txt', { type: 'text/plain' });
+               const clientId = formData.id || 'temp';
+               const timestamp = Date.now();
+               const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/${timestamp}_OCR_Unificado.txt`, file);
+               
+               if (storageUrl) {
+                   const newDoc: ScannedDocument = {
+                       id: Math.random().toString(36).substr(2, 9),
+                       name: `📄 OCR Unificado Inteligente`,
+                       type: 'text/plain',
+                       date: new Date().toLocaleDateString('pt-BR'),
+                       url: storageUrl,
+                       tag: 'medico'
+                   };
+                   const updatedDocs = [...(formData.documents || []), newDoc];
+                   const updatedFormData = { ...formData, documents: updatedDocs };
+                   setFormData(updatedFormData);
+                   await onSave(updatedFormData as ClientRecord);
+                   alert("OCR Unificado gerado com sucesso e anexado nos arquivos do cliente!");
+               } else {
+                   throw new Error("Erro ao salvar TXT no Storage");
+               }
+          }
+      } catch (err: any) {
+          console.error(err);
+          alert(`Erro na extração de OCR: ${err.message}`);
+      } finally {
+          setIsGeneratingOCR(false);
+      }
+  };
 
   const handleScannerSave = async (doc: ScannedDocument) => {
       setSyncStatus(prev => ({ ...prev, [doc.id]: 'syncing' }));
@@ -888,6 +966,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
+                            </button>
+                            <button 
+                                onClick={handleUnifiedOCR}
+                                disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
+                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
+                            >
+                                {isGeneratingOCR ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <BoltIcon className="h-4 w-4" />}
+                                {isGeneratingOCR ? 'Lendo...' : 'Gerar OCR Unificado'}
                             </button>
                             <button 
                                 onClick={() => setIsScannerOpen(true)}
