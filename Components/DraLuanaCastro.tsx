@@ -467,7 +467,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
         // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
         const activeProvider = eliteProviderOverride || selectedModelProvider;
-        const textLimit = doc.fileUri ? 1000 : (activeProvider === 'openrouter' ? 150000 : 500000); // Reduce limit for paid models to save tokens
+        const activeModel = eliteModelOverride || selectedModel;
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000)); // Limit claude to ~12k tokens input
         const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';

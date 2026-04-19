@@ -1381,6 +1381,10 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
+    if (model && model.includes('claude')) {
+      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA CLAUDE]: IGNORE AS REGRAS DE "ENTREGA FRACIONADA" E "REGRA DE PARADA". Você é estruturalmente capaz de gerar textos longos de forma nativa. Portanto, ao invés de usar o método de janela contínua do manual, você DEVE redigir a petição COMPLETA, do cabeçalho aos pedidos e valor da causa, DE UMA SÓ VEZ, na mesma resposta. Foque nos fatos cruciais sem inventar linguagens prolixas para preservar o orçamento rigoroso de tokens. NUNCA pergunte se deve continuar. Entregue pronta.`;
+    }
+
     if (documentContext) {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
     }
@@ -1516,6 +1520,10 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     if (isGenerationRequest) {
       console.log("Injetando Manual de Redação de Elite - Dra. Luana");
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    if (model && model.includes('claude')) {
+      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA CLAUDE]: IGNORE AS REGRAS DE "ENTREGA FRACIONADA" E "REGRA DE PARADA". Você é estruturalmente capaz de gerar textos longos de forma nativa. Portanto, ao invés de usar o método de janela contínua do manual, você DEVE redigir a petição COMPLETA, do cabeçalho aos pedidos e valor da causa, DE UMA SÓ VEZ, na mesma resposta. Foque nos fatos cruciais sem inventar linguagens prolixas para preservar o orçamento rigoroso de tokens. NUNCA pergunte se deve continuar. Entregue pronta.`;
     }
 
     if (documentContext) {
