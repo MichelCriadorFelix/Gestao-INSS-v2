@@ -1383,6 +1383,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
                       <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="qwen/qwen-plus">Qwen Plus (Qwen)</option>
+                      <option value="qwen/qwen-max">Qwen Max (Qwen)</option>
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>
