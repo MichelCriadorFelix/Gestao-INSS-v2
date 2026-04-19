@@ -466,13 +466,13 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         
         // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
         if (doc.fileUri) {
-          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
+          return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
         }
 
         // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
         const textLimit = doc.fileUri ? 1000 : 500000; // If we have the file, send only a small preview to save tokens
         const fullTextPart = doc.fullText ? `CONTEÚDO (EXCERTOS):\n${doc.fullText.substring(0, textLimit)}` : '';
-        return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Gemini File API Habilitado]' : ''}`;
+        return `${header}${summaryPart}${fullTextPart}${doc.fileUri ? '\n[Acesso Direto via Base de Dados Habilitado]' : ''}`;
       }).join('\n\n---\n\n') || '';
 
       const contextPrompt = docSummaries ? 
@@ -909,7 +909,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento via Gemini File API para garantir máxima precisão técnica. Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento a partir do banco de dados para garantir máxima precisão técnica. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -961,7 +961,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED via Gemini File API, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED a partir do nosso banco de dados, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       

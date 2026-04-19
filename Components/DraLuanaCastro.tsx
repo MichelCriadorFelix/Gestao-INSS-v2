@@ -462,7 +462,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         
         // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
         if (doc.fileUri) {
-          return `${header}${summaryPart}[Arquivo anexado via Gemini File API]`;
+          return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
         }
 
         // Include as much full text as possible within safety limits (increased to 500k)
@@ -904,7 +904,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento via Gemini File API para garantir máxima precisão técnica. Por favor, aguarde...`,
+        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento a partir do banco de dados para garantir máxima precisão técnica. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
@@ -980,7 +980,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const readingMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED via Gemini File API, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
+        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED a partir do nosso banco de dados, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
         timestamp: new Date().toISOString()
       };
       
