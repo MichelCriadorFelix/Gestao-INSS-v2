@@ -1277,11 +1277,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
-                  e.target.style.height = `${e.target.scrollHeight}px`;
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`;
                 }}
-                className="w-full p-4 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[56px] max-h-40 overflow-y-auto"
+                className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <input 
                     type="file" 
