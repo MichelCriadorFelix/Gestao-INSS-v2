@@ -928,13 +928,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         <div className="flex items-center gap-2">
                             {formData.documents?.some(d => d.type === 'application/pdf') && (
                                 <button 
-                                    onClick={() => {
-                                        formData.documents?.filter(d => d.type === 'application/pdf').forEach(doc => {
+                                    onClick={async () => {
+                                        const pdfDocs = formData.documents?.filter(d => d.type === 'application/pdf') || [];
+                                        for (const doc of pdfDocs) {
+                                            const response = await fetch(doc.url);
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
                                             const link = document.createElement('a');
-                                            link.href = doc.url;
+                                            link.href = url;
                                             link.download = doc.name;
+                                            document.body.appendChild(link);
                                             link.click();
-                                        });
+                                            document.body.removeChild(link);
+                                            window.URL.revokeObjectURL(url);
+                                        }
                                     }}
                                     className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                                 >
@@ -1063,9 +1070,24 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             )}
                                         </div>
                                         
-                                        <a href={doc.url} download={`${doc.name}.${doc.type === 'application/pdf' ? 'pdf' : 'jpg'}`} className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" title="Baixar">
+                                        <button 
+                                            onClick={async () => {
+                                                const response = await fetch(doc.url);
+                                                const blob = await response.blob();
+                                                const url = window.URL.createObjectURL(blob);
+                                                const link = document.createElement('a');
+                                                link.href = url;
+                                                link.download = doc.name;
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                                window.URL.revokeObjectURL(url);
+                                            }}
+                                            className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
+                                            title="Baixar"
+                                        >
                                             <ArrowDownTrayIcon className="h-5 w-5" />
-                                        </a>
+                                        </button>
                                         <button onClick={() => handleRemoveDocument(doc.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Excluir">
                                             <TrashIcon className="h-5 w-5" />
                                         </button>
