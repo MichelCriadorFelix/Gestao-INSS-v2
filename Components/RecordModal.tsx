@@ -9,6 +9,59 @@ import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
 import { supabaseService } from '../services/supabaseService';
 
+const downloadFileRobust = async (docUrl: string, docName: string) => {
+    try {
+        let downloadUrl = docUrl;
+        let isObjectURL = false;
+        
+        if (docUrl.startsWith('data:')) {
+            const parts = docUrl.split('base64,');
+            if (parts.length === 2) {
+                let mimeType = 'application/pdf';
+                const headerPart = parts[0].split(';')[0];
+                if (headerPart && headerPart.startsWith('data:')) {
+                    mimeType = headerPart.substring(5);
+                }
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while(n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                const blob = new Blob([u8arr], {type: mimeType});
+                downloadUrl = window.URL.createObjectURL(blob);
+                isObjectURL = true;
+            }
+        } else {
+            const response = await fetch(docUrl);
+            if (!response.ok) throw new Error("Network error");
+            const blob = await response.blob();
+            downloadUrl = window.URL.createObjectURL(blob);
+            isObjectURL = true;
+        }
+
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = docName || 'documento';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        if (isObjectURL) {
+            setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 1000);
+        }
+    } catch (error) {
+        console.error("Falha detalhada no download:", error);
+        const link = document.createElement('a');
+        link.href = docUrl;
+        link.download = docName || 'documento';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+};
+
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, initialData, onOpenPetition }) => {
   const [formData, setFormData] = useState<Partial<ClientRecord>>({
       nationality: 'Brasileira',
@@ -931,16 +984,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     onClick={async () => {
                                         const pdfDocs = formData.documents?.filter(d => d.type === 'application/pdf') || [];
                                         for (const doc of pdfDocs) {
-                                            const response = await fetch(doc.url);
-                                            const blob = await response.blob();
-                                            const url = window.URL.createObjectURL(blob);
-                                            const link = document.createElement('a');
-                                            link.href = url;
-                                            link.download = doc.name;
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                            window.URL.revokeObjectURL(url);
+                                            await downloadFileRobust(doc.url, doc.name);
                                         }
                                     }}
                                     className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -1071,18 +1115,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                         </div>
                                         
                                         <button 
-                                            onClick={async () => {
-                                                const response = await fetch(doc.url);
-                                                const blob = await response.blob();
-                                                const url = window.URL.createObjectURL(blob);
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.download = doc.name;
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-                                                window.URL.revokeObjectURL(url);
-                                            }}
+                                            onClick={() => downloadFileRobust(doc.url, doc.name)}
                                             className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
                                             title="Baixar"
                                         >

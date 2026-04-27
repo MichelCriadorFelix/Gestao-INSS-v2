@@ -675,8 +675,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 isoDate = `${year}-${month}-${day}`;
                             }
                         }
-                        if (isoDate && newAgendaEvents[eventIndex].date !== isoDate) {
-                            newAgendaEvents[eventIndex] = { ...newAgendaEvents[eventIndex], date: isoDate };
+                        if (isoDate && (newAgendaEvents[eventIndex].date !== isoDate || newAgendaEvents[eventIndex].status === 'resolved')) {
+                            newAgendaEvents[eventIndex] = { ...newAgendaEvents[eventIndex], date: isoDate, status: 'pending' };
                             agendaUpdated = true;
                         }
                     } else {
@@ -698,6 +698,35 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (agendaUpdated) {
             setAgendaEvents(newAgendaEvents);
             saveData('agenda', newAgendaEvents);
+        }
+
+        let alertsModified = false;
+        let newResolvedAlerts = [...resolvedAlerts];
+
+        const alertSuffixMap: Record<string, string> = {
+            medExpertiseDate: '_med',
+            socialExpertiseDate: '_soc',
+            extensionDate: '_ext',
+            securityMandateDate: '_mand',
+            dcbDate: '_dcb',
+            ninetyDaysDate: '_90d'
+        };
+
+        Object.keys(alertSuffixMap).forEach(fieldKey => {
+            if (oldData[fieldKey as keyof ClientRecord] !== data[fieldKey as keyof ClientRecord]) {
+                const suffix = alertSuffixMap[fieldKey];
+                const alertId = `${data.id}${suffix}`;
+                
+                if (newResolvedAlerts.includes(alertId)) {
+                    newResolvedAlerts = newResolvedAlerts.filter(id => id !== alertId);
+                    alertsModified = true;
+                }
+            }
+        });
+
+        if (alertsModified) {
+            setResolvedAlerts(newResolvedAlerts);
+            saveData('resolved_alerts', newResolvedAlerts);
         }
 
         if (dailyFocusState) {
