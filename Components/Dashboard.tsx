@@ -699,6 +699,47 @@ const Dashboard: React.FC<DashboardProps> = ({
             setAgendaEvents(newAgendaEvents);
             saveData('agenda', newAgendaEvents);
         }
+
+        if (dailyFocusState) {
+            let tasksModified = false;
+            let newResolvedTasks = [...(dailyFocusState.resolvedTasks || [])];
+            let newPostponedTasks = [...(dailyFocusState.postponedTasks || [])];
+
+            const alertKeyMap: Record<string, string> = {
+                extensionDate: 'extension',
+                medExpertiseDate: 'medExpertise',
+                socialExpertiseDate: 'socialExpertise',
+                dcbDate: 'dcb',
+                ninetyDaysDate: 'ninetyDays',
+                securityMandateDate: 'securityMandate'
+            };
+
+            Object.keys(alertKeyMap).forEach(fieldKey => {
+                if (oldData[fieldKey as keyof ClientRecord] !== data[fieldKey as keyof ClientRecord]) {
+                    const alertKey = alertKeyMap[fieldKey];
+                    const taskId = `alert-${data.id}-${alertKey}`;
+                    
+                    if (newResolvedTasks.includes(taskId)) {
+                        newResolvedTasks = newResolvedTasks.filter(id => id !== taskId);
+                        tasksModified = true;
+                    }
+                    if (newPostponedTasks.find((t: any) => t.id === taskId)) {
+                        newPostponedTasks = newPostponedTasks.filter((t: any) => t.id !== taskId);
+                        tasksModified = true;
+                    }
+                }
+            });
+
+            if (tasksModified) {
+                const newState = {
+                    ...dailyFocusState,
+                    resolvedTasks: newResolvedTasks,
+                    postponedTasks: newPostponedTasks
+                };
+                setDailyFocusState(newState);
+                saveData('daily_focus', [newState]);
+            }
+        }
     }
     return result;
   };
