@@ -15,6 +15,7 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
         let isObjectURL = false;
         
         if (docUrl.startsWith('data:')) {
+            // Fix for sometimes malformed or very long base64 strings
             const parts = docUrl.split('base64,');
             if (parts.length === 2) {
                 let mimeType = 'application/pdf';
@@ -22,19 +23,33 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
                 if (headerPart && headerPart.startsWith('data:')) {
                     mimeType = headerPart.substring(5);
                 }
-                const bstr = atob(parts[1]);
-                let n = bstr.length;
-                const u8arr = new Uint8Array(n);
-                while(n--) {
-                    u8arr[n] = bstr.charCodeAt(n);
+                
+                // Remove any invalid characters (spaces, newlines, etc)
+                const safeBase64 = parts[1].replace(/[^A-Za-z0-9+/=]/g, '');
+                
+                try {
+                    const bstr = atob(safeBase64);
+                    let n = bstr.length;
+                    const u8arr = new Uint8Array(n);
+                    while(n--) {
+                        u8arr[n] = bstr.charCodeAt(n);
+                    }
+                    const blob = new Blob([u8arr], {type: mimeType});
+                    downloadUrl = window.URL.createObjectURL(blob);
+                    isObjectURL = true;
+                } catch (atobErr) {
+                    console.error("Erro no 'atob' do base64:", atobErr);
+                    // Fallback to fetch API which sometimes handles data URIs natively
+                    const response = await fetch(docUrl);
+                    if (!response.ok) throw new Error("Network error with data URI");
+                    const blob = await response.blob();
+                    downloadUrl = window.URL.createObjectURL(blob);
+                    isObjectURL = true;
                 }
-                const blob = new Blob([u8arr], {type: mimeType});
-                downloadUrl = window.URL.createObjectURL(blob);
-                isObjectURL = true;
             }
         } else {
             const response = await fetch(docUrl);
-            if (!response.ok) throw new Error("Network error");
+            if (!response.ok) throw new Error("Network error fetching url");
             const blob = await response.blob();
             downloadUrl = window.URL.createObjectURL(blob);
             isObjectURL = true;
@@ -42,7 +57,7 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
 
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = docName || 'documento';
+        link.download = docName || 'documento.pdf';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -52,13 +67,18 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
         }
     } catch (error) {
         console.error("Falha detalhada no download:", error);
-        const link = document.createElement('a');
-        link.href = docUrl;
-        link.download = docName || 'documento';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        alert("Falha ao baixar o arquivo. Talvez ele esteja corrompido ou o link expirou.");
+        
+        // Ultimate fallback
+        try {
+            const link = document.createElement('a');
+            link.href = docUrl;
+            link.download = docName || 'documento.pdf';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch(e) {}
     }
 };
 
