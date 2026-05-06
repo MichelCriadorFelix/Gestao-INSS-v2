@@ -2151,9 +2151,10 @@ app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
 });
 
-// Development server setup - ONLY runs locally, NOT on Vercel
+// Development server setup
+const PORT = 3000;
+
 if (process.env.NODE_ENV !== "production") {
-  const PORT = 3000;
   // Use dynamic import to avoid loading Vite in production/Vercel
   import("vite").then(({ createServer: createViteServer }) => {
     createViteServer({
@@ -2167,6 +2168,28 @@ if (process.env.NODE_ENV !== "production") {
     });
   }).catch(err => {
     console.error("Failed to start development server:", err);
+  });
+} else {
+  // Production setup
+  const path = await import("path");
+  const url = await import("url");
+  const __filename = url.fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
+  const root = path.join(__dirname, "..");
+  const distPath = path.join(root, 'dist');
+  
+  // Serve static files from the React app
+  app.use(express.static(distPath));
+  
+  // The "catchall" handler: for any request that doesn't
+  // match one above, send back React's index.html file.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Production server running on port ${PORT}`);
   });
 }
 
