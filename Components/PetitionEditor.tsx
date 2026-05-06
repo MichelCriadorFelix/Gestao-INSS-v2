@@ -157,6 +157,40 @@ interface HeaderFooterConfig {
   template: 'losangos' | 'tramitacao' | 'lumina';
 }
 
+const FONT_OPTIONS = [
+  { label: 'Roboto', value: 'Roboto', css: "'Roboto', sans-serif" },
+  { label: 'Times New Roman', value: 'Times', css: "'Times New Roman', Times, serif" },
+  { label: 'Helvetica (Arial)', value: 'Helvetica', css: "'Helvetica Neue', Helvetica, Arial, sans-serif" },
+  { label: 'Courier New', value: 'Courier', css: "'Courier New', Courier, monospace" },
+];
+
+const PDF_FONT_CONFIGS: Record<string, any> = {
+  Roboto: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  },
+  Times: {
+    normal: 'Times-Roman',
+    bold: 'Times-Bold',
+    italics: 'Times-Italic',
+    bolditalics: 'Times-BoldItalic',
+  },
+  Helvetica: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique',
+  },
+  Courier: {
+    normal: 'Courier',
+    bold: 'Courier-Bold',
+    italics: 'Courier-Oblique',
+    bolditalics: 'Courier-BoldOblique',
+  },
+};
+
 const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initialPetition, initialClientId, onSavePetition }) => {
   const [title, setTitle] = useState(initialPetition?.title || 'NOVA PETIÇÃO SEM TÍTULO');
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(
@@ -170,6 +204,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedFont, setSelectedFont] = useState<string>('Roboto');
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<ChatDocument[]>([]);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -690,7 +725,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         pageSize: 'A4',
         pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
-          font: 'Roboto',
+          font: selectedFont,
           fontSize: 12,
           lineHeight: 1.5,
           color: '#000000'
@@ -731,14 +766,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       };
 
-      const pdfFontsConfig = {
-        Roboto: {
-          normal: 'Roboto-Regular.ttf',
-          bold: 'Roboto-Medium.ttf',
-          italics: 'Roboto-Italic.ttf',
-          bolditalics: 'Roboto-MediumItalic.ttf'
-        }
-      };
+      const pdfFontsConfig: Record<string, any> = { ...PDF_FONT_CONFIGS };
 
       (pdfMake as any).createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
       setIsSaving(false);
@@ -1054,6 +1082,21 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           {/* Toolbar */}
           <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm print:hidden">
+            <select
+              value={selectedFont}
+              onChange={(e) => setSelectedFont(e.target.value)}
+              title="Selecionar fonte"
+              style={{ fontFamily: FONT_OPTIONS.find(f => f.value === selectedFont)?.css }}
+              className="h-8 px-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              {FONT_OPTIONS.map(f => (
+                <option key={f.value} value={f.value} style={{ fontFamily: f.css }}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive('bold')}
@@ -1178,7 +1221,10 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           {/* Editor Content */}
           <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
-            <div className="relative print:shadow-none print:w-full print:max-w-none print:block">
+            <div 
+              className="relative print:shadow-none print:w-full print:max-w-none print:block"
+              style={{ fontFamily: FONT_OPTIONS.find(f => f.value === selectedFont)?.css }}
+            >
               <EditorContent editor={editor} />
             </div>
           </div>
