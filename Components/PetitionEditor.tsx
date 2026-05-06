@@ -172,22 +172,22 @@ const PDF_FONT_CONFIGS: Record<string, any> = {
     bolditalics: 'Roboto-MediumItalic.ttf',
   },
   Times: {
-    normal: 'Times-Roman',
-    bold: 'Times-Bold',
-    italics: 'Times-Italic',
-    bolditalics: 'Times-BoldItalic',
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
   },
   Helvetica: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique',
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
   },
   Courier: {
-    normal: 'Courier',
-    bold: 'Courier-Bold',
-    italics: 'Courier-Oblique',
-    bolditalics: 'Courier-BoldOblique',
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
   },
 };
 
@@ -1221,6 +1221,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           {/* Editor Content */}
           <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
+            <style>{`.ProseMirror * { font-family: ${FONT_OPTIONS.find(f => f.value === selectedFont)?.css || 'inherit'} !important; }`}</style>
             <div 
               className="relative print:shadow-none print:w-full print:max-w-none print:block"
               style={{ fontFamily: FONT_OPTIONS.find(f => f.value === selectedFont)?.css }}
