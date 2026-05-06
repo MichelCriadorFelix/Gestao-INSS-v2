@@ -1597,12 +1597,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
                   />
              ) : currentView === 'dra_luana' ? (
                  <DraLuanaCastro 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
                   />
              ) : currentView === 'legislation' ? (
                   <Legislation customLaws={customLaws} onSaveCustomLaws={handleSaveCustomLaws} />

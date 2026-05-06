@@ -1704,7 +1704,7 @@ app.post("/api/marketing/generate", async (req, res) => {
 
 app.post("/api/dr-michel/chat", async (req, res) => {
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
@@ -1734,6 +1734,21 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     if (documentContext) {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
+    }
+
+    if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
+      const lawsContext = customLaws.map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA - PRIORIDADE MÁXIMA DE CITAÇÃO]\n
+ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TEMAS, SÚMULAS E JURISPRUDÊNCIA.
+VOCÊ DEVE:
+1. Priorizar COMPLETAMENTE as informações abaixo para fundamentação e citações diretas.
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto aqui fornecido.
+3. É PROIBIDO inventar ou alucinar citações que divirjam desta base.
+4. Se você souber de uma lei ou súmula importante que NÃO está nesta base, você pode sugerir, mas DEVE informar explicitamente que é uma sugestão externa para o usuário validar e alimentar a base se desejar.
+5. Em caso de conflito entre seu conhecimento interno e esta base, ESTA BASE PREVALECE.
+
+CONTEÚDO DA BASE DE CONHECIMENTO:
+${lawsContext}`;
     }
 
     if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
@@ -1806,7 +1821,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
 app.post("/api/dra-luana/chat", async (req, res) => {
   try {
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
     
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
@@ -1875,6 +1890,21 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     if (documentContext) {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
+    }
+
+    if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
+      const lawsContext = customLaws.map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA - PRIORIDADE MÁXIMA DE CITAÇÃO]\n
+ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TEMAS, SÚMULAS E JURISPRUDÊNCIA.
+VOCÊ DEVE:
+1. Priorizar COMPLETAMENTE as informações abaixo para fundamentação e citações diretas.
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto aqui fornecido.
+3. É PROIBIDO inventar ou alucinar citações que divirjam desta base.
+4. Se você souber de uma lei ou súmula importante que NÃO está nesta base, você pode sugerir, mas DEVE informar explicitamente que é uma sugestão externa para o usuário validar e alimentar a base se desejar.
+5. Em caso de conflito entre seu conhecimento interno e esta base, ESTA BASE PREVALECE.
+
+CONTEÚDO DA BASE DE CONHECIMENTO:
+${lawsContext}`;
     }
 
     // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4

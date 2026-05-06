@@ -60,12 +60,13 @@ interface DraLuanaCastroProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: { title: string; content: string }) => void;
+  customLaws?: any[];
 }
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition }) => {
+const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -484,6 +485,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
+          customLaws,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
           keyIndex: session?.uploadKeyIndex
