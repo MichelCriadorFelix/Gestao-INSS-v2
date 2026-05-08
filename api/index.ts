@@ -637,9 +637,17 @@ const ELITE_REDACTION_MANUAL = `
    - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
 4. DENSIDADE PROBATÓRIA: Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
 5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
-5. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
-6. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
-7. MODO SILENCIOSO (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3).
+6. CITAÇÃO COM RECUO (BLOCKQUOTE) - REGRA CRÍTICA PARA O "PADRÃO OPUS":
+   - Sempre que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown ou HTML.
+   - Utilize o sinal \`>\` no início de **cada linha** da citação. 
+   - Exemplo Certo:
+     > Art. 5º da CF. Todos são iguais perante a lei...
+     > I - homens e mulheres são iguais em direitos e obrigações...
+   - Exemplo Errado (Proibido): Colocar apenas entre aspas normais no meio do texto.
+   - TEXTOS FORA DA BASE: Se a lei NÃO ESTIVER na Base de Conhecimento inserida, você NÃO DEVE transcrevê-la (não use \`>\`), apenas cite que ela se aplica e explique seu efeito (ex: "O artigo 482 da CLT fundamenta esta pretensão conforme dispõe sobre..."). Mas NUNCA simule uma citação direta com recuo de algo que não lhe foi fornecido ipsis litteris.
+7. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
+8. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
+9. MODO SILENCIOSO (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3).
 `;
 
 const DR_MICHEL_SYSTEM_PROMPT = `
@@ -911,17 +919,20 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - PROIBIDO: NÃO gere relatórios nem petições nesta etapa.
 2. COMANDO "GERAR RELATÓRIO":
    - AÇÃO: Analise todo o contexto acumulado (documentos, conversas, CNIS, Laudos) e gere um Relatório de Análise Jurídica e Estratégia Processual.
-   - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO:
+   - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO (NÃO RESUMA, SEJA EXAUSTIVO E DENSO):
      1. STATUS DA LEITURA DOCUMENTAL: Liste os documentos lidos. SE algum documento estiver ilegível, vazio ou corrompido, crie um ALERTA EM DESTAQUE pedindo o reenvio.
-     2. RESUMO DOS FATOS: Síntese clara do caso (DER, DII, idade, tempo de contribuição, indeferimento).
-     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial.
+     2. RESUMO DOS FATOS: Síntese profunda do caso (DER, DII, idade, tempo de contribuição, indeferimento, carência, etc).
+     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados detalhadamente. Aponte se falta algum documento essencial.
      4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos.
-     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM): Atue como um Procurador do INSS rigoroso. Aponte os 3 maiores pontos fracos da documentação e defina a estratégia de blindagem.
-     6. ANÁLISE DE REQUISITOS: Verifique se os requisitos legais para o benefício foram preenchidos.
-     7. PRINCÍPIOS PREVIDENCIÁRIOS APLICÁVEIS: Sugira 1 ou 2 princípios.
-     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher.
-     9. ANÁLISE DA BASE DE CONHECIMENTO (VERIFICAÇÃO DE LEGISLAÇÃO/SÚMULAS): Liste as leis, artigos, teses e súmulas específicas que fundamentarão a peça. OBRIGATÓRIO: Verifique se elas constam na "BASE DE CONHECIMENTO PERSONALIZADA". Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado expressamente pedindo que ele adicione à base ou autorize sua mera menção sem transcrição.
-     10. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas.
+     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM - EXTREMAMENTE DETALHADO): Atue como um Procurador do INSS rigoroso. Aponte os maiores pontos fracos da documentação e defina a estratégia de blindagem.
+     6. ANÁLISE DE REQUISITOS (CHECAGEM RIGOROSA): Verifique exaustivamente se os requisitos legais para o benefício foram preenchidos (mostre o cálculo lógico e a subsunção).
+     7. PRINCÍPIOS PREVIDENCIÁRIOS APLICÁVEIS: Sugira e explique a aplicação de princípios ao caso.
+     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos processuais detalhados para o advogado escolher.
+     9. ANÁLISE ESTATÍSTICA DA BASE DE CONHECIMENTO (FOCO ABSOLUTO - NÃO IGNORE):
+        - Liste TODAS as leis, artigos, teses e súmulas específicas que SERÃO USADAS para fundamentar a peça.
+        - Para CADA UMA delas, você DEVE dizer explicitamente: "ENCONTRADA NA BASE DE CONHECIMENTO" ou "NÃO ENCONTRADA NA BASE DE CONHECIMENTO".
+        - Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado DE FORMA DESTACADA pedindo expressamente que ele adicione o texto à base, alertando-o que se não for adicionada, a IA apenas a MENCIONARÁ por cima e jamais a transcreverá (sem recuo).
+     10. PERGUNTAS AO ADVOGADO (DIÁLOGO ATIVO): Termine o relatório com perguntas estratégicas e diretrizes sobre a documentação/base de conhecimento.
      11. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
@@ -1139,17 +1150,20 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - PROIBIDO: NÃO gere relatórios nem petições nesta etapa.
 2. COMANDO "GERAR RELATÓRIO":
    - AÇÃO: Analise todo o contexto acumulado (documentos, conversas, e ESPECIALMENTE a planilha de cálculos) e gere um Relatório de Análise Jurídica e Estratégia Processual.
-   - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO:
+   - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO (NÃO RESUMA, SEJA EXAUSTIVO E DENSO):
      1. STATUS DA LEITURA DOCUMENTAL: Liste os documentos lidos. SE algum documento estiver ilegível, vazio ou corrompido, crie um ALERTA EM DESTAQUE pedindo o reenvio.
-     2. RESUMO DOS FATOS: Síntese clara do caso (admissão, demissão, função, violações).
-     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial.
+     2. RESUMO DOS FATOS: Síntese profunda do caso (admissão, demissão, função, violações, etc).
+     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados detalhadamente. Aponte se falta algum documento essencial.
      4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos.
-     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM): Atue como um Advogado de Defesa da Empresa extremamente rigoroso. Aponte os 3 maiores pontos fracos e defina a estratégia de blindagem.
-     6. ANÁLISE DOS CÁLCULOS E VERBAS COBRADAS: Liste as verbas devidas com os valores exatos da planilha.
-     7. PRINCÍPIOS TRABALHISTAS APLICÁVEIS: Sugira 1 ou 2 princípios.
-     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher.
-     9. ANÁLISE DA BASE DE CONHECIMENTO (VERIFICAÇÃO DE LEGISLAÇÃO/SÚMULAS): Liste as leis, artigos, teses e súmulas específicas que fundamentarão a peça. OBRIGATÓRIO: Verifique se elas constam na "BASE DE CONHECIMENTO PERSONALIZADA". Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado expressamente pedindo que ele adicione à base ou autorize sua mera menção sem transcrição.
-     10. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas.
+     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM - EXTREMAMENTE DETALHADO): Atue como um Advogado de Defesa da Empresa extremamente rigoroso. Aponte os maiores pontos fracos e defina a estratégia de blindagem.
+     6. ANÁLISE DOS CÁLCULOS E VERBAS COBRADAS: Liste exaustivamente as verbas devidas com os valores exatos da planilha.
+     7. PRINCÍPIOS TRABALHISTAS APLICÁVEIS: Sugira e explique a aplicação de princípios ao caso.
+     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos processuais detalhados para o advogado escolher.
+     9. ANÁLISE ESTATÍSTICA DA BASE DE CONHECIMENTO (FOCO ABSOLUTO - NÃO IGNORE):
+        - Liste TODAS as leis, artigos, teses e súmulas específicas que SERÃO USADAS para fundamentar a peça.
+        - Para CADA UMA delas, você DEVE dizer explicitamente: "ENCONTRADA NA BASE DE CONHECIMENTO" ou "NÃO ENCONTRADA NA BASE DE CONHECIMENTO".
+        - Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado DE FORMA DESTACADA pedindo expressamente que ele adicione o texto à base, alertando-o que se não for adicionada, a IA apenas a MENCIONARÁ por cima e jamais a transcreverá (sem recuo).
+     10. PERGUNTAS AO ADVOGADO (DIÁLOGO ATIVO): Termine o relatório com perguntas estratégicas e diretrizes sobre a documentação/base de conhecimento.
      11. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
@@ -1753,7 +1767,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
 VOCÊ DEVE:
 1. Priorizar COMPLETAMENTE as informações da base abaixo para fundamentação e citações diretas (se existirem).
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido.
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
 3. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
 4. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
    Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado na base de conhecimento abaixo:
@@ -1919,7 +1933,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
 VOCÊ DEVE:
 1. Priorizar COMPLETAMENTE as informações da base abaixo para fundamentação e citações diretas (se existirem).
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido.
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
 3. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
 4. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
    Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado na base de conhecimento abaixo:
