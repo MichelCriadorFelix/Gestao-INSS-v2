@@ -1190,15 +1190,13 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-1.5-flash-latest",
-  "gemini-1.5-pro-latest"
+  "gemini-3-flash-preview",
+  "gemini-3.1-pro-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-3-flash-preview": "gemini-1.5-flash-latest",
-  "gemini-3.1-pro-preview": "gemini-1.5-pro-latest",
-  "gemini-1.5-flash": "gemini-1.5-flash-latest",
-  "gemini-1.5-pro": "gemini-1.5-pro-latest"
+  "gemini-1.5-flash-latest": "gemini-3-flash-preview",
+  "gemini-1.5-pro-latest": "gemini-3.1-pro-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2197,13 +2195,14 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/config", (req, res) => {
   // Tenta buscar por diversos nomes comuns para garantir que encontre
-  const url = process.env.VITE_SUPABASE_URL || 
-              process.env.SUPABASE_URL || 
+  // Prioriza SEM o prefixo VITE_ para uso no backend/Vercel
+  const url = process.env.SUPABASE_URL || 
+              process.env.VITE_SUPABASE_URL || 
               process.env.URL_SUPABASE ||
               process.env.NEXT_PUBLIC_SUPABASE_URL;
               
-  const key = process.env.VITE_SUPABASE_ANON_KEY || 
-              process.env.SUPABASE_ANON_KEY || 
+  const key = process.env.SUPABASE_ANON_KEY || 
+              process.env.VITE_SUPABASE_ANON_KEY || 
               process.env.ANON_KEY_SUPABASE ||
               process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
