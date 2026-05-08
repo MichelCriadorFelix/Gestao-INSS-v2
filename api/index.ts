@@ -1190,8 +1190,8 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-1.5-flash",
-  "gemini-1.5-pro"
+  "gemini-3-flash-preview",
+  "gemini-3.1-pro-preview"
 ];
 
 function getApiKeys() {
@@ -1371,11 +1371,14 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   let currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
-  // Mapping fake/legacy names to real ones
-  if (currentModel === "gemini-3-flash-preview") currentModel = "gemini-1.5-flash";
-  if (currentModel === "gemini-3.1-pro-preview") currentModel = "gemini-1.5-pro";
+  // Mapping for SDK internal names if needed
+  const modelMapping: Record<string, string> = {
+    "gemini-3-flash-preview": "gemini-1.5-flash",
+    "gemini-3.1-pro-preview": "gemini-1.5-pro"
+  };
   
-  const finalParams = { ...params, model: currentModel };
+  const actualModel = modelMapping[currentModel] || currentModel;
+  const finalParams = { ...params, model: actualModel };
   
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -1849,7 +1852,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema:
 
     try {
       const responseStream = await callGeminiStream({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-3-flash-preview",
         contents,
         config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
@@ -2077,7 +2080,7 @@ ${ragContext}`;
       let responseStream;
       
       responseStream = await callGeminiStream({
-        model: model || "gemini-1.5-flash",
+        model: model || "gemini-3-flash-preview",
         contents: contents,
         config: {
           systemInstruction: selectedSystemPrompt,
