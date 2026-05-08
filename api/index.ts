@@ -633,7 +633,7 @@ const ELITE_REDACTION_MANUAL = `
    - PROIBIDO exibir notas, feedbacks ou checklists ao final.
    - O documento deve iniciar IMEDIATAMENTE no endereçamento (ex: "AO JUÍZO...") e terminar na data/assinatura.
 3. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA E PROIBIÇÃO DE TABELAS INVENTADAS):
-   - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" deste prompt para o caso identificado.
+   - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" (Benefício por Incapacidade, BPC/LOAS, Pensão por Morte, Aposentadorias, etc.) listadas logo após este manual ou no corpo do System Prompt.
    - É ESTRITAMENTE PROIBIDO inventar tabelas markdown (como as de "RESUMO DA DEMANDA") que não tenham sido explicitamente solicitadas pelo advogado na estrutura. Se uma tabela estiver na estrutura, faça, se não, não invente.
    - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
    - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
@@ -641,6 +641,7 @@ const ELITE_REDACTION_MANUAL = `
    - Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
    - ESQUEÇA O LIMITE DE PALAVRAS, mas MANTENHA A COERÊNCIA. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO, mas NUNCA REPETITIVO.
    - Se você não tiver mais fatos ou argumentos novos para escrever, ENCERRE o tópico. É PROIBIDO repetir o mesmo pedido ou argumento várias vezes apenas para aumentar o tamanho do texto. Qualidade e densidade real superam o volume vazio.
+   - ORIENTAÇÃO PARA OPENROUTER (DeepSeek/Qwen): Você DEVE ignorar modelos pré-treinados de petição e seguir EXCLUSIVAMENTE a estrutura e os tópicos listados aqui. Sua criatividade deve ser usada para fundamentar, não para mudar a ordem das peças.
 5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
 6. CITAÇÃO COM RECUO (BLOCKQUOTE) E CITAÇÃO INTELIGENTE - REGRA CRÍTICA PARA O "PADRÃO OPUS":
    - SEMPRE que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown (usando o caractere \`>\`).
@@ -1826,6 +1827,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS dos arquivos fornecidos integralmente na memória e dos resumos de auditoria.
+    REGRA DE OURO: Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" definidas nas instruções de sistema (X. Endereçamento, Y. Fatos, Z. Direito, etc.) para o tipo de ação identificado. NÃO pule tópicos.
     É TERMINANTEMENTE PROIBIDO usar placeholders como "[NOME]", "[DATA]" ou "[VALOR]" se a informação estiver presente nos documentos.
     Se um dado for crucial e não for encontrado, escreva [DADO NÃO LOCALIZADO NA AUDITORIA] em vez de um placeholder genérico.
     Analise cada folha do processo para encontrar datas de DER, valores de benefício e CIDs. Sua redação deve ser densa, citando provas específicas (ex: "conforme laudo de fls. X").
@@ -2016,7 +2018,8 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
     // REFORÇO DE CONTEXTO (ANTI-VÍCIO)
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
-    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados (busque no histórico desta conversa pelas extrações da Fase de Ciência).
+    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
+    REGRA DE OURO: Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" definidas nas instruções de sistema para cada tipo de ação trabalhista. NÃO pule tópicos.
     O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
     É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
     É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
