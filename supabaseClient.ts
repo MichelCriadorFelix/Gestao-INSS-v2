@@ -41,8 +41,8 @@ export const getDbConfig = () => {
     const stored = localStorage.getItem(DB_CONFIG_KEY);
     if (stored) return JSON.parse(stored);
 
-    const envUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+    const envUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL') || getEnvVar('URL_SUPABASE');
+    const envKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('ANON_KEY_SUPABASE');
 
     if (isValidUrl(envUrl) && envKey) {
         return { url: envUrl as string, key: envKey, isEnv: true };

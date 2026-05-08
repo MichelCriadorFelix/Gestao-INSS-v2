@@ -15,8 +15,8 @@ app.use(express.json({ limit: '50mb' }));
 
 // Supabase Admin Client for Auth Verification
 const supabaseAdmin = createClient(
-  process.env.VITE_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
 );
 
 // Authentication Middleware
@@ -1190,9 +1190,21 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview"
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-pro-latest"
 ];
+
+const MODEL_MAPPING: Record<string, string> = {
+  "gemini-3-flash-preview": "gemini-1.5-flash-latest",
+  "gemini-3.1-pro-preview": "gemini-1.5-pro-latest",
+  "gemini-1.5-flash": "gemini-1.5-flash-latest",
+  "gemini-1.5-pro": "gemini-1.5-pro-latest"
+};
+
+function getEffectiveModel(modelName?: string): string {
+  if (!modelName) return MODEL_HIERARCHY[0];
+  return MODEL_MAPPING[modelName] || modelName;
+}
 
 function getApiKeys() {
   const keys: string[] = [];
@@ -1250,7 +1262,8 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   
   // Select model from hierarchy or use the requested model on first try
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  const currentModel = getEffectiveModel(requestedModel);
   
   // Override model in params
   const finalParams = { ...params, model: currentModel };
@@ -1369,7 +1382,8 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  const currentModel = getEffectiveModel(requestedModel);
   
   const finalParams = { ...params, model: currentModel };
   
