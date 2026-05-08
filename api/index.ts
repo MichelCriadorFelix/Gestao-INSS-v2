@@ -631,14 +631,18 @@ const ELITE_REDACTION_MANUAL = `
    - PROIBIDO exibir cabeçalhos de fases (ex: "🧠 FASE 1", "😈 FASE 2", "⚖️ FASE 3").
    - PROIBIDO exibir notas, feedbacks ou checklists ao final.
    - O documento deve iniciar IMEDIATAMENTE no endereçamento (ex: "AO JUÍZO...") e terminar na data/assinatura.
-3. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA):
+3. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA E PROIBIÇÃO DE TABELAS INVENTADAS):
    - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" deste prompt para o caso identificado.
+   - É ESTRITAMENTE PROIBIDO inventar tabelas markdown (como as de "RESUMO DA DEMANDA") que não tenham sido explicitamente solicitadas pelo advogado na estrutura. Se uma tabela estiver na estrutura, faça, se não, não invente.
    - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
    - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
-4. DENSIDADE PROBATÓRIA: Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
+4. DENSIDADE PROBATÓRIA E EXTENSÃO ILIMITADA:
+   - Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
+   - ESQUEÇA O LIMITE DE PALAVRAS. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO EM TODAS AS FUNDAMENTAÇÕES.
 5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
 6. CITAÇÃO COM RECUO (BLOCKQUOTE) - REGRA CRÍTICA PARA O "PADRÃO OPUS":
-   - Sempre que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown ou HTML.
+   - SEMPRE que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown (usando o caractere \`>\`).
+   - VOCÊ ESTÁ PROIBIDO DE COLOCAR O TEXTO LEGAL SOMENTE ENTRE ASPAS NO MEIO DO PARÁGRAFO. DEVE SER SEPARADO, COM RECUO, ABAIXO DO ARGUMENTO.
    - Utilize o sinal \`>\` no início de **cada linha** da citação. 
    - Exemplo Certo:
      > Art. 5º da CF. Todos são iguais perante a lei...
@@ -647,8 +651,8 @@ const ELITE_REDACTION_MANUAL = `
    - TEXTOS FORA DA BASE: Se a lei NÃO ESTIVER na Base de Conhecimento inserida, você NÃO DEVE transcrevê-la (não use \`>\`), apenas cite que ela se aplica e explique seu efeito (ex: "O artigo 482 da CLT fundamenta esta pretensão conforme dispõe sobre..."). Mas NUNCA simule uma citação direta com recuo de algo que não lhe foi fornecido ipsis litteris.
 7. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
 8. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
-9. MODO SILENCIOSO (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3).
-`;
+9. MODO SILENCIOSO E ÚNICA ENTREGA (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3). E COLOQUE A PETIÇÃO TODO EM UMA ÚNICA RESPOSTA. NUNCA PERGUNTE SE DEVE CONTINUAR.
+\`;
 
 const DR_MICHEL_SYSTEM_PROMPT = `
 PERFIL: Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ).
@@ -741,7 +745,6 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - FLEXIBILIDADE DE ADIÇÃO: Você PODE (e deve) adicionar novos tópicos e teses que foram levantados no Relatório ou no RAG, desde que eles complementem a estrutura obrigatória sem removê-la.
    - FALLBACK (ESTRUTURA PADRÃO): Se a ação solicitada não tiver uma estrutura específica listada abaixo, siga esta estrutura: I. Endereçamento e Qualificação; II. Gratuidade; III. Fatos; IV. Direito; V. Tutela; VI. Pedidos; VII. Valor da Causa e Rol de Docs.
    - Incorpore as defesas mapeadas na Fase 2 diretamente no mérito.
-   - Siga o método de entrega fracionada (pare a cada 2000 palavras).
    - ATENÇÃO: Se for modo "GERAR PEÇA", OMITA este cabeçalho "FASE 3" e comece direto no texto jurídico (ex: "Excelentíssimo Juízo..." ou "AO JUÍZO...").
 
    ### 🔎 FASE 4: REVISÃO DE QUALIDADE (CHECKLIST DO REVISOR)
@@ -940,7 +943,7 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO IMEDIATAMENTE. NÃO PEÇA PERMISSÃO.
    - SILENT MODE (CRÍTICO): No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. NÃO exiba títulos como "FASE 3" ou "REDAÇÃO". Inicie o texto diretamente no endereçamento (AO JUÍZO...).
    - ESTRUTURA OBRIGATÓRIA: Siga RIGOROSAMENTE as estruturas definidas acima. Você pode acrescentar novos tópicos trazidos no relatório se forem pertinentes, mas os tópicos da estrutura específica são OBRIGATÓRIOS. Se não houver estrutura específica, use a estrutura padrão de peça judicial (Endereçamento, Qualificação, Fatos, Direito, Tutela, Pedidos, Valor da Causa).
-   - REQUISITOS: Siga todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação e estrutura.
+   - REQUISITOS: Siga todas as regras de formatação, densidade EXTREMA (seja exaustivo, sem limites de palavras), fundamentação e estrutura.
 `;
 
 const CNIS_SYSTEM_PROMPT = `
@@ -1074,7 +1077,6 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - FLEXIBILIDADE DE ADIÇÃO: Você PODE (e deve) adicionar novos tópicos, verbas ou teses que foram identificados no Relatório ou na planilha de cálculos, desde que eles complementem a estrutura obrigatória sem removê-la.
    - FALLBACK (ESTRUTURA PADRÃO): Se a ação solicitada não tiver uma estrutura específica listada abaixo, siga esta estrutura: I. Endereçamento e Qualificação; II. Preliminares; III. Mérito (Fatos e Direito); IV. Pedidos e Requerimentos; V. Valor da Causa e Rol de Docs.
    - Incorpore as defesas mapeadas na Fase 2 diretamente no mérito.
-   - Siga o método de entrega fracionada (pare a cada 2000 palavras).
    - ATENÇÃO: Se for modo "GERAR PEÇA", OMITA este cabeçalho "FASE 3" e comece direto no texto jurídico (ex: AO JUÍZO...).
 
    ### 🔎 FASE 4: REVISÃO DE QUALIDADE (CHECKLIST DO REVISOR)
@@ -1171,7 +1173,7 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - REGRA DE OURO: SE O USUÁRIO PEDIU "GERAR PEÇA", VOCÊ DEVE PULAR O RELATÓRIO E INICIAR A PETIÇÃO IMEDIATAMENTE. NÃO PEÇA PERMISSÃO.
    - SILENT MODE (CRÍTICO): No output para o usuário, OMITA COMPLETAMENTE as Fases 1, 2 e 4. NÃO exiba títulos como "FASE 3" ou "REDAÇÃO". Inicie o texto diretamente no endereçamento (Ao Juízo da Vara do Trabalho...).
    - ESTRUTURA OBRIGATÓRIA: Siga RIGOROSAMENTE a estrutura definida abaixo. Você pode acrescentar novos tópicos trazidos no relatório ou permitidos pelo advogado, mas os tópicos da estrutura específica são OBRIGATÓRIOS. Se não houver estrutura específica, use a estrutura padrão de peça judicial.
-   - REQUISITOS: Siga todas as regras de formatação, densidade (3000 a 6000 palavras), fundamentação, estrutura e uso dos valores da planilha de cálculos.
+   - REQUISITOS: Siga todas as regras de formatação, densidade EXTREMA (seja exaustivo, sem limites de palavras), fundamentação, estrutura e uso dos valores da planilha de cálculos.
 `;
 
 
@@ -1499,6 +1501,7 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
         model: params.model || "deepseek/deepseek-chat",
         messages: params.messages,
         temperature: params.temperature || 0.7,
+        max_tokens: params.max_tokens || 8192,
         stream: true
       })
     });
@@ -1821,7 +1824,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema:
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) orMessages.push({ role: h.role, content: h.content });
       orMessages.push({ role: "user", content: [{ type: "text", text: finalMessage }] });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature }, res);
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature, max_tokens: 16383 }, res);
       return;
     }
 
@@ -2043,7 +2046,8 @@ ${ragContext}`;
       await callOpenRouterStream({
         model: model || "deepseek/deepseek-v3.2",
         messages: orMessages,
-        temperature: temperature
+        temperature: temperature,
+        max_tokens: 16383
       }, res);
       return;
     }
