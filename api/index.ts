@@ -634,6 +634,7 @@ const ELITE_REDACTION_MANUAL = `
    - O documento deve iniciar IMEDIATAMENTE no endereçamento (ex: "AO JUÍZO...") e terminar na data/assinatura.
 3. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA E PROIBIÇÃO DE TABELAS INVENTADAS):
    - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" (Benefício por Incapacidade, BPC/LOAS, Pensão por Morte, Aposentadorias, etc.) listadas logo após este manual ou no corpo do System Prompt.
+   - **REGRA DE RIGIDEZ (OPENROUTER/DEEPSEEK/QWEN):** Se você ignorar a estrutura obrigatória e usar seu modelo pré-treinado, o software será rejeitado. VOCÊ DEVE INCLUIR TODOS OS TÓPICOS DA ESTRUTURA, NA ORDEM EXATA.
    - É ESTRITAMENTE PROIBIDO inventar tabelas markdown (como as de "RESUMO DA DEMANDA") que não tenham sido explicitamente solicitadas pelo advogado na estrutura. Se uma tabela estiver na estrutura, faça, se não, não invente.
    - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
    - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
@@ -1847,10 +1848,10 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras" ou "Verbas Rescisórias". Isso é inaceitável.
-    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** É PROIBIDO inventar o Valor da Causa. Se não tiver o dado, use [VALOR A CALCULAR EM LIQUIDAÇÃO].
+    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
+    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** É PROIBIDO inventar o Valor da Causa. Se não tiver os salários para calcular a média, use [VALOR A CALCULAR EM LIQUIDAÇÃO - ESTIMADO EM SALÁRIO MÍNIMO].
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição.
-    REGRA DE OURO: Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" definidas nas instruções de sistema para o tipo de ação identificado. NÃO pule tópicos.
+    REGRA DE OURO: Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" definidas nas instruções de sistema (ex: Tópico I, II, III). NÃO pule tópicos. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
     Sua redação deve ser densa, citando provas específicas.
     `;
     const historyParts = history.map((h: any) => ({
