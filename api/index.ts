@@ -640,13 +640,15 @@ const ELITE_REDACTION_MANUAL = `
    - Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
    - ESQUEÇA O LIMITE DE PALAVRAS. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO EM TODAS AS FUNDAMENTAÇÕES.
 5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
-6. CITAÇÃO COM RECUO (BLOCKQUOTE) - REGRA CRÍTICA PARA O "PADRÃO OPUS":
+6. CITAÇÃO COM RECUO (BLOCKQUOTE) E CITAÇÃO INTELIGENTE - REGRA CRÍTICA PARA O "PADRÃO OPUS":
    - SEMPRE que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown (usando o caractere \`>\`).
    - VOCÊ ESTÁ PROIBIDO DE COLOCAR O TEXTO LEGAL SOMENTE ENTRE ASPAS NO MEIO DO PARÁGRAFO. DEVE SER SEPARADO, COM RECUO, ABAIXO DO ARGUMENTO.
    - Utilize o sinal \`>\` no início de **cada linha** da citação. 
-   - Exemplo Certo:
-     > Art. 5º da CF. Todos são iguais perante a lei...
-     > I - homens e mulheres são iguais em direitos e obrigações...
+   - CITAÇÃO INTELIGENTE (RECORTES ESTRATÉGICOS): O gerador de petição DEVE acessar a base de conhecimento de forma estratégica. Se precisar usar um inciso de um longo artigo, ele DEVE citar a cabeça (caput) do artigo na íntegra, usar reticências entre colchetes \`[...]\` para suprimir os trechos/incisos desnecessários, e então citar na íntegra apenas os incisos, alíneas ou parágrafos que irá utilizar. Uma citação inteligente, expressa e direta.
+   - Exemplo Certo (Citação Inteligente):
+     > Art. 5º Todos são iguais perante a lei, sem distinção de qualquer natureza, garantindo-se aos brasileiros e aos estrangeiros residentes no País a inviolabilidade do direito à vida...
+     > [...]
+     > I - homens e mulheres são iguais em direitos e obrigações, nos termos desta Constituição;
    - Exemplo Errado (Proibido): Colocar apenas entre aspas normais no meio do texto.
    - TEXTOS FORA DA BASE: Se a lei NÃO ESTIVER na Base de Conhecimento inserida, você NÃO DEVE transcrevê-la (não use \`>\`), apenas cite que ela se aplica e explique seu efeito (ex: "O artigo 482 da CLT fundamenta esta pretensão conforme dispõe sobre..."). Mas NUNCA simule uma citação direta com recuo de algo que não lhe foi fornecido ipsis litteris.
 7. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
