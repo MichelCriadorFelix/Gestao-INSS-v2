@@ -1745,17 +1745,27 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
       const lawsContext = customLaws.map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA - PRIORIDADE MÁXIMA DE CITAÇÃO]\n
-ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TEMAS, SÚMULAS E JURISPRUDÊNCIA.
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
+ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
 VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações abaixo para fundamentação e citações diretas.
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto aqui fornecido.
-3. É PROIBIDO inventar ou alucinar citações que divirjam desta base.
-4. Se você souber de uma lei ou súmula importante que NÃO está nesta base, você pode sugerir, mas DEVE informar explicitamente que é uma sugestão externa para o usuário validar e alimentar a base se desejar.
-5. Em caso de conflito entre seu conhecimento interno e esta base, ESTA BASE PREVALECE.
+1. Priorizar COMPLETAMENTE as informações da base abaixo para fundamentação e citações diretas (se existirem).
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido.
+3. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
+4. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
+   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado na base de conhecimento abaixo:
+   - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
+   - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
+5. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
-CONTEÚDO DA BASE DE CONHECIMENTO:
+CONTEÚDO DA BASE DE CONHECIMENTO DO SUPABASE:
 ${lawsContext}`;
+    } else {
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
+A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário.
+REGRA DE OURO OBRIGATÓRIA:
+Se o caso EXIGIR uma lei, artigo, súmula ou tema:
+- NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
+- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Como a base está vazia, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
     if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
@@ -1901,17 +1911,27 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
       const lawsContext = customLaws.map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA - PRIORIDADE MÁXIMA DE CITAÇÃO]\n
-ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TEMAS, SÚMULAS E JURISPRUDÊNCIA.
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
+ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
 VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações abaixo para fundamentação e citações diretas.
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto aqui fornecido.
-3. É PROIBIDO inventar ou alucinar citações que divirjam desta base.
-4. Se você souber de uma lei ou súmula importante que NÃO está nesta base, você pode sugerir, mas DEVE informar explicitamente que é uma sugestão externa para o usuário validar e alimentar a base se desejar.
-5. Em caso de conflito entre seu conhecimento interno e esta base, ESTA BASE PREVALECE.
+1. Priorizar COMPLETAMENTE as informações da base abaixo para fundamentação e citações diretas (se existirem).
+2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido.
+3. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
+4. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
+   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado na base de conhecimento abaixo:
+   - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
+   - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
+5. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
-CONTEÚDO DA BASE DE CONHECIMENTO:
+CONTEÚDO DA BASE DE CONHECIMENTO DO SUPABASE:
 ${lawsContext}`;
+    } else {
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
+A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário.
+REGRA DE OURO OBRIGATÓRIA:
+Se o caso EXIGIR uma lei, artigo, súmula ou tema:
+- NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
+- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Como a base está vazia, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
     // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4
