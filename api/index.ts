@@ -1190,8 +1190,8 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview"
+  "gemini-1.5-flash",
+  "gemini-1.5-pro"
 ];
 
 function getApiKeys() {
@@ -1369,7 +1369,11 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  let currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  
+  // Mapping fake/legacy names to real ones
+  if (currentModel === "gemini-3-flash-preview") currentModel = "gemini-1.5-flash";
+  if (currentModel === "gemini-3.1-pro-preview") currentModel = "gemini-1.5-pro";
   
   const finalParams = { ...params, model: currentModel };
   
@@ -1845,7 +1849,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema:
 
     try {
       const responseStream = await callGeminiStream({
-        model: model || "gemini-3-flash-preview",
+        model: model || "gemini-1.5-flash",
         contents,
         config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
@@ -2073,7 +2077,7 @@ ${ragContext}`;
       let responseStream;
       
       responseStream = await callGeminiStream({
-        model: model || "gemini-3-flash-preview",
+        model: model || "gemini-1.5-flash",
         contents: contents,
         config: {
           systemInstruction: selectedSystemPrompt,

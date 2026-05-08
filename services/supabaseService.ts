@@ -727,7 +727,11 @@ export const supabaseService = {
       });
       
     if (error) {
-      console.error('Error searching legal documents in Supabase:', error);
+      if (error.message?.includes('timeout')) {
+        console.warn('Supabase RAG search timeout - possibly missing index or too many records. Continuing without extra context.');
+      } else {
+        console.error('Error searching legal documents in Supabase:', error);
+      }
       return [];
     }
     return data || [];
