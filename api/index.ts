@@ -1167,19 +1167,26 @@ const MODEL_HIERARCHY = [
 ];
 
 function getApiKeys() {
+  const keys: string[] = [];
+
+  // 1. Prioritize API_KEY_1 (supports comma-separated list of keys)
+  if (process.env.API_KEY_1) {
+    keys.push(...process.env.API_KEY_1.split(',').map(k => k.trim()).filter(Boolean));
+  }
+
+  // 2. Get all OTHER API keys
   const envKeys = Object.keys(process.env);
+  const keyVars = envKeys.filter(k => 
+    (k.startsWith('API_KEY_') && k !== 'API_KEY_1') || 
+    k.startsWith('GEMINI_API_KEY_')
+  );
   
-  // Buscar chaves que começam com API_KEY_ ou GEMINI_API_KEY_
-  const keyVars = envKeys.filter(k => k.startsWith('API_KEY_') || k.startsWith('GEMINI_API_KEY_'));
+  keys.push(...keyVars.map(k => process.env[k]).filter(Boolean) as string[]);
   
-  let keys = keyVars
-    .map(k => process.env[k])
-    .filter(Boolean) as string[];
-  
-  // Adiciona a chave padrão se existir
+  // 3. Adiciona a chave padrão se existir
   if (process.env.GEMINI_API_KEY) keys.push(process.env.GEMINI_API_KEY);
   
-  // Adiciona chaves da lista GEMINI_KEYS se existir
+  // 4. Adiciona chaves da lista GEMINI_KEYS se existir
   if (process.env.GEMINI_KEYS) {
     keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(Boolean));
   }
@@ -1189,7 +1196,7 @@ function getApiKeys() {
   
   // Log detalhado para diagnóstico no console da Vercel
   if (process.env.NODE_ENV === 'production') {
-    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keyVars.length} variáveis de ambiente seguindo o padrão API_KEY_X.`);
+    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keys.length} chaves potenciais.`);
     console.log(`[AUTH] Total de chaves únicas carregadas: ${uniqueKeys.length}. Chaves operacionais: ${filteredValidKeys.length}.`);
   }
   
