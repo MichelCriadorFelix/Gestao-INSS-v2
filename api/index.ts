@@ -1739,8 +1739,15 @@ app.post("/api/marketing/generate", async (req, res) => {
 });
 
 app.post("/api/dr-michel/chat", async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
+  
   try {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
+    message = message || "";
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
@@ -1825,18 +1832,14 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema:
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-
     if (modelProvider === 'openrouter') {
+      clearInterval(heartbeat);
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) orMessages.push({ role: h.role, content: h.content });
       orMessages.push({ role: "user", content: [{ type: "text", text: finalMessage }] });
       await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature, max_tokens: 16383 }, res);
       return;
     }
-
-    const heartbeat = setInterval(() => res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`), 5000);
 
     const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
 
@@ -1860,14 +1863,22 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema:
       res.end();
     }
   } catch (err: any) {
+    clearInterval(heartbeat);
     res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
     res.end();
   }
 });
 
 app.post("/api/dra-luana/chat", async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
+
   try {
     let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
+    message = message || "";
     
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
@@ -2032,12 +2043,8 @@ ${ragContext}`;
     // Configuração de Tools (Google Search Grounding + URL Context)
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-
     if (modelProvider === 'openrouter') {
+      clearInterval(heartbeat);
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) {
         orMessages.push({ role: h.role, content: h.content });
@@ -2059,10 +2066,6 @@ ${ragContext}`;
       }, res);
       return;
     }
-
-    const heartbeat = setInterval(() => {
-      res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-    }, 5000);
 
     const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
 
@@ -2118,6 +2121,7 @@ ${ragContext}`;
       res.end();
     }
   } catch (error: any) {
+    clearInterval(heartbeat);
     console.error("Error in chat (Dra. Luana):", error);
     res.write(`data: ${JSON.stringify({ error: error.message || "Falha no chat" })}\n\n`);
     res.end();
