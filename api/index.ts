@@ -603,10 +603,11 @@ const DR_MICHEL_CASUAL_PROMPT = `${DR_MICHEL_IDENTITY}\nVocê está em modo de c
 const DRA_LUANA_CASUAL_PROMPT = `${DRA_LUANA_IDENTITY}\nVocê está em modo de conversação leve. Responda de forma breve, empática, formal e prestativa. Não utilize o manual completo de redação agora. Se o usuário quiser gerar uma peça, aguarde o comando específico ou sugira que ele peça para "Gerar Relatório".`;
 
 async function detectUserIntent(message: string): Promise<string> {
+  const safeMessage = message || "";
   try {
     const response = await callGemini({
       model: "gemini-3-flash-preview",
-      contents: { role: "user", parts: [{ text: message }] },
+      contents: { role: "user", parts: [{ text: safeMessage }] },
       config: {
         systemInstruction: INTENT_DETECTOR_PROMPT,
         temperature: 0
@@ -654,7 +655,7 @@ const ELITE_REDACTION_MANUAL = `
 7. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
 8. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
 9. MODO SILENCIOSO E ÚNICA ENTREGA (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3). E COLOQUE A PETIÇÃO TODO EM UMA ÚNICA RESPOSTA. NUNCA PERGUNTE SE DEVE CONTINUAR.
-\`;
+`;
 
 const DR_MICHEL_SYSTEM_PROMPT = `
 PERFIL: Dr. Michel Felix - Advogado Previdenciarista de Elite (OAB/RJ).
@@ -727,15 +728,16 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - Se o comando for "GERAR RELATÓRIO": Exiba as FASES 1, 2 e 4 normalmente para conferência do advogado.
    - Se o comando for "GERAR PEÇA": OMITA COMPLETAMENTE as FASES 1, 2 e 4 do seu output. Realize-as internamente, mas inicie o texto diretamente pelo endereçamento/título da Petição Inicial. NÃO exiba o checklist de revisão ao final na peça.
 
-   ### 🧠 FASE 1: PENSAMENTO PROFUNDO E MAPEAMENTO
-   - Liste mentalmente todos os documentos enviados pelo usuário.
+   ### 🧠 FASE 1: PENSAMENTO PROFUNDO E MAPEAMENTO (RELATÓRIO MESTRE)
+   - Liste **detalhadamente** todos os documentos enviados pelo usuário, indicando a qual página ou trecho (OCR) se referem.
    - IDENTIFICAÇÃO DA ESTRUTURA OBRIGATÓRIA: Declare explicitamente qual das "ESTRUTURAS OBRIGATÓRIAS" (listadas mais abaixo neste prompt) se aplica ao caso (ex: Benefício por Incapacidade, BPC/LOAS, Aposentadoria por Idade).
    - Defina a tese principal e planeje onde cada documento será citado.
+   - ANÁLISE DE BASE DE CONHECIMENTO (OBRIGATÓRIO MENCIONAR NO RELATÓRIO): Liste explicitamente TODAS as leis, artigos, incisos, súmulas e teses que embasarão a ação. Verifique e **indique no relatório se elas estão presentes ou não na base de conhecimento**. Caso falte alguma legislação essencial, faça a recomendação para que o advogado adicione (ex: "Súmula X não consta na base, recomendo adição...").
 
-   ### 😈 FASE 2: ADVOGADO DO DIABO (ANTECIPAÇÃO DE DEFESA)
-   - Atue como um Procurador do INSS rigoroso.
-   - Aponte os 3 maiores pontos fracos da documentação.
-   - Defina a estratégia de blindagem para rebater essas teses na peça.
+   ### 😈 FASE 2: ADVOGADO DO DIABO E ESTRATÉGIA (ANTECIPAÇÃO DE DEFESA)
+   - Atue como um Procurador adversário (do INSS ou da Empresa) extremamente rigoroso.
+   - Aponte os 3 maiores pontos fracos, lacunas ou contradições na documentação (falta de carência, justa causa aparente, prescrição).
+   - Defina a estratégia de reflexão e blindagem MAIS ROBUSTA para afastar totalmente essas preliminares na peça. O Relatório deve apresentar isso em profundidade, como um parecer analítico.
 
    ---
    ⚠️ **Abaixo inicia-se a petição para cópia:**
@@ -1059,15 +1061,16 @@ REGRAS CRÍTICAS DE ESCRITA (DNA JURÍDICO):
    - Se o comando for "GERAR RELATÓRIO": Exiba as FASES 1, 2 e 4 normalmente para conferência do advogado.
    - Se o comando for "GERAR PEÇA": OMITA COMPLETAMENTE as FASES 1, 2 e 4 do seu output. Realize-as internamente, mas inicie o texto diretamente pelo endereçamento/título da Reclamação Trabalhista. NÃO exiba o checklist de revisão ao final na peça.
 
-   ### 🧠 FASE 1: PENSAMENTO PROFUNDO E MAPEAMENTO
-   - Liste mentalmente todos os documentos e cálculos enviados pelo usuário.
+   ### 🧠 FASE 1: PENSAMENTO PROFUNDO E MAPEAMENTO (RELATÓRIO MESTRE)
+   - Liste **detalhadamente** todos os documentos e cálculos enviados pelo usuário, indicando a qual página ou trecho (OCR) se referem.
    - IDENTIFICAÇÃO DA ESTRUTURA OBRIGATÓRIA: Declare explicitamente qual das "ESTRUTURAS OBRIGATÓRIAS" (listadas mais abaixo neste prompt) se aplica ao caso (ex: Reclamação Trabalhista Padrão, Rescisão Indireta).
    - Defina a tese principal e planeje onde cada verba e documento será citado.
+   - ANÁLISE DE BASE DE CONHECIMENTO (OBRIGATÓRIO MENCIONAR NO RELATÓRIO): Liste explicitamente TODAS as leis, artigos, incisos, súmulas e teses que embasarão a ação. Verifique e **indique no relatório se elas estão presentes ou não na base de conhecimento**. Caso falte alguma legislação essencial, faça a recomendação para que a advogada adicione (ex: "Súmula X não consta na base, recomendo adição...").
 
-   ### 😈 FASE 2: ADVOGADO DO DIABO (ANTECIPAÇÃO DE DEFESA)
+   ### 😈 FASE 2: ADVOGADO DO DIABO E ESTRATÉGIA (ANTECIPAÇÃO DE DEFESA)
    - Atue como um Advogado de Defesa da Empresa extremamente rigoroso.
    - Aponte os 3 maiores pontos fracos da documentação (ex: cartões de ponto assinados, recibos de pagamento, prescrição quinquenal).
-   - Defina a estratégia de blindagem para rebater essas teses na peça.
+   - Defina a estratégia de reflexão e blindagem MAIS ROBUSTA para rebater essas teses na peça. O Relatório deve apresentar isso em profundidade, como um parecer analítico.
 
    ---
    ⚠️ **Abaixo inicia-se a petição para cópia:**
