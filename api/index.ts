@@ -1369,16 +1369,9 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  let currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  const currentModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
   
-  // Mapping for SDK internal names if needed
-  const modelMapping: Record<string, string> = {
-    "gemini-3-flash-preview": "gemini-1.5-flash",
-    "gemini-3.1-pro-preview": "gemini-1.5-pro"
-  };
-  
-  const actualModel = modelMapping[currentModel] || currentModel;
-  const finalParams = { ...params, model: actualModel };
+  const finalParams = { ...params, model: currentModel };
   
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
