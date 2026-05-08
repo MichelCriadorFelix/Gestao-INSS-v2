@@ -914,13 +914,15 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO:
      1. STATUS DA LEITURA DOCUMENTAL: Liste os documentos lidos. SE algum documento estiver ilegível, vazio ou corrompido, crie um ALERTA EM DESTAQUE pedindo o reenvio.
      2. RESUMO DOS FATOS: Síntese clara do caso (DER, DII, idade, tempo de contribuição, indeferimento).
-     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial (Ex: "Falta o CadÚnico atualizado para o BPC/LOAS").
-      4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos (ex: CNIS vs. PPP, CTPS vs. CNIS, Laudo vs. Relato do Cliente). Explique o impacto jurídico de cada divergência e peça instruções ao advogado sobre como proceder ou qual verdade deve prevalecer.
-      5. ANÁLISE DE REQUISITOS: Verifique se os requisitos legais para o benefício foram preenchidos.
-      6. PRINCÍPIOS PREVIDENCIÁRIOS APLICÁVEIS: Sugira 1 ou 2 princípios que se encaixam perfeitamente no caso (Ex: In Dubio Pro Misero, Seletividade e Distributividade) e explique brevemente como usá-los na peça.
-      7. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher (Ex: Estratégia A - Focar na incapacidade total; Estratégia B - Focar na incapacidade parcial com reabilitação).
-      8. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas. Ex: "Falta a data exata do indeferimento. O senhor tem essa informação?", "Deseja incluir alguma ementa específica do seu TRF?", "Qual estratégia o senhor prefere?".
-      9. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
+     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial.
+     4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos.
+     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM): Atue como um Procurador do INSS rigoroso. Aponte os 3 maiores pontos fracos da documentação e defina a estratégia de blindagem.
+     6. ANÁLISE DE REQUISITOS: Verifique se os requisitos legais para o benefício foram preenchidos.
+     7. PRINCÍPIOS PREVIDENCIÁRIOS APLICÁVEIS: Sugira 1 ou 2 princípios.
+     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher.
+     9. ANÁLISE DA BASE DE CONHECIMENTO (VERIFICAÇÃO DE LEGISLAÇÃO/SÚMULAS): Liste as leis, artigos, teses e súmulas específicas que fundamentarão a peça. OBRIGATÓRIO: Verifique se elas constam na "BASE DE CONHECIMENTO PERSONALIZADA". Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado expressamente pedindo que ele adicione à base ou autorize sua mera menção sem transcrição.
+     10. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas.
+     11. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
    - AÇÃO: Gere a petição inicial previdenciária completa e final.
@@ -1140,13 +1142,15 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
    - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO:
      1. STATUS DA LEITURA DOCUMENTAL: Liste os documentos lidos. SE algum documento estiver ilegível, vazio ou corrompido, crie um ALERTA EM DESTAQUE pedindo o reenvio.
      2. RESUMO DOS FATOS: Síntese clara do caso (admissão, demissão, função, violações).
-     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial (Ex: "Falta o TRCT para comprovar a demissão").
-      4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos (ex: Planilha de Cálculos vs. TRCT, CTPS vs. Relato do Cliente). Explique o impacto jurídico de cada divergência e peça instruções ao advogado sobre como proceder ou qual verdade deve prevalecer.
-      5. ANÁLISE DOS CÁLCULOS E VERBAS COBRADAS: Liste as verbas devidas com os valores exatos da planilha.
-      6. PRINCÍPIOS TRABALHISTAS APLICÁVEIS: Sugira 1 ou 2 princípios que se encaixam perfeitamente no caso (Ex: Primazia da Realidade, In Dubio Pro Operario) e explique brevemente como usá-los na peça.
-      7. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher (Ex: Estratégia A - Focar no vínculo; Estratégia B - Focar na responsabilidade solidária).
-      8. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas. Ex: "Falta a data exata da demissão. O senhor tem essa informação?", "Deseja incluir alguma ementa específica do seu TRT?", "Qual estratégia o senhor prefere?".
-      9. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
+     3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados. Aponte se falta algum documento essencial.
+     4. ANÁLISE DE DIVERGÊNCIAS E CRUZAMENTO DE DADOS (CRÍTICO): Identifique e liste TODAS as discrepâncias entre os documentos.
+     5. ADVOGADO DO DIABO (PONTOS FRACOS E BLINDAGEM): Atue como um Advogado de Defesa da Empresa extremamente rigoroso. Aponte os 3 maiores pontos fracos e defina a estratégia de blindagem.
+     6. ANÁLISE DOS CÁLCULOS E VERBAS COBRADAS: Liste as verbas devidas com os valores exatos da planilha.
+     7. PRINCÍPIOS TRABALHISTAS APLICÁVEIS: Sugira 1 ou 2 princípios.
+     8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos possíveis para o advogado escolher.
+     9. ANÁLISE DA BASE DE CONHECIMENTO (VERIFICAÇÃO DE LEGISLAÇÃO/SÚMULAS): Liste as leis, artigos, teses e súmulas específicas que fundamentarão a peça. OBRIGATÓRIO: Verifique se elas constam na "BASE DE CONHECIMENTO PERSONALIZADA". Se alguma legislação/súmula crucial NÃO estiver na base, ALERTE o advogado expressamente pedindo que ele adicione à base ou autorize sua mera menção sem transcrição.
+     10. PERGUNTAS AO ADVOGADO (DIÁLOGO): Termine o relatório com perguntas estratégicas.
+     11. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
 3. COMANDO "GERAR PEÇA":
    - AÇÃO: Gere a petição inicial trabalhista completa e final.
