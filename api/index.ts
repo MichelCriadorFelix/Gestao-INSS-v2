@@ -637,9 +637,10 @@ const ELITE_REDACTION_MANUAL = `
    - É ESTRITAMENTE PROIBIDO inventar tabelas markdown (como as de "RESUMO DA DEMANDA") que não tenham sido explicitamente solicitadas pelo advogado na estrutura. Se uma tabela estiver na estrutura, faça, se não, não invente.
    - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
    - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
-4. DENSIDADE PROBATÓRIA E EXTENSÃO ILIMITADA:
+4. DENSIDADE PROBATÓRIA E EXTENSÃO ILIMITADA (CUIDADO COM REPETIÇÃO):
    - Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
-   - ESQUEÇA O LIMITE DE PALAVRAS. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO EM TODAS AS FUNDAMENTAÇÕES.
+   - ESQUEÇA O LIMITE DE PALAVRAS, mas MANTENHA A COERÊNCIA. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO, mas NUNCA REPETITIVO.
+   - Se você não tiver mais fatos ou argumentos novos para escrever, ENCERRE o tópico. É PROIBIDO repetir o mesmo pedido ou argumento várias vezes apenas para aumentar o tamanho do texto. Qualidade e densidade real superam o volume vazio.
 5. PROIBIÇÃO DE PLACEHOLDERS: Use dados reais. Se não existirem, cite como dado não localizado.
 6. CITAÇÃO COM RECUO (BLOCKQUOTE) E CITAÇÃO INTELIGENTE - REGRA CRÍTICA PARA O "PADRÃO OPUS":
    - SEMPRE que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown (usando o caractere \`>\`).
@@ -657,7 +658,8 @@ const ELITE_REDACTION_MANUAL = `
    - Explique o qual foi o argumento de negativa e cole o "trecho do OCR da prova" RECUADO em bloco (blockquote \`>\`) provando o contrário. Isso fortalece o caráter estritamente probatório da peça.
 8. ESTILO: Use linguagem sóbria, elegante e técnica. Evite clichês e redundâncias.
 9. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento (Fase 1) e Advogado do Diabo (Fase 2).
-10. MODO SILENCIOSO E ÚNICA ENTREGA (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3). E COLOQUE A PETIÇÃO TODO EM UMA ÚNICA RESPOSTA. NUNCA PERGUNTE SE DEVE CONTINUAR.
+10. MODO SILENCIOSO E ÚNICA ENTREGA (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3). 
+   - REGRA DE OURO: ESTA REGRA SOBRESCREVE QUALQUER OUTRA REGRA DE "ENTREGA FRACIONADA" OU "STOP". Você deve entregar a petição COMPLETA, do início ao fim, em uma única resposta. NUNCA pergunte se deve continuar.
 `;
 
 const DR_MICHEL_SYSTEM_PROMPT = `
@@ -1795,28 +1797,28 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
 ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
-AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [RAG] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
+AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
 
 VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [RAG]) para fundamentação e citações diretas.
+1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
 2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. Se um artigo ou súmula aparecer no [RAG], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
+3. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
 4. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
 5. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
-   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [RAG]:
+   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
    - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
    - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
 6. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
 CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
-${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [RAG] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
+${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
     } else {
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [RAG] na mensagem do usuário.
+A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário.
 REGRA DE OURO OBRIGATÓRIA:
-Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [RAG]:
+Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [BASE DE CONHECIMENTO (RAG)]:
 - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
-- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no RAG). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
+- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
     if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
@@ -1835,7 +1837,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
     if (ragContext) {
-      finalMessage += `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO (RAG)]
+      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
 NUNCA afirme algo que contradiga o texto abaixo.
@@ -1858,8 +1860,13 @@ ${ragContext}`;
     if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
-      for (const h of history) orMessages.push({ role: h.role, content: h.content });
-      orMessages.push({ role: "user", content: [{ type: "text", text: finalMessage }] });
+      for (const h of history) {
+        // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
+        const role = h.role === 'model' ? 'assistant' : h.role;
+        orMessages.push({ role, content: h.content });
+      }
+      // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
+      orMessages.push({ role: "user", content: finalMessage });
       await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature, max_tokens: 16383 }, res);
       return;
     }
@@ -1976,28 +1983,28 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
 ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
-AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [RAG] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
+AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
 
 VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [RAG]) para fundamentação e citações diretas.
+1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
 2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. Se um artigo ou súmula aparecer no [RAG], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
+3. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
 4. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
 5. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
-   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [RAG]:
+   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
    - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
    - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
 6. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
 CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
-${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [RAG] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
+${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
     } else {
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [RAG] na mensagem do usuário.
+A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário.
 REGRA DE OURO OBRIGATÓRIA:
-Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [RAG]:
+Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [BASE DE CONHECIMENTO (RAG)]:
 - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
-- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no RAG). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
+- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
     // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4
@@ -2026,7 +2033,7 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
     if (ragContext) {
-      finalMessage += `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO (RAG)]
+      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
 NUNCA afirme algo que contradiga o texto abaixo.
@@ -2073,16 +2080,22 @@ ${ragContext}`;
       clearInterval(heartbeat);
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) {
-        orMessages.push({ role: h.role, content: h.content });
+        // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
+        const role = h.role === 'model' ? 'assistant' : h.role;
+        orMessages.push({ role, content: h.content });
       }
       
-      const userContent: any[] = [{ type: "text", text: finalMessage }];
+      const userContent: any[] = [];
+      // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
+      // Mas se houver imagens, TEM que ser array. Se não houver, string simples é mais seguro.
       if (images && images.length > 0) {
+        userContent.push({ type: "text", text: finalMessage });
         images.forEach((img: string) => {
           userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
         });
       }
-      orMessages.push({ role: "user", content: userContent });
+
+      orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
 
       await callOpenRouterStream({
         model: model || "deepseek/deepseek-v3.2",
