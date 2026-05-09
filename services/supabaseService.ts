@@ -460,7 +460,7 @@ export const supabaseService = {
       record.petitions = client.petitions;
     }
 
-    console.log('Salvando cliente no Supabase:', record);
+    console.log('Salvando cliente no Supabase:', record.id);
 
     const { data, error } = await supabase
       .from('clients_v2')
