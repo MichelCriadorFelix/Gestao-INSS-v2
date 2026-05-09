@@ -19,7 +19,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const sortedClients = [...(clients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const filteredClients = sortedClients.filter(c => (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()));
+    const filteredClients = clientSearchQuery.trim()
+        ? sortedClients.filter(c =>
+            (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+            (c.cpf || '').includes(clientSearchQuery)
+          )
+        : sortedClients;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
