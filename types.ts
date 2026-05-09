@@ -22,6 +22,9 @@ export interface AgendaEvent {
   resolvedBy?: string;
   resolutionNote?: string;
   isVirtual?: boolean;
+  gender?: 'M' | 'F';
+  extraInstructions?: string;
+  benefitType?: 'incapacidade' | 'bpc';
 }
 
 export interface Petition {
@@ -59,6 +62,7 @@ export interface ClientRecord {
   legalRepresentativeAddress?: string;
   legalRepresentativeNationality?: string;
   whatsapp?: string;
+  gender?: 'M' | 'F';
 
   isDailyAttention?: boolean;
   isUrgentAttention?: boolean;
