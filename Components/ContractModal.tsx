@@ -237,7 +237,16 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                              <option value="Michel">Dr. Michel</option>
                              <option value="Luana">Dra. Luana</option>
                          </select>
-                         <p className="text-[10px] text-slate-400 mt-1">Define a divisão de lucros (60/40).</p>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">% Responsável Principal</label>
+                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData({...formData, lawyerSplit: Number(e.target.value)})} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                             <option value={100}>100% / 0%</option>
+                             <option value={70}>70% / 30%</option>
+                             <option value={60}>60% / 40%</option>
+                             <option value={50}>50% / 50%</option>
+                         </select>
+                         <p className="text-[10px] text-slate-400 mt-1">Divisão: Responsável / Outro advogado</p>
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Valor Total Honorários (R$)</label>
@@ -246,12 +255,25 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Status do Processo <span className="text-red-500">*</span></label>
-                         <select name="status" value={formData.status || 'Pendente'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="status" value={formData.status || 'Pendente'} onChange={(e) => {
+                             const newStatus = e.target.value;
+                             const update: any = { ...formData, status: newStatus };
+                             if (newStatus === 'Concluído' && !formData.concludedAt) {
+                                 update.concludedAt = new Date().toISOString().split('T')[0];
+                             }
+                             setFormData(update);
+                         }} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="Pendente">Pendente</option>
                              <option value="Em Andamento">Em Andamento</option>
                              <option value="Concluído">Concluído</option>
                          </select>
                      </div>
+                     {formData.status === 'Concluído' && (
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Data de Conclusão</label>
+                         <input type="date" name="concludedAt" value={formData.concludedAt || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                     </div>
+                     )}
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Forma de Pagamento</label>
                          <select name="paymentMethod" value={formData.paymentMethod || 'Parcelado'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
