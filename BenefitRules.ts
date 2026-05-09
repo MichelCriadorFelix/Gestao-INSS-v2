@@ -512,11 +512,14 @@ export const checkInsuredQuality = (bonds: CNISBond[], der: string): { hasQualit
 
     // Add grace months to last bond end
     const gracePeriodEnd = new Date(lastBondEnd);
+    // Soma os meses de graça
     gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + graceMonths);
-    // Add 45 days (approx 1.5 months) for payment deadline? No, usually just the month.
-    // The law says "up to 15th of the month following the end of grace period".
+    // O prazo vai até o dia 15 do mês SUBSEQUENTE ao fim
+    // da graça (art. 15, §1º, Lei 8.213/91 — o segurado
+    // pode contribuir como CI até o dia 15 do mês seguinte
+    // ao da competência)
+    gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + 1);
     gracePeriodEnd.setDate(15);
-    gracePeriodEnd.setMonth(gracePeriodEnd.getMonth() + 2); // +2 to be safe on "following month" logic? 
     // Let's stick to standard: End Date + Grace Months + 1.5 months (payment window)
     
     const derDate = parseDateLocal(der);
@@ -604,9 +607,19 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     // Calculate Carência (Simplified: count unique months in bonds)
     const totalCarencia = calculateCarencia(data.bonds, der, data.bonds);
 
-    const points = (age.years + timeTotal.years) + 
-                   ((age.months + timeTotal.months) / 12) + 
-                   ((age.days + timeTotal.days) / 365);
+    // Normaliza meses e dias antes de somar para evitar overflow
+    let totalMonths = age.months + timeTotal.months;
+    let extraYearsFromMonths = Math.floor(totalMonths / 12);
+    let remainingMonths = totalMonths % 12;
+
+    let totalDaysRaw = age.days + timeTotal.days;
+    let extraYearsFromDays = Math.floor(totalDaysRaw / 365);
+    let remainingDays = totalDaysRaw % 365;
+
+    const points = (age.years + timeTotal.years + 
+                    extraYearsFromMonths + extraYearsFromDays) +
+                   (remainingMonths / 12) +
+                   (remainingDays / 365);
     
     // Check Insured Quality
     const { hasQuality, gracePeriodEnd } = checkInsuredQuality(data.bonds, der);
@@ -619,9 +632,19 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const reformDate = '2019-11-13';
     const timeAtReformTotal = calculateTimeForPeriod(data.bonds, reformDate, data.gender);
     const ageAtReform = calculateAge(data.birthDate, reformDate);
-    const pointsAtReform = (ageAtReform.years + timeAtReformTotal.years) + 
-                           ((ageAtReform.months + timeAtReformTotal.months) / 12) + 
-                           ((ageAtReform.days + timeAtReformTotal.days) / 365);
+    // Normaliza meses e dias antes de somar para evitar overflow
+    let totalMonthsAtReform = ageAtReform.months + timeAtReformTotal.months;
+    let extraYearsFromMonthsAtReform = Math.floor(totalMonthsAtReform / 12);
+    let remainingMonthsAtReform = totalMonthsAtReform % 12;
+
+    let totalDaysRawAtReform = ageAtReform.days + timeAtReformTotal.days;
+    let extraYearsFromDaysAtReform = Math.floor(totalDaysRawAtReform / 365);
+    let remainingDaysAtReform = totalDaysRawAtReform % 365;
+
+    const pointsAtReform = (ageAtReform.years + timeAtReformTotal.years + 
+                            extraYearsFromMonthsAtReform + extraYearsFromDaysAtReform) + 
+                           (remainingMonthsAtReform / 12) + 
+                           (remainingDaysAtReform / 365);
     
     // Calculate Carência at Reform
     const carenciaAtReform = calculateCarencia(data.bonds, reformDate, data.bonds);
@@ -857,7 +880,10 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const timeNeededAtReform = data.gender === 'M' ? 35 : 30;
     const missingAtReform = Math.max(0, timeNeededAtReform - timeAtReform.years);
     
-    if (missingAtReform > 0 && missingAtReform <= 2) {
+    if (missingAtReform > 0) {
+        // Pedágio 50%: qualquer segurado que faltava tempo
+        // em 13/11/2019 pode usar — sem limite de 2 anos
+        // O pedágio é 50% do que faltava, independente do valor
         const toll50 = missingAtReform * 0.5;
         const totalNeeded50 = timeNeededAtReform + toll50;
         if (timeTotal.years >= totalNeeded50 && totalCarencia >= 180) {
@@ -883,9 +909,7 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
             isEligible: false,
             ruleType: 'Transition_50',
             category: 'aposentadorias',
-            missingDetails: missingAtReform <= 0 
-                ? "Direito adquirido antes da reforma (não se aplica regra de transição)." 
-                : "Faltava mais de 2 anos em 13/11/2019 (Regra inaplicável)."
+            missingDetails: "Direito adquirido antes da reforma (não se aplica regra de transição do Pedágio 50%)."
         });
     }
 
@@ -1025,6 +1049,52 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
             missingDetails: `Tempo Especial (25): ${specialTime25.toFixed(1)}/25. Idade: ${age.years}/${specialAgeReq25}.`
         });
     }
+
+  // 1.8b Aposentadoria Especial 20 anos (pós-reforma)
+  const specialAgeReq20 = 58;
+  if (specialTime20 >= 20 && age.years >= specialAgeReq20 
+      && totalCarencia >= 180) {
+    benefits.push({
+      benefitName: "1.8b) Aposentadoria Especial 20 anos (Filiados após 13/11/2019)",
+      isEligible: true,
+      ruleType: 'Post-Reform',
+      category: 'aposentadorias',
+      ...calculateRMI(data.bonds, 'Post-Reform', data.gender,
+        timeTotal.years, inpcIndices, der, fractionalAge,
+        data.customMinWage, undefined, data.isTeacher, ibgeTable)
+    });
+  } else {
+    benefits.push({
+      benefitName: "1.8b) Aposentadoria Especial 20 anos (Filiados após 13/11/2019)",
+      isEligible: false,
+      ruleType: 'Post-Reform',
+      category: 'aposentadorias',
+      missingDetails: `Tempo Especial (20): ${specialTime20.toFixed(1)}/20. Idade: ${age.years}/${specialAgeReq20}.`
+    });
+  }
+
+  // 1.8c Aposentadoria Especial 15 anos (pós-reforma)
+  const specialAgeReq15 = 55;
+  if (specialTime15 >= 15 && age.years >= specialAgeReq15 
+      && totalCarencia >= 180) {
+    benefits.push({
+      benefitName: "1.8c) Aposentadoria Especial 15 anos (Filiados após 13/11/2019)",
+      isEligible: true,
+      ruleType: 'Post-Reform',
+      category: 'aposentadorias',
+      ...calculateRMI(data.bonds, 'Post-Reform', data.gender,
+        timeTotal.years, inpcIndices, der, fractionalAge,
+        data.customMinWage, undefined, data.isTeacher, ibgeTable)
+    });
+  } else {
+    benefits.push({
+      benefitName: "1.8c) Aposentadoria Especial 15 anos (Filiados após 13/11/2019)",
+      isEligible: false,
+      ruleType: 'Post-Reform',
+      category: 'aposentadorias',
+      missingDetails: `Tempo Especial (15): ${specialTime15.toFixed(1)}/15. Idade: ${age.years}/${specialAgeReq15}.`
+    });
+  }
 
     // 1.9 Aposentadoria do Professor (Regra de Transição - Pedágio 100%)
     if (data.isTeacher) {
@@ -1267,8 +1337,8 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
         age,
         points,
         gender: data.gender,
-        isTeacher: false,
-        isPcd: false,
+        isTeacher: data.isTeacher || false,
+        isPcd: data.isPcd || false,
         benefits
     };
 };

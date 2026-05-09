@@ -792,7 +792,17 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             return {
                 clientName: aiData.client?.name || '',
                 cpf: aiData.client?.cpf || '',
-                birthDate: aiData.client?.birthDate ? aiData.client.birthDate.split('-').reverse().join('/') : '',
+                birthDate: (() => {
+                    const raw = aiData.client?.birthDate || '';
+                    if (!raw) return '';
+                    // Suporta tanto YYYY-MM-DD quanto DD/MM/YYYY
+                    if (raw.includes('-') && raw.indexOf('-') === 4) {
+                        // YYYY-MM-DD → DD/MM/YYYY
+                        return raw.split('-').reverse().join('/');
+                    }
+                    // Já está em DD/MM/YYYY ou outro formato
+                    return raw;
+                })(),
                 motherName: aiData.client?.motherName || '',
                 gender: aiData.client?.gender || 'M',
                 bonds: mappedBonds,
@@ -832,7 +842,17 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             // Truncate text to ~300k characters to avoid Vercel function timeouts (approx 60-80 pages of dense text)
             // The free tier has a 10s limit, Pro has 60s (or 300s if configured). 
             // Gemini has a large context window, so we can send more.
-            const truncatedText = fullText.length > 300000 ? fullText.substring(0, 300000) + "\n...[Texto truncado para análise]..." : fullText;
+            const WAS_TRUNCATED = fullText.length > 300000;
+            const truncatedText = WAS_TRUNCATED
+                ? fullText.substring(0, 300000) + "\n...[Texto truncado para análise]..."
+                : fullText;
+
+            if (WAS_TRUNCATED) {
+                showToast(
+                    "⚠️ CNIS muito extenso — apenas os primeiros 300.000 caracteres foram analisados. Verifique se todos os vínculos foram importados.",
+                    "error"
+                );
+            }
             
             const aiResult = await analyzeCNISWithAI(truncatedText);
             
@@ -858,29 +878,71 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     };
 
     const calculateUnifiedTime = () => {
-        let totalDays = 0;
-        data.bonds.forEach(bond => {
-            if (bond.useInCalculation && bond.startDate && bond.endDate) {
-                let effectiveEndDate = bond.endDate;
-                if (data.der) {
-                    const bondEnd = parseDateLocal(bond.endDate);
-                    const derDate = parseDateLocal(data.der);
-                    if (bondEnd > derDate) {
-                        effectiveEndDate = data.der;
-                    }
-                }
-                
-                const time = calculateTime(bond.startDate, effectiveEndDate, bond.activityType, data.gender);
-                totalDays += (time.years * 365) + (time.months * 30) + time.days;
-            }
-        });
-        
-        const years = Math.floor(totalDays / 365);
-        const months = Math.floor((totalDays % 365) / 30);
-        const days = Math.floor((totalDays % 365) % 30);
-        
-        return `${years}a ${months}m ${days}d`;
-    };
+    // Usa o mesmo método dia a dia do unifiedTime
+    // para garantir consistência no relatório PDF
+    const activeBonds = data.bonds.filter(
+      b => b.useInCalculation && b.startDate && b.endDate
+    );
+    if (activeBonds.length === 0) return "0a 0m 0d";
+
+    const REFORM_DATE_MS = new Date('2019-11-13T12:00:00').getTime();
+
+    let minMs = Infinity;
+    let maxMs = -Infinity;
+
+    const processed = activeBonds.map(b => {
+      const start = parseDateLocal(b.startDate);
+      start.setHours(12, 0, 0, 0);
+      let end = parseDateLocal(b.endDate);
+      end.setHours(12, 0, 0, 0);
+      if (data.der) {
+        const der = parseDateLocal(data.der);
+        der.setHours(12, 0, 0, 0);
+        if (end > der) end = der;
+      }
+      if (start.getTime() < minMs) minMs = start.getTime();
+      if (end.getTime() > maxMs) maxMs = end.getTime();
+
+      let factor = 1.0;
+      if (b.activityType === 'special_25')
+        factor = data.gender === 'M' ? 1.4 : 1.2;
+      if (b.activityType === 'special_20')
+        factor = data.gender === 'M' ? 1.75 : 1.5;
+      if (b.activityType === 'special_15')
+        factor = data.gender === 'M' ? 2.33 : 2.0;
+
+      return { startMs: start.getTime(), endMs: end.getTime(), factor };
+    }).filter(b => b.startMs <= b.endMs);
+
+    if (processed.length === 0) return "0a 0m 0d";
+
+    let totalAdjustedDays = 0;
+    let current = new Date(minMs);
+    const maxDate = new Date(maxMs);
+    let loops = 0;
+
+    while (current <= maxDate && loops < 36600) {
+      const ms = current.getTime();
+      let maxFactor = 0;
+      let isActive = false;
+      for (const b of processed) {
+        if (ms >= b.startMs && ms <= b.endMs) {
+          isActive = true;
+          const f = ms <= REFORM_DATE_MS ? b.factor : 1.0;
+          if (f > maxFactor) maxFactor = f;
+        }
+      }
+      if (isActive) totalAdjustedDays += maxFactor;
+      current.setDate(current.getDate() + 1);
+      current.setHours(12, 0, 0, 0);
+      loops++;
+    }
+
+    const years = Math.floor(totalAdjustedDays / 365);
+    const months = Math.floor((totalAdjustedDays % 365) / 30);
+    const days = Math.floor((totalAdjustedDays % 365) % 30);
+    return `${years}a ${months}m ${days}d`;
+  };
 
     const generateReport = () => {
         const reportType = window.prompt(
@@ -1440,6 +1502,13 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 endDate = `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
             }
 
+            // Detecta se é benefício por incapacidade
+            const isBeneficio = 
+              block.includes('B31') || block.includes('B32') ||
+              block.includes('B91') || block.includes('B92') ||
+              /Benefício\s+\d/.test(block) ||
+              origin.toUpperCase().includes('BENEFÍCIO');
+
             bonds.push({
                 id: Math.random().toString(),
                 seq,
@@ -1453,7 +1522,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 sc,
                 activityType: 'common',
                 isConcomitant: false,
-                isBenefit: false,
+                isBenefit: isBeneficio,
                 useInCalculation: true
             });
         });

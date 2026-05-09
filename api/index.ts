@@ -1845,7 +1845,9 @@ app.post("/api/analyze-cnis", async (req, res) => {
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        temperature: 0.05,
+        maxOutputTokens: 16383
       }
     });
 
