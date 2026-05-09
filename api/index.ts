@@ -832,6 +832,15 @@ ESTRUTURA OBRIGATÓRIA PARA BENEFÍCIO POR INCAPACIDADE:
 - II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resoluções do CNJ.
 - III. DO RESUMO DA DEMANDA: Síntese narrativa e estratégica (1-2 parágrafos) do erro administrativo/judicial e por que a parte autora faz jus ao pedido. É um texto corrido, denso e persuasivo. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO. Destaque o nexo entre a patologia e a incapacidade.
 - IV. DOS FATOS: Histórico profissional, patologias (CIDs), exames (Ressonâncias, etc.), atestados, DII (Data de Início da Incapacidade), indeferimento administrativo e qualidade de segurado.
+- IV-A. QUADRO CONTRIBUTIVO SIMPLIFICADO 
+  (OBRIGATÓRIO quando houver discussão de carência 
+  ou qualidade de segurado): Tabela Markdown com 
+  colunas:
+  | Nº | Empregador | Início | Fim | Tempo | Carência |
+  Destacar em **negrito** eventuais períodos 
+  controvertidos. Última linha: **TOTAL**.
+  Se não houver discussão de carência, omitir este 
+  tópico e passar direto para o DIREITO.
 - V. DO DIREITO - DA INCAPACIDADE: Base legal (Lei 8.213/91), Súmula 47 da TNU (condições sociais e pessoais).
 - VI. DO DIREITO - DA OBSERVÂNCIA À LEI 14.331/2022 (OBRIGATÓRIO USAR SUBTÓPICOS LETRADOS): 
     a) Descrição clara da doença e das limitações que ela impõe;
@@ -916,8 +925,24 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR IDADE:
     - Requisitos Legais: Detalhar regras Pré-Reforma (até 13/11/2019) e Pós-Reforma (EC 103/2019).
     - Caso Concreto: Idade, carência e tempo de contribuição na DER.
     - DOS PERÍODOS CONTROVERTIDOS (URBANOS/ESPECIAIS): Esmiuçar cada período não reconhecido pelo INSS, citando provas (CTPS, PPP) e enquadramentos (ex: Decreto 53.831/64).
-- QUADRO CONTRIBUTIVO CONSOLIDADO: Tabela com Nº, Nome/Anotações, Início, Fim, Fator, Tempo e Carência.
-- MARCO TEMPORAL: Tabela comparativa de Tempo, Carência e Idade em datas-chave (Reforma, Lei 14.331, DER).
+- QUADRO CONTRIBUTIVO CONSOLIDADO (OBRIGATÓRIO — 
+  NUNCA OMITIR): Tabela Markdown com colunas:
+  | Nº | Empregador | Início | Fim | Tempo | Carência |
+  Liste TODOS os vínculos da CTPS, destacando em 
+  **negrito** os desconsiderados pelo INSS.
+  Última linha: **TOTAL** com soma de tempo e carência.
+  Posição: logo após DOS FATOS, antes do DIREITO.
+  É PROIBIDO omitir esta tabela sob qualquer hipótese.
+
+- MARCO TEMPORAL (OBRIGATÓRIO — NUNCA OMITIR): Tabela 
+  Markdown com colunas:
+  | Data-Chave | Idade | Tempo de Contribuição | Carência |
+  Incluir obrigatoriamente:
+  * 13/11/2019 (Reforma EC 103/2019)
+  * DER (Data de Entrada do Requerimento)
+  * Data de ajuizamento
+  Posição: logo após o Quadro Contributivo.
+  É PROIBIDO omitir esta tabela sob qualquer hipótese.
 - DIREITO ADQUIRIDO E REGRAS DE TRANSIÇÃO: Art. 18 da EC 103/19.
 - DA REAFIRMAÇÃO DA DER: Tema 995 do STJ.
 - DO ENCONTRO DE CONTAS: Tema 1.207 do STJ (evitar execução invertida).
@@ -956,7 +981,25 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR TEMPO DE CONTRIBUIÇÃO (COM CONVE
 - DOS FATOS E FUNDAMENTOS JURÍDICOS: Histórico laboral, exposição a agentes nocivos (ex: Técnico em Enfermagem), DER e indeferimento.
 - DA CONTAGEM DE TEMPO ESPECIAL E SUA CONVERSÃO ATÉ 13/11/2019: Fundamentação no Art. 201 §1º II CF, Art. 57 Lei 8.213 e multiplicadores (1.40 homem / 1.20 mulher).
 - DOS PERÍODOS ESPECIAIS CONTROVERTIDOS: Detalhamento de cada empresa, período, provas (PPP, LTCAT) e enquadramento legal (ex: Decreto 53.831/64).
-- QUADRO CONTRIBUTIVO CONSOLIDADO e MARCO TEMPORAL (incluindo Pontos Lei 13.183/2015).
+- QUADRO CONTRIBUTIVO CONSOLIDADO (OBRIGATÓRIO — 
+  NUNCA OMITIR): Tabela Markdown com colunas:
+  | Nº | Empregador | Início | Fim | Tipo | Tempo 
+  Comum | Tempo Especial | Carência |
+  Liste TODOS os vínculos, indicando se comum ou 
+  especial. Destacar em **negrito** os períodos 
+  controvertidos. Última linha: **TOTAL**.
+  Posição: após DOS PERÍODOS ESPECIAIS, antes das 
+  REGRAS DE TRANSIÇÃO. PROIBIDO omitir.
+
+- MARCO TEMPORAL (OBRIGATÓRIO — NUNCA OMITIR): 
+  Tabela Markdown com colunas:
+  | Data-Chave | Tempo Comum | Tempo Especial | 
+  Tempo Convertido | Total | Pontos |
+  Incluir obrigatoriamente:
+  * 13/11/2019 (corte do tempo especial)
+  * DER
+  * Data de ajuizamento
+  PROIBIDO omitir.
 - REGRA DE TRANSIÇÃO (PEDÁGIO 50%): Art. 17 da EC 103/19.
 - DA REAFIRMAÇÃO DA DER (Tema 995 STJ).
 - DA ANTECIPAÇÃO DOS EFEITOS DA TUTELA.
