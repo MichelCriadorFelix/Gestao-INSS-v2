@@ -251,16 +251,16 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                             </button>
 
                             {isClientDropdownOpen && createPortal(
-                                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
                                     onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}>
-                                    <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+                                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
                                         onClick={e => e.stopPropagation()}>
-                                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-20">
                                             <span className="font-bold text-slate-800 dark:text-white text-sm">Selecionar Cliente</span>
                                             <button type="button" onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}
                                                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold">✕</button>
                                         </div>
-                                        <div className="p-3 border-b border-slate-100 dark:border-slate-700">
+                                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-[56px] z-20">
                                             <div className="relative">
                                                 <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                                 <input
@@ -268,45 +268,47 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     placeholder="Buscar cliente..."
                                                     value={clientSearchQuery}
                                                     onChange={(e) => setClientSearchQuery(e.target.value)}
-                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
+                                                    autoFocus
                                                 />
                                             </div>
                                         </div>
-                                        <div className="max-h-72 overflow-y-auto">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData({ ...formData, clientId: undefined, firstName: '', lastName: '', cpf: '' });
-                                                setIsClientDropdownOpen(false);
-                                                setClientSearchQuery('');
-                                            }}
-                                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition font-medium"
-                                        >
-                                            Novo Cliente
-                                        </button>
-                                        {filteredClients.length > 0 ? (
-                                            filteredClients.map(c => (
-                                                <button
-                                                    key={c.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const nameParts = (c.name || '').split(' ');
-                                                        const firstName = nameParts[0] || '';
-                                                        const lastName = nameParts.slice(1).join(' ') || '';
-                                                        setFormData({ ...formData, clientId: c.id, firstName, lastName, cpf: c.cpf });
-                                                        setIsClientDropdownOpen(false);
-                                                        setClientSearchQuery('');
-                                                    }}
-                                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition border-t border-slate-50 dark:border-slate-800"
-                                                >
-                                                    {c.name}
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div className="px-4 py-4 text-center text-sm text-slate-500">
-                                                Nenhum cliente encontrado
-                                            </div>
-                                        )}
+                                        <div className="overflow-y-auto flex-1 bg-white dark:bg-slate-900 min-h-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData({ ...formData, clientId: undefined, firstName: '', lastName: '', cpf: '' });
+                                                    setIsClientDropdownOpen(false);
+                                                    setClientSearchQuery('');
+                                                }}
+                                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-primary-600 dark:text-primary-400 transition font-bold border-b border-slate-50 dark:border-slate-800 flex items-center gap-2"
+                                            >
+                                                <PlusIcon className="w-4 h-4" /> Novo Cliente
+                                            </button>
+                                            {filteredClients.length > 0 ? (
+                                                filteredClients.map(c => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nameParts = (c.name || '').split(' ');
+                                                            const firstName = nameParts[0] || '';
+                                                            const lastName = nameParts.slice(1).join(' ') || '';
+                                                            setFormData({ ...formData, clientId: c.id, firstName, lastName, cpf: c.cpf });
+                                                            setIsClientDropdownOpen(false);
+                                                            setClientSearchQuery('');
+                                                        }}
+                                                        className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 transition border-b border-slate-50 dark:border-slate-800 last:border-0"
+                                                    >
+                                                        <p className="font-bold uppercase truncate">{c.name}</p>
+                                                        <p className="text-[10px] text-slate-500 font-mono tracking-wider">{c.cpf}</p>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="p-8 text-center text-sm text-slate-400 italic">
+                                                    Nenhum cliente encontrado.
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
