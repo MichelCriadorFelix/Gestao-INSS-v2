@@ -555,29 +555,54 @@ export default function Dashboard({
                   return;
               }
           } else if (type === 'agenda') {
-              setAgendaEvents(newData);
-              safeSetLocalStorage('agenda_events', JSON.stringify(newData));
               if (supabase) {
+                  // Proteção: busca o estado atual do Supabase antes de salvar
+                  // para nunca sobrescrever com array vazio
+                  if (newData.length === 0) {
+                      const { data: current } = await supabase
+                          .from('clients').select('data').eq('id', 7).maybeSingle();
+                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                          setIsSyncing(false);
+                          return; // Não sobrescreve dados existentes com array vazio
+                      }
+                  }
                   const error = await upsertWithRetry({ id: 7, data: newData });
                   if (error) {
                       console.error("Sync error (Agenda):", error);
                       setSaveError("Erro de sincronização (Agenda).");
+                  } else {
+                      setAgendaEvents(newData);
+                      safeSetLocalStorage('agenda_events', JSON.stringify(newData));
                   }
                   setIsSyncing(false);
                   return;
               }
+              setAgendaEvents(newData);
+              safeSetLocalStorage('agenda_events', JSON.stringify(newData));
           } else if (type === 'resolved_alerts') {
-              setResolvedAlerts(newData);
-              safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
               if (supabase) {
+                  // Proteção: nunca sobrescreve alertas resolvidos com array vazio
+                  if (newData.length === 0) {
+                      const { data: current } = await supabase
+                          .from('clients').select('data').eq('id', 8).maybeSingle();
+                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                          setIsSyncing(false);
+                          return; // Não sobrescreve dados existentes com array vazio
+                      }
+                  }
                   const error = await upsertWithRetry({ id: 8, data: newData });
                   if (error) {
                       console.error("Sync error (Resolved Alerts):", error);
                       setSaveError("Erro de sincronização (Alertas).");
+                  } else {
+                      setResolvedAlerts(newData);
+                      safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
                   }
                   setIsSyncing(false);
                   return;
               }
+              setResolvedAlerts(newData);
+              safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
           } else if (type === 'daily_focus') {
               setDailyFocusState(newData[0]);
               safeSetLocalStorage('daily_focus_state', JSON.stringify(newData[0]));
