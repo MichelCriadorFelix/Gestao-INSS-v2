@@ -611,53 +611,51 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const drawTextContent = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     if (!postData) return;
 
-    // 5. Title
+    // 5. Title — fonte 60px para caber melhor em 5 palavras
     ctx.fillStyle = colors.gold;
-    ctx.font = 'italic bold 65px "Times New Roman", serif'; // Slightly smaller to fit better
-    
-    // Wrap title text
-    const titleMaxWidth = 480; // Strict width to avoid image overlap
-    let nextY = wrapText(ctx, postData.title, 80, 280, titleMaxWidth, 75);
+    ctx.font = 'italic bold 60px "Times New Roman", serif';
+    const titleMaxWidth = 480;
+    let nextY = wrapText(ctx, postData.title, 80, 280, titleMaxWidth, 72);
 
     // 6. Highlight Box
-    const highlightY = nextY + 20;
-    ctx.font = 'bold 35px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    const highlightY = nextY + 22;
+    ctx.font = 'bold 33px "Helvetica Neue", Helvetica, Arial, sans-serif';
     const highlightMetrics = ctx.measureText(postData.highlight);
-    const highlightWidth = Math.min(highlightMetrics.width + 40, 480); // Add padding, max width
-    
+    const highlightWidth = Math.min(highlightMetrics.width + 40, 480);
+
     ctx.fillStyle = colors.yellowHighlight;
-    ctx.fillRect(80, highlightY - 40, highlightWidth, 60);
+    ctx.fillRect(80, highlightY - 38, highlightWidth, 58);
     ctx.fillStyle = colors.blueText;
-    
-    // Wrap highlight if needed, though it should be short
-    nextY = wrapText(ctx, postData.highlight, 100, highlightY, 440, 40);
+    nextY = wrapText(ctx, postData.highlight, 100, highlightY, 440, 38);
 
     // Highlight underline
     ctx.fillStyle = colors.white;
-    ctx.fillRect(80, nextY + 10, 150, 6);
+    ctx.fillRect(80, nextY + 12, 150, 5);
 
     // 7. Points (List)
     ctx.fillStyle = colors.white;
-    ctx.font = '30px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    let currentY = nextY + 70;
-    
+    ctx.font = '29px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    let currentY = nextY + 68;
+
     postData.points.forEach((point, index) => {
       const text = `${index + 1}) ${point}`;
-      currentY = wrapText(ctx, text, 80, currentY, 460, 40);
-      currentY += 20; // Extra space between points
+      currentY = wrapText(ctx, text, 80, currentY, 460, 38);
+      currentY += 22;
     });
 
-    // 8. CTA Caption
+    // 8. CTA — posicionado dinamicamente após os points
+    const ctaY = Math.min(currentY + 40, 920);
     if (postData.ctaCaption) {
       ctx.fillStyle = colors.yellowHighlight;
-      ctx.font = 'italic bold 32px "Helvetica Neue", Helvetica, Arial, sans-serif';
-      ctx.fillText(postData.ctaCaption, 80, 930);
+      ctx.font = 'italic bold 30px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      ctx.fillText(postData.ctaCaption, 80, ctaY);
     }
 
-    // 9. Footer
+    // 9. Footer — sempre 50px abaixo do CTA, nunca ultrapassa y=990
+    const footerY = Math.min(ctaY + 50, 990);
     ctx.fillStyle = colors.white;
-    ctx.font = '500 25px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    ctx.fillText('@advprevfelixecastro', 80, 1000);
+    ctx.font = '500 24px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.fillText('@advprevfelixecastro', 80, footerY);
   };
 
   // Redraw canvas when data or image changes
