@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { BriefcaseIcon, XMarkIcon, PlusIcon, TrashIcon, BanknotesIcon, CheckIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ContractRecord, ContractModalProps, PaymentEntry } from '../types';
 import { formatCurrency } from '../utils';
@@ -244,8 +245,8 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                 <ChevronDownIcon className="w-5 h-5 text-slate-400" />
                             </button>
 
-                            {isClientDropdownOpen && (
-                                <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                            {isClientDropdownOpen && createPortal(
+                                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
                                     onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}>
                                     <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden"
                                         onClick={e => e.stopPropagation()}>
@@ -304,7 +305,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            , document.body)}
                         </div>
                      </div>
 
