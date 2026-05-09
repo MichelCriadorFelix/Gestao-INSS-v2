@@ -1520,7 +1520,7 @@ export default function Dashboard({
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative h-full overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
         {/* Navbar (Top) */}
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6 z-30">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
@@ -1578,7 +1578,7 @@ export default function Dashboard({
              </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-2 lg:p-6 scroll-smooth flex flex-col">
+        <main className="flex-1 overflow-y-auto p-2 lg:p-6 pb-24 lg:pb-6 flex flex-col" style={{WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain'}}>
              
              {/* CONTENT SWITCHER */}
              {currentView === 'dr_michel' ? (
@@ -1714,7 +1714,7 @@ export default function Dashboard({
                     </div>
 
                     {/* Clients Table / Cards */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
                         {/* Desktop Table (Visible only on md screens and up) */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
@@ -1866,7 +1866,7 @@ export default function Dashboard({
                         </div>
 
                         {/* Mobile Cards (Visible only on screens below md) */}
-                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto">
                              {paginatedList.length === 0 ? (
                                  <div className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
                                      Nenhum cliente encontrado {clientFilter === 'archived' ? 'nos arquivos' : ''}.
@@ -1992,7 +1992,7 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
