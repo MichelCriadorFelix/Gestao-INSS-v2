@@ -428,14 +428,35 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         abortController.abort();
       }, 300000); // 300 seconds
 
+      const session = sessionsRef.current.find(s => s.id === sessionId);
+      const docSummaries = session?.documents?.map(doc => {
+        const header = `DOCUMENTO: ${doc.name}\n`;
+        const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA:\n${doc.summary}\n\n` : '';
+        
+        // Se temos um arquivo na nuvem que o back-end vai processar, enviar menos texto para poupar RAG
+        if (doc.fileUri) {
+          return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
+        }
+
+        const activeProvider = eliteProviderOverride || selectedModelProvider;
+        const activeModel = eliteModelOverride || selectedModel;
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000));
+        const fullTextPart = doc.fullText ? `CONTEÚDO:\n${doc.fullText.substring(0, textLimit)}` : '';
+        return `${header}${summaryPart}${fullTextPart}`;
+      }).join('\n\n---\n\n') || '';
+
       // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
       try {
         const currentSession = sessions.find(s => s.id === sessionId);
         const recentHistory = currentSession?.messages.slice(-2) || [];
-        const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText;
+        
+        // Extract a condensed version of the document context for RAG search
+        const condensedContext = docSummaries.substring(0, 3000);
+        const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText + '\n' + condensedContext;
 
         // Perform keyword search (simultaneous with embedding generation)
+        // Keyword search should only run on explicit short text to avoid generic matching
         const keywordPromise = supabaseService.keywordSearchLegalDocuments(messageText, 10);
 
         const embedResponse = await apiFetch('/api/rag/embed', {
@@ -472,25 +493,6 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       } catch (err) {
         console.warn("RAG search failed, continuing without context:", err);
       }
-
-      // Prepare context from documents
-      const session = sessionsRef.current.find(s => s.id === sessionId);
-      const docSummaries = session?.documents?.map(doc => {
-        const header = `DOCUMENTO: ${doc.name}\n`;
-        const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
-        
-        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
-        if (doc.fileUri) {
-          return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
-        }
-
-        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
-        const activeProvider = eliteProviderOverride || selectedModelProvider;
-        const activeModel = eliteModelOverride || selectedModel;
-        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000)); // Limit claude to ~12k tokens input
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, textLimit)}` : '';
-        return `${header}${summaryPart}${fullTextPart}`;
-      }).join('\n\n---\n\n') || '';
 
       const response = await apiFetch('/api/dra-luana/chat', {
         method: 'POST',
