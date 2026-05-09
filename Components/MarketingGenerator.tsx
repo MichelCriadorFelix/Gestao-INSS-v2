@@ -391,7 +391,9 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
     setIsUploadingAsset(true);
     try {
-      const fileName = `assets/${newAssetTopic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+      const sanitizeName = (str: string) =>
+        str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const fileName = `assets/${sanitizeName(newAssetTopic)}_${Date.now()}.png`;
       const publicUrl = await supabaseService.uploadFile('marketing', fileName, newAssetPreview);
       
       if (publicUrl) {
