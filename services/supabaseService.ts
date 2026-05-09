@@ -610,7 +610,9 @@ export const supabaseService = {
       payment_method: contract.paymentMethod || 'Parcelado',
       installments_count: contract.installmentsCount || 0,
       payments: contract.payments || [],
-      created_at: contract.createdAt || new Date().toISOString()
+      created_at: contract.createdAt || new Date().toISOString(),
+      concluded_at: contract.concludedAt || null,
+      lawyer_split: contract.lawyerSplit ?? 60
     };
 
     const { data, error } = await supabase
@@ -650,7 +652,9 @@ export const supabaseService = {
       paymentMethod: c.payment_method,
       installmentsCount: c.installments_count,
       payments: c.payments,
-      createdAt: c.created_at
+      createdAt: c.created_at,
+      concludedAt: c.concluded_at,
+      lawyerSplit: c.lawyer_split ?? 60
     }));
   },
 
