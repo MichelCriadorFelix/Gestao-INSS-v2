@@ -1940,9 +1940,22 @@ app.post("/api/marketing/generate", async (req, res) => {
       jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
 
+    const captionInstructions = mode === 'full' ? `
+REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
+- Escreva em parágrafos CURTOS (máximo 3 linhas cada)
+- Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto
+- Separe cada parágrafo com linha em branco
+- Termine SEMPRE com 8 a 12 hashtags relevantes em linha separada
+- Exemplo de formato:
+  "Você sabia que o INSS não pode ignorar o laudo do seu médico particular? ⚖️\n\nIsso é um direito seu garantido por lei. Se seu benefício foi negado por esse motivo, você tem como reverter na Justiça. ✅\n\nNão aceite um não sem questionar. 👉\n\n#advocaciaprevidenciaria #inss #direitoprevidenciario"
+- O campo "title" deve ter NO MÁXIMO 5 palavras para caber no template
+- O campo "highlight" deve ter NO MÁXIMO 6 palavras
+- O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras` : '';
+
     const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
     Público: Pessoas simples. Linguagem CLARA.
     Estratégia: ${strategyDesc}. Tom: ${personaDesc}.
+    ${captionInstructions}
     Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
