@@ -11,6 +11,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
     const [newPaymentAmount, setNewPaymentAmount] = useState('');
     const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [newPaymentDueDate, setNewPaymentDueDate] = useState(new Date().toISOString().split('T')[0]);
+    const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
 
     const [clientSearchQuery, setClientSearchQuery] = useState('');
     const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -82,6 +83,28 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         }
     };
 
+    const generateInstallments = (startDate: string, count: number, totalValue: number) => {
+        if (!startDate || count < 1 || totalValue <= 0) return;
+        const installmentValue = Math.round((totalValue / count) * 100) / 100;
+        const payments: any[] = [];
+        const [year, month, day] = startDate.split('-').map(Number);
+        for (let i = 0; i < count; i++) {
+            let m = month + i;
+            let y = year;
+            while (m > 12) { m -= 12; y++; }
+            const dueDate = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            payments.push({
+                id: `${Date.now()}-${i}`,
+                date: dueDate,
+                dueDate,
+                amount: installmentValue,
+                isPaid: false,
+                note: `Parcela ${i + 1}/${count}`
+            });
+        }
+        setFormData(prev => ({ ...prev, payments }));
+    };
+
     const handleAddPayment = () => {
         if (!newPaymentAmount || Number(newPaymentAmount) <= 0) return;
         const payment: PaymentEntry = {
@@ -137,17 +160,23 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
             msg += `*Forma:* À Vista\n\n`;
         }
 
-        if (paidPayments.length > 0) {
-            msg += `*Pagamentos Realizados:*\n`;
-            paidPayments.forEach((p, i) => {
+        const allPayments = [...payments].sort((a, b) => (a.dueDate || a.date).localeCompare(b.dueDate || b.date));
+ 
+        if (allPayments.length > 0) {
+            msg += `*Histórico de Parcelas:*\n`;
+            allPayments.forEach((p, i) => {
                 const refDate = p.dueDate || p.date;
                 const [y, m] = refDate ? refDate.split('-') : ['', ''];
                 const monthYear = m && y ? `${m}/${y}` : formatDateLocal(refDate);
-                msg += `${i + 1}) ${monthYear} — ${formatCurrencyLocal(p.amount)} ✅\n`;
+                if (p.isPaid) {
+                    msg += `${i + 1}) ${monthYear} — ${formatCurrencyLocal(p.amount)} ✅\n`;
+                } else {
+                    msg += `${i + 1}) ${monthYear} — Aguardando pagamento ⏳\n`;
+                }
             });
             msg += `\n`;
         }
-
+ 
         if (isFullyPaid) {
             msg += `✅ *TOTALMENTE QUITADO*\n`;
             msg += `_Felix e Castro Advocacia agradece a preferência!_ 🙏`;
@@ -340,25 +369,49 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      
                      {formData.paymentMethod === 'Parcelado' && (
-                         <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 flex items-center justify-between gap-4">
-                             <div>
-                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Qtd. Parcelas</label>
-                                 <select 
-                                    name="installmentsCount" 
-                                    value={formData.installmentsCount || 1} 
-                                    onChange={(e) => setFormData({...formData, installmentsCount: Number(e.target.value)})} 
-                                    className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
-                                 >
-                                     {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                                         <option key={num} value={num}>{num}x</option>
-                                     ))}
-                                 </select>
+                         <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                             <div className="flex items-center justify-between gap-4 mb-4">
+                                 <div>
+                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Qtd. Parcelas</label>
+                                     <select
+                                         name="installmentsCount"
+                                         value={formData.installmentsCount || 2}
+                                         onChange={(e) => setFormData({...formData, installmentsCount: Number(e.target.value)})}
+                                         className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
+                                     >
+                                         {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                             <option key={num} value={num}>{num}x</option>
+                                         ))}
+                                     </select>
+                                 </div>
+                                 <div className="text-right">
+                                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase mb-1">Valor por Parcela</p>
+                                     <p className="text-xl font-bold text-slate-800 dark:text-white font-mono">
+                                         {formatCurrency(installmentValue)}
+                                     </p>
+                                 </div>
                              </div>
-                             <div className="text-right">
-                                 <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase mb-1">Valor por Parcela</p>
-                                 <p className="text-xl font-bold text-slate-800 dark:text-white font-mono">
-                                     {formatCurrency(installmentValue)}
-                                 </p>
+                             <div className="flex items-end gap-3">
+                                 <div className="flex-1">
+                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Data do 1º Pagamento</label>
+                                     <input
+                                         type="date"
+                                         value={firstInstallmentDate}
+                                         onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                                         className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                     />
+                                 </div>
+                                 <button
+                                     type="button"
+                                     onClick={() => generateInstallments(
+                                         firstInstallmentDate,
+                                         Number(formData.installmentsCount) || 2,
+                                         Number(formData.totalFee) || 0
+                                     )}
+                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition whitespace-nowrap"
+                                 >
+                                     Gerar Parcelas
+                                 </button>
                              </div>
                          </div>
                      )}
@@ -400,7 +453,17 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                 <BanknotesIcon className="h-4 w-4" />
                                             </div>
                                             <div>
-                                                <span className="block font-bold dark:text-slate-200">{formatCurrency(p.amount)}</span>
+                                                <input
+                                                    type="number"
+                                                    value={p.amount}
+                                                    onChange={(e) => {
+                                                        const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, amount: Number(e.target.value)} : pay);
+                                                        setFormData({...formData, payments: updatedPayments});
+                                                    }}
+                                                    className="block font-bold dark:text-slate-200 bg-transparent border-none p-0 focus:ring-0 w-28 text-sm"
+                                                    step="0.01"
+                                                    min="0"
+                                                />
                                                 <input 
                                                     type="date" 
                                                     value={p.dueDate || p.date || new Date().toISOString().split('T')[0]} 
