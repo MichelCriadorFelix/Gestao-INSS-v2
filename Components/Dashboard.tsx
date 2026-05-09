@@ -1520,7 +1520,7 @@ export default function Dashboard({
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-w-0 relative h-full overflow-y-auto lg:overflow-hidden">
         {/* Navbar (Top) */}
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6 z-30">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
@@ -1713,9 +1713,10 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    {/* Clients Table */}
+                    {/* Clients Table / Cards */}
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table (Visible only on md screens and up) */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
@@ -1863,7 +1864,88 @@ export default function Dashboard({
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationControls />
+
+                        {/* Mobile Cards (Visible only on screens below md) */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                             {paginatedList.length === 0 ? (
+                                 <div className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                                     Nenhum cliente encontrado {clientFilter === 'archived' ? 'nos arquivos' : ''}.
+                                 </div>
+                             ) : paginatedList.map((record: any) => (
+                                 <div key={record.id} className="p-4 space-y-4">
+                                     <div className="flex justify-between items-start">
+                                         <div className="flex items-center gap-3">
+                                             <button onClick={(e) => toggleDailyAttention(record.id, e)}>
+                                                 {record.isUrgentAttention ? (
+                                                     <StarIconSolid className="h-6 w-6 text-red-500" />
+                                                 ) : record.isDailyAttention ? (
+                                                     <StarIconSolid className="h-6 w-6 text-yellow-400" />
+                                                 ) : (
+                                                     <StarIcon className="h-6 w-6 text-slate-300" />
+                                                 )}
+                                             </button>
+                                             <div>
+                                                 <div className="font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                                                     {record.name}
+                                                     {record.whatsapp && (
+                                                         <a href={`https://wa.me/${record.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-500">
+                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                                                 <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.855L.057 23.882l6.186-1.453A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.032-1.388l-.361-.214-3.732.877.944-3.618-.235-.372A9.808 9.808 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+                                                             </svg>
+                                                         </a>
+                                                     )}
+                                                 </div>
+                                                 <div className="text-xs text-slate-500 font-mono tracking-wider">{record.cpf}</div>
+                                             </div>
+                                         </div>
+                                         <div className="flex gap-2">
+                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                                                 <PencilSquareIcon className="h-5 w-5" />
+                                             </button>
+                                             <button onClick={() => handleClientDelete(record.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                                                 <TrashIcon className="h-5 w-5" />
+                                             </button>
+                                         </div>
+                                     </div>
+
+                                     <div className="grid grid-cols-2 gap-3 text-[10px] font-bold uppercase text-slate-400">
+                                         <div>
+                                             <p className="mb-1">Senha</p>
+                                             <p className="text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded">{record.password}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">Tipo</p>
+                                             <p className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded border border-blue-100 dark:border-blue-800">{record.type || 'N/D'}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">DER</p>
+                                             <p className="text-slate-700 dark:text-slate-300">{record.der || '-'}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">Dcb</p>
+                                             <p className="text-slate-700 dark:text-slate-300">{record.dcbDate || '-'}</p>
+                                         </div>
+                                     </div>
+                                      
+                                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50 dark:border-slate-800/50">
+                                         {record.medExpertiseDate && (
+                                             <div className="px-2 py-1 bg-primary-50 dark:bg-primary-900/10 text-primary-600 dark:text-primary-400 rounded text-[9px] font-bold border border-primary-100 dark:border-primary-800">
+                                                 P. Médica: {record.medExpertiseDate}
+                                             </div>
+                                         )}
+                                         {record.socialExpertiseDate && (
+                                             <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
+                                                 P. Social: {record.socialExpertiseDate}
+                                             </div>
+                                         )}
+                                     </div>
+                                 </div>
+                             ))}
+                        </div>
+                        <div className="mt-auto">
+                            <PaginationControls />
+                        </div>
                     </div>
                  </>
              ) : currentView === 'jurisprudence' ? (
@@ -1911,7 +1993,8 @@ export default function Dashboard({
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
@@ -1972,7 +2055,72 @@ export default function Dashboard({
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationControls />
+
+                        {/* Mobile Cards */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                             {paginatedList.length === 0 ? (
+                                 <div className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                                     Nenhum contrato encontrado.
+                                 </div>
+                             ) : paginatedList.map((contract: any) => {
+                                 const totalPaid = (contract.payments || []).reduce((sum: number, p: any) => p.isPaid ? sum + p.amount : sum, 0);
+                                 const totalFee = Number(contract.totalFee) || 0;
+                                 const percentPaid = totalFee > 0 ? (totalPaid / totalFee) * 100 : 0;
+                                 
+                                 return (
+                                     <div key={contract.id} className="p-4 space-y-3">
+                                         <div className="flex justify-between items-start">
+                                             <div>
+                                                 <div className="font-bold text-slate-900 dark:text-white uppercase truncate">
+                                                     {contract.firstName} {contract.lastName}
+                                                 </div>
+                                                 <div className="text-xs text-slate-500 font-mono tracking-wider">{contract.cpf}</div>
+                                             </div>
+                                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold border 
+                                                 ${contract.status === 'Concluído' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                   contract.status === 'Em Andamento' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                                                   'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                 {contract.status}
+                                             </span>
+                                         </div>
+
+                                         <div className="flex justify-between items-center text-xs">
+                                             <div className="text-slate-600 dark:text-slate-400 font-medium italic">{contract.serviceType}</div>
+                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
+                                                 {contract.lawyer === 'Michel' ? 'Michel' : 'Luana'}
+                                             </span>
+                                         </div>
+
+                                         <div className="space-y-1">
+                                             <div className="flex justify-between text-[10px] items-center mb-1">
+                                                 <span className="text-slate-500">Valor Total: <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalFee)}</span></span>
+                                                 <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
+                                             </div>
+                                             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                             </div>
+                                         </div>
+
+                                         <div className="flex justify-between items-center pt-2">
+                                             <div className="text-[10px] text-slate-500">
+                                                 Sinal/Pago: <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(totalPaid)}</span>
+                                             </div>
+                                             <div className="flex gap-2">
+                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                                     <PencilSquareIcon className="h-4 w-4" />
+                                                 </button>
+                                                 <button onClick={() => handleContractDelete(contract.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                                                     <TrashIcon className="h-4 w-4" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 );
+                             })}
+                        </div>
+                        <div className="mt-auto">
+                            <PaginationControls />
+                        </div>
                     </div>
                  </>
              )}
