@@ -455,21 +455,14 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           messageText.includes('GERAR') ||
           messageText.includes('Gerar');
 
-        const laborBooster = isGenerationCommand
-          ? ' ' + [
-              'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)',
-              'Reforma Trabalhista (Lei nº 13.467/2017)',
-              'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988',
-              'Código de Processo Civil (Lei nº 13.105/2015)',
-              'Lei do FGTS (Lei nº 8.036/1990)',
-              'Lei do Seguro-Desemprego (Lei nº 7.998/1990)',
-              'Lei do Trabalho Doméstico (LC nº 150/2015)',
-              'TST - Orientação Jurisprudencial - OJ n. 42 do SDI1 do TST',
-            ].join(' ')
-          : '';
+        // Busca TODOS os títulos da base dinamicamente.
+        // Documentos futuros são captados automaticamente
+        // desde que sigam os padrões de nomenclatura da base.
+        const allTitles = isGenerationCommand
+          ? await supabaseService.getAllLegalDocumentTitles()
+          : [];
 
-        const ragQuery = messageText.substring(0, 400) +
-          laborBooster;
+        const ragQuery = messageText.substring(0, 400);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
@@ -480,6 +473,10 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           }),
           supabaseService.keywordSearchLegalDocuments(messageText, 5)
         ]);
+
+        const titleResults = allTitles.length > 0
+          ? await supabaseService.searchByTitles(allTitles, 2)
+          : [];
 
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
@@ -492,6 +489,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             const seen = new Set<number>();
             const merged: any[] = [];
             
+            // Título exato primeiro (relevância máxima garantida)
+            titleResults.forEach((r: any) => {
+              seen.add(r.id);
+              merged.push({ ...r, source: 'title_exact' });
+            });
+
             // Vetorial primeiro (mais relevante)
             vectorResults.forEach((r: any) => {
               seen.add(r.id);

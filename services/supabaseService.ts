@@ -737,6 +737,50 @@ export const supabaseService = {
     return data || [];
   },
 
+  async getAllLegalDocumentTitles(): Promise<string[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('legal_documents')
+      .select("metadata->>title")
+      .not('metadata->>title', 'is', null);
+
+    if (error || !data) return [];
+
+    const titles = data
+      .map((row: any) => Object.values(row)[0])
+      .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
+
+    return [...new Set(titles)] as string[];
+  },
+
+  async searchByTitles(titles: string[], chunksPerTitle = 2): Promise<any[]> {
+    const supabase = getSupabase();
+    if (!supabase || titles.length === 0) return [];
+
+    const results: any[] = [];
+    const seen = new Set<number>();
+
+    for (const title of titles) {
+      const { data, error } = await supabase
+        .from('legal_documents')
+        .select('*')
+        .eq('metadata->>title', title)
+        .limit(chunksPerTitle);
+
+      if (!error && data) {
+        data.forEach((doc: any) => {
+          if (!seen.has(doc.id)) {
+            seen.add(doc.id);
+            results.push({ ...doc, similarity: 1.0, source: 'title_exact' });
+          }
+        });
+      }
+    }
+    return results;
+  },
+
   async keywordSearchLegalDocuments(query: string, matchCount = 15) {
     const supabase = getSupabase();
     if (!supabase) return [];
