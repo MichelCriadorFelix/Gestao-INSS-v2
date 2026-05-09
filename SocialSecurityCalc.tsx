@@ -801,15 +801,48 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 clientName: aiData.client?.name || '',
                 cpf: aiData.client?.cpf || '',
                 birthDate: (() => {
-                    const raw = aiData.client?.birthDate || '';
+                    const raw = (aiData.client?.birthDate || '').trim();
                     if (!raw) return '';
-                    // Suporta tanto YYYY-MM-DD quanto DD/MM/YYYY
-                    if (raw.includes('-') && raw.indexOf('-') === 4) {
-                        // YYYY-MM-DD → DD/MM/YYYY
-                        return raw.split('-').reverse().join('/');
+
+                    // Função auxiliar: tenta construir YYYY-MM-DD a partir
+                    // de qualquer variação comum e valida o resultado
+                    const toISO = (d: string, m: string, y: string): string => {
+                        const dd = d.padStart(2, '0');
+                        const mm = m.padStart(2, '0');
+                        const yyyy = y.length === 2 
+                            ? (parseInt(y) > 30 ? '19' : '20') + y 
+                            : y;
+                        const date = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+                        if (isNaN(date.getTime())) return '';
+                        return `${yyyy}-${mm}-${dd}`;
+                    };
+
+                    // 1. YYYY-MM-DD (padrão ISO — mais comum vindo da IA)
+                    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+                    // 2. DD/MM/YYYY ou DD-MM-YYYY
+                    const dmy = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+                    if (dmy) return toISO(dmy[1], dmy[2], dmy[3]);
+
+                    // 4. YYYY/MM/DD
+                    const ymd = raw.match(/^(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})$/);
+                    if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+
+                    // 5. DDMMYYYY (sem separador — ex: "15041963")
+                    const noslash = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+                    if (noslash) return toISO(noslash[1], noslash[2], noslash[3]);
+
+                    // 6. Tenta Date.parse como último recurso
+                    const fallback = new Date(raw + 'T12:00:00');
+                    if (!isNaN(fallback.getTime())) {
+                        const y = fallback.getFullYear();
+                        const m = String(fallback.getMonth() + 1).padStart(2, '0');
+                        const d = String(fallback.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
                     }
-                    // Já está em DD/MM/YYYY ou outro formato
-                    return raw;
+
+                    return ''; // Não reconhecido — deixa o campo vazio para preenchimento manual
                 })(),
                 motherName: aiData.client?.motherName || '',
                 gender: aiData.client?.gender || 'M',
