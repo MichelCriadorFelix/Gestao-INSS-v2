@@ -1950,7 +1950,9 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
   "Você sabia que o INSS não pode ignorar o laudo do seu médico particular? ⚖️\n\nIsso é um direito seu garantido por lei. Se seu benefício foi negado por esse motivo, você tem como reverter na Justiça. ✅\n\nNão aceite um não sem questionar. 👉\n\n#advocaciaprevidenciaria #inss #direitoprevidenciario"
 - O campo "title" deve ter NO MÁXIMO 5 palavras para caber no template
 - O campo "highlight" deve ter NO MÁXIMO 6 palavras
-- O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras` : '';
+- O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras
+- O campo "ctaCaption" deve ser uma frase imperativa curta (máximo 6 palavras) com caráter EDUCATIVO e INSTITUCIONAL. Exemplos: "Salve esse post!", "Comente sua dúvida!", "Compartilhe com quem precisa!", "Siga para mais conteúdo!". NUNCA use frases que incentivem contato direto ou captação de clientes como "Me chame no WhatsApp", "Entre em contato", "Agende sua consulta" — isso viola o Código de Ética da OAB.
+- PRECISÃO JURÍDICA: nunca simplifique a ponto de distorcer o direito. Se afirmar que algo é garantido por lei, isso deve ser juridicamente correto` : '';
 
     const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
     Público: Pessoas simples. Linguagem CLARA.
