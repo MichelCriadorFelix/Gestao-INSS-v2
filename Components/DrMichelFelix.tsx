@@ -1413,6 +1413,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
                       <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
                       <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
                       <option value="qwen/qwen-plus">Qwen Plus (Qwen)</option>
