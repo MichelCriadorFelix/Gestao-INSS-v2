@@ -25,7 +25,7 @@ export interface SocialSecurityCalculationRecord {
 
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
-import { isUrgentDate, formatCurrency, parseDate } from '../utils';
+import { isUrgentDate, formatCurrency, parseDate, isOverdueDate } from '../utils';
 import { parseISO, differenceInDays, startOfDay, format } from 'date-fns';
 import StatsCards from './StatsCards';
 import ReferralModal from './ReferralModal';
@@ -59,6 +59,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
+
+  const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
+    setClientFilter(filter);
+    setCurrentPage(1);
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -1231,7 +1236,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             if (clientFilter === 'archived') {
                 filterMatch = !!r.isArchived;
             } else if (clientFilter === 'referral') {
-                filterMatch = !!r.isReferral;
+                filterMatch = !!r.isReferral && !r.isArchived;
             } else {
                 filterMatch = !r.isArchived && !r.isReferral;
             }
@@ -1317,14 +1322,21 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Helper for Date Cells with Alerts
   const renderDateCell = (dateStr: string, recordId?: string, suffix?: string) => {
-      const urgent = isUrgentDate(dateStr);
+      const overdue = isOverdueDate(dateStr);
+      const urgent = !overdue && isUrgentDate(dateStr);
       const isResolved = recordId && suffix ? resolvedAlerts.includes(recordId + suffix) : false;
+      const showAsOverdue = overdue && !isResolved;
       const showAsUrgent = urgent && !isResolved;
 
       return (
           <td className="px-4 py-3">
-              <div className={`flex items-center gap-1.5 ${showAsUrgent ? 'text-red-600 dark:text-red-400 font-bold' : isResolved ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'dark:text-slate-400'}`}>
-                  {showAsUrgent && <ExclamationTriangleIcon className="h-4 w-4 animate-pulse" />}
+              <div className={`flex items-center gap-1.5 ${
+                showAsOverdue ? 'text-red-700 dark:text-red-400 font-bold' :
+                showAsUrgent ? 'text-orange-500 dark:text-orange-400 font-semibold' :
+                isResolved ? 'text-emerald-600 dark:text-emerald-400 font-medium' :
+                'dark:text-slate-400'}`}>
+                  {showAsOverdue && <ExclamationTriangleIcon className="h-4 w-4 animate-pulse" />}
+                  {showAsUrgent && <ExclamationTriangleIcon className="h-4 w-4" />}
                   {isResolved && <CheckIcon className="h-4 w-4" />}
                   {dateStr || '-'}
               </div>
@@ -1668,21 +1680,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                          {/* Toggle Tabs */}
                          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl w-fit">
                             <button 
-                                onClick={() => setClientFilter('active')} 
+                                onClick={() => handleClientFilterChange('active')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'active' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <UserGroupIcon className="h-4 w-4" />
                                 Ativos
                             </button>
                             <button 
-                                onClick={() => setClientFilter('referral')} 
+                                onClick={() => handleClientFilterChange('referral')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'referral' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <StarIcon className="h-4 w-4" />
                                 Indicações
                             </button>
                             <button 
-                                onClick={() => setClientFilter('archived')} 
+                                onClick={() => handleClientFilterChange('archived')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'archived' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <ArchiveBoxIcon className="h-4 w-4" />
@@ -1700,7 +1712,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 placeholder={clientFilter === 'archived' ? "Buscar em arquivados..." : "Buscar cliente por nome ou CPF..."}
                                 className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 />
                             </div>
                             {clientFilter === 'active' && (
@@ -1881,7 +1893,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 placeholder="Buscar contrato por nome ou CPF..."
                                 className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             />
                         </div>
                         <div className="flex items-center gap-2">
