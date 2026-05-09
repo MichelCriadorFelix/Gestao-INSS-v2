@@ -69,6 +69,7 @@ export interface ClientRecord {
   totalFee?: number;
   documents?: ScannedDocument[];
   documentCount?: number;
+  petitionCount?: number;
   petitions?: Petition[];
 }
 
