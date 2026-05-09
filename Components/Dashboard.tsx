@@ -1991,7 +1991,7 @@ export default function Dashboard({
             onClose={() => setIsContractModalOpen(false)} 
             onSave={handleSaveContract}
             initialData={currentContract}
-            clients={records}
+            clients={records.filter(r => !r.isArchived)}
         />
         
         <SettingsModal 
