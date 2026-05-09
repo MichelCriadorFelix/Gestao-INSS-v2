@@ -715,12 +715,12 @@ export const supabaseService = {
     return data;
   },
 
-  async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5) {
+  async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
     const supabase = getSupabase();
     if (!supabase) return [];
     
     const { data, error } = await supabase
-      .rpc('match_legal_documents', {
+      .rpc('match_legal_documents_smart', {
         query_embedding: embedding,
         match_threshold: matchThreshold,
         match_count: matchCount

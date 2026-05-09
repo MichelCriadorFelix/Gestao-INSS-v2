@@ -448,56 +448,66 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
       try {
-        const currentSession = sessions.find(s => s.id === sessionId);
-        const recentHistory = currentSession?.messages.slice(-2) || [];
-        
-        // Extract a condensed version of the document context for RAG search
-        const condensedContext = docSummaries.substring(0, 3000);
-        const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText + '\n' + condensedContext;
+        // Query focada apenas na mensagem jurídica, sem OCR
+        const ragQuery = messageText.substring(0, 500);
 
-        // Perform keyword search (simultaneous with embedding generation)
-        // Keyword search should only run on explicit short text to avoid generic matching
-        const keywordPromise = supabaseService.keywordSearchLegalDocuments(messageText, 10);
-
-        const embedResponse = await apiFetch('/api/rag/embed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: contextText }),
-          signal: abortController.signal
-        });
-
-        const keywordResults = await keywordPromise;
+        const [embedResponse, keywordResults] = await Promise.all([
+          apiFetch('/api/rag/embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: ragQuery }),
+            signal: abortController.signal
+          }),
+          supabaseService.keywordSearchLegalDocuments(messageText, 5)
+        ]);
 
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
-            // 2. Query Supabase (threshold lowered for better coverage)
-            const vectorResults = await supabaseService.searchLegalDocuments(embedding, 0.65, 10);
+            // Threshold 0.60 e máximo 12 resultados para reduzir ruído
+            const vectorResults = await supabaseService
+              .searchLegalDocuments(embedding, 0.60, 12);
+
+            // Merge sem duplicatas, priorizando vetorial
+            const seen = new Set<number>();
+            const merged: any[] = [];
             
-            // Merge and dedup results
-            const allResults = [...keywordResults];
-            vectorResults.forEach((vr: any) => {
-              if (!allResults.find(ar => ar.id === vr.id)) {
-                allResults.push(vr);
+            // Vetorial primeiro (mais relevante)
+            vectorResults.forEach((r: any) => {
+              seen.add(r.id);
+              merged.push({ ...r, source: 'vector' });
+            });
+            // Keyword depois (complementar)
+            keywordResults.forEach((r: any) => {
+              if (!seen.has(r.id)) {
+                seen.add(r.id);
+                merged.push({ ...r, source: 'keyword' });
               }
             });
 
-            if (allResults.length > 0) {
-              ragContext = allResults
-                .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
-                .map((r: any) => `[RELEVÂNCIA: ${((r.similarity || 0) * 100).toFixed(0)}%]\n${r.content}`)
-                .join('\n\n---\n\n');
+            if (merged.length > 0) {
+              // Injeta título + score para o modelo saber a relevância
+              ragContext = merged.map((r: any) => {
+                const score = r.similarity 
+                  ? ` [Score: ${(r.similarity * 100).toFixed(0)}%]`
+                  : ' [Keyword Match]';
+                const title = r.metadata?.title 
+                  ? `FONTE: ${r.metadata.title}${score}\n` 
+                  : '';
+                return `${title}${r.content}`;
+              }).join('\n\n---\n\n');
             }
           }
         } else if (keywordResults.length > 0) {
-          // If embedding fails, at least use keyword results
-          ragContext = keywordResults
-            .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
-            .map((r: any) => `[RELEVÂNCIA: ${((r.similarity || 0) * 100).toFixed(0)}%]\n${r.content}`)
-            .join('\n\n---\n\n');
+          ragContext = keywordResults.map((r: any) => {
+            const title = r.metadata?.title 
+              ? `FONTE: ${r.metadata.title} [Keyword Match]\n` 
+              : '';
+            return `${title}${r.content}`;
+          }).join('\n\n---\n\n');
         }
       } catch (err) {
-        console.warn("RAG search failed, continuing without context:", err);
+        console.warn("RAG search failed:", err);
       }
 
       const response = await apiFetch('/api/dra-luana/chat', {

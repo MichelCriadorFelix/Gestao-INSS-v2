@@ -691,7 +691,7 @@ BASE DE CONHECIMENTO JURÍDICO OBRIGATÓRIA (HARD SKILLS):
    - Portaria Interministerial MPS/MF vigente (Para valores de teto e salário mínimo).
 
 3. JURISPRUDÊNCIA VINCULANTE E DOMINANTE:
-   - Súmulas da TNU (Turma Nacional de Uniformização): Foco nas Súmulas 47 (biopsicossocial) e 60.
+   - Súmulas da TNU (Turma Nacional de Uniformização): Foco nas Súmulas 47 (biopsicossocial), 60, 75 (Presunção de Veracidade da CTPS — texto disponível na Base de Conhecimento, citar sempre em blockquote quando o caso envolver vínculos negados pelo INSS por pendência no CNIS).
    - Súmulas do STJ: Foco na Súmula 416 (perda da qualidade de segurado).
    - Temas Repetitivos do STJ: Tema 810 (Correção Monetária), Tema 995 (Reafirmação da DER), Tema 1.207 (Encontro de Contas).
 
@@ -1838,13 +1838,15 @@ AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (aba
 VOCÊ DEVE:
 1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
 2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
-4. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
-5. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
+3. IDENTIFICAÇÃO DA FONTE: Cada item da base virá precedido de 'FONTE: [título do documento] [Score: XX%]'. Quanto maior o score, mais relevante é o trecho. Priorize itens com score acima de 70% para citação direta em blockquote. Itens com score abaixo de 60% use apenas como referência contextual, sem citar textualmente.
+4. SÚMULAS E TEMAS COM 1 CHUNK: Documentos como 'SÚMULA 75 TNU', 'Súmula n. 416 do STJ', 'Tema 1.030/STJ', 'Tema 905/STJ' são documentos únicos e altamente relevantes. Se aparecerem no RAG com qualquer score, CITE-OS INTEGRALMENTE em blockquote.
+5. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
+6. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
+7. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
    Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
    - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
    - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
-6. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
+8. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
 CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
 ${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
@@ -2027,13 +2029,15 @@ AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (aba
 VOCÊ DEVE:
 1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
 2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
-4. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
-5. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
+3. IDENTIFICAÇÃO DA FONTE: Cada item da base virá precedido de 'FONTE: [título do documento] [Score: XX%]'. Quanto maior o score, mais relevante é o trecho. Priorize itens com score acima de 70% para citação direta em blockquote. Itens com score abaixo de 60% use apenas como referência contextual, sem citar textualmente.
+4. SÚMULAS E TEMAS COM 1 CHUNK: Documentos como 'SÚMULA 75 TNU', 'Súmula n. 416 do STJ', 'Tema 1.030/STJ', 'Tema 905/STJ' são documentos únicos e altamente relevantes. Se aparecerem no RAG com qualquer score, CITE-OS INTEGRALMENTE em blockquote.
+5. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
+6. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
+7. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
    Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
    - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
    - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
-6. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
+8. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
 
 CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
 ${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
