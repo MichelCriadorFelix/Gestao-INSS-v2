@@ -172,13 +172,27 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   const handleConfirmResolution = (note: string) => {
     if (!eventToResolve) return;
     
-    onSaveEvent({
+    const resolvedEvent = {
       ...eventToResolve,
-      status: 'resolved',
+      status: 'resolved' as const,
       resolvedAt: new Date().toISOString(),
       resolvedBy: `${user.firstName} ${user.lastName}`,
       resolutionNote: note
-    });
+    };
+
+    onSaveEvent(resolvedEvent);
+
+    // Ao resolver qualquer evento vinculado a um cliente,
+    // muda o contrato de Pendente para Em Andamento automaticamente
+    if (resolvedEvent.clientId && onUpdateContractStatus && contracts) {
+        const linked = contracts.find(c =>
+            c.clientId === resolvedEvent.clientId &&
+            c.status === 'Pendente'
+        );
+        if (linked) {
+            onUpdateContractStatus(linked.id, 'Em Andamento');
+        }
+    }
     
     setIsResolutionModalOpen(false);
     setEventToResolve(null);
