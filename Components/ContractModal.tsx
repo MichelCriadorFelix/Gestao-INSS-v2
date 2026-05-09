@@ -129,7 +129,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         const client = (clients || []).find(c => c.id === formData.clientId);
         const whatsapp = client?.whatsapp?.replace(/\D/g, '');
         if (!whatsapp) {
-            alert('Este cliente não possui WhatsApp cadastrado.');
+            console.warn('Cliente sem WhatsApp cadastrado.');
+            const btn = document.createElement('div');
+            btn.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;padding:12px 24px;border-radius:12px;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+            btn.textContent = '⚠️ Este cliente não possui WhatsApp cadastrado.';
+            document.body.appendChild(btn);
+            setTimeout(() => document.body.removeChild(btn), 3000);
             return;
         }
 
@@ -240,21 +245,28 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                             </button>
 
                             {isClientDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                                    <div className="p-2 border-b border-slate-100 dark:border-slate-700">
-                                        <div className="relative">
-                                            <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar cliente..."
-                                                value={clientSearchQuery}
-                                                onChange={(e) => setClientSearchQuery(e.target.value)}
-                                                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
-                                                autoFocus
-                                            />
+                                <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                                    onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}>
+                                    <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+                                        onClick={e => e.stopPropagation()}>
+                                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                            <span className="font-bold text-slate-800 dark:text-white text-sm">Selecionar Cliente</span>
+                                            <button type="button" onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold">✕</button>
                                         </div>
-                                    </div>
-                                    <div className="max-h-60 overflow-y-auto">
+                                        <div className="p-3 border-b border-slate-100 dark:border-slate-700">
+                                            <div className="relative">
+                                                <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar cliente..."
+                                                    value={clientSearchQuery}
+                                                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="max-h-72 overflow-y-auto">
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -289,6 +301,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                 Nenhum cliente encontrado
                                             </div>
                                         )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -343,7 +356,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Status do Processo <span className="text-red-500">*</span></label>
                          <select name="status" value={formData.status || 'Pendente'} onChange={(e) => {
                              const newStatus = e.target.value;
-                             const update: any = { ...formData, status: newStatus };
+                             const update: Partial<ContractRecord> = { ...formData, status: newStatus as ContractRecord['status'] };
                              if (newStatus === 'Concluído' && !formData.concludedAt) {
                                  update.concludedAt = new Date().toISOString().split('T')[0];
                              }
