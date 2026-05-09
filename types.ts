@@ -57,6 +57,8 @@ export interface ClientRecord {
   legalRepresentativeMaritalStatus?: string;
   legalRepresentativeProfession?: string;
   legalRepresentativeAddress?: string;
+  legalRepresentativeNationality?: string;
+  whatsapp?: string;
 
   isDailyAttention?: boolean;
   isUrgentAttention?: boolean;
