@@ -472,7 +472,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
             // 2. Query Supabase (threshold lowered for better coverage)
-            const vectorResults = await supabaseService.searchLegalDocuments(embedding, 0.4, 20);
+            const vectorResults = await supabaseService.searchLegalDocuments(embedding, 0.65, 10);
             
             // Merge and dedup results
             const allResults = [...keywordResults];
@@ -483,12 +483,18 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             });
 
             if (allResults.length > 0) {
-              ragContext = allResults.map((r: any) => r.content).join('\n\n---\n\n');
+              ragContext = allResults
+                .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
+                .map((r: any) => `[RELEVÂNCIA: ${((r.similarity || 0) * 100).toFixed(0)}%]\n${r.content}`)
+                .join('\n\n---\n\n');
             }
           }
         } else if (keywordResults.length > 0) {
           // If embedding fails, at least use keyword results
-          ragContext = keywordResults.map((r: any) => r.content).join('\n\n---\n\n');
+          ragContext = keywordResults
+            .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
+            .map((r: any) => `[RELEVÂNCIA: ${((r.similarity || 0) * 100).toFixed(0)}%]\n${r.content}`)
+            .join('\n\n---\n\n');
         }
       } catch (err) {
         console.warn("RAG search failed, continuing without context:", err);
