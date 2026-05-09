@@ -426,7 +426,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const abortController = new AbortController();
       const timeoutId = setTimeout(() => {
         abortController.abort();
-      }, 300000); // 300 seconds
+      }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
 
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => {
@@ -615,7 +615,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         } catch (readError: any) {
           if (readError.name === 'AbortError') {
             console.log('Stream aborted after 300 seconds');
-            fullText += '\n\n[Aviso: Tempo limite de 5 minutos atingido. Geração pausada. Digite "continue" para prosseguir.]';
+            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
           } else {
             throw readError;
           }
