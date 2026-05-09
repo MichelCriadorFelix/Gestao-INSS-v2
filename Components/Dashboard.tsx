@@ -243,6 +243,29 @@ const Dashboard: React.FC<DashboardProps> = ({
                     }
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'clients' },
+                (payload: any) => {
+                    if (payload.new?.id === 8 && Array.isArray(payload.new?.data)) {
+                        setResolvedAlerts(payload.new.data);
+                        safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(payload.new.data));
+                    }
+                    if (payload.new?.id === 7) {
+                        let newAgenda = payload.new.data;
+                        if (typeof newAgenda === 'string') {
+                            try {
+                                const d = LZString.decompressFromUTF16(newAgenda);
+                                newAgenda = d ? JSON.parse(d) : JSON.parse(newAgenda);
+                            } catch(e) {}
+                        }
+                        if (Array.isArray(newAgenda)) {
+                            setAgendaEvents(newAgenda);
+                            safeSetLocalStorage('agenda_events', JSON.stringify(newAgenda));
+                        }
+                    }
+                }
+            )
             // Removed ai_conversations subscription to prevent read loops and high I/O
             .on(
                 'postgres_changes',
