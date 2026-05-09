@@ -139,7 +139,10 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
     const handleOpenWhatsApp = () => {
         const client = (clients || []).find(c => c.id === formData.clientId);
-        const whatsapp = client?.whatsapp?.replace(/\D/g, '');
+        let whatsapp = (client?.whatsapp || '').replace(/\D/g, '');
+        if (whatsapp && !whatsapp.startsWith('55')) {
+            whatsapp = '55' + whatsapp;
+        }
         if (!whatsapp) {
             console.warn('Cliente sem WhatsApp cadastrado.');
             const btn = document.createElement('div');
