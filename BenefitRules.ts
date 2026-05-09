@@ -857,7 +857,8 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
 
     // 1.2 Aposentadoria por idade (Filiados após 13/11/2019)
     const timeReqNew = data.gender === 'M' ? 20 : 15;
-    if (age.years >= 65 && timeTotal.years >= timeReqNew && totalCarencia >= 180) {
+    const ageReqNew = data.gender === 'M' ? 65 : 62;
+    if (age.years >= ageReqNew && timeTotal.years >= timeReqNew && totalCarencia >= 180) {
         benefits.push({
             benefitName: "1.2) Aposentadoria por idade (Filiados após 13/11/2019)",
             isEligible: true,
@@ -878,7 +879,8 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     // 1.3 Aposentadoria por tempo de contribuição (Regra de Transição - Pedágio 50%)
     const timeAtReform = calculateTimeForPeriod(data.bonds, '2019-11-13', data.gender);
     const timeNeededAtReform = data.gender === 'M' ? 35 : 30;
-    const missingAtReform = Math.max(0, timeNeededAtReform - timeAtReform.years);
+    const timeAtReformFractional = timeAtReform.years + (timeAtReform.months / 12) + (timeAtReform.days / 365);
+    const missingAtReform = Math.max(0, timeNeededAtReform - timeAtReformFractional);
     
     if (missingAtReform > 0) {
         // Pedágio 50%: qualquer segurado que faltava tempo
@@ -998,11 +1000,8 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     
     data.bonds.forEach(b => {
         if (!b.useInCalculation || !b.startDate) return;
-        const start = parseDateLocal(b.startDate);
-        const end = b.endDate ? parseDateLocal(b.endDate) : new Date();
-        const diff = end.getTime() - start.getTime();
-        const days = diff / (1000 * 60 * 60 * 24);
-        const years = days / 365;
+        const result = calculateTimeForPeriod([b], der, data.gender);
+        const years = result.years + (result.months / 12) + (result.days / 365);
         
         if (b.activityType === 'special_15') specialTime15 += years;
         if (b.activityType === 'special_20') specialTime20 += years;
