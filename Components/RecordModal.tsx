@@ -798,6 +798,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     { label: "Nacionalidade", name: "nationality", type: "text", width: "third" },
     { label: "Estado Civil", name: "maritalStatus", type: "select", width: "third", options: ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] },
     { label: "Profissão", name: "profession", type: "text", width: "third" },
+    { label: "Gênero", name: "gender", type: "select", width: "third", options: ["M", "F"] },
     { label: "CPF", name: "cpf", type: "text", width: "third" },
     { label: "Senha INSS", name: "password", type: "text", width: "third" },
     { label: "WhatsApp", name: "whatsapp", type: "text", placeholder: "55219XXXXXXXX", width: "third" },
