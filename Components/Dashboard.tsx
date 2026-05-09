@@ -232,60 +232,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'clients'
+                    table: 'clients_v2'
                 },
-                (payload: any) => {
-                     if (payload.new && payload.new.data) {
-                         if (payload.new.id === 1) {
-                             let newData = payload.new.data;
-                             if (typeof newData === 'string') {
-                                 try {
-                                     const decompressed = LZString.decompressFromUTF16(newData);
-                                     newData = decompressed ? JSON.parse(decompressed) : JSON.parse(newData);
-                                 } catch (e) {
-                                     console.error("Failed to decompress realtime clients data", e);
-                                 }
-                             }
-                             if (Array.isArray(newData)) {
-                                 setRecords(newData);
-                                 safeSetLocalStorage('inss_records', JSON.stringify(newData));
-                             }
-                         } else if (payload.new.id === 2) {
-                             let newData = payload.new.data;
-                             if (typeof newData === 'string') {
-                                 try {
-                                     const decompressed = LZString.decompressFromUTF16(newData);
-                                     newData = decompressed ? JSON.parse(decompressed) : JSON.parse(newData);
-                                 } catch (e) {
-                                     console.error("Failed to decompress realtime contracts data", e);
-                                 }
-                             }
-                             if (Array.isArray(newData)) {
-                                 setContracts(newData);
-                                 safeSetLocalStorage('inss_contracts', JSON.stringify(newData));
-                             }
-                         } else if (payload.new.id === 7) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setAgendaEvents(payload.new.data);
-                                 safeSetLocalStorage('agenda_events', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 8) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setResolvedAlerts(payload.new.data);
-                                 safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 9) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setCustomLaws(payload.new.data);
-                                 safeSetLocalStorage('custom_laws', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 10) {
-                             if (payload.new.data) {
-                                 setDailyFocusState(payload.new.data);
-                                 safeSetLocalStorage('daily_focus_state', JSON.stringify(payload.new.data));
-                             }
-                         }
-                     }
+                async (_payload: any) => {
+                    try {
+                        const updated = await supabaseService.getClients();
+                        setRecords(updated);
+                    } catch (e) {
+                        console.error('Realtime clients_v2 error', e);
+                    }
                 }
             )
             // Removed ai_conversations subscription to prevent read loops and high I/O
