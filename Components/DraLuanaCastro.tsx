@@ -451,17 +451,24 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
-        const isGenerationCommand = 
-          messageText.includes('GERAR') || 
+        const isGenerationCommand =
+          messageText.includes('GERAR') ||
           messageText.includes('Gerar');
 
         const laborBooster = isGenerationCommand
-          ? ' CLT rescisão trabalhista horas extras ' +
-            'FGTS aviso prévio férias verbas rescisórias ' +
-            'TST reforma trabalhista vínculo empregatício'
+          ? ' ' + [
+              'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)',
+              'Reforma Trabalhista (Lei nº 13.467/2017)',
+              'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988',
+              'Código de Processo Civil (Lei nº 13.105/2015)',
+              'Lei do FGTS (Lei nº 8.036/1990)',
+              'Lei do Seguro-Desemprego (Lei nº 7.998/1990)',
+              'Lei do Trabalho Doméstico (LC nº 150/2015)',
+              'TST - Orientação Jurisprudencial - OJ n. 42 do SDI1 do TST',
+            ].join(' ')
           : '';
-          
-        const ragQuery = messageText.substring(0, 400) + 
+
+        const ragQuery = messageText.substring(0, 400) +
           laborBooster;
 
         const [embedResponse, keywordResults] = await Promise.all([

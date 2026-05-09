@@ -455,17 +455,42 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
-        const isGenerationCommand = 
-          messageText.includes('GERAR') || 
+        const isGenerationCommand =
+          messageText.includes('GERAR') ||
           messageText.includes('Gerar');
-          
+
+        // Quando for geração, injeta os títulos exatos dos
+        // documentos previdenciários da base para forçar
+        // o RAG a recuperá-los independente do embedding
         const previdenciaryBooster = isGenerationCommand
-          ? ' aposentadoria previdenciária INSS benefício ' +
-            'tempo contribuição carência EC 103 Lei 8213 ' +
-            'IN 128 Decreto 3048 CTPS CNIS segurado'
+          ? ' ' + [
+              'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)',
+              'Reforma da Previdência (EC nº 103/2019)',
+              'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022',
+              'Regulamento da Previdência Social (Decreto nº 3.048/1999)',
+              'SÚMULA 75 TNU',
+              'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF',
+              'Tema 905/STJ — Correção Monetária e Juros nas Condenações da Fazenda Pública',
+              'Súmula n. 416 do STJ',
+              'Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)',
+              'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988',
+              'Código de Processo Civil (Lei nº 13.105/2015)',
+              'DECRETO Nº 10.410 DE 30 DE JUNHO DE 2020',
+              'QUADRO ANEXO DO Decreto nº 53.831 de 25/03/1964ETO',
+              'JURISPRUDÊNCIA - Tema 286 da TNU',
+              'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL',
+              'JURISPRUDÊNCIA DEMORA INJUSTIFICADA DO INSS IMPETRAÇÃO DE MANDADO DE SEGURANÇA',
+              'JURISPRUDÊNCIA INCONSTITUCIONALIDADE PARCIAL PARA UTILIZAÇÃO DO REQUISITO DE 1/4 DO SALÁRIO MÍNIMO BPC LOAS',
+              'JURISPRUDÊNCIA STF INCONSTITUCIONALIDADE DA CARÊNCIA AUXÍLIO-MATERNIDADE',
+              'JURISPRUDÊNCIA: A Relativização do Critério de Renda na Análise da Miserabilidade',
+              'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)',
+              'ESTATUTO DO IDOSO',
+              'NÃO APLICAÇÃO DO PRAZO DECADENCIAL DE 120 PARA PROPOSITURA DO MANDADO DE SEGURANÇA CONTRA INSS',
+              'PREVIDENCIÁRIO. INEXIGIBILIDADE DE DÉBITO. TEMA 979/STJ. ERRO AUTARQUIA. RECEBIMENTO BOA FÉ. RESTITUIR VALORES',
+            ].join(' ')
           : '';
-          
-        const ragQuery = messageText.substring(0, 400) + 
+
+        const ragQuery = messageText.substring(0, 400) +
           previdenciaryBooster;
 
         const [embedResponse, keywordResults] = await Promise.all([

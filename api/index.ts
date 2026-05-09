@@ -981,19 +981,89 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
      7. PRINCÍPIOS PREVIDENCIÁRIOS APLICÁVEIS: Sugira e explique a aplicação de princípios ao caso.
      8. OPÇÕES DE ESTRATÉGIA JURÍDICA: Apresente caminhos processuais detalhados para o advogado escolher.
      9. ANÁLISE ESTATÍSTICA DA BASE DE CONHECIMENTO
-        - Liste TODAS as leis, artigos, teses e súmulas que serão usadas na peça.
-        - Para cada uma, verifique se aparece no conteúdo recebido via [BASE DE CONHECIMENTO (RAG)]:
-          * Se aparecer com 'FONTE:' identificado no RAG: marque '[DISPONÍVEL - CITAR EM BLOCKQUOTE]'
-          * Se NÃO aparecer no RAG desta sessão: marque '[NÃO RECUPERADA NESTA BUSCA - MENCIONAR SEM TRANSCREVER]' — NUNCA afirme que não existe na base, pois pode existir e não ter sido recuperada nesta consulta específica.
-        - AVISO: As seguintes leis ESTÃO na base e devem ser buscadas ativamente pelo modelo:
-          * 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'
-          * 'Reforma da Previdência (EC nº 103/2019)'
-          * 'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022'
-          * 'Regulamento da Previdência Social (Decreto nº 3.048/1999)'
-          * 'SÚMULA 75 TNU'
-          * 'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF'
-          * 'Tema 905/STJ — Correção Monetária e Juros nas Condenações da Fazenda Pública'
-          Se alguma dessas não veio no RAG desta sessão, alerte o advogado para reenviar o caso com mais contexto jurídico na mensagem.
+        (OBRIGATÓRIO — NÃO PULE ESTE ITEM)
+
+        Liste TODAS as leis, súmulas e jurisprudências que 
+        serão usadas na peça. Para cada uma, verifique se 
+        aparece no conteúdo recebido via [BASE DE CONHECIMENTO 
+        (RAG)] com o prefixo 'FONTE:'.
+
+        REGRA DE STATUS:
+        * Apareceu no RAG com 'FONTE:' identificado →
+          '[DISPONÍVEL - SERÁ CITADA EM BLOCKQUOTE]'
+        * NÃO apareceu no RAG desta sessão →
+          '[NÃO RECUPERADA NESTA BUSCA - MENCIONAR SEM 
+          TRANSCREVER]'
+        * PROIBIDO afirmar que não existe na base. A ausência 
+          no RAG não significa ausência na base.
+
+        CATÁLOGO COMPLETO DA BASE DE CONHECIMENTO DO ESCRITÓRIO
+        (títulos exatos — use para identificar disponibilidade):
+
+        LEGISLAÇÃO PREVIDENCIÁRIA:
+        - 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'
+        - 'Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)'
+        - 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)'
+        - 'Reforma da Previdência (EC nº 103/2019)'
+        - 'Regulamento da Previdência Social (Decreto nº 3.048/1999)'
+        - 'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022'
+        - 'DECRETO Nº 10.410 DE 30 DE JUNHO DE 2020'
+        - 'QUADRO ANEXO DO Decreto nº 53.831 de 25/03/1964ETO'
+        - 'ESTATUTO DO IDOSO'
+
+        SÚMULAS E TEMAS PREVIDENCIÁRIOS:
+        - 'SÚMULA 75 TNU'
+        - 'Súmula n. 416 do STJ'
+        - 'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF'
+        - 'Tema 905/STJ — Correção Monetária e Juros nas Condenações da Fazenda Pública'
+        - 'JURISPRUDÊNCIA - Tema 286 da TNU'
+
+        JURISPRUDÊNCIA PREVIDENCIÁRIA:
+        - 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
+        - 'JURISPRUDÊNCIA DEMORA INJUSTIFICADA DO INSS IMPETRAÇÃO DE MANDADO DE SEGURANÇA'
+        - 'JURISPRUDÊNCIA INCONSTITUCIONALIDADE PARCIAL PARA UTILIZAÇÃO DO REQUISITO DE 1/4 DO SALÁRIO MÍNIMO BPC LOAS'
+        - 'JURISPRUDÊNCIA STF INCONSTITUCIONALIDADE DA CARÊNCIA AUXÍLIO-MATERNIDADE'
+        - 'JURISPRUDÊNCIA: A Relativização do Critério de Renda na Análise da Miserabilidade'
+        - 'NÃO APLICAÇÃO DO PRAZO DECADENCIAL DE 120 PARA PROPOSITURA DO MANDADO DE SEGURANÇA CONTRA INSS'
+        - 'PREVIDENCIÁRIO. INEXIGIBILIDADE DE DÉBITO. TEMA 979/STJ. ERRO AUTARQUIA. RECEBIMENTO BOA FÉ. RESTITUIR VALORES'
+
+        LEGISLAÇÃO PROCESSUAL E CONSTITUCIONAL:
+        - 'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
+        - 'Código de Processo Civil (Lei nº 13.105/2015)'
+
+        LEGISLAÇÃO TRABALHISTA (Dra. Luana):
+        - 'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)'
+        - 'Reforma Trabalhista (Lei nº 13.467/2017)'
+        - 'Lei do FGTS (Lei nº 8.036/1990)'
+        - 'Lei do Seguro-Desemprego (Lei nº 7.998/1990)'
+        - 'Lei do Trabalho Doméstico (LC nº 150/2015)'
+        - 'TST - Orientação Jurisprudencial - OJ n. 42 do SDI1 do TST'
+
+        LEGISLAÇÃO CONSUMERISTA (CDC):
+        - 'LEI Nº 8.078 - CÓDIGO DE DEFESA DO CONSUMIDOR'
+        - 'Jurisprudência - CDC. Repetição de indébito. descontos indevidos'
+        - 'Jurisprudência CDC - Dano moral. Descontos indevidos'
+        - 'Jurisprudência CDC - Dano moral. Fortuito interno.'
+        - 'Jurisprudência CDC - Repetição de indébito. Descontos indevidos'
+        - 'Jurisprudência CDC - Suspensão liminar de descontos indevidos'
+        - 'Jurisprudência CDC sobre suspensão de descontos indevidos'
+        - 'Jurisprudência. Direito do Consumidor. Dano moral. Descontos indevidos'
+
+        PADRÃO PARA NOVOS DOCUMENTOS ADICIONADOS À BASE:
+        Quando o escritório adicionar novos documentos, o título
+        deve seguir este padrão para garantir recuperação correta:
+        * Leis: 'Nome da Lei (Sigla nº X/AAAA)'
+          Ex: 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'
+        * Decretos: 'Nome do Decreto (Decreto nº X/AAAA)'
+          Ex: 'Regulamento da Previdência Social (Decreto nº 3.048/1999)'
+        * Súmulas: 'SÚMULA [número] [tribunal]'
+          Ex: 'SÚMULA 75 TNU'
+        * Temas repetitivos: 'Tema [número]/[tribunal] — [descrição curta]'
+          Ex: 'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF'
+        * Jurisprudência: 'JURISPRUDÊNCIA [ASSUNTO EM MAIÚSCULAS]'
+          Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
+        * Instruções Normativas: 'INSTRUÇÃO NORMATIVA [ÓRGÃO] Nº [X], DE [DATA]'
+          Ex: 'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022'
      10. PERGUNTAS AO ADVOGADO (DIÁLOGO ATIVO): Termine o relatório com perguntas estratégicas e diretrizes sobre a documentação/base de conhecimento.
      11. DOCUMENTOS ANALISADOS: Lista final de todos os arquivos.
    - TRAVA DE SEGURANÇA: NUNCA redija a petição inicial nesta fase de RELATÓRIO. Aguarde o comando "GERAR PEÇA".
