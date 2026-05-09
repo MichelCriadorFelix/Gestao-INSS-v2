@@ -443,6 +443,8 @@ export const supabaseService = {
       legal_representative_marital_status: client.legalRepresentativeMaritalStatus,
       legal_representative_profession: client.legalRepresentativeProfession,
       legal_representative_address: client.legalRepresentativeAddress,
+      whatsapp: client.whatsapp,
+      legal_representative_nationality: client.legalRepresentativeNationality,
       is_daily_attention: !!client.isDailyAttention,
       is_urgent_attention: !!client.isUrgentAttention,
       is_archived: !!client.isArchived,
@@ -478,7 +480,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, documents, petitions');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, documents, petitions, whatsapp, legal_representative_nationality');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -507,6 +509,8 @@ export const supabaseService = {
       legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
       legalRepresentativeProfession: c.legal_representative_profession,
       legalRepresentativeAddress: c.legal_representative_address,
+      whatsapp: c.whatsapp,
+      legalRepresentativeNationality: c.legal_representative_nationality,
       isDailyAttention: c.is_daily_attention,
       isUrgentAttention: c.is_urgent_attention,
       isArchived: c.is_archived,
@@ -559,6 +563,8 @@ export const supabaseService = {
       legalRepresentativeMaritalStatus: data.legal_representative_marital_status,
       legalRepresentativeProfession: data.legal_representative_profession,
       legalRepresentativeAddress: data.legal_representative_address,
+      whatsapp: data.whatsapp,
+      legalRepresentativeNationality: data.legal_representative_nationality,
       isDailyAttention: data.is_daily_attention,
       isUrgentAttention: data.is_urgent_attention,
       isArchived: data.is_archived,
