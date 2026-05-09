@@ -140,6 +140,8 @@ export interface ContractRecord {
   installmentsCount?: number; // Novo campo para quantidade de parcelas
   payments: PaymentEntry[];
   createdAt: string;
+  concludedAt?: string;
+  lawyerSplit?: number;
 }
 
 // --- Interfaces de Componentes (Movidas do App.tsx) ---
