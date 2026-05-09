@@ -1411,16 +1411,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                    onClick={() => handleViewChange('clients')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'clients' ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <UserGroupIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Clientes</span>
+                   <UserGroupIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Clientes</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('contracts')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'contracts' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BriefcaseIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Contratos & Fin.</span>
+                   <BriefcaseIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Contratos & Fin.</span>
                </button>
 
                 {/* NOVO MENU: CÁLCULOS */}
@@ -1429,7 +1429,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'labor_calc' ? 'bg-emerald-600 shadow-lg shadow-emerald-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Calc. Trabalhista</span>
+                   <span className="font-medium">Calc. Trabalhista</span>
                </button>
 
                <button 
@@ -1437,7 +1437,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dra_luana' ? 'bg-pink-600 shadow-lg shadow-pink-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Dra. Luana Castro (IA)</span>
+                   <span className="font-medium">Dra. Luana Castro (IA)</span>
                </button>
 
                <button 
@@ -1445,7 +1445,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'social_calc' ? 'bg-orange-600 shadow-lg shadow-orange-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Calc. Previdenciária</span>
+                   <span className="font-medium">Calc. Previdenciária</span>
                </button>
 
                <button 
@@ -1453,68 +1453,68 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dr_michel' ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Dr. Michel Felix (IA)</span>
+                   <span className="font-medium">Dr. Michel Felix (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('agenda')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'agenda' ? 'bg-slate-600 shadow-lg shadow-slate-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <CalendarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Agenda</span>
+                   <CalendarIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Agenda</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('petition_editor')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'petition_editor' ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <PencilSquareIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Editor de Petições</span>
+                   <PencilSquareIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Editor de Petições</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('legislation')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'legislation' ? 'bg-teal-600 shadow-lg shadow-teal-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BookOpenIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Legislação</span>
+                   <BookOpenIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Legislação</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('jurisprudence')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'jurisprudence' ? 'bg-cyan-600 shadow-lg shadow-cyan-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <ScaleIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Jurisprudência</span>
+                   <ScaleIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Jurisprudência</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('meu_inss')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'meu_inss' ? 'bg-amber-600 shadow-lg shadow-amber-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <GlobeAltIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Meu INSS</span>
+                   <GlobeAltIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Meu INSS</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('knowledge_base')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <AcademicCapIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium whitespace-nowrap">Base de Conhecimento</span>
+                   <AcademicCapIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('marketing')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <SparklesIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium whitespace-nowrap">Marketing Jurídico</span>
+                   <SparklesIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Marketing Jurídico</span>
                </button>
            </div>
            
            <div className="p-4 border-t border-slate-800">
-               <div className="flex items-center justify-center lg:justify-start gap-3">
+               <div className="flex items-center justify-start gap-3">
                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
                        {user.firstName[0]}
                    </div>
@@ -1523,9 +1523,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                        <p className="text-[10px] text-slate-400">{user.role}</p>
                    </div>
                </div>
-               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-center lg:justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
-                   <ArrowRightOnRectangleIcon className="h-5 w-5 lg:mr-2" />
-                   <span className="hidden lg:block text-xs font-bold uppercase">Sair</span>
+               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
+                   <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
+                   <span className="text-xs font-bold uppercase">Sair</span>
                </button>
            </div>
       </aside>

@@ -888,7 +888,8 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
         // O pedágio é 50% do que faltava, independente do valor
         const toll50 = missingAtReform * 0.5;
         const totalNeeded50 = timeNeededAtReform + toll50;
-        if (timeTotal.years >= totalNeeded50 && totalCarencia >= 180) {
+        const timeTotalFractional = timeTotal.years + (timeTotal.months / 12) + (timeTotal.days / 365);
+        if (timeTotalFractional >= totalNeeded50 && totalCarencia >= 180) {
             benefits.push({
                 benefitName: "1.3) Aposentadoria por tempo de contribuição (Regra de Transição - Pedágio 50%)",
                 isEligible: true,
