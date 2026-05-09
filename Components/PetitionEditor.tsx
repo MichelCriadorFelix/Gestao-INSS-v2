@@ -655,8 +655,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           ol: { margin: [0, 12, 0, 12] },
           li: { fontSize: 12, lineHeight: 1.5 },
           table: { margin: [0, 12, 0, 12] },
-          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0] },
-          td: { margin: [0, 0, 0, 0] },
+          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0], fontSize: 10 },
+          td: { margin: [0, 0, 0, 0], fontSize: 10 },
         }
       });
 
@@ -695,7 +695,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             if (inTable) {
               node.alignment = 'left';
               node.leadingIndent = 0;
-              node.bold = true;
+              node.fontSize = 10; // Reduce font size inside tables to avoid overflow
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
             } else {
               const isCenterOrRight = node.alignment === 'center' || node.alignment === 'right';
@@ -714,6 +714,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
+            // Let the columns take necessary space but distribute them using * 
+            // We use '*' but limit the table width implicitly by the page layout
             node.table.widths = Array(colCount).fill('*');
             node.layout = {
               hLineWidth: function () { return 1; },
