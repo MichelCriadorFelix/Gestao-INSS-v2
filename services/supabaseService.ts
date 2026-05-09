@@ -737,6 +737,40 @@ export const supabaseService = {
     return data || [];
   },
 
+  async keywordSearchLegalDocuments(query: string, matchCount = 15) {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    
+    // Extract potential legal identifiers (e.g., IN 128, Art. 482, Lei 8.213)
+    const identifiers = query.match(/(IN|Art|Lei|Decreto|Súmula|Enunciado)\.?\s*\d+/gi) || [];
+    
+    // Split query into terms, but be more inclusive for numbers and identifiers
+    const terms = query.split(/\s+/).filter(t => t.length >= 2);
+    if (terms.length === 0 && identifiers.length === 0) return [];
+
+    const searchTerms = Array.from(new Set([...identifiers, ...terms]));
+    
+    let filter = '';
+    searchTerms.forEach((term, i) => {
+      // Escape special characters for ilike
+      const escapedTerm = term.replace(/[%_]/g, '\\$0');
+      if (i > 0) filter += ',';
+      filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
+    });
+
+    const { data, error } = await supabase
+      .from('legal_documents')
+      .select('*')
+      .or(filter)
+      .limit(matchCount);
+      
+    if (error) {
+      console.error('Error keyword searching legal documents in Supabase:', error);
+      return [];
+    }
+    return data || [];
+  },
+
   async deleteLegalDocumentByTitle(title: string) {
     const supabase = getSupabase();
     if (!supabase) return null;

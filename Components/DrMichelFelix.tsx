@@ -432,12 +432,15 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         abortController.abort();
       }, 300000); // 300 seconds
 
-      // 1. Get embedding for the user's message (include recent history for context)
+      // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
       try {
         const currentSession = sessions.find(s => s.id === sessionId);
         const recentHistory = currentSession?.messages.slice(-2) || [];
         const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText;
+
+        // Perform keyword search (simultaneous with embedding generation)
+        const keywordPromise = supabaseService.keywordSearchLegalDocuments(messageText, 10);
 
         const embedResponse = await apiFetch('/api/rag/embed', {
           method: 'POST',
@@ -445,15 +448,31 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           body: JSON.stringify({ text: contextText }),
           signal: abortController.signal
         });
+
+        const keywordResults = await keywordPromise;
+
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
             // 2. Query Supabase (threshold lowered to 0.5 and count increased to 15 for better coverage)
-            const results = await supabaseService.searchLegalDocuments(embedding, 0.5, 15);
-            if (results && results.length > 0) {
-              ragContext = results.map((r: any) => r.content).join('\n\n---\n\n');
+            const vectorResults = await supabaseService.searchLegalDocuments(embedding, 0.4, 20);
+            
+            // Merge and dedup results
+            const allResults = [...keywordResults];
+            vectorResults.forEach((vr: any) => {
+              if (!allResults.find(ar => ar.id === vr.id)) {
+                allResults.push(vr);
+              }
+            });
+
+            if (allResults.length > 0) {
+              // Sort by relevance (keyword matches first if it's a specific term like IN 128)
+              ragContext = allResults.map((r: any) => r.content).join('\n\n---\n\n');
             }
           }
+        } else if (keywordResults.length > 0) {
+          // If embedding fails, at least use keyword results
+          ragContext = keywordResults.map((r: any) => r.content).join('\n\n---\n\n');
         }
       } catch (err) {
         console.warn("RAG search failed, continuing without context:", err);
