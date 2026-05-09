@@ -18,13 +18,19 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
     const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const sortedClients = [...(clients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const filteredClients = clientSearchQuery.trim()
-        ? sortedClients.filter(c =>
-            (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-            (c.cpf || '').includes(clientSearchQuery)
-          )
-        : sortedClients;
+    const sortedClients = React.useMemo(() =>
+        [...(clients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+        [clients]
+    );
+    const filteredClients = React.useMemo(() =>
+        clientSearchQuery.trim()
+            ? sortedClients.filter(c =>
+                (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                (c.cpf || '').includes(clientSearchQuery)
+              )
+            : sortedClients,
+        [sortedClients, clientSearchQuery]
+    );
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
