@@ -452,8 +452,21 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
       try {
-        // Query focada apenas na mensagem jurídica, sem OCR
-        const ragQuery = messageText.substring(0, 500);
+        // Se for comando de geração, enriquece a query com
+        // termos jurídicos previdenciários para forçar o RAG
+        // a recuperar as leis principais do RGPS
+        const isGenerationCommand = 
+          messageText.includes('GERAR') || 
+          messageText.includes('Gerar');
+          
+        const previdenciaryBooster = isGenerationCommand
+          ? ' aposentadoria previdenciária INSS benefício ' +
+            'tempo contribuição carência EC 103 Lei 8213 ' +
+            'IN 128 Decreto 3048 CTPS CNIS segurado'
+          : '';
+          
+        const ragQuery = messageText.substring(0, 400) + 
+          previdenciaryBooster;
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {

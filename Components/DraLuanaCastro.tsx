@@ -448,8 +448,21 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
       try {
-        // Query focada apenas na mensagem jurídica, sem OCR
-        const ragQuery = messageText.substring(0, 500);
+        // Se for comando de geração, enriquece a query com
+        // termos jurídicos previdenciários para forçar o RAG
+        // a recuperar as leis principais do RGPS
+        const isGenerationCommand = 
+          messageText.includes('GERAR') || 
+          messageText.includes('Gerar');
+
+        const laborBooster = isGenerationCommand
+          ? ' CLT rescisão trabalhista horas extras ' +
+            'FGTS aviso prévio férias verbas rescisórias ' +
+            'TST reforma trabalhista vínculo empregatício'
+          : '';
+          
+        const ragQuery = messageText.substring(0, 400) + 
+          laborBooster;
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
