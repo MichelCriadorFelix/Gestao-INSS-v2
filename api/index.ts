@@ -972,6 +972,35 @@ COMANDO DE EXECUÇÃO (FLUXO DE TRABALHO OBRIGATÓRIO):
 2. COMANDO "GERAR RELATÓRIO":
    - AÇÃO: Analise todo o contexto acumulado (documentos, conversas, CNIS, Laudos) e gere um Relatório de Análise Jurídica e Estratégia Processual.
    - ESTRUTURA OBRIGATÓRIA DO RELATÓRIO (NÃO RESUMA, SEJA EXAUSTIVO E DENSO):
+     METAS DE DENSIDADE OBRIGATÓRIAS PARA O RELATÓRIO:
+     - Total mínimo: 2.000 palavras. NÃO ECONOMIZE.
+     - Cada item abaixo tem meta própria — cumpra todas.
+     - PROIBIDO usar marcadores genéricos como 'Conforme 
+       os documentos' ou 'Como indicado'. Cite sempre 
+       dados reais: nome do documento, página, data, valor.
+
+     METAS POR ITEM:
+     1. STATUS DA LEITURA: liste cada documento com o que 
+        foi encontrado de relevante. Mínimo 200 palavras.
+     2. RESUMO DOS FATOS: narrativa densa com DER, idade, 
+        tempo de contribuição, carência, indeferimento e 
+        motivo. Mínimo 300 palavras.
+     3. PROVAS E ANÁLISE DOCUMENTAL: cite cada documento 
+        com página e dado extraído. Mínimo 400 palavras.
+     4. ANÁLISE DE DIVERGÊNCIAS: compare CTPS vs CNIS vs 
+        decisão do INSS. Mínimo 200 palavras.
+     5. ADVOGADO DO DIABO: atue como Procurador implacável.
+        3 pontos fracos detalhados + estratégia de cada um.
+        Mínimo 400 palavras.
+     6. ANÁLISE DE REQUISITOS: mostre o cálculo completo 
+        com datas, subtotais e total. Mínimo 300 palavras.
+     7. PRINCÍPIOS PREVIDENCIÁRIOS: mínimo 150 palavras.
+     8. OPÇÕES DE ESTRATÉGIA: mínimo 200 palavras.
+     9. BASE DE CONHECIMENTO: liste TODOS os fundamentos 
+        com status. Mínimo 150 palavras.
+     10. PERGUNTAS AO ADVOGADO: mínimo 3 perguntas 
+         estratégicas fundamentadas. Mínimo 150 palavras.
+
      1. STATUS DA LEITURA DOCUMENTAL: Liste os documentos lidos. SE algum documento estiver ilegível, vazio ou corrompido, crie um ALERTA EM DESTAQUE pedindo o reenvio.
      2. RESUMO DOS FATOS: Síntese profunda do caso (DER, DII, idade, tempo de contribuição, indeferimento, carência, etc).
      3. PROVAS IDENTIFICADAS E ANÁLISE DOCUMENTAL: Relacione os fatos com os documentos enviados detalhadamente. Aponte se falta algum documento essencial.
@@ -2007,13 +2036,22 @@ ${ragContext}`;
       return;
     }
 
-    const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
+
+    const maxOutputTokens = (model || "").includes("pro")
+      ? 16383
+      : isReportRequest
+        ? 16383   // Relatório: máximo para Gemini Flash
+        : 8192;   // Peça: já vai para DeepSeek, mantém padrão
+
+    const reportTemperature = isReportRequest ? 0.4 : temperature;
 
     try {
       const responseStream = await callGeminiStream({
         model: model || "gemini-3-flash-preview",
         contents,
-        config: { systemInstruction: selectedSystemPrompt, temperature, maxOutputTokens, tools }
+        config: { systemInstruction: selectedSystemPrompt, temperature: reportTemperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
