@@ -1732,8 +1732,8 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
       body: JSON.stringify({
         model: params.model || "deepseek/deepseek-chat",
         messages: params.messages,
-        temperature: params.temperature || 0.7,
-        max_tokens: params.max_tokens || 8192,
+        temperature: params.temperature ?? 0.2,
+        max_tokens: params.max_tokens || 16383,
         stream: true
       })
     });
@@ -2091,15 +2091,26 @@ ${ragContext}`;
 
     if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
-      const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
+      const orSystemPrompt = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
+Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
+REGRAS ABSOLUTAS E INEGOCIÁVEIS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
+2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
+3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
+4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
+5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
+6. VALOR DA CAUSA: Nunca invente valores. Use [VALOR A CALCULAR EM LIQUIDAÇÃO] se não tiver dados.
+7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
+
+      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
       for (const h of history) {
-        // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
         const role = h.role === 'model' ? 'assistant' : h.role;
         orMessages.push({ role, content: h.content });
       }
-      // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
       orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature, max_tokens: 16383 }, res);
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
       return;
     }
 
@@ -2323,6 +2334,17 @@ ${ragContext}`;
 
     if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
+      const orSystemPromptLuana = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
+Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
+REGRAS ABSOLUTAS E INEGOCIÁVEIS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
+2. CITAÇÕES WITH RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
+3. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
+4. DENSITY: Entre 4000 e 6000 palavras. Não resuma.
+5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
+
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) {
         // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
@@ -2342,10 +2364,12 @@ ${ragContext}`;
 
       orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
 
+      const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
+
       await callOpenRouterStream({
         model: model || "deepseek/deepseek-v3.2",
-        messages: orMessages,
-        temperature: temperature,
+        messages: orMessagesFinal,
+        temperature: isGenerationRequest ? 0.15 : temperature,
         max_tokens: 16383
       }, res);
       return;
