@@ -447,10 +447,18 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
       // 1. Get embedding and perform Keyword Search in parallel
       let ragContext = '';
+
+      // Detectar mensagens casuais para evitar busca RAG desnecessária
+      const isCasualMessage = /^(oi|olá|bom dia|boa tarde|boa noite|obrigad|tudo bem|tudo bom|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza)/i.test(messageText.trim()) && messageText.trim().length < 60;
+
       try {
+        if (isCasualMessage) {
+          // Mensagem casual: pular busca RAG completamente
+          ragContext = '';
+        } else {
         // Se for comando de geração, enriquece a query com
-        // termos jurídicos previdenciários para forçar o RAG
-        // a recuperar as leis principais do RGPS
+        // termos jurídicos trabalhistas para forçar o RAG
+        // a recuperar as leis principais da CLT
         const isGenerationCommand =
           messageText.includes('GERAR') ||
           messageText.includes('Gerar');
@@ -529,6 +537,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
+        } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
       }
