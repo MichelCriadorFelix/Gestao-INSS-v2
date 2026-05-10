@@ -765,7 +765,7 @@ export const supabaseService = {
     return [...new Set(titles)] as string[];
   },
 
-  async searchByTitles(titles: string[], chunksPerTitle = 2): Promise<any[]> {
+  async searchByTitles(titles: string[], chunksPerTitle = 5): Promise<any[]> {
     const supabase = getSupabase();
     if (!supabase || titles.length === 0) return [];
 

@@ -496,7 +496,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         ]);
 
         const titleResults = allTitles.length > 0
-          ? await supabaseService.searchByTitles(allTitles, 2)
+          ? await supabaseService.searchByTitles(allTitles, 5)
           : [];
 
         if (embedResponse.ok) {
