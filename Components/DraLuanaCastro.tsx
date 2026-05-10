@@ -1438,10 +1438,10 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
-                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (2 Milhões de Tokens - Alta Complexidade)</option>
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro — OpenRouter ($2/$12 por 1M tokens — Peças Complexas)</option>
                       <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
