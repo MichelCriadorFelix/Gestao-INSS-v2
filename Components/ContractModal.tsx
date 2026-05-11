@@ -303,7 +303,17 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                             const nameParts = (c.name || '').split(' ');
                                                             const firstName = nameParts[0] || '';
                                                             const lastName = nameParts.slice(1).join(' ') || '';
-                                                            setFormData(prev => ({ ...prev, clientId: c.id, firstName, lastName, cpf: c.cpf }));
+                                                            setFormData(prev => ({ 
+                                                                ...prev, 
+                                                                clientId: c.id, 
+                                                                firstName, 
+                                                                lastName, 
+                                                                cpf: c.cpf || '',
+                                                                // Pré-preenche honorários se vier de indicação
+                                                                totalFee: c.totalFee || prev.totalFee || 0,
+                                                                // Pré-preenche tipo de serviço se disponível
+                                                                serviceType: prev.serviceType || c.type || '',
+                                                            }));
                                                             setIsClientDropdownOpen(false);
                                                             setClientSearchQuery('');
                                                         }}
@@ -356,7 +366,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">% Responsável Principal</label>
-                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData({...formData, lawyerSplit: Number(e.target.value)})} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData(prev => ({...prev, lawyerSplit: Number(e.target.value)}))} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value={100}>100% / 0%</option>
                              <option value={70}>70% / 30%</option>
                              <option value={60}>60% / 40%</option>
@@ -406,7 +416,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                      <select
                                          name="installmentsCount"
                                          value={formData.installmentsCount || 2}
-                                         onChange={(e) => setFormData({...formData, installmentsCount: Number(e.target.value)})}
+                                         onChange={(e) => setFormData(prev => ({...prev, installmentsCount: Number(e.target.value)}))}
                                          className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
                                      >
                                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
@@ -488,7 +498,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     value={p.amount}
                                                     onChange={(e) => {
                                                         const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, amount: Number(e.target.value)} : pay);
-                                                        setFormData({...formData, payments: updatedPayments});
+                                                        setFormData(prev => ({...prev, payments: updatedPayments}));
                                                     }}
                                                     className="block font-bold dark:text-slate-200 bg-transparent border-none p-0 focus:ring-0 w-28 text-sm"
                                                     step="0.01"
@@ -499,7 +509,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     value={p.dueDate || p.date || new Date().toISOString().split('T')[0]} 
                                                     onChange={(e) => {
                                                         const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, dueDate: e.target.value, date: e.target.value} : pay);
-                                                        setFormData({...formData, payments: updatedPayments});
+                                                        setFormData(prev => ({...prev, payments: updatedPayments}));
                                                     }}
                                                     className="text-[10px] text-slate-500 uppercase bg-transparent border-none p-0 focus:ring-0"
                                                 />
@@ -508,7 +518,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                         <div className="flex items-center gap-2">
                                             <button type="button" onClick={() => {
                                                 const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, isPaid: !pay.isPaid} : pay);
-                                                setFormData({...formData, payments: updatedPayments});
+                                                setFormData(prev => ({...prev, payments: updatedPayments}));
                                             }} className={`p-2 rounded-lg transition ${p.isPaid ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
                                                 <CheckIcon className="h-4 w-4" />
                                             </button>
