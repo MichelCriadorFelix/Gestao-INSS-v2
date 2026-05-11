@@ -261,8 +261,9 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                             {isClientDropdownOpen && createPortal(
                                 <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-                                    onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}>
+                                    onMouseDown={(e) => { if (e.target === e.currentTarget) { setIsClientDropdownOpen(false); setClientSearchQuery(''); } }}>
                                     <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                                        onMouseDown={e => e.stopPropagation()}
                                         onClick={e => e.stopPropagation()}>
                                         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-20">
                                             <span className="font-bold text-slate-800 dark:text-white text-sm">Selecionar Cliente</span>
