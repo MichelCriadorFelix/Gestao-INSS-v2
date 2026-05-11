@@ -2178,17 +2178,15 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       (message || "").includes("GERAR RELATORIO");
 
     // maxOutputTokens calibrado por intenção:
-    // - Relatório: 16383 (análise longa)
-    // - Peça (Pro): 16383
+    // - Peça (coração do processo): 16383 — máximo absoluto
+    // - Relatório: 16383 — máximo (análise longa)
+    // - Pro: 16383
     // - Dúvida: 4096 (resposta técnica focada, sem peça completa)
-    // - Peça Flash: 8192 (vai para DeepSeek via OpenRouter)
     const maxOutputTokens = (model || "").includes("pro")
       ? 16383
-      : isReportRequest
-        ? 16383
-        : intent === "[DÚVIDA]"
-          ? 4096
-          : 8192;
+      : intent === "[DÚVIDA]"
+        ? 4096
+        : 16383; // GERAÇÃO (peça ou relatório): máximo sempre
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -2468,11 +2466,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     // maxOutputTokens calibrado por intenção
     const maxOutputTokens = (model || "").includes("pro")
       ? 16383
-      : isReportRequestLuana
-        ? 16383
-        : intent === "[DÚVIDA]"
-          ? 4096
-          : 8192;
+      : intent === "[DÚVIDA]"
+        ? 4096
+        : 16383; // GERAÇÃO (peça ou relatório): máximo sempre
 
     // Temperature calibrada por intenção
     const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
