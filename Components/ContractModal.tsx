@@ -286,7 +286,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                             <button
                                                 type="button"
                                                 onClick={() => {
-                                                    setFormData({ ...formData, clientId: undefined, firstName: '', lastName: '', cpf: '' });
+                                                    setFormData(prev => ({ ...prev, clientId: undefined, firstName: '', lastName: '', cpf: '' }));
                                                     setIsClientDropdownOpen(false);
                                                     setClientSearchQuery('');
                                                 }}
@@ -303,7 +303,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                             const nameParts = (c.name || '').split(' ');
                                                             const firstName = nameParts[0] || '';
                                                             const lastName = nameParts.slice(1).join(' ') || '';
-                                                            setFormData({ ...formData, clientId: c.id, firstName, lastName, cpf: c.cpf });
+                                                            setFormData(prev => ({ ...prev, clientId: c.id, firstName, lastName, cpf: c.cpf }));
                                                             setIsClientDropdownOpen(false);
                                                             setClientSearchQuery('');
                                                         }}
