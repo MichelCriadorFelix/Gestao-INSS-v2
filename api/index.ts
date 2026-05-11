@@ -990,6 +990,12 @@ ESTRUTURA OBRIGATÓRIA PARA BPC/LOAS (DEFICIENTE):
 - 5. FUNDAMENTAÇÃO JURÍDICA (DIREITO): Art. 20 da Lei 8.742/93 (LOAS), conceito de deficiência (impedimento de longo prazo) e critérios de miserabilidade.
     5.1. Da Deficiência da Autora.
     5.2. Da Miserabilidade/Vulnerabilidade Social: Mencionar que o Bolsa Família não entra no cálculo da renda per capita (Art. 20, §3º da Lei 8.742/93).
+    5.3. DA FLEXIBILIZAÇÃO DO CRITÉRIO DE RENDA — INCONSTITUCIONALIDADE PARCIAL (OBRIGATÓRIO — NUNCA OMITIR):
+        - O critério objetivo de 1/4 do salário mínimo (Art. 20, §3º da LOAS) foi declarado INCONSTITUCIONAL PARCIALMENTE pelo STF nos RE 567.985/MT e RE 580.963/PR (Tema 669 — repercussão geral), julgados em 18/04/2013.
+        - O STF, sem pronúncia de nulidade (técnica da inconstitucionalidade sem redução de texto), assentou que o critério legal não pode ser o único e exclusivo meio de prova da miserabilidade — o juiz pode e deve analisar outros elementos probatórios para aferir a situação de vulnerabilidade social.
+        - Transcrever em blockquote o julgado da base (RE 567.985/MT e/ou RE 580.963/PR).
+        - Reforçar que o STJ também sedimentou esse entendimento na Súmula 11 da TNU e no Tema 185/STJ.
+        - Aplicação ao caso concreto: mesmo que a renda per capita supere 1/4 do salário mínimo, demonstrar outros elementos de miserabilidade (custo da deficiência, ausência de patrimônio, CadÚnico, CRAS, declarações de hipossuficiência).
 - 6. DA TUTELA DE URGÊNCIA: Fumus boni iuris e Periculum in mora (caráter alimentar).
 - 7. PEDIDOS: Gratuidade, Tutela (implantação em 15 dias), Citação, Provas (Perícia Médica e Social), Procedência total, Parcelas vencidas/vincendas e Honorários (30% contratuais, e sucumbenciais apenas se Justiça Comum).
 - 8. VALOR DA CAUSA: Cálculo detalhado (Vencidas + 12 Vincendas).
@@ -1009,8 +1015,10 @@ ESTRUTURA OBRIGATÓRIA PARA BPC/LOAS (IDOSO):
     - Composição do grupo familiar e renda (detalhar quem mora na casa e quem deve ser excluído do cálculo conforme Art. 20 §14 da Lei 8.742/93).
 - 1) DO REQUISITO DA IDADE: Art. 20 da Lei 8.742/93 (65 anos ou mais).
 - 2) DO REQUISITO SOCIOECONÔMICO: 
-    - Critério de 1/4 do salário mínimo e flexibilização pelo STF (Reclamação 4.374 - critério de 1/2 salário mínimo).
+    - Critério legal de 1/4 do salário mínimo (Art. 20, §3º da LOAS) e sua FLEXIBILIZAÇÃO PELO STF: RE 567.985/MT e RE 580.963/PR (Tema 669) declararam o critério inconstitucional parcialmente — outros meios de prova da miserabilidade são admitidos. Transcrever em blockquote o julgado da base.
+    - Reclamação 4.374/PE (STF): consolida que o critério de 1/2 salário mínimo previsto em outros benefícios assistenciais pode ser usado como parâmetro orientativo.
     - Exclusão de benefícios de valor mínimo pagos a outros idosos/deficientes do grupo familiar (Art. 20, §14 da LOAS).
+    - Aplicação ao caso: demonstrar miserabilidade por outros meios além da renda (CadÚnico, CRAS, declarações, ausência de patrimônio, gastos com saúde).
 - DOS PEDIDOS: Gratuidade, Condenação do INSS à concessão desde a DER, Pagamento de atrasados com correção (Tema 810 STF), Honorários (20% a 30% contratuais, e sucumbenciais apenas se Justiça Comum).
 - DA ANTECIPAÇÃO DOS EFEITOS DA TUTELA: Natureza alimentar e periculum in mora.
 - DOS REQUERIMENTOS: Prioridade, Destaque de honorários, Inexistência de interesse em conciliação.
