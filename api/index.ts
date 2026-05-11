@@ -2094,9 +2094,25 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
 - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
-    if (!isGenerationRequest && history.length > 6) history = history.slice(-6);
+    // Janela de histórico calibrada por intenção:
+    // - GERAÇÃO: histórico completo (contexto integral do caso)
+    // - DÚVIDA: até 10 turnos (jurídico precisa de contexto mais amplo)
+    // - CASUAL/outros: até 6 turnos (conversa leve, economiza tokens)
+    if (isGenerationRequest) {
+      // mantém histórico completo
+    } else if (intent === "[DÚVIDA]") {
+      if (history.length > 10) history = history.slice(-10);
+    } else {
+      if (history.length > 6) history = history.slice(-6);
+    }
 
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
+    // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
+    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
+    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
+    Use Google Search para verificar a redação atualizada de artigos antes de responder.
+    ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
@@ -2161,19 +2177,30 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
+    // maxOutputTokens calibrado por intenção:
+    // - Relatório: 16383 (análise longa)
+    // - Peça (Pro): 16383
+    // - Dúvida: 4096 (resposta técnica focada, sem peça completa)
+    // - Peça Flash: 8192 (vai para DeepSeek via OpenRouter)
     const maxOutputTokens = (model || "").includes("pro")
       ? 16383
       : isReportRequest
-        ? 16383   // Relatório: máximo para Gemini Flash
-        : 8192;   // Peça: já vai para DeepSeek, mantém padrão
+        ? 16383
+        : intent === "[DÚVIDA]"
+          ? 4096
+          : 8192;
 
-    const reportTemperature = isReportRequest ? 0.4 : temperature;
+    // Temperature calibrada por intenção:
+    // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
+    // - Dúvida: 0.1 (máxima precisão, resposta determinística)
+    // - Peça/outros: temperature já definida (0.2)
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
       const responseStream = await callGeminiStream({
         model: model || "gemini-3-flash-preview",
         contents,
-        config: { systemInstruction: selectedSystemPrompt, temperature: reportTemperature, maxOutputTokens, tools }
+        config: { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       for await (const chunk of responseStream) {
@@ -2308,14 +2335,27 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
 - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
     }
 
-    // 3. GESTÃO DE JANELA DESLIZANTE (SLIDING WINDOW) - Pilar 4
-    if (!isGenerationRequest && history.length > 6) {
-      console.log(`Pilar 4: Limitando histórico de ${history.length} para 6 turnos para redução de custos.`);
-      history = history.slice(-6);
+    // 3. GESTÃO DE JANELA DESLIZANTE CALIBRADA POR INTENÇÃO - Pilar 4
+    if (isGenerationRequest) {
+      // mantém histórico completo para geração de peça/relatório
+    } else if (intent === "[DÚVIDA]") {
+      if (history.length > 10) history = history.slice(-10);
+      console.log(`Pilar 4: Modo DÚVIDA — limitando histórico a 10 turnos.`);
+    } else {
+      if (history.length > 6) {
+        console.log(`Pilar 4: Limitando histórico de ${history.length} para 6 turnos para redução de custos.`);
+        history = history.slice(-6);
+      }
     }
 
-    // REFORÇO DE CONTEXTO (ANTI-VÍCIO)
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : `
+    // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
+    Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
+    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários.
+    Use Google Search para verificar a redação atualizada de artigos da CLT e súmulas do TST.
+    Informe sempre o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
+    ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
     Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
     **PROIBIÇÃO DE REPETIÇÃO E TERMOS DE IA:** Jamais repita os mesmos pedidos ou tópicos no final da peça. É TERMINANTEMENTE PROIBIDO incluir as strings "RAG", "Base de Conhecimento", "Local OCR" ou referências ao sistema de IA no corpo da petição.
@@ -2422,7 +2462,20 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       return;
     }
 
-    const maxOutputTokens = (model || "").includes("pro") ? 16383 : 8192;
+    const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
+
+    // maxOutputTokens calibrado por intenção
+    const maxOutputTokens = (model || "").includes("pro")
+      ? 16383
+      : isReportRequestLuana
+        ? 16383
+        : intent === "[DÚVIDA]"
+          ? 4096
+          : 8192;
+
+    // Temperature calibrada por intenção
+    const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
       let responseStream;
@@ -2432,7 +2485,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         contents: contents,
         config: {
           systemInstruction: selectedSystemPrompt,
-          temperature: temperature,
+          temperature: finalTemperature,
           maxOutputTokens: maxOutputTokens,
           tools: tools,
           safetySettings: [

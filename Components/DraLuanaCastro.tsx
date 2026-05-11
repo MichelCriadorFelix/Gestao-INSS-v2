@@ -898,7 +898,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. O processo foi mapeado e estou pronto para gerar a petição ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
+        content: `✅ **Auditoria concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e mapeei os dados trabalhistas essenciais de cada documento. Estou pronta para **GERAR RELATÓRIO** ou **GERAR PEÇA** com base nas informações consolidadas. Como deseja prosseguir?`,
         timestamp: new Date().toISOString()
       };
       
