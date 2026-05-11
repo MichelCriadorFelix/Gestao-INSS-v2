@@ -1150,6 +1150,173 @@ ESTRUTURA OBRIGATÓRIA PARA RECURSO INOMINADO (JEF — 1ª para 2ª Turma Recurs
 - VI. DOS DOCUMENTOS: Listar documentos novos eventualmente juntados (se admissível).
 ATENÇÃO: Recurso Inominado vai para a Turma Recursal, não para o TRF. PROIBIDO mencionar "apelação". Honorários sucumbenciais são vedados no JEF em 1ª instância, mas cabíveis em Recurso Inominado se o recorrido for vencido.
 
+ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA ESPECIAL:
+- ENDEREÇAMENTO: Conforme regra 7.
+- QUALIFICAÇÃO DA PARTE AUTORA: Completa (nome, CPF, NIT, profissão, endereço).
+- QUALIFICAÇÃO DO RÉU: Conforme regra 7.
+- TÍTULO: Ação Previdenciária — Concessão de Aposentadoria Especial (Art. 57 da Lei nº 8.213/91).
+- I. DA GRATUIDADE DE JUSTIÇA: Fundamentação nos arts. 98 a 102 do CPC e declaração de hipossuficiência.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução CNJ nº 345/2020 e Resolução CJF nº 10/2020.
+- III. DO RESUMO DA DEMANDA: Síntese narrativa e estratégica (1-2 parágrafos) — destacar a profissão, o agente nocivo, o tempo de exposição e o erro do INSS em negar o reconhecimento. Texto corrido, denso e persuasivo. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
+- IV. DOS FATOS:
+    IV.1. Da Trajetória Profissional: Descrever cada emprego, função exercida, agentes nocivos a que esteve exposto (físicos, químicos ou biológicos), equipamentos de proteção individual e coletiva (EPI/EPC), e se o uso de EPI neutralizou efetivamente a nocividade (Tema 555 STF).
+    IV.2. Do Requerimento Administrativo e do Indeferimento: DER, NB, motivo do indeferimento.
+    IV.3. Dos Documentos Técnicos: PPP (Perfil Profissiográfico Previdenciário), LTCAT (Laudo Técnico das Condições Ambientais do Trabalho) e DSST emitidos pela empresa.
+- V. QUADRO DE PERÍODOS ESPECIAIS (OBRIGATÓRIO — NUNCA OMITIR): Tabela Markdown:
+  | Nº | Empregador | Início | Fim | Agente Nocivo | Enquadramento Legal | Tempo Especial |
+  Destacar em **negrito** os períodos controvertidos.
+  Última linha: **TOTAL DE TEMPO ESPECIAL**.
+  PROIBIDO omitir esta tabela.
+- VI. MARCO TEMPORAL (OBRIGATÓRIO — NUNCA OMITIR): Tabela Markdown:
+  | Data-Chave | Tempo Especial Acumulado | Observação |
+  Incluir: 28/04/1995 (marco do PPP), 01/01/2004 (marco do LTCAT), DER, data de ajuizamento.
+  PROIBIDO omitir esta tabela.
+- VII. DO DIREITO:
+    VII.1. Do Enquadramento Legal: Art. 57 e 58 da Lei 8.213/91; Decreto 3.048/99 (Anexos I, II, IV e V); Decreto 53.831/64 e Decreto 83.080/79 (para períodos anteriores a 05/03/1997).
+    VII.2. Da Prova da Exposição — PPP e LTCAT: Obrigatoriedade do PPP (art. 58 §1º da Lei 8.213/91 e IN 128/2022) e do LTCAT (art. 58 §1º). Citar se foram emitidos corretamente.
+    VII.3. Do EPI e a Neutralização da Nocividade: Tema 555 do STF — uso de EPI não afasta o tempo especial se a eficácia neutralizadora não for comprovada pelo empregador. Citar blockquote da jurisprudência da base.
+    VII.4. Do Direito Adquirido Pré-Reforma: Art. 3º da EC 103/2019 — a Aposentadoria Especial não foi extinta; períodos especiais até 13/11/2019 são contados com os multiplicadores de conversão.
+    VII.5. Da Reafirmação da DER: Tema 995 do STJ.
+- VIII. DA TUTELA DE URGÊNCIA: Fumus boni iuris (documentos técnicos comprovando exposição) e periculum in mora (natureza alimentar e risco à saúde do segurado).
+- IX. DOS PEDIDOS (numerar com letras: a), b), c)...):
+    a) Gratuidade de Justiça (fundamentação legal detalhada);
+    b) Tutela de urgência para implantação do benefício em 15 dias;
+    c) Citação do INSS para contestar, sob pena de revelia;
+    d) Produção de provas, especialmente perícia técnica no local de trabalho e oitiva de testemunhas;
+    e) Reconhecimento de todos os períodos especiais listados no Quadro de Períodos Especiais;
+    f) Concessão da Aposentadoria Especial desde a DER (NB específico), com os acréscimos legais;
+    g) Pagamento das parcelas vencidas desde a DER, com correção monetária (Tema 810 STF) e juros;
+    h) Destaque dos honorários contratuais (percentual do contrato — usualmente 20% a 30%);
+    i) Condenação em honorários sucumbenciais de 20% (apenas se Justiça Comum; excluir se JEF);
+    j) Renúncia aos valores excedentes ao teto do JEF (apenas se JEF).
+- X. DOS REQUERIMENTOS: Juízo 100% Digital; inexistência de interesse em conciliação; remessa dos autos ao CEJUSF se for o caso.
+- XI. DO VALOR DA CAUSA: Cálculo detalhado (12 parcelas vencidas desde a DER + 12 vincendas pelo valor estimado do benefício).
+- XII. DO ROL DE DOCUMENTOS: Lista numerada exaustiva (CTPS, PPP, LTCAT, DSST, laudos médicos, requerimento, carta de indeferimento, documentos pessoais).
+ATENÇÃO: PROIBIDO incluir tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este é exclusivo de Benefício por Incapacidade. PROIBIDO mencionar "Regra de Pedágio" — ela é exclusiva da ATC. A Aposentadoria Especial é ação autônoma, fundamentada no Art. 57 da Lei 8.213/91.
+
+ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR TEMPO DE CONTRIBUIÇÃO — REGRAS DE TRANSIÇÃO EC 103/2019 (SEM CONVERSÃO ESPECIAL):
+- ENDEREÇAMENTO: Conforme regra 7.
+- QUALIFICAÇÃO DA PARTE AUTORA: Completa.
+- QUALIFICAÇÃO DO RÉU: Conforme regra 7.
+- TÍTULO: Ação Previdenciária — Concessão de Aposentadoria por Tempo de Contribuição pelas Regras de Transição da EC nº 103/2019 [indicar a regra aplicável: Pedágio 50%, Pedágio 100%, Pontos, Idade Progressiva ou Idade Mínima com Tempo].
+- I. DA GRATUIDADE DE JUSTIÇA.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL.
+- III. DO RESUMO DA DEMANDA: Síntese narrativa (1-2 parágrafos) — destacar o tempo de contribuição acumulado, a regra de transição preenchida e o erro do INSS. Texto corrido. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
+- IV. DOS FATOS:
+    IV.1. Da Trajetória Contributiva: Histórico de vínculos e contribuições desde o início da vida laboral até a DER.
+    IV.2. Do Requerimento Administrativo: DER, NB e motivo do indeferimento.
+    IV.3. Dos Períodos Controvertidos: Detalhar cada período não reconhecido pelo INSS, com as provas disponíveis (CTPS, carnês de contribuição, declarações).
+- V. QUADRO CONTRIBUTIVO CONSOLIDADO (OBRIGATÓRIO — NUNCA OMITIR): Tabela Markdown:
+  | Nº | Empregador/Vínculo | Início | Fim | Tempo | Carência | Observação |
+  Destacar em **negrito** os períodos controvertidos. Última linha: **TOTAL**.
+  PROIBIDO omitir.
+- VI. MARCO TEMPORAL E REGRAS DE TRANSIÇÃO (OBRIGATÓRIO — NUNCA OMITIR): Tabela Markdown:
+  | Regra de Transição | Requisito | Situação na DER | Preenchida? |
+  Incluir as 5 regras de transição da EC 103/2019 (Arts. 15 a 19):
+  - Art. 15 — Pedágio 50%
+  - Art. 16 — Pedágio 100%
+  - Art. 17 — Pontos (progressivos por ano)
+  - Art. 18 — Idade Mínima + Tempo (86/96 pontos)
+  - Art. 19 — Idade Mínima com Tempo de 30/35 anos
+  Destacar a regra aplicável ao caso em **negrito**.
+  PROIBIDO omitir.
+- VII. DO DIREITO:
+    VII.1. Do Direito Adquirido Pré-Reforma (Art. 3º da EC 103/2019): Se preencheu requisitos antes de 13/11/2019, o direito é adquirido pelas regras anteriores.
+    VII.2. Das Regras de Transição Aplicáveis: Fundamentação no(s) artigo(s) da EC 103/2019 e na Lei 8.213/91. Citar blockquote da base.
+    VII.3. Do Tempo de Contribuição — Períodos Controvertidos: Fundamentação para reconhecimento de cada período negado (CTPS, Súmula 75 TNU, declaração de empregador).
+    VII.4. Da Reafirmação da DER: Tema 995 do STJ.
+    VII.5. Do Encontro de Contas: Tema 1.207 do STJ (evitar execução invertida se já recebe auxílio-doença ou aposentadoria por invalidez).
+- VIII. DA TUTELA DE URGÊNCIA (se aplicável): Periculum in mora (idade avançada, condição de saúde) e fumus boni iuris (tempo comprovado).
+- IX. DOS PEDIDOS (numerar com letras: a), b), c)...):
+    a) Gratuidade de Justiça;
+    b) Tutela de urgência para implantação (se pleiteada);
+    c) Citação do INSS;
+    d) Produção de provas (documental e, se necessário, testemunhal);
+    e) Reconhecimento de todos os períodos contributivos controvertidos;
+    f) Concessão da aposentadoria pela regra de transição identificada, desde a DER;
+    g) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    h) Destaque de honorários contratuais;
+    i) Honorários sucumbenciais de 20% (apenas Justiça Comum);
+    j) Renúncia ao excedente do teto (apenas JEF).
+- X. DOS REQUERIMENTOS: Juízo 100% Digital; inexistência de interesse em conciliação.
+- XI. DO VALOR DA CAUSA: Cálculo detalhado (parcelas vencidas desde DER + 12 vincendas).
+- XII. DO ROL DE DOCUMENTOS: Lista numerada exaustiva.
+ATENÇÃO: PROIBIDO incluir tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — exclusivo de Benefício por Incapacidade. PROIBIDO mencionar "conversão de tempo especial" se não houver períodos especiais no caso.
+
+ESTRUTURA OBRIGATÓRIA PARA SALÁRIO-MATERNIDADE:
+- ENDEREÇAMENTO: Conforme regra 7.
+- QUALIFICAÇÃO DA PARTE AUTORA: Completa (nome, CPF, NIT, profissão, endereço).
+- QUALIFICAÇÃO DO RÉU: Conforme regra 7.
+- TÍTULO: Ação Previdenciária — Concessão de Salário-Maternidade (Art. 71 da Lei nº 8.213/91).
+- I. DA GRATUIDADE DE JUSTIÇA.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL.
+- III. DO RESUMO DA DEMANDA: Síntese narrativa (1-2 parágrafos) — destacar a condição de segurada, o parto/adoção, a carência e o erro do INSS. Texto corrido. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
+- IV. DOS FATOS:
+    IV.1. Da Condição de Segurada e da Carência: Categoria da segurada (empregada, contribuinte individual, facultativa, desempregada em período de graça) e cumprimento da carência (Art. 25, III da Lei 8.213/91: 10 contribuições para CI/facultativa; isenta para empregada/doméstica/trabalhadora avulsa).
+    IV.2. Do Evento Gerador: Data do parto, nascimento, adoção ou guarda judicial — certidão de nascimento ou termo de adoção.
+    IV.3. Do Requerimento Administrativo e do Indeferimento: DER, NB e motivo do indeferimento.
+    IV.4. Da Qualidade de Segurada na Data do Parto: Demonstrar manutenção da qualidade de segurada (período de graça, se aplicável — Art. 15 da Lei 8.213/91).
+- V. QUADRO CONTRIBUTIVO (OBRIGATÓRIO se houver discussão de carência): Tabela Markdown:
+  | Nº | Competência | Contribuição | Categoria | Carência Contada? |
+  Última linha: **TOTAL DE CARÊNCIA**.
+  Omitir se a segurada for empregada/doméstica/avulsa (carência inexigível).
+- VI. DO DIREITO:
+    VI.1. Do Direito ao Salário-Maternidade: Art. 71 a 73 da Lei 8.213/91 e Art. 7º, XVIII da CF/88.
+    VI.2. Da Categoria da Segurada e da Carência Aplicável: Fundamentação específica por categoria (Art. 25, III c/c Art. 71 §§ da Lei 8.213/91).
+    VI.3. Da Duração do Benefício: 120 dias (parto), podendo ser estendido para 180 dias (Lei 11.770/2008 — empresa cidadã) ou reduzido para adoção conforme a idade da criança (Art. 71-A da Lei 8.213/91).
+    VI.4. Da Base de Cálculo: Salário de contribuição na data do parto (empregada: último salário; CI/facultativa: média dos últimos 12 meses; desempregada: último salário antes da demissão).
+    VI.5. Do Período de Graça (se aplicável): Art. 15 da Lei 8.213/91 — segurada desempregada mantém qualidade por 12 ou 24 meses conforme tempo de contribuição.
+- VII. DA TUTELA DE URGÊNCIA: Natureza alimentar e urgência (recém-nascido/criança adotada).
+- VIII. DOS PEDIDOS (numerar com letras: a), b), c)...):
+    a) Gratuidade de Justiça;
+    b) Tutela de urgência para implantação em 15 dias;
+    c) Citação do INSS;
+    d) Produção de provas;
+    e) Concessão do Salário-Maternidade desde a data do parto/adoção, pelo período de [120/180] dias;
+    f) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    g) Destaque de honorários contratuais;
+    h) Honorários sucumbenciais (apenas Justiça Comum);
+    i) Renúncia ao excedente do teto (apenas JEF).
+- IX. DOS REQUERIMENTOS: Juízo 100% Digital; inexistência de interesse em conciliação.
+- X. DO VALOR DA CAUSA: Valor total do benefício (salário × número de dias ÷ 30) × número de meses de atraso + vincendas.
+- XI. DO ROL DE DOCUMENTOS: Certidão de nascimento/termo de adoção, CTPS, carnês, extrato CNIS, documentos pessoais.
+ATENÇÃO: PROIBIDO mencionar "Lei 14.331/2022" — exclusiva de Benefício por Incapacidade. A base de cálculo varia por categoria — NUNCA usar a mesma fórmula para empregada e contribuinte individual.
+
+ESTRUTURA OBRIGATÓRIA PARA AUXÍLIO-ACIDENTE:
+- ENDEREÇAMENTO: Conforme regra 7.
+- QUALIFICAÇÃO DA PARTE AUTORA: Completa (nome, CPF, NIT, profissão, endereço).
+- QUALIFICAÇÃO DO RÉU: Conforme regra 7.
+- TÍTULO: Ação Previdenciária — Concessão de Auxílio-Acidente (Art. 86 da Lei nº 8.213/91).
+- I. DA GRATUIDADE DE JUSTIÇA.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL.
+- III. DO RESUMO DA DEMANDA: Síntese narrativa (1-2 parágrafos) — destacar o acidente/doença ocupacional, a sequela permanente, a redução da capacidade laboral e o erro do INSS. Texto corrido. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
+- IV. DOS FATOS:
+    IV.1. Do Acidente ou Doença Ocupacional: Data, local, descrição do acidente de trabalho ou desenvolvimento da doença ocupacional (nexo causal com a atividade — CAT emitida ou não).
+    IV.2. Do Tratamento e da Sequela Permanente: Histórico médico, laudos, CIDs, cirurgias e, principalmente, a sequela definitiva que reduziu a capacidade para o trabalho habitual.
+    IV.3. Da Diferença entre Auxílio-Doença e Auxílio-Acidente: O segurado pode ter recebido Auxílio-Doença durante o tratamento; o Auxílio-Acidente é devido após a consolidação das lesões, quando há sequela definitiva e redução parcial da capacidade.
+    IV.4. Do Requerimento Administrativo e do Indeferimento: DER, NB e motivo da negativa.
+- V. DO DIREITO:
+    V.1. Do Direito ao Auxílio-Acidente: Art. 86 da Lei 8.213/91 — devido ao segurado empregado, trabalhador avulso e segurado especial que sofrer acidente de qualquer natureza com sequela permanente que reduza a capacidade para o trabalho habitual. Citar blockquote da base.
+    V.2. Da Sequela Permanente Comprovada: Nexo entre o acidente/doença e a sequela, comprovado por laudos e perícia.
+    V.3. Da Natureza Indenizatória e Cumulativa: O Auxílio-Acidente é indenizatório e pode ser acumulado com salário (mas não com aposentadoria — Art. 86 §3º da Lei 8.213/91). Alertar para esta regra nos pedidos.
+    V.4. Do Valor do Benefício: 50% do salário de benefício que deu origem ao Auxílio-Doença anterior, ou do salário de benefício calculado na data do requerimento se não houve Auxílio-Doença prévio.
+    V.5. Da Data de Início do Benefício (DIB): Dia seguinte à cessação do Auxílio-Doença, ou na DER se não houve Auxílio-Doença.
+- VI. DA TUTELA DE URGÊNCIA: Fumus boni iuris (sequela documentada) e periculum in mora (natureza alimentar, redução permanente de renda).
+- VII. DOS PEDIDOS (numerar com letras: a), b), c)...):
+    a) Gratuidade de Justiça;
+    b) Tutela de urgência para implantação em 15 dias;
+    c) Citação do INSS;
+    d) Produção de provas, especialmente perícia médica por especialista na área da sequela;
+    e) Concessão do Auxílio-Acidente (Espécie 94) a partir do dia seguinte à alta do Auxílio-Doença (ou da DER), no valor de 50% do salário de benefício;
+    f) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    g) Destaque de honorários contratuais;
+    h) Honorários sucumbenciais de 20% (apenas Justiça Comum);
+    i) Renúncia ao excedente do teto (apenas JEF).
+- VIII. DOS REQUERIMENTOS: Juízo 100% Digital; inexistência de interesse em conciliação; alerta para a vedação de cumulação com aposentadoria (Art. 86 §3º).
+- IX. DO VALOR DA CAUSA: 50% do salário de benefício × meses em atraso + 12 vincendas.
+- X. DO ROL DE DOCUMENTOS: CAT, laudos médicos, exames de imagem, CTPS, requerimento administrativo, carta de indeferimento, documentos pessoais.
+ATENÇÃO: Auxílio-Acidente é indenizatório — não exige carência (Art. 26, I da Lei 8.213/91). PROIBIDO confundir com Auxílio-Doença (incapacidade temporária) ou com Aposentadoria por Invalidez (incapacidade total e permanente). A sequela precisa ser permanente mas a incapacidade pode ser parcial.
+
 `;
 
 const CNIS_SYSTEM_PROMPT = `
