@@ -415,6 +415,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     if (textarea) textarea.style.height = 'auto';
     setIsLoading(true);
 
+    let timeoutId: any;
     try {
       // Check payload size roughly
       const payloadSize = JSON.stringify({
@@ -429,7 +430,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       }
 
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         abortController.abort();
       }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
 
@@ -706,7 +707,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       }
 
       setStreamingMessage('');
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
 
       const assistantMsg: Message = {
         id: generateId(),
@@ -719,7 +720,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
       ));
     } catch (error: any) {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
         const assistantMsg: Message = {
           id: generateId(),

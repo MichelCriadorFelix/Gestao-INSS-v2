@@ -744,7 +744,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 const responseText = await response.text();
                 if (responseText.trim().startsWith('<')) {
                     console.error("AI Studio proxy returned HTML instead of JSON:", responseText.substring(0, 100));
-                    showToast("O ambiente de preview bloqueou a requisição. Por favor, abra o app em uma NOVA ABA utilizando o ícone no canto superior direito.", "error", 8000);
+                    showToast("O ambiente de preview bloqueou a requisição. Por favor, abra o app em uma NOVA ABA utilizando o ícone no canto superior direito.", "error");
                     return null;
                 }
                 aiData = JSON.parse(responseText);
