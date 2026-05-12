@@ -76,6 +76,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,7 +100,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -664,21 +665,24 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 
                 if (data.text) {
                   fullText += data.text;
+                  setStreamingMessage(fullText);
                 }
               }
             }
           }
         } catch (readError: any) {
           if (readError.name === 'AbortError') {
-            console.log('Stream aborted after 300 seconds');
-            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
+            console.log('Stream aborted after max limit');
+            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" ou "continuar de onde parou" para prosseguir.]';
           } else {
-            throw readError;
+            console.warn('Stream read error:', readError);
+            fullText += '\n\n[Aviso: Geração interrompida prematuramente devido a um limite de tempo/rede do servidor. Digite "continuar" para continuar a peça de onde parou.]';
           }
         }
       }
 
       clearTimeout(timeoutId);
+      setStreamingMessage('');
 
       const assistantMsg: Message = {
         id: generateId(),
@@ -1387,7 +1391,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               ))}
               {isLoading && (
                 <div className="flex gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
                     <Loader2 className="w-6 h-6 text-white animate-spin" />
                   </div>
                   <div className="flex-1 space-y-3">
@@ -1396,13 +1400,25 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       <span className="text-[10px] text-slate-400">•</span>
                       <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest animate-pulse">{progressText}</span>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 mb-1 overflow-hidden">
-                      <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span className="font-medium text-emerald-600 dark:text-emerald-400">{progress}% concluído</span>
-                      <span className="animate-pulse">Gerando resposta...</span>
-                    </div>
+                    
+                    {!streamingMessage && progress < 100 && (
+                      <>
+                        <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 mb-1 overflow-hidden">
+                          <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">{progress}% concluído</span>
+                          <span className="animate-pulse">Gerando resposta...</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {streamingMessage && (
+                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base font-inter">
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
+                        <span className="w-2 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle"></span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

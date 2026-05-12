@@ -1619,8 +1619,9 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview"
+  "gemini-3.1-pro-preview",
+  "gemini-1.5-pro",
+  "gemini-1.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
@@ -2065,7 +2066,7 @@ app.post("/api/analyze-cnis", async (req, res) => {
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
@@ -2075,7 +2076,30 @@ app.post("/api/analyze-cnis", async (req, res) => {
       }
     });
 
-    res.json(JSON.parse(response.text || "{}"));
+    let jsonData = {};
+    try {
+      jsonData = JSON.parse(response.text || "{}");
+    } catch (e) {
+      console.warn("Malformed JSON in analyze-cnis, returning raw text or partial data.", e);
+      let rawText = (response.text || "").trim();
+      if (rawText.startsWith('```json')) rawText = rawText.substring(7);
+      if (rawText.endsWith('```')) rawText = rawText.substring(0, rawText.length - 3);
+      rawText = rawText.trim();
+      
+      try {
+        const lastBraceIndex = Math.max(rawText.lastIndexOf('}'), rawText.lastIndexOf(']'));
+        if (lastBraceIndex > -1) {
+           jsonData = JSON.parse(rawText.substring(0, lastBraceIndex + 1));
+        } else {
+           throw new Error("Cannot find braces");
+        }
+      } catch (e2) {
+         // Fallback formatting for CNIS data that was heavily truncated
+         jsonData = { error: "Análise incompleta devido ao limite de tokens da IA. Tente enviar menos páginas do CNIS de cada vez.", raw: rawText };
+      }
+    }
+    
+    res.json(jsonData);
   } catch (error: any) {
     console.error("Error analyzing CNIS:", error);
     res.status(500).json({ error: error.message || "Falha na análise do CNIS" });
@@ -2193,6 +2217,21 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
   } catch (error: any) {
     console.error("Marketing error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/bcdata/inpc", async (req, res) => {
+  try {
+    const fetch = await import('node-fetch').then(m => m.default);
+    const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json');
+    if (!response.ok) {
+      return res.status(response.status).json({ error: "Failed to fetch from BCB" });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (error: any) {
+    console.error("BCB Proxy Error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch BCB data" });
   }
 });
 

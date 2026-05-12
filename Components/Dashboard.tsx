@@ -972,14 +972,14 @@ export default function Dashboard({
   };
 
   const handleSaveDrMichelSessions = async (sessions: any[]) => {
-      // Since DrMichelFelix now handles its own sync, this is mostly for local state sync
       setDrMichelSessions(sessions);
-      safeSetLocalStorage('dr_michel_sessions', JSON.stringify(sessions));
+      // Evitar QuotaExceededError limitando localStorage às 3 últimas sessões (o histórico total fica no Supabase)
+      safeSetLocalStorage('dr_michel_sessions', JSON.stringify(sessions.slice(0, 3)));
   };
 
   const handleSaveDraLuanaSessions = async (sessions: any[]) => {
       setDraLuanaSessions(sessions);
-      safeSetLocalStorage('dra_luana_sessions', JSON.stringify(sessions));
+      safeSetLocalStorage('dra_luana_sessions', JSON.stringify(sessions.slice(0, 3)));
   };
 
   // Merge virtual events from clients into agenda

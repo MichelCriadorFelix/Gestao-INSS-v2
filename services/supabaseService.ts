@@ -809,7 +809,7 @@ export const supabaseService = {
       // Escape special characters for ilike
       const escapedTerm = term.replace(/[%_]/g, '\\$0');
       if (i > 0) filter += ',';
-      filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
+      filter += `content.ilike.*${escapedTerm}*,metadata->>title.ilike.*${escapedTerm}*`;
     });
 
     const { data, error } = await supabase

@@ -9,7 +9,7 @@ export interface CorrectionIndex {
     cumulativeFactor: number;
 }
 
-const BCB_API_URL = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json';
+const BCB_API_URL = '/api/bcdata/inpc';
 
 export const fetchINPCData = async (): Promise<INPCData[]> => {
     try {
