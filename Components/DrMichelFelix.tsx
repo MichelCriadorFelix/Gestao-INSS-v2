@@ -100,7 +100,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -432,7 +432,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const abortController = new AbortController();
       timeoutId = setTimeout(() => {
         abortController.abort();
-      }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
+      }, 800000); // 800 seconds — conforme solicitado pelo usuário
 
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => {

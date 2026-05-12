@@ -1619,6 +1619,7 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
+  "gemini-3-flash-preview",
   "gemini-3.1-pro-preview",
   "gemini-1.5-pro",
   "gemini-1.5-flash"
@@ -2062,11 +2063,11 @@ app.post("/api/rag/embed", async (req, res) => {
 
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
-    const { cnisContent } = req.body;
+    const { cnisContent, model = "gemini-3-flash-preview" } = req.body;
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: model,
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
