@@ -802,14 +802,17 @@ export const supabaseService = {
     const terms = query.split(/\s+/).filter(t => t.length >= 2);
     if (terms.length === 0 && identifiers.length === 0) return [];
 
-    const searchTerms = Array.from(new Set([...identifiers, ...terms]));
+    const searchTerms = Array.from(new Set([...identifiers, ...terms])).slice(0, 8);
     
     let filter = '';
     searchTerms.forEach((term, i) => {
       // Escape special characters for ilike
-      const escapedTerm = term.replace(/[%_]/g, '\\$0');
+      // Supabase PostgREST uses % as wildcard, not *
+      const escapedTerm = term.replace(/[%_]/g, '\\$0')
+                             .replace(/[()]/g, '') // Remove parentheses that break OR logic strings
+                             .substring(0, 30);    // Avoid too long terms
       if (i > 0) filter += ',';
-      filter += `content.ilike.*${escapedTerm}*,metadata->>title.ilike.*${escapedTerm}*`;
+      filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
     });
 
     const { data, error } = await supabase

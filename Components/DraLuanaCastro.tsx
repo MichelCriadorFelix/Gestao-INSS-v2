@@ -409,7 +409,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     const textarea = document.getElementById('chat-input-luana');
     if (textarea) textarea.style.height = 'auto';
     setIsLoading(true);
-
+    let timeoutId: any;
     try {
       // Check payload size roughly
       const payloadSize = JSON.stringify({
@@ -424,7 +424,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       }
 
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         abortController.abort();
       }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
 
@@ -586,7 +586,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       });
 
       if (!response.ok) {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         const errorText = await response.text();
         let errorMessage = 'Falha na resposta da IA';
         try {
@@ -655,7 +655,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         }
       }
 
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
 
       const assistantMsg: Message = {
         id: generateId(),
@@ -668,6 +668,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
       ));
     } catch (error: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
         const assistantMsg: Message = {
           id: generateId(),
