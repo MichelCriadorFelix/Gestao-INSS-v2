@@ -235,7 +235,7 @@ app.post("/api/ocr", async (req, res) => {
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
-        maxOutputTokens: 8192
+        maxOutputTokens: 16383
       }
     });
 
@@ -498,7 +498,7 @@ ${specialInstructions}`;
       config: {
         systemInstruction: systemPrompt,
         temperature: 0.05,
-        maxOutputTokens: 8192
+        maxOutputTokens: 16383
       }
     });
 
@@ -574,7 +574,7 @@ REGRAS:
         const response = await callGemini({
           model: "gemini-3-flash-preview",
           contents: { role: "user", parts },
-          config: { temperature: 0.1, maxOutputTokens: 8192 }
+          config: { temperature: 0.1, maxOutputTokens: 16383 }
         });
         
         const extracted = response.text || "[Falha na extração de texto ou conteúdo vazio]";
@@ -2066,7 +2066,7 @@ app.post("/api/analyze-cnis", async (req, res) => {
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
@@ -2411,16 +2411,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens calibrado por intenção:
-    // - Peça (coração do processo): 16383 — máximo absoluto
-    // - Relatório: 16383 — máximo (análise longa)
-    // - Pro: 16383
-    // - Dúvida: 4096 (resposta técnica focada, sem peça completa)
-    const maxOutputTokens = (model || "").includes("pro")
-      ? 16383
-      : intent === "[DÚVIDA]"
-        ? 4096
-        : 16383; // GERAÇÃO (peça ou relatório): máximo sempre
+    // maxOutputTokens fixo em 16383 para garantir petições e relatórios completos
+    const maxOutputTokens = 16383;
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -2435,11 +2427,24 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         config: { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
+      let maxTokensHit = false;
       for await (const chunk of responseStream) {
-        let text = chunk.text || "";
+        let text = "";
+        try { text = chunk.text || ""; } catch(e) {}
+        
+        if (chunk.candidates && chunk.candidates.length > 0) {
+          const candidate = chunk.candidates[0];
+          if (candidate.finishReason === 'MAX_TOKENS') {
+            maxTokensHit = true;
+          }
+        }
+
         if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
       clearInterval(heartbeat);
+      if (maxTokensHit) {
+        res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
+      }
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (err: any) {
@@ -2722,12 +2727,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens calibrado por intenção
-    const maxOutputTokens = (model || "").includes("pro")
-      ? 16383
-      : intent === "[DÚVIDA]"
-        ? 4096
-        : 16383; // GERAÇÃO (peça ou relatório): máximo sempre
+    // maxOutputTokens fixo em 16383 para garantir petições e relatórios completos
+    const maxOutputTokens = 16383;
 
     // Temperature calibrada por intenção
     const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;

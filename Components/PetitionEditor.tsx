@@ -389,44 +389,85 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       const fullPrompt = `[CONTEXTO INTEGRAL DOS DOCUMENTOS]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: 'GERAR PEÇA'. Use os dados técnicos acima (valores, datas, rubricas) e fundamente com base nos documentos citados.`;
 
-      const response = await apiFetch('/api/dr-michel/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: fullPrompt,
-          history: [],
-          images: [],
-          modelProvider: eliteProviderOverride,
-          model: eliteModelOverride
-        })
-      });
-
-      if (!response.ok) throw new Error('Falha na geração');
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      let isFinished = false;
+      let resumeCount = 0;
+      const MAX_RESUMES = 3;
       let fullText = '';
-      let buffer = '';
-      
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.text) {
-                  fullText += data.text;
-                }
-              } catch (e) {}
-            }
+
+      while (!isFinished && resumeCount <= MAX_RESUMES) {
+        let currentMessage = fullPrompt;
+        if (resumeCount > 0) {
+          const lastWords = fullText.slice(-100).replace(/\n/g, ' ');
+          currentMessage = `(A GERAÇÃO FOI INTERROMPIDA PELO LIMITE. CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, A PARTIR DESTE TRECHO: "${lastWords}")`;
+        }
+        try {
+          const response = await apiFetch('/api/dr-michel/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: currentMessage,
+              history: resumeCount === 0 ? [] : [{ role: 'user', content: fullPrompt }, { role: 'assistant', content: fullText }],
+              images: [],
+              modelProvider: eliteProviderOverride,
+              model: eliteModelOverride
+            })
+          });
+
+          if (!response.ok) {
+            if (resumeCount === 0) throw new Error('Falha na geração');
+            else throw new Error('Falha ao retomar');
           }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                isFinished = true;
+                break;
+              }
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6);
+                  if (dataStr === '[DONE]') {
+                    isFinished = true;
+                    continue;
+                  }
+                  try {
+                    const data = JSON.parse(dataStr);
+                    if (data.error) throw new Error(data.error);
+                    if (data.max_tokens) {
+                      isFinished = false;
+                      throw new Error("MAX_TOKENS_HIT");
+                    }
+                    if (data.text) {
+                      fullText += data.text;
+                    }
+                  } catch (e) {
+                     if ((e as Error).message === 'MAX_TOKENS_HIT') throw e;
+                  }
+                }
+              }
+            }
+          } else {
+            isFinished = true;
+          }
+        } catch (readError: any) {
+           if (resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+             resumeCount++;
+             await new Promise(r => setTimeout(r, 2000));
+           } else {
+             isFinished = true;
+             if (resumeCount === 0) throw readError;
+           }
         }
       }
 

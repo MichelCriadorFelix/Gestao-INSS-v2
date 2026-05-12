@@ -591,98 +591,122 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
       const compressedHistory = compressHistory(session?.messages || []);
 
-      const response = await apiFetch('/api/dr-michel/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          documentContext: docSummaries,
-          history: compressedHistory,
-          images: images || [],
-          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
-          ragContext,
-          customLaws,
-          modelProvider: eliteProviderOverride || selectedModelProvider,
-          model: eliteModelOverride || selectedModel,
-          keyIndex: session?.uploadKeyIndex
-        }),
-        signal: abortController.signal
-      });
-
-      if (!response.ok) {
-        clearTimeout(timeoutId);
-        const errorText = await response.text();
-        let errorMessage = 'Falha na resposta da IA';
-        try {
-          const errorData = JSON.parse(errorText);
-          if (response.status === 429 || (errorData.error && errorData.error.code === 429)) {
-            errorMessage = 'Limite de uso atingido (Quota Exceeded). Por favor, aguarde cerca de 1 minuto antes de tentar novamente. Se o problema persistir, considere usar uma chave de API paga.';
-          } else if (response.status === 503 || (errorData.error && errorData.error.code === 503)) {
-            errorMessage = 'O serviço de IA está temporariamente sobrecarregado (Erro 503). Por favor, aguarde alguns instantes e tente novamente.';
-          } else {
-            errorMessage = errorData.error?.message || errorData.error || errorMessage;
-          }
-        } catch (e) {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
       let fullText = '';
-      
-      if (reader) {
-        let buffer = '';
+      let isFinished = false;
+      let resumeCount = 0;
+      const MAX_RESUMES = 3;
+
+      while (!isFinished && resumeCount <= MAX_RESUMES) {
+        let currentMessage = messageText;
+        if (resumeCount > 0) {
+          const lastWords = fullText.slice(-100).replace(/\n/g, ' ');
+          currentMessage = `(A GERAÇÃO FOI INTERROMPIDA PELO LIMITE. CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, A PARTIR DESTE TRECHO: "${lastWords}")`;
+        }
+
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop() || '';
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const dataStr = line.slice(6);
-                if (dataStr === '[DONE]') continue;
-                
-                let data;
-                try {
-                  data = JSON.parse(dataStr);
-                } catch (e) {
-                  continue;
+          const response = await apiFetch('/api/dr-michel/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: currentMessage,
+              documentContext: docSummaries,
+              history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
+              images: resumeCount === 0 ? (images || []) : [],
+              files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
+              ragContext: resumeCount === 0 ? ragContext : undefined,
+              customLaws,
+              modelProvider: eliteProviderOverride || selectedModelProvider,
+              model: eliteModelOverride || selectedModel,
+              keyIndex: session?.uploadKeyIndex
+            })
+          });
+
+          if (!response.ok) {
+            if (resumeCount === 0) {
+              const errorText = await response.text();
+              let errorMessage = 'Falha na resposta da IA';
+              try {
+                const errorData = JSON.parse(errorText);
+                if (response.status === 429 || (errorData.error && errorData.error.code === 429)) {
+                  errorMessage = 'Limite de uso atingido (Quota Exceeded). Por favor, aguarde cerca de 1 minuto antes de tentar novamente.';
+                } else if (response.status === 503 || (errorData.error && errorData.error.code === 503)) {
+                  errorMessage = 'O serviço de IA está temporariamente sobrecarregado (Erro 503). Por favor, aguarde alguns instantes e tente novamente.';
+                } else {
+                  errorMessage = errorData.error?.message || errorData.error || errorMessage;
                 }
-                
-                if (data.error) {
-                  throw new Error(data.error);
-                }
-                
-                if (data.heartbeat) {
-                  continue;
-                }
-                
-                if (data.text) {
-                  fullText += data.text;
-                  setStreamingMessage(fullText);
+              } catch (e) {
+                errorMessage = errorText || errorMessage;
+              }
+              throw new Error(errorMessage);
+            } else {
+              throw new Error("Failed to resume stream");
+            }
+          }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          
+          if (reader) {
+            let buffer = '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                isFinished = true;
+                break;
+              }
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6);
+                  if (dataStr === '[DONE]') {
+                    isFinished = true;
+                    continue;
+                  }
+                  
+                  let data;
+                  try {
+                    data = JSON.parse(dataStr);
+                  } catch (e) {
+                    continue;
+                  }
+                  
+                  if (data.error) throw new Error(data.error);
+                  if (data.max_tokens) {
+                    isFinished = false; // We need to resume
+                    throw new Error("MAX_TOKENS_HIT");
+                  }
+                  if (data.heartbeat) continue;
+                  
+                  if (data.text) {
+                    fullText += data.text;
+                    setStreamingMessage(fullText);
+                  }
                 }
               }
             }
+          } else {
+            isFinished = true;
           }
         } catch (readError: any) {
-          if (readError.name === 'AbortError') {
-            console.log('Stream aborted after max limit');
-            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" ou "continuar de onde parou" para prosseguir.]';
+          if (resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+            // Auto-resume gracefully
+            console.log(`Auto-resuming after interruption (Attempt ${resumeCount + 1})...`);
+            resumeCount++;
+            await new Promise(r => setTimeout(r, 2000));
           } else {
-            console.warn('Stream read error:', readError);
-            fullText += '\n\n[Aviso: Geração interrompida prematuramente devido a um limite de tempo/rede do servidor. Digite "continuar" para continuar a peça de onde parou.]';
+            if (resumeCount > 0) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática pelo servidor.]';
+            isFinished = true;
+            if (resumeCount === 0) throw readError; 
           }
         }
       }
 
-      clearTimeout(timeoutId);
       setStreamingMessage('');
+      clearTimeout(timeoutId);
 
       const assistantMsg: Message = {
         id: generateId(),
@@ -695,6 +719,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
       ));
     } catch (error: any) {
+      clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
         const assistantMsg: Message = {
           id: generateId(),
