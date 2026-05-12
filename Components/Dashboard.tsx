@@ -481,7 +481,7 @@ export default function Dashboard({
                   await supabaseService.saveClient(clientToSave);
                   // Update local state and cache
                   setRecords(newData);
-                  safeSetLocalStorage('inss_records', JSON.stringify(newData));
+                  // safeSetLocalStorage('inss_records', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               } catch (e: any) {
                   console.error("Sync error (client):", e);
                   setSaveError(`Erro de sincronização (Cliente): ${e.message || 'Erro'}`);
@@ -490,7 +490,7 @@ export default function Dashboard({
               return;
           } else if (type === 'contracts') {
               setContracts(newData);
-              safeSetLocalStorage('inss_contracts', JSON.stringify(newData));
+              // safeSetLocalStorage('inss_contracts', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               if (supabase) {
                   try {
                       const compressedData = LZString.compressToUTF16(JSON.stringify(newData));
@@ -508,7 +508,7 @@ export default function Dashboard({
               }
           } else if (type === 'calculations') {
               setSavedCalculations(newData);
-              safeSetLocalStorage('inss_calculations', JSON.stringify(newData));
+              // safeSetLocalStorage('inss_calculations', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               if (supabase) {
                   const error = await upsertWithRetry({ id: 3, data: newData });
                   if (error) {
@@ -520,7 +520,7 @@ export default function Dashboard({
               }
           } else if (type === 'social_calculations') {
               setSavedSocialCalculations(newData);
-              safeSetLocalStorage('social_security_calculations', JSON.stringify(newData));
+              // safeSetLocalStorage('social_security_calculations', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               if (supabase) {
                   const error = await upsertWithRetry({ id: 4, data: newData });
                   if (error) {
@@ -532,7 +532,7 @@ export default function Dashboard({
               }
           } else if (type === 'dr_michel') {
               setDrMichelSessions(newData);
-              safeSetLocalStorage('dr_michel_sessions', JSON.stringify(newData));
+              // safeSetLocalStorage('dr_michel_sessions', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               if (supabase) {
                   const error = await upsertWithRetry({ id: 5, data: newData });
                   if (error) {
@@ -544,7 +544,7 @@ export default function Dashboard({
               }
           } else if (type === 'dra_luana') {
               setDraLuanaSessions(newData);
-              safeSetLocalStorage('dra_luana_sessions', JSON.stringify(newData));
+              // safeSetLocalStorage('dra_luana_sessions', JSON.stringify(newData)); // Removed to avoid QuotaExceededError
               if (supabase) {
                   const error = await upsertWithRetry({ id: 6, data: newData });
                   if (error) {
@@ -572,13 +572,13 @@ export default function Dashboard({
                       setSaveError("Erro de sincronização (Agenda).");
                   } else {
                       setAgendaEvents(newData);
-                      safeSetLocalStorage('agenda_events', JSON.stringify(newData));
+                      // safeSetLocalStorage('agenda_events', JSON.stringify(newData)); // Removed
                   }
                   setIsSyncing(false);
                   return;
               }
               setAgendaEvents(newData);
-              safeSetLocalStorage('agenda_events', JSON.stringify(newData));
+              // safeSetLocalStorage('agenda_events', JSON.stringify(newData)); // Removed
           } else if (type === 'resolved_alerts') {
               if (supabase) {
                   // Proteção: nunca sobrescreve alertas resolvidos com array vazio
@@ -596,7 +596,7 @@ export default function Dashboard({
                       setSaveError("Erro de sincronização (Alertas).");
                   } else {
                       setResolvedAlerts(newData);
-                      safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
+                      // safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData)); // Removed
                   }
                   setIsSyncing(false);
                   return;

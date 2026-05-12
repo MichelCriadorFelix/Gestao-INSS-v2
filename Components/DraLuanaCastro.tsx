@@ -204,23 +204,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
     }));
   }, [sessions]);
 
-  // Save to Local Storage immediately
+  // Save to Local Storage immediately - REMOVED to avoid QuotaExceededError as requested
   useEffect(() => {
     if (!isLoaded) return;
-    try {
-      const currentStr = JSON.stringify(sanitizedSessions);
-      const storageKey = 'dra_luana_sessions';
-      const localSaved = localStorage.getItem(storageKey);
-      
-      if (localSaved !== currentStr) {
-        if (onSaveSessions) {
-          onSaveSessions(sanitizedSessions);
-        } else {
-          safeSetLocalStorage(storageKey, currentStr);
-        }
-      }
-    } catch (error) {
-      console.warn("Failed to save sessions locally:", error);
+    if (onSaveSessions) {
+      onSaveSessions(sanitizedSessions);
     }
   }, [sanitizedSessions, onSaveSessions, isLoaded]);
 

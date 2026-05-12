@@ -1457,10 +1457,6 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             // Fallback local save if no prop provided
              try {
                 await supabaseService.saveCalculation(newCalc);
-                
-                const saved = localStorage.getItem('social_security_calculations');
-                const calculations = saved ? JSON.parse(saved) : [];
-                safeSetLocalStorage('social_security_calculations', JSON.stringify([newCalc, ...calculations]));
                 showToast("Novo cálculo salvo com sucesso!");
             } catch (e) {
                 console.error("Error saving", e);
@@ -1499,8 +1495,6 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             
             if (onUpdateCalculations) {
                 onUpdateCalculations(updatedList);
-            } else {
-                safeSetLocalStorage('social_security_calculations', JSON.stringify(updatedList));
             }
             showToast("Alterações salvas com sucesso!");
             

@@ -808,10 +808,13 @@ export const supabaseService = {
     searchTerms.forEach((term, i) => {
       // Escape special characters for ilike
       // Supabase PostgREST uses % as wildcard, not *
+      // IMPORTANT: Remove commas as they break the OR logic tree in PostgREST
       const escapedTerm = term.replace(/[%_]/g, '\\$0')
-                             .replace(/[()]/g, '') // Remove parentheses that break OR logic strings
+                             .replace(/[(),]/g, '') // Remove parentheses and commas
                              .substring(0, 30);    // Avoid too long terms
-      if (i > 0) filter += ',';
+      if (escapedTerm.length < 2) return;
+      
+      if (filter) filter += ',';
       filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
     });
 

@@ -1620,9 +1620,9 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview",
+  "gemini-1.5-flash",
   "gemini-1.5-pro",
-  "gemini-1.5-flash"
+  "gemini-3.1-pro-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
@@ -1691,7 +1691,9 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   
   // Select model from hierarchy or use the requested model on first try
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const requestedModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota, 
+  // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
+  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
   
   // Override model in params
@@ -1811,7 +1813,9 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const requestedModel = modelIndex === 0 && params.model ? params.model : MODEL_HIERARCHY[safeModelIndex];
+  // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota,
+  // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
+  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
   
   const finalParams = { ...params, model: currentModel };
@@ -2067,13 +2071,13 @@ app.post("/api/analyze-cnis", async (req, res) => {
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
-      model: model,
+      model: "gemini-3-flash-preview", // Garante o uso do Flash para CNIS como solicitado
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
         responseMimeType: "application/json",
         temperature: 0.05,
-        maxOutputTokens: 16383
+        maxOutputTokens: 16383 // Mantido em 16383 para análise completa
       }
     });
 
