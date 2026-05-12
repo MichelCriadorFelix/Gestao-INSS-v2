@@ -554,13 +554,49 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         console.warn("RAG search failed:", err);
       }
 
+      // ============================================================
+      // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
+      // ============================================================
+      // Comprime mensagens longas que apenas inflam o contexto sem
+      // agregar valor para a resposta atual. O compilado completo
+      // já está no documentContext, separadamente.
+      //
+      // Regras:
+      // - Tomada de ciência (TXT/OCR injetado) → 500 chars + marcador
+      // - Respostas de IA com peça/relatório longo (>3000 chars) → 500 chars + marcador
+      // - Mensagens curtas (correções, dúvidas, comandos) → intactas
+      // - Janela: últimas 8 mensagens (4 trocas)
+      // ============================================================
+      const compressHistory = (msgs: Message[]): Message[] => {
+        const last = msgs.slice(-8); // últimas 8 mensagens
+        return last.map((m) => {
+          // Tomada de ciência: tem padrão "[FASE DE TOMADA DE CIÊNCIA]" ou conteúdo enorme com "CONTEÚDO:"
+          if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
+            };
+          }
+          // Resposta de IA com peça/relatório longo
+          if (m.role === 'assistant' && m.content.length > 3000) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
+            };
+          }
+          return m;
+        });
+      };
+
+      const compressedHistory = compressHistory(session?.messages || []);
+
       const response = await apiFetch('/api/dr-michel/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageText,
           documentContext: docSummaries,
-          history: session?.messages || [],
+          history: compressedHistory,
           images: images || [],
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           ragContext,

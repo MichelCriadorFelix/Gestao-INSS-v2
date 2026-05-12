@@ -542,13 +542,37 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         console.warn("RAG search failed:", err);
       }
 
+      // ============================================================
+      // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
+      // ============================================================
+      const compressHistory = (msgs: Message[]): Message[] => {
+        const last = msgs.slice(-8);
+        return last.map((m) => {
+          if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
+            };
+          }
+          if (m.role === 'assistant' && m.content.length > 3000) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
+            };
+          }
+          return m;
+        });
+      };
+
+      const compressedHistory = compressHistory(session?.messages || []);
+
       const response = await apiFetch('/api/dra-luana/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageText,
           documentContext: docSummaries,
-          history: session?.messages || [],
+          history: compressedHistory,
           images: images || [],
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',

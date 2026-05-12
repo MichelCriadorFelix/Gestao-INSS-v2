@@ -2239,42 +2239,34 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
     }
 
-    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0) || (ragContext && ragContext.length > 0)) {
+    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
       const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
-AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
+REGRAS DE USO:
+1. Priorize COMPLETAMENTE esta legislação adicional para fundamentação.
+2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>').
+3. PROIBIDO inventar citações fora do texto enviado.
+4. A legislação dinâmica do Supabase virá na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário — ambas as fontes são VÁLIDAS.
 
-VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. IDENTIFICAÇÃO DA FONTE: Cada item da base virá precedido de 'FONTE: [título do documento] [Score: XX%]'. Quanto maior o score, mais relevante é o trecho. Priorize itens com score acima de 70% para citação direta em blockquote. Itens com score abaixo de 60% use apenas como referência contextual, sem citar textualmente.
-4. SÚMULAS E TEMAS COM 1 CHUNK: Documentos como 'SÚMULA 75 TNU', 'Súmula n. 416 do STJ', 'Tema 1.030/STJ', 'Tema 905/STJ' são documentos únicos e altamente relevantes. Se aparecerem no RAG com qualquer score, CITE-OS INTEGRALMENTE em blockquote.
-5. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
-6. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
-7. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
-   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
-   - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
-   - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
-8. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
-
-CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
-${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
+CONTEÚDO:
+${lawsContext}`;
     } else {
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário.
-REGRA DE OURO OBRIGATÓRIA:
-Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [BASE DE CONHECIMENTO (RAG)]:
-- NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
-- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO]\n
+A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário (Supabase). Use-a como fonte única de verdade para transcrições em blockquote.
+
+REGRAS DE OURO:
+1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
+2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
+3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ, Tema 905/STJ etc.) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
     // Janela de histórico calibrada por intenção:
-    // - GERAÇÃO: histórico completo (contexto integral do caso)
-    // - DÚVIDA: até 10 turnos (jurídico precisa de contexto mais amplo)
-    // - CASUAL/outros: até 6 turnos (conversa leve, economiza tokens)
+    // - GERAÇÃO: até 6 turnos (já comprimidos pelo frontend) — contexto suficiente
+    // - DÚVIDA: até 10 turnos
+    // - CASUAL/outros: até 6 turnos
     if (isGenerationRequest) {
-      // mantém histórico completo
+      if (history.length > 6) history = history.slice(-6);
     } else if (intent === "[DÚVIDA]") {
       if (history.length > 10) history = history.slice(-10);
     } else {
@@ -2302,7 +2294,35 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
       parts: [{ text: h.content }]
     }));
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
+    // ============================================================
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
+    // ============================================================
+    let correctionInstruction = "";
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
+    );
+    const userMsgIsShort = message.length < 500;
+
+    if (lastAssistantWasLongGeneration && userMsgIsShort && !isGenerationRequest) {
+      correctionInstruction = `\n\n[MODO CORREÇÃO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo um AJUSTE PONTUAL agora.
+
+INSTRUÇÕES PRIORITÁRIAS:
+1. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário acima.
+2. Reescreva a peça/relatório INTEIRO mantendo TODO o conteúdo anterior INTACTO, alterando APENAS o que foi solicitado.
+3. NÃO RESUMA o conteúdo que já existia — preserve toda a densidade, todos os tópicos, todas as citações em blockquote.
+4. NÃO inverta a ordem dos tópicos.
+5. Se a correção for adicionar algo: ADICIONE no local correto, preservando o resto.
+6. Se a correção for remover algo: REMOVA apenas o item indicado.
+7. Se a correção for substituir: SUBSTITUA apenas o trecho indicado.
+8. A peça final corrigida deve ter densidade IGUAL OU SUPERIOR à anterior.
+`;
+      console.log("Dr. Michel: MODO CORREÇÃO detectado e ativado.");
+    }
+
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
     if (ragContext) {
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -2478,39 +2498,35 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
     }
 
-    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0) || (ragContext && ragContext.length > 0)) {
+    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
       const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-ESTA É A SUA FONTE ÚNICA DE VERDADE PARA TRANSCRIÇÃO (CITAÇÃO COM RECUO) DE TEMAS, SÚMULAS E LEGISLAÇÃO.
-AVISO IMPORTANTE: A base de conhecimento pode ser enviada via System Prompt (abaixo) ou dinamicamente via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário. AMBAS SÃO VÁLIDAS E DEVEM SER CONSIDERADAS COMO "BASE DE CONHECIMENTO DO SUPABASE".
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
+REGRAS DE USO:
+1. Priorize COMPLETAMENTE esta legislação adicional para fundamentação.
+2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>').
+3. PROIBIDO inventar citações fora do texto enviado.
+4. A legislação dinâmica do Supabase virá na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário — ambas as fontes são VÁLIDAS.
 
-VOCÊ DEVE:
-1. Priorizar COMPLETAMENTE as informações da base (tanto as listadas aqui quanto as enviadas via [BASE DE CONHECIMENTO (RAG)]) para fundamentação e citações diretas.
-2. As citações diretas de artigos, súmulas ou temas EXTRAÍDOS DESTA BASE devem ser IDÊNTICAS ao texto fornecido E DEVIDAMENTE FORMATADAS EM BLOCKQUOTE (USANDO O CARACTERE '>' NO INÍCIO DE CADA LINHA DA CITAÇÃO).
-3. IDENTIFICAÇÃO DA FONTE: Cada item da base virá precedido de 'FONTE: [título do documento] [Score: XX%]'. Quanto maior o score, mais relevante é o trecho. Priorize itens com score acima de 70% para citação direta em blockquote. Itens com score abaixo de 60% use apenas como referência contextual, sem citar textualmente.
-4. SÚMULAS E TEMAS COM 1 CHUNK: Documentos como 'SÚMULA 75 TNU', 'Súmula n. 416 do STJ', 'Tema 1.030/STJ', 'Tema 905/STJ' são documentos únicos e altamente relevantes. Se aparecerem no RAG com qualquer score, CITE-OS INTEGRALMENTE em blockquote.
-5. Se um artigo ou súmula aparecer no [BASE DE CONHECIMENTO (RAG)], considere-o como "PRESENTE NA BASE DE CONHECIMENTO".
-6. É PROIBIDO inventar ou alucinar citações diretas fora do texto enviado.
-7. REGRA DE OURO PARA LEIS/SÚMULAS/TEMAS FORA DA BASE DE CONHECIMENTO:
-   Se o caso EXIGIR uma lei, artigo, súmula ou tema que NÃO ESTÁ listado nem aqui nem no [BASE DE CONHECIMENTO (RAG)]:
-   - NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para colocá-la na nossa Base de Conhecimento, aguardando que eu diga se você deve apenas mencioná-la sem citar o texto ou se não deve usar.
-   - NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base. Legislações ou enunciados externos permitidos por mim devem ser apenas mencionados de forma breve no corpo do texto.
-8. Em caso de conflito, a regra da BASE DA CONHECIMENTO prevalece.
-
-CONTEÚDO DA BASE DE CONHECIMENTO (ADICIONAL):
-${lawsContext || "Nenhuma legislação manual enviada no momento. Verifique a tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário para conteúdos dinâmicos do banco de dados."}`;
+CONTEÚDO:
+${lawsContext}`;
     } else {
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (SUPABASE) E REGRAS DE CITAÇÃO EXTERNA]\n
-A Base de Conhecimento Personalizada encontra-se VAZIA. Nenhuma legislação ou jurisprudência foi enviada pelo usuário no System Prompt. Verifique se há conteúdos na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário.
-REGRA DE OURO OBRIGATÓRIA:
-Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base nem no [BASE DE CONHECIMENTO (RAG)]:
-- NO RELATÓRIO/CHAT: Você DEVE ME PEDIR para adicioná-la à Base de Conhecimento, e aguardar que eu diga se você deve usar apenas mencionando ou descartar.
-- NA PETIÇÃO/GERAÇÃO DE PEÇA: Você SÓ PODE fazer transcrição literal (citação com recuo) do que estiver na Base (ou no [BASE DE CONHECIMENTO (RAG)]). Caso ambos estejam vazios, MENCIONE leis apenas de forma breve no corpo do texto se eu houver autorizado, NUNCA transcrevendo seu interior.`;
+      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO]\n
+A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário (Supabase). Use-a como fonte única de verdade para transcrições em blockquote.
+
+REGRAS DE OURO:
+1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
+2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
+3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
     // 3. GESTÃO DE JANELA DESLIZANTE CALIBRADA POR INTENÇÃO - Pilar 4
+    // GERAÇÃO: 6 turnos (já comprimidos pelo frontend) | DÚVIDA: 10 | CASUAL: 6
     if (isGenerationRequest) {
-      // mantém histórico completo para geração de peça/relatório
+      if (history.length > 6) {
+        console.log(`Pilar 4: GERAÇÃO — limitando histórico de ${history.length} para 6 turnos.`);
+        history = history.slice(-6);
+      }
     } else if (intent === "[DÚVIDA]") {
       if (history.length > 10) history = history.slice(-10);
       console.log(`Pilar 4: Modo DÚVIDA — limitando histórico a 10 turnos.`);
@@ -2544,7 +2560,36 @@ Se o caso EXIGIR uma lei, artigo, súmula ou tema que não conste nem na base ne
       parts: [{ text: h.content }]
     }));
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT;
+    // ============================================================
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
+    // ============================================================
+    let correctionInstruction = "";
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
+    );
+    const userMsgIsShort = message.length < 500;
+
+    if (lastAssistantWasLongGeneration && userMsgIsShort && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      correctionInstruction = `\n\n[MODO CORREÇÃO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo um AJUSTE PONTUAL agora.
+
+INSTRUÇÕES PRIORITÁRIAS:
+1. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário acima.
+2. Reescreva a peça/relatório INTEIRO mantendo TODO o conteúdo anterior INTACTO, alterando APENAS o que foi solicitado.
+3. NÃO RESUMA o conteúdo que já existia — preserve toda a densidade, todos os tópicos, todas as fundamentações.
+4. NÃO inverta a ordem dos tópicos.
+5. Se a correção for adicionar algo: ADICIONE no local correto, preservando o resto.
+6. Se a correção for remover algo: REMOVA apenas o item indicado.
+7. Se a correção for substituir: SUBSTITUA apenas o trecho indicado.
+8. A peça final corrigida deve ter densidade IGUAL OU SUPERIOR à anterior.
+9. PRESERVE INTEGRALMENTE os valores da Planilha de Cálculos — nunca altere valores ao fazer correção textual.
+`;
+      console.log("Dra. Luana: MODO CORREÇÃO detectado e ativado.");
+    }
+
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
     if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
