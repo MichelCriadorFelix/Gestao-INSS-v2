@@ -72,6 +72,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -426,7 +427,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const abortController = new AbortController();
       timeoutId = setTimeout(() => {
         abortController.abort();
-      }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
+      }, 800000); // 800 seconds — conforme solicitado para petições longas
 
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => {
@@ -641,13 +642,14 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                 
                 if (data.text) {
                   fullText += data.text;
+                  setStreamingMessage(fullText);
                 }
               }
             }
           }
         } catch (readError: any) {
           if (readError.name === 'AbortError') {
-            console.log('Stream aborted after 300 seconds');
+            console.log('Stream aborted after 800 seconds');
             fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
           } else {
             throw readError;
@@ -667,6 +669,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       setSessions(prev => prev.map(s => 
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
       ));
+      setStreamingMessage('');
     } catch (error: any) {
       if (timeoutId) clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
@@ -1362,20 +1365,24 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               {isLoading && (
                 <div className="flex gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
                   <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    <Bot className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">Dra. Luana Castro</span>
-                      <span className="text-[10px] text-slate-400">•</span>
-                      <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest animate-pulse">{progressText}</span>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-rose-600">Dra. Luana Castro</span>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 mb-1 overflow-hidden">
-                      <div className="bg-rose-600 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
+                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {streamingMessage}
+                      <span className="inline-block w-1.5 h-4 ml-1 bg-rose-600 animate-pulse" />
                     </div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span className="font-medium text-rose-600 dark:text-rose-400">{progress}% concluído</span>
-                      <span className="animate-pulse">Gerando resposta...</span>
+                    {/* Barra de Progresso Mantida para Contexto de Longa Duração */}
+                    <div className="pt-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest animate-pulse">{progressText}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-rose-600 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
+                      </div>
                     </div>
                   </div>
                 </div>
