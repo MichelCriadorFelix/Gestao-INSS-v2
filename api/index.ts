@@ -622,7 +622,6 @@ REGRAS DESTE MODO:
 4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
 5. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis ou súmulas. PROIBIDO responder sobre Direito do Trabalho (encaminhe para a Dra. Luana).
 6. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as duas posições (majoritária e minoritária) e indique qual tende a prevalecer nos JEFs do RJ.
-7. ANTI-ALUCINAÇÃO: Use Google Search para verificar prazos, valores e redação atualizada de artigos antes de responder.
 
 ESTILO: Advogado sênior respondendo a colega de escritório. Tom técnico, direto, sem cerimônia desnecessária.`;
 
@@ -640,7 +639,6 @@ REGRAS DESTE MODO:
 5. RITO PROCESSUAL: Sempre que relevante, informe o rito (Sumário / Sumaríssimo / Ordinário) e suas implicações práticas.
 6. PROIBIÇÕES: PROIBIDO usar juridiquês arcaico. PROIBIDO inventar artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel).
 7. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as posições do TST e dos TRTs relevantes, indicando a tendência predominante.
-8. ANTI-ALUCINAÇÃO: Use Google Search para verificar prazos, valores e redação atualizada de artigos antes de responder.
 
 ESTILO: Advogada sênior respondendo a colega de escritório. Tom técnico, direto, sem cerimônia desnecessária.`;
 
@@ -889,7 +887,6 @@ BLOCO 6 — AUDITORIA VISUAL (ANTI-ERRO EM DOCUMENTOS)
 - SUPREMACIA VISUAL: Se o texto OCR divergir do que você vê claramente na imagem, IGNORE o OCR e use sua visão.
 - CNIS: Leia apenas os campos "Data Início" e "Data Fim" dos cabeçalhos de cada Vínculo. Ignore datas dentro das tabelas de remunerações.
 - Se um dígito estiver borrado: NÃO CHUTE. Informe: "O Campo X está ilegível na imagem".
-- ANTI-ALUCINAÇÃO: Use Google Search para verificar a redação ATUALIZADA de artigos citados. Não confie apenas na memória.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 7 — PERSONALIDADE E POSTURA
@@ -1513,7 +1510,6 @@ BLOCO 6 — AUDITORIA VISUAL (ANTI-ERRO EM DOCUMENTOS)
 - SUPREMACIA VISUAL: Se o texto OCR divergir do que você vê claramente na imagem, IGNORE o OCR.
 - TRCT: Admissão (Campo 24), Aviso Prévio (Campo 25), Afastamento/Saída (Campo 26). Se Página 1 e Página 2 divergirem, priorize Página 1.
 - Se um dígito estiver borrado: NÃO CHUTE. Informe: "O Campo X está ilegível na imagem".
-- ANTI-ALUCINAÇÃO: Use Google Search para verificar a redação ATUALIZADA de artigos citados.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 7 — PERSONALIDADE E POSTURA
@@ -2324,7 +2320,6 @@ REGRAS DE OURO:
     [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
     Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
-    Use Google Search para verificar a redação atualizada de artigos antes de responder.
     ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
