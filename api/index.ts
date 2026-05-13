@@ -836,7 +836,8 @@ COMANDO "GERAR RELATÓRIO":
    6. ANÁLISE DE REQUISITOS (mín. 300 palavras): verifique se os requisitos legais foram preenchidos com cálculo completo (datas, subtotais, total).
    7. PRINCÍPIOS PREVIDENCIÁRIOS (mín. 150 palavras): princípios aplicáveis ao caso.
    8. ESTRATÉGIA JURÍDICA (mín. 200 palavras): caminhos processuais com prós e contras.
-   9. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
+   9. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Com base na complexidade dos fatos, volume de provas (OCR) e densidade da Base de Conhecimento (RAG), sugira qual a extensão de palavras aconselhável para este caso específico: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique sua escolha com base na necessidade de citação direta de dispositivos e profundidade argumentativa.
+   10. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
       Liste TODOS os fundamentos a serem usados. Para cada um, informe:
       → [DISPONÍVEL — SERÁ CITADA EM BLOCKQUOTE] se apareceu no RAG com prefixo 'FONTE:'
       → [NÃO RECUPERADA NESTA BUSCA — SOLICITAR AO ADVOGADO ADICIONAR] se a lei/fundamento for essencial mas NÃO constar no RAG. Você **NÃO** deve utilizar ou citar leis fora do RAG, devendo alertar o advogado da falta dela.
@@ -869,8 +870,8 @@ COMANDO "GERAR RELATÓRIO":
       LEGISLAÇÃO PROCESSUAL:
       'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
       'Código de Processo Civil (Lei nº 13.105/2015)'
-   10. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
-   11. DOCUMENTOS ANALISADOS: lista final completa.
+   11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
+   12. DOCUMENTOS ANALISADOS: lista final completa.
 → TRAVA: NUNCA redija a petição nesta fase. Aguarde "GERAR PEÇA".
 
 COMANDO "GERAR PEÇA":
@@ -1477,7 +1478,8 @@ COMANDO "GERAR RELATÓRIO":
    6. ANÁLISE DOS CÁLCULOS E VERBAS: liste exaustivamente as verbas devidas com valores exatos.
    7. PRINCÍPIOS TRABALHISTAS APLICÁVEIS.
    8. ESTRATÉGIA JURÍDICA: caminhos processuais com prós e contras.
-   9. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
+   9. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Com base na complexidade das verbas trabalhistas e volume de evidências, sugira a extensão de palavras aconselhável: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique a escolha levando em conta as citações diretas necessárias.
+   10. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
       Liste TODOS os fundamentos a serem usados. Para cada um:
       → [DISPONÍVEL — SERÁ CITADA EM BLOCKQUOTE] se apareceu no RAG
       → [NÃO RECUPERADA NESTA BUSCA — SOLICITAR AO ADVOGADO ADICIONAR] se a lei/fundamento for essencial mas NÃO constar no RAG. Você **NÃO** deve utilizar ou citar leis fora do RAG, devendo alertar o advogado da falta dela.
@@ -1493,8 +1495,8 @@ COMANDO "GERAR RELATÓRIO":
       LEGISLAÇÃO PROCESSUAL:
       'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
       'Código de Processo Civil (Lei nº 13.105/2015)'
-   10. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
-   11. DOCUMENTOS ANALISADOS: lista final completa.
+   11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
+   12. DOCUMENTOS ANALISADOS: lista final completa.
 → TRAVA: NUNCA redija a petição nesta fase. Aguarde "GERAR PEÇA".
 
 COMANDO "GERAR PEÇA":
