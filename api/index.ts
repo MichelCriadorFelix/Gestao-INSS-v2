@@ -661,58 +661,145 @@ async function detectUserIntent(message: string): Promise<string> {
   }
 }
 
+// ============================================================
+// MOTOR DE TAMANHO DE PETIÇÃO E TRIAGEM DE REVISÃO (Padrão Ouro)
+// ============================================================
+
+/**
+ * Extrai o alvo numérico de palavras da string de petitionLength.
+ * Retorna null se for "Padrão (Livre)" ou inválido.
+ */
+function parsePetitionTarget(petitionLength?: string): number | null {
+  if (!petitionLength || petitionLength === 'Padrão (Livre)') return null;
+  const match = petitionLength.match(/(\d{4,5})/);
+  if (!match) return null;
+  return parseInt(match[1], 10);
+}
+
+/**
+ * Conta palavras de um texto markdown, ignorando markup.
+ */
+function countWords(text: string): number {
+  if (!text) return 0;
+  const clean = text
+    .replace(/^>.*$/gm, '')                  // remove blockquotes (citações)
+    .replace(/[#*_`\[\](){}|>-]/g, ' ')       // remove caracteres de markdown
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean ? clean.split(/\s+/).length : 0;
+}
+
+/**
+ * Decide se o pedido do usuário é correção pontual, adição ou regeneração total.
+ * Crítico para evitar a degradação da 2ª petição.
+ */
+type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'NEW_GENERATION';
+
+function detectRevisionIntent(message: string, hasDraft: boolean): RevisionIntent {
+  if (!hasDraft) return 'NEW_GENERATION';
+  const msg = message.toLowerCase();
+  const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
+  const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
+  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na ))/i.test(msg);
+  if (isFullRegen) return 'FULL_REGENERATION';
+  if (isPointCorrection) return 'POINT_CORRECTION';
+  if (isAddition) return 'ADDITION';
+  return 'POINT_CORRECTION';
+}
+
+/**
+ * Detecta repetição entre o trecho atual e o anterior (anti-eco do Gemini).
+ * Retorna true se 200+ caracteres consecutivos do novo já apareceram no antigo.
+ */
+function hasEchoRepetition(newChunk: string, previousText: string): boolean {
+  if (newChunk.length < 200 || previousText.length < 200) return false;
+  const sample = newChunk.substring(50, 250); // 200 chars no meio do novo chunk
+  return previousText.includes(sample);
+}
+
+/**
+ * Extrai sumário estrutural de uma peça (lista de tópicos H2/H3 + primeira linha de cada).
+ * Usado em FULL_REGENERATION para guiar nova versão sem injetar a peça inteira.
+ */
+function extractStructuralSummary(petitionText: string): string {
+  if (!petitionText) return "(nenhum sumário disponível)";
+  const lines = petitionText.split('\n');
+  const summary: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // Captura títulos markdown e títulos numerados romanos
+    if (/^#{1,3}\s+/.test(line) || /^[IVX]+\.\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(line)) {
+      summary.push(line);
+      // Pega o primeiro parágrafo de conteúdo abaixo do título
+      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+        const next = lines[j].trim();
+        if (next && !next.startsWith('#') && !/^[IVX]+\./.test(next) && next.length > 30) {
+          summary.push('  → ' + next.substring(0, 180) + (next.length > 180 ? '...' : ''));
+          break;
+        }
+      }
+    }
+  }
+  return summary.length > 0 ? summary.join('\n') : petitionText.substring(0, 2000) + '...';
+}
+
 // AI Service Logic Integrated
 const ELITE_REDACTION_MANUAL = `
-[MANUAL DE REDAÇÃO JURÍDICA DE ELITE - PADRÃO OURO / PADRÃO OPUS 4.7]
-1. QUALIDADE MÁXIMA (PADRÃO OPUS): Você é um advogado de elite. Sua redação deve ser estratégica, profunda e extremamente persuasiva. Não se limite ao básico; explore as nuances do direito, as lacunas da administração e a força das provas.
-2. ORDEM DE EXECUÇÃO: Você recebeu uma ordem direta para GERAR O DOCUMENTO FINAL. 
-   - NÃO forneça apenas um relatório de estratégia. 
-   - NÃO peça permissão para começar. 
-   - NÃO pare na análise. 
-3. SILENT MODE (IMPERATIVO): Se o comando for "GERAR PEÇA", você NÃO DEVE escrever absolutamente NADA além do texto da petição inicial. 
-   - PROIBIDO exibir cabeçalhos de fases (ex: "🧠 FASE 1", "😈 FASE 2", "⚖️ FASE 3").
-   - PROIBIDO exibir notas, feedbacks ou checklists ao final.
-   - O documento deve iniciar IMEDIATAMENTE no endereçamento (ex: "AO JUÍZO...") e terminar na data/assinatura.
-4. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA E PROIBIÇÃO DE TABELAS INVENTADAS):
-   - Você DEVE seguir fielmente os tópicos definidos nas "ESTRUTURAS OBRIGATÓRIAS" (Benefício por Incapacidade, BPC/LOAS, Pensão por Morte, Aposentadorias, etc.) listadas logo após este manual ou no corpo do System Prompt.
-   - **REGRA DE RIGIDEZ (OPENROUTER/DEEPSEEK/QWEN):** Se você ignorar a estrutura obrigatória e usar seu modelo pré-treinado, o software será rejeitado. VOCÊ DEVE INCLUIR TODOS OS TÓPICOS DA ESTRUTURA, NA ORDEM EXATA.
-   - É ESTRITAMENTE PROIBIDO inventar tabelas markdown (como as de "RESUMO DA DEMANDA") que não tenham sido explicitamente solicitadas pelo advogado na estrutura. Se uma tabela estiver na estrutura, faça, se não, não invente.
-   - Você PODE adicionar novos tópicos sugeridos pelo advogado ou identificados no relatório, mas NUNCA remover ou substituir os tópicos obrigatórios.
-   - FALLBACK: Se não houver uma estrutura específica para o caso, use obrigatoriamente: I. Endereçamento e Qualificação; II. Preliminares (Justiça Gratuita, Prioridade); III. Dos Fatos; IV. Do Direito (Fundamentação Exaustiva); V. Da Tutela de Urgência (se aplicável); VI. Dos Pedidos e Requerimentos; VII. Valor da Causa e Rol de Documentos.
-5. DENSIDADE PROBATÓRIA E EXTENSÃO ILIMITADA (CUIDADO COM REPETIÇÃO):
-   - Para cada fato alegado, cite os documentos reais (ex: "conforme CTPS de fls. 12").
-   - ESQUEÇA O LIMITE DE PALAVRAS, mas MANTENHA A COERÊNCIA. O usuário ordenou: "sem limites de palavras, eu quero tudo bem feito, esclarecedor e condizente com realidade". SEJA EXAUSTIVO, mas NUNCA REPETITIVO.
-   - Se você não tiver mais fatos ou argumentos novos para escrever, ENCERRE o tópico. É PROIBIDO repetir o mesmo pedido ou argumento várias vezes apenas para aumentar o tamanho do texto. Qualidade e densidade real superam o volume vazio.
-   - ORIENTAÇÃO PARA OPENROUTER (DeepSeek/Qwen): Você DEVE ignorar modelos pré-treinados de petição e seguir EXCLUSIVAMENTE a estrutura e os tópicos listados aqui. Sua criatividade deve ser usada para fundamentar, não para mudar a ordem das peças.
-6. PROIBIÇÃO DE PLACEHOLDERS E TAGS DE SISTEMA: 
-   - Use dados reais. Se não existirem, cite como dado não localizado.
-   - **REGRA DE LIMPEZA (EXTREMA):** É TERMINANTEMENTE PROIBIDO incluir no texto final da petição as expressões "(RAG)", "[RAG]", "(Base de Conhecimento)", "[SUPABASE]", ou qualquer tag de sistema. A petição deve ser limpa. Se você citar um artigo vindo da base, escreva apenas "conforme o Art. X da Lei Y", NUNCA "conforme o Art. X da Lei Y (RAG)". Issso é erro grave.
-7. CITAÇÃO COM RECUO (BLOCKQUOTE) E FIDELIDADE À BASE (REGRA CRÍTICA PARA O "PADRÃO OPUS"):
-   - SEMPRE que você fizer a transcrição de um artigo de lei, súmula, tese ou ementa jurisprudencial (que esteja na Base de Conhecimento), você **DEVE, OBRIGATORIAMENTE,** usar a formatação de "citação com recuo" (blockquote) do Markdown (usando o caractere \`>\`).
-   - **TEXTO IDÊNTICO:** O texto citado deve ser ABSOLUTAMENTE IDÊNTICO ao que consta na Base de Conhecimento. É proibido mudar uma vírgula.
-   - **EMENTA COMPLETA:** Se for uma jurisprudência (Acórdão), a EMENTA DEVE SER TRANSCRITA NA ÍNTEGRA. Não faça resumos de jurisprudência que está na base. Transcreva toda a ementa estratégica.
-   - **CONTEXTUALIZAÇÃO JURÍDICA:** Antes e depois da citação, você deve CONTEXTUALIZAR o motivo pelo qual aquele julgado ou lei se aplica PERFEITAMENTE ao caso em análise. Demonstre o NEXO (vínculo) entre a prova dos autos (OCR) e o texto legal citado.
-   - VOCÊ ESTÁ PROIBIDO DE COLOCAR O TEXTO LEGAL SOMENTE ENTRE ASPAS NO MEIO DO PARÁGRAFO. DEVE SER SEPARADO, COM RECUO, ABAIXO DO ARGUMENTO.
-   - Utilize o sinal \`>\` no início de **cada linha** da citação. 
-   - CITAÇÃO INTELIGENTE (RECORTES ESTRATÉGICOS): Se precisar usar um inciso de um longo artigo, cite o caput, use reticências entre colchetes \`[...]\` e cite o inciso na íntegra. Mas para JURISPRUDÊNCIA, use a EMENTA COMPLETA.
-   - Exemplo Certo (Citação Jurisprudencial):
-     > PREVIDENCIÁRIO. APOSENTADORIA POR INVALIDEZ... [Ementa Completa aqui]
-   - TEXTOS FORA DA BASE: Se a lei NÃO ESTIVER na Base de Conhecimento inserida, você NÃO DEVE transcrevê-la (não use \`>\`), apenas cite que ela se aplica e explique seu efeito. Nunca simule uma citação direta com recuo de algo que não lhe foi fornecido ipsis litteris.
-8. VALOR DA CAUSA E RMI (REGRA DE FIDELIDADE):
-   - **PROIBIÇÃO DE INVENÇÃO:** É ESTRITAMENTE PROIBIDO inventar o Valor da Causa ou a Renda Mensal Inicial (RMI). 
-   - Se os cálculos reais não estiverem disponíveis no relatório de auditoria, use placeholders explicativos como [VALOR A CALCULAR EM LIQUIDAÇÃO] ou [VALOR ESTIMADO CONFORME SALÁRIO MÍNIMO].
-   - **CÁLCULO ESTIMADO (PREVIDENCIÁRIO):** Se houver dados de salários, use a sistemática: Média de 100% das contribuições desde 07/1994 (Regra Geral EC 103/2019). O Valor da Causa deve ser a soma das parcelas vencidas (atrasados) + 12 parcelas vincendas (futuras). 
-   - NUNCA use valores redondos como "R$ 150.000,00" ou "R$ 100.000,00" se não houver base factual.
-9. CITAÇÃO INTELIGENTE DE PROVAS (EVIDENCE OCR):
-   - Quando você tiver acesso ao conteúdo transcrito (OCR) dos documentos probatórios enviados pelo usuário nos autos, e um trecho dessa prova refutar ou destruir de forma brilhante uma negativa da parte contrária (ex: INSS ou Empresa), você DEVE fazer uma "citação estratégica" do conteúdo da prova.
-   - Explique o qual foi o argumento de negativa e cole o "trecho do OCR da prova" RECUADO em bloco (blockquote \`>\`) provando o contrário. Isso fortalece o caráter estritamente probatório da peça.
-10. ESTILO E FINITUDE (ERRADICAÇÃO INTERNA DE LOOPS):
-   - Use linguagem sóbria, elegante, técnica e COMBATIVA. Evite clichês.
-   - **PROIBIÇÃO DE REPETIÇÃO (REGRA DE FERRO):** É terminantemente PROIBIDO repetir o mesmo pedido, argumento ou tópico sob o pretexto de "reiteração" ou "reforço". Uma vez que um ponto foi abordado, prossiga para o próximo. 
-   - **FIM DO ARQUIVO:** Após o tópico "Pedidos e Requerimentos", o "Valor da Causa" e o "Rol de Documentos", você DEVE escrever "Pede Deferimento", Local, Data, Assinatura e ENCERRAR seu output imediatamente. Não adicione nada depois, não repita a petição e não inclua Checklists.
-11. OBJETIVIDADE: Vá direto ao ponto juridicamente relevante. Inicie a Petição (Fase 3) imediatamente após o Pensamento.
-12. MODO SILENCIOSO E ÚNICA ENTREGA (GERAR PEÇA): Quando o comando for "GERAR PEÇA", você DEVE omitir as fases de pensamento (1, 2 e 4) do seu output final para focar apenas no conteúdo jurídico da peça (Fase 3). 
-   - REGRA DE OURO: ESTA REGRA SOBRESCREVE QUALQUER OUTRA REGRA DE "ENTREGA FRACIONADA" OU "STOP". Você deve entregar a petição COMPLETA, do início ao fim, em uma única resposta. NUNCA pergunte se deve continuar.
+[MANUAL DE REDAÇÃO JURÍDICA DE ELITE — PADRÃO OURO]
+
+1. QUALIDADE DE ELITE: Você é um advogado de alto nível. Redação estratégica, profunda e persuasiva. Explore nuances do direito, lacunas administrativas e força probatória das evidências.
+
+2. EXECUÇÃO DIRETA: Recebeu ordem de GERAR O DOCUMENTO FINAL — não forneça relatório de estratégia, não peça permissão, não pare na análise.
+
+3. SILENT MODE (GERAR PEÇA): O comando "GERAR PEÇA" exige output exclusivamente jurídico:
+   - PROIBIDO exibir cabeçalhos de fases ("FASE 1", "FASE 2", "FASE 3").
+   - PROIBIDO checklists, notas ou feedbacks finais.
+   - Inicie IMEDIATAMENTE no endereçamento e finalize na data/assinatura.
+
+4. ESTRUTURA OBRIGATÓRIA (RIGIDEZ MÁXIMA):
+   - Siga FIELMENTE os tópicos das "ESTRUTURAS OBRIGATÓRIAS" do System Prompt.
+   - PROIBIDO inventar tabelas markdown não listadas na estrutura.
+   - Pode acrescentar tópicos sugeridos pelo advogado, mas NUNCA remover obrigatórios.
+   - Fallback (sem estrutura específica): I. Endereçamento e Qualificação · II. Preliminares (Gratuidade, Prioridade) · III. Dos Fatos · IV. Do Direito · V. Tutela de Urgência (se aplicável) · VI. Pedidos e Requerimentos · VII. Valor da Causa e Rol de Documentos.
+
+5. CONTINUAÇÃO TRANSPARENTE (CRÍTICO — LEIA COM ATENÇÃO):
+   - Este sistema usa CONTINUAÇÃO AUTOMÁTICA INVISÍVEL ao usuário. Se sua geração for interrompida, você receberá uma ordem para continuar EXATAMENTE de onde parou.
+   - NUNCA peça permissão para continuar. NUNCA escreva "vou continuar" ou "prosseguindo". Apenas continue o texto.
+   - NUNCA recomece a petição do zero numa continuação. Retome no caractere exato em que parou, mantendo coerência sintática.
+   - Foque em DENSIDADE REAL (fatos novos, provas novas, argumentos novos). Quando não houver mais conteúdo novo, ENCERRE o tópico — proibido encher linguiça.
+
+6. DENSIDADE PROBATÓRIA:
+   - Cada fato alegado deve citar o documento real (ex: "conforme CTPS de fls. 12", "consoante laudo médico de 12/03/2024").
+   - SEJA EXAUSTIVO em fundamentação, NUNCA REPETITIVO.
+   - Repetir o mesmo argumento sob pretexto de "reforço" é PROIBIDO. Avance para o próximo ponto.
+
+7. LIMPEZA DO TEXTO (REGRA DE FERRO):
+   - PROIBIDO incluir no texto final: "(RAG)", "[RAG]", "[Base de Conhecimento]", "[SUPABASE]", "[OCR]" ou qualquer tag de sistema.
+   - Citação de norma vinda da base: escreva apenas "conforme o Art. X da Lei Y", sem qualquer sufixo técnico.
+
+8. CITAÇÃO COM RECUO (BLOCKQUOTE — PADRÃO OURO):
+   - SE o texto estiver na Base de Conhecimento (RAG): transcreva IDÊNTICO em blockquote, com \`>\` no início de cada linha. Antes e depois, contextualize o nexo com o caso.
+   - Jurisprudência: EMENTA COMPLETA, nunca resumo.
+   - Artigos longos: cite o caput, use \`[...]\` e cite o inciso necessário na íntegra.
+   - SE o texto NÃO estiver na base: mencione a aplicabilidade SEM transcrever entre \`>\`. Nunca simule citação textual de algo não fornecido.
+   - PROIBIDO colocar texto legal entre aspas no meio do parágrafo — sempre separado, abaixo do argumento, com recuo.
+
+9. CITAÇÃO ESTRATÉGICA DE PROVAS (OCR):
+   - Quando um trecho de prova refutar diretamente uma negativa do INSS/empresa, cite-o em blockquote \`>\` com prefácio explicativo, demonstrando o nexo prova vs. argumento.
+
+10. VALOR DA CAUSA E RMI (FIDELIDADE OBRIGATÓRIA):
+    - PROIBIDO inventar Valor da Causa ou RMI.
+    - Sem dados: use [VALOR A CALCULAR EM LIQUIDAÇÃO — ESTIMADO EM SALÁRIO MÍNIMO].
+    - Com dados: média de 100% das contribuições desde 07/1994 (EC 103/2019). Valor da Causa = parcelas vencidas + 12 vincendas.
+    - PROIBIDO valores redondos sem base factual ("R$ 100.000,00", "R$ 150.000,00").
+
+11. ESTILO E ENCERRAMENTO:
+    - Linguagem sóbria, elegante, técnica e COMBATIVA. Evite clichês.
+    - Após "Pede Deferimento", Local, Data, Assinatura: ENCERRE imediatamente. Nada depois.
+
+12. ORIENTAÇÃO ESPECÍFICA PARA OPENROUTER (DeepSeek/Qwen/Claude):
+    - Ignore templates pré-treinados. Siga EXCLUSIVAMENTE a estrutura listada neste prompt.
+    - Use criatividade para fundamentar, NUNCA para alterar a ordem ou os tópicos obrigatórios.
 `;
 
 const DR_MICHEL_SYSTEM_PROMPT = `
@@ -2252,6 +2339,13 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   try {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
+
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    if (petitionLength && /premium|7000/i.test(petitionLength)) {
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v3.2';
+      console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+    }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
@@ -2277,8 +2371,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
-    if (model && model.includes('claude')) {
-      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA CLAUDE]: IGNORE AS REGRAS DE "ENTREGA FRACIONADA" E "REGRA DE PARADA". Você é estruturalmente capaz de gerar textos longos de forma nativa. Portanto, ao invés de usar o método de janela contínua do manual, você DEVE redigir a petição COMPLETA, do cabeçalho aos pedidos e valor da causa, DE UMA SÓ VEZ, na mesma resposta. Foque nos fatos cruciais sem inventar linguagens prolixas para preservar o orçamento rigoroso de tokens. NUNCA pergunte se deve continuar. Entregue pronta.`;
+    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
+      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
     if (documentContext) {
@@ -2369,9 +2463,10 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
-      lengthConstraint = `\n\n[INSTRUÇÃO CRÍTICA DE TAMANHO DA PEÇA]
-O usuário exigiu explicitamente que esta peça tenha o tamanho de: **${petitionLength}**.
-Você está PROIBIDO de entregar uma peça reduzida ou resumida. Você DEVE expandir cada argumento, citar jurisprudências completas, analisar pormenorizadamente cada laudo, e aprofundar a fundamentação jurídica de forma exaustiva para ATINGIR E ULTRAPASSAR a marca estipulada de ${petitionLength}. Se você entregar menos palavras do que o exigido, seu output será reprovado e considerado uma infração grave.`;
+      const target = parsePetitionTarget(petitionLength);
+      lengthConstraint = `\n\n[ALVO DE TAMANHO DA PEÇA]
+Esta peça tem como alvo: **${petitionLength}**${target ? ` (~${target} palavras)` : ''}.
+Densifique cada tópico com fundamentação real (não com repetição). Cite leis em blockquote, correlacione provas com argumentos, esgote a subsunção fato-norma. O sistema fará continuação automática transparente se necessário — basta você gerar com profundidade. Nunca repita o mesmo argumento para inflar o texto: o alvo é densidade probatória, não volume oco.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -2396,24 +2491,52 @@ ${ragContext}`;
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
-          const rawContent = draftData.messages[0].content || "";
-          draftContent = rawContent.substring(0, 40000);
+          draftContent = draftData.messages[0].content || "";
         }
       } catch (e) {
         console.error("Supabase petition_draft fetch error:", e);
       }
 
-      if (draftContent) {
-        finalMessage += `\n\n[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-ATENÇÃO: Abaixo está a versão anterior (ou rascunho base) da peça gerada. 
-Use esta base estrutural e jurídica como ESTRUTURA PRINCIPAL.
-MANTENHA A DENSIDADE, TAMANHO E TODA A FUNDAMENTAÇÃO QUE NÃO DEVE SER ALTERADA.
-APLIQUE CIRURGICAMENTE as mudanças, correções ou adições solicitadas acima.
-NÃO FAÇA UM RESUMO. GERE A PEÇA COMPLETA COM AS ATUALIZAÇÕES.
+      const revisionIntent = detectRevisionIntent(message, !!draftContent);
+      console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-[CONTEÚDO DA PETIÇÃO BASE]
-${draftContent}
-[FIM DA PETIÇÃO BASE]`;
+      if (draftContent) {
+        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+          // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
+          const draftEnxuto = draftContent.substring(0, 15000);
+          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
+A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
+Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
+Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+        } else if (revisionIntent === 'ADDITION') {
+          // Adição — devolve só o trecho novo.
+          const draftEnxuto = draftContent.substring(0, 15000);
+          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
+A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
+Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
+Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+        } else {
+          // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
+          const sumarioEstrutural = extractStructuralSummary(draftContent);
+          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
+O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
+Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+
+[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
+${sumarioEstrutural}
+[FIM DO SUMÁRIO]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+        }
       }
     }
 
@@ -2471,13 +2594,21 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let fullResponseText = "";
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
+      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
+      const MAX_ATTEMPTS = wordTarget ? 4 : 3; // mais ciclos quando há alvo de palavras
 
-      while (!isFinished && attempt < 3) {
+      while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         const responseStream = await callGeminiStream({
           model: model || "gemini-3-flash-preview",
           contents: currentContents,
-          config: { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools }
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: finalTemperature,
+            maxOutputTokens,
+            tools,
+            thinkingConfig: { thinkingBudget: 0 } // libera orçamento de output (Gemini Flash thinking consome tokens)
+          } as any
         }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
         let maxTokensHit = false;
@@ -2485,7 +2616,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         for await (const chunk of responseStream) {
           let text = "";
           try { text = chunk.text || ""; } catch(e) {}
-          
+
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
             if (candidate.finishReason === 'MAX_TOKENS') {
@@ -2500,18 +2631,41 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
         }
 
-        if (maxTokensHit) {
-          console.log(`Max tokens atingido em DrMichel. Iniciando continuação automática (tentativa ${attempt + 1})...`);
+        // ANTI-ECO: se a continuação anterior repetiu mais de 200 chars do texto antigo, aborta
+        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+          console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação para evitar repetição.`);
+          isFinished = true;
+          break;
+        }
+
+        const currentWordCount = countWords(fullResponseText);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.92);
+
+        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
+          const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: "A API foi interrompida pelo limite de tokens. Continue a sua resposta EXATAMENTE de onde parou, gerando o texto da próxima palavra em diante. Não adicione saudações ou explicações, apenas continue o texto." }] });
-          if (attempt >= 3) {
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nVocê está em ${currentWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''}. Continue EXATAMENTE de onde parou, sem repetir o texto anterior, sem recomeçar, sem saudações.\n\nÚltima linha gerada (use como âncora de continuidade sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga com o próximo parágrafo/tópico da estrutura. Foque em densidade real, sem encher linguiça.` }] });
+        } else if (!maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          // Modelo parou sozinho (STOP) antes do alvo — força continuação
+          console.log(`[Dr.Michel] STOP prematuro no ciclo ${attempt} (${currentWordCount}/${wordTarget} palavras). Forçando expansão...`);
+          const anchor = fullResponseText.slice(-600);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: `[EXPANSÃO OBRIGATÓRIA — CICLO ${attempt + 1}]\nA peça está em ${currentWordCount} palavras, mas o alvo é ${wordTarget}. APROFUNDE os argumentos dos tópicos já redigidos, especialmente DOS FATOS e DO DIREITO. Adicione fundamentação jurídica adicional, mais provas correlacionadas, mais subsunção fato-norma.\n\nÚltima linha da peça atual: "${anchor.slice(-200)}"\n\nNÃO recomece a peça. NÃO escreva "continuando" nem similares. Apenas adicione novo conteúdo de qualidade na sequência natural.` }] });
+        } else {
+          if (maxTokensHit && targetReached) {
+            console.log(`[Dr.Michel] Alvo atingido (${currentWordCount}/${wordTarget}) mesmo com MAX_TOKENS — encerrando.`);
+          }
+          if (attempt >= MAX_ATTEMPTS && maxTokensHit) {
             finalMaxTokensHit = true;
           }
-        } else {
           isFinished = true;
         }
       }
-      
+
+      const finalWordCount = countWords(fullResponseText);
+      console.log(`[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
+
       clearInterval(heartbeat);
       if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
@@ -2556,7 +2710,14 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   try {
     let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
-    
+
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    if (petitionLength && /premium|7000/i.test(petitionLength)) {
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v3.2';
+      console.log('[Dra.Luana] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+    }
+
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
@@ -2621,8 +2782,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
-    if (model && model.includes('claude')) {
-      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA CLAUDE]: IGNORE AS REGRAS DE "ENTREGA FRACIONADA" E "REGRA DE PARADA". Você é estruturalmente capaz de gerar textos longos de forma nativa. Portanto, ao invés de usar o método de janela contínua do manual, você DEVE redigir a petição COMPLETA, do cabeçalho aos pedidos e valor da causa, DE UMA SÓ VEZ, na mesma resposta. Foque nos fatos cruciais sem inventar linguagens prolixas para preservar o orçamento rigoroso de tokens. NUNCA pergunte se deve continuar. Entregue pronta.`;
+    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
+      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
     if (documentContext) {
@@ -2721,9 +2882,10 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
-      lengthConstraint = `\n\n[INSTRUÇÃO CRÍTICA DE TAMANHO DA PEÇA]
-O usuário exigiu explicitamente que esta peça tenha o tamanho de: **${petitionLength}**.
-Você está PROIBIDO de entregar uma peça reduzida ou resumida. Você DEVE expandir cada argumento, citar jurisprudências completas, analisar pormenorizadamente cada laudo, e aprofundar a fundamentação jurídica de forma exaustiva para ATINGIR E ULTRAPASSAR a marca estipulada de ${petitionLength}. Se você entregar menos palavras do que o exigido, seu output será reprovado e considerado uma infração grave.`;
+      const target = parsePetitionTarget(petitionLength);
+      lengthConstraint = `\n\n[ALVO DE TAMANHO DA PEÇA]
+Esta peça tem como alvo: **${petitionLength}**${target ? ` (~${target} palavras)` : ''}.
+Densifique cada tópico com fundamentação real (não com repetição). Cite leis em blockquote, correlacione provas com argumentos, esgote a subsunção fato-norma. O sistema fará continuação automática transparente se necessário — basta você gerar com profundidade. Nunca repita o mesmo argumento para inflar o texto: o alvo é densidade probatória, não volume oco.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -2751,24 +2913,49 @@ ${ragContext}`;
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
-          const rawContent = draftData.messages[0].content || "";
-          draftContent = rawContent.substring(0, 40000);
+          draftContent = draftData.messages[0].content || "";
         }
       } catch (e) {
         console.error("Supabase petition_draft fetch error:", e);
       }
 
-      if (draftContent) {
-        finalMessage += `\n\n[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-ATENÇÃO: Abaixo está a versão anterior (ou rascunho base) da peça gerada. 
-Use esta base estrutural e jurídica como ESTRUTURA PRINCIPAL.
-MANTENHA A DENSIDADE, TAMANHO E TODA A FUNDAMENTAÇÃO QUE NÃO DEVE SER ALTERADA.
-APLIQUE CIRURGICAMENTE as mudanças, correções ou adições solicitadas acima.
-NÃO FAÇA UM RESUMO. GERE A PEÇA COMPLETA COM AS ATUALIZAÇÕES.
+      const revisionIntent = detectRevisionIntent(message, !!draftContent);
+      console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-[CONTEÚDO DA PETIÇÃO BASE]
-${draftContent}
-[FIM DA PETIÇÃO BASE]`;
+      if (draftContent) {
+        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+          const draftEnxuto = draftContent.substring(0, 15000);
+          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
+A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
+Mantenha densidade, valores da planilha e formatação idênticas ao padrão da peça original.
+Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+        } else if (revisionIntent === 'ADDITION') {
+          const draftEnxuto = draftContent.substring(0, 15000);
+          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
+A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
+Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
+Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+        } else {
+          const sumarioEstrutural = extractStructuralSummary(draftContent);
+          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
+O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
+Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+
+[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
+${sumarioEstrutural}
+[FIM DO SUMÁRIO]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+        }
       }
     }
 
@@ -2864,8 +3051,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let fullResponseText = "";
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
+      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
+      const MAX_ATTEMPTS = wordTarget ? 4 : 3;
 
-      while (!isFinished && attempt < 3) {
+      while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         const responseStream = await callGeminiStream({
           model: model || "gemini-3-flash-preview",
@@ -2875,13 +3064,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             temperature: finalTemperature,
             maxOutputTokens: maxOutputTokens,
             tools: tools,
+            thinkingConfig: { thinkingBudget: 0 },
             safetySettings: [
               { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
               { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
               { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
               { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
             ]
-          }
+          } as any
         }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
         let maxTokensHit = false;
@@ -2893,7 +3083,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           } catch (e) {
             // ignore
           }
-          
+
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
             if (candidate.finishReason === 'MAX_TOKENS') {
@@ -2910,18 +3100,36 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
         }
 
-        if (maxTokensHit) {
-          console.log(`Max tokens atingido em DraLuana. Iniciando continuação automática (tentativa ${attempt + 1})...`);
+        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+          console.log(`[Dra.Luana] ECO detectado no ciclo ${attempt} — interrompendo continuação para evitar repetição.`);
+          isFinished = true;
+          break;
+        }
+
+        const currentWordCount = countWords(fullResponseText);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.92);
+
+        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
+          const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: "A API foi interrompida pelo limite de tokens. Continue a sua resposta EXATAMENTE de onde parou, gerando o texto da próxima palavra em diante. Não adicione saudações ou explicações, apenas continue o texto." }] });
-          if (attempt >= 3) {
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nVocê está em ${currentWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''}. Continue EXATAMENTE de onde parou, sem repetir o texto anterior, sem recomeçar, sem saudações.\n\nÚltima linha gerada: "${anchor.slice(-200)}"\n\nProssiga com o próximo parágrafo/tópico. Foque em densidade real.` }] });
+        } else if (!maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dra.Luana] STOP prematuro no ciclo ${attempt} (${currentWordCount}/${wordTarget} palavras). Forçando expansão...`);
+          const anchor = fullResponseText.slice(-600);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: `[EXPANSÃO OBRIGATÓRIA — CICLO ${attempt + 1}]\nA peça está em ${currentWordCount} palavras, alvo: ${wordTarget}. APROFUNDE os argumentos dos tópicos já redigidos, especialmente DOS FATOS e DO DIREITO.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nNÃO recomece. Adicione conteúdo de qualidade na sequência natural.` }] });
+        } else {
+          if (attempt >= MAX_ATTEMPTS && maxTokensHit) {
             finalMaxTokensHit = true;
           }
-        } else {
           isFinished = true;
         }
       }
-      
+
+      const finalWordCount = countWords(fullResponseText);
+      console.log(`[Dra.Luana] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
+
       clearInterval(heartbeat);
       if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
