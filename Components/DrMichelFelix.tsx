@@ -606,7 +606,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
-              keyIndex: session?.uploadKeyIndex
+              keyIndex: session?.uploadKeyIndex,
+              sessionId: session?.id
             })
           });
 

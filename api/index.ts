@@ -2248,7 +2248,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId } = req.body;
     message = message || "";
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
@@ -2377,6 +2377,37 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
+    if (sessionId && isGenerationRequest) {
+      let draftContent = "";
+      try {
+        const { data: draftData } = await supabaseAdmin
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dr_michel_${sessionId}`)
+          .maybeSingle();
+
+        if (draftData && draftData.messages && draftData.messages.length > 0) {
+          draftContent = draftData.messages[0].content;
+        }
+      } catch (e) {
+        console.error("Supabase petition_draft fetch error:", e);
+      }
+
+      if (draftContent) {
+        finalMessage += `\n\n[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+ATENÇÃO: Abaixo está a versão anterior (ou rascunho base) da peça gerada. 
+Use esta base estrutural e jurídica como ESTRUTURA PRINCIPAL.
+MANTENHA A DENSIDADE, TAMANHO E TODA A FUNDAMENTAÇÃO QUE NÃO DEVE SER ALTERADA.
+APLIQUE CIRURGICAMENTE as mudanças, correções ou adições solicitadas acima.
+NÃO FAÇA UM RESUMO. GERE A PEÇA COMPLETA COM AS ATUALIZAÇÕES.
+
+[CONTEÚDO DA PETIÇÃO BASE]
+${draftContent}
+[FIM DA PETIÇÃO BASE]`;
+      }
+    }
+
     const currentMessageParts: any[] = [{ text: finalMessage }];
     if (images && Array.isArray(images)) {
       images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
@@ -2433,6 +2464,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
       let maxTokensHit = false;
+      let fullResponseText = "";
       for await (const chunk of responseStream) {
         let text = "";
         try { text = chunk.text || ""; } catch(e) {}
@@ -2444,12 +2476,31 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
         }
 
-        if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        if (text) {
+          fullResponseText += text;
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
       }
       clearInterval(heartbeat);
       if (maxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
+      
+      // Salva a peça gerada como draft se for longa o suficiente
+      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+        try {
+          await supabaseAdmin.from('ai_conversations').upsert({
+            id: `draft_dr_michel_${sessionId}`,
+            lawyer_type: 'petition_draft',
+            title: 'DrMichel',
+            date: new Date().toISOString(),
+            messages: [{ role: 'assistant', content: fullResponseText }]
+          });
+        } catch (e) {
+          console.error("Erro salvando petition_draft (DrMichel):", e);
+        }
+      }
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (err: any) {
@@ -2472,7 +2523,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId } = req.body;
     message = message || "";
     
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
@@ -2652,6 +2703,37 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
+    if (sessionId && isGenerationRequest) {
+      let draftContent = "";
+      try {
+        const { data: draftData } = await supabaseAdmin
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dra_luana_${sessionId}`)
+          .maybeSingle();
+
+        if (draftData && draftData.messages && draftData.messages.length > 0) {
+          draftContent = draftData.messages[0].content;
+        }
+      } catch (e) {
+        console.error("Supabase petition_draft fetch error:", e);
+      }
+
+      if (draftContent) {
+        finalMessage += `\n\n[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+ATENÇÃO: Abaixo está a versão anterior (ou rascunho base) da peça gerada. 
+Use esta base estrutural e jurídica como ESTRUTURA PRINCIPAL.
+MANTENHA A DENSIDADE, TAMANHO E TODA A FUNDAMENTAÇÃO QUE NÃO DEVE SER ALTERADA.
+APLIQUE CIRURGICAMENTE as mudanças, correções ou adições solicitadas acima.
+NÃO FAÇA UM RESUMO. GERE A PEÇA COMPLETA COM AS ATUALIZAÇÕES.
+
+[CONTEÚDO DA PETIÇÃO BASE]
+${draftContent}
+[FIM DA PETIÇÃO BASE]`;
+      }
+    }
+
     const currentMessageParts: any[] = [{ text: finalMessage }];
 
     // Add images if present
@@ -2758,6 +2840,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
 
+      let fullResponseText = "";
       for await (const chunk of responseStream) {
         let text = "";
         try {
@@ -2774,10 +2857,27 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
 
         if (text) {
+          fullResponseText += text;
           res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
         }
       }
       clearInterval(heartbeat);
+      
+      // Salva a peça gerada como draft se for longa o suficiente
+      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+        try {
+          await supabaseAdmin.from('ai_conversations').upsert({
+            id: `draft_dra_luana_${sessionId}`,
+            lawyer_type: 'petition_draft',
+            title: 'DraLuana',
+            date: new Date().toISOString(),
+            messages: [{ role: 'assistant', content: fullResponseText }]
+          });
+        } catch (e) {
+          console.error("Erro salvando petition_draft (DraLuana):", e);
+        }
+      }
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (streamError: any) {

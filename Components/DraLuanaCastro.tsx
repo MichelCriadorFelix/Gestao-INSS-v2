@@ -569,7 +569,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           customLaws,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
-          keyIndex: session?.uploadKeyIndex
+          keyIndex: session?.uploadKeyIndex,
+          sessionId: session?.id
         }),
         signal: abortController.signal
       });
