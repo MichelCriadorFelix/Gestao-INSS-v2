@@ -2346,23 +2346,21 @@ REGRAS DE OURO:
       lastAssistantMsg.content.length > 3000 ||
       lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
     );
-    const userMsgIsShort = message.length < 500;
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
-    if (lastAssistantWasLongGeneration && userMsgIsShort && !isGenerationRequest) {
-      correctionInstruction = `\n\n[MODO CORREÇÃO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo um AJUSTE PONTUAL agora.
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
+      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
 
-INSTRUÇÕES PRIORITÁRIAS:
-1. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário acima.
-2. Reescreva a peça/relatório INTEIRO mantendo TODO o conteúdo anterior INTACTO, alterando APENAS o que foi solicitado.
-3. NÃO RESUMA o conteúdo que já existia — preserve toda a densidade, todos os tópicos, todas as citações em blockquote.
-4. NÃO inverta a ordem dos tópicos.
-5. Se a correção for adicionar algo: ADICIONE no local correto, preservando o resto.
-6. Se a correção for remover algo: REMOVA apenas o item indicado.
-7. Se a correção for substituir: SUBSTITUA apenas o trecho indicado.
-8. A peça final corrigida deve ter densidade IGUAL OU SUPERIOR à anterior.
+INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
+1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
+2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
+5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
+6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
 `;
-      console.log("Dr. Michel: MODO CORREÇÃO detectado e ativado.");
+      console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
@@ -2669,24 +2667,21 @@ REGRAS DE OURO:
       lastAssistantMsg.content.length > 3000 ||
       lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
     );
-    const userMsgIsShort = message.length < 500;
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
-    if (lastAssistantWasLongGeneration && userMsgIsShort && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      correctionInstruction = `\n\n[MODO CORREÇÃO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo um AJUSTE PONTUAL agora.
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
 
-INSTRUÇÕES PRIORITÁRIAS:
-1. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário acima.
-2. Reescreva a peça/relatório INTEIRO mantendo TODO o conteúdo anterior INTACTO, alterando APENAS o que foi solicitado.
-3. NÃO RESUMA o conteúdo que já existia — preserve toda a densidade, todos os tópicos, todas as fundamentações.
-4. NÃO inverta a ordem dos tópicos.
-5. Se a correção for adicionar algo: ADICIONE no local correto, preservando o resto.
-6. Se a correção for remover algo: REMOVA apenas o item indicado.
-7. Se a correção for substituir: SUBSTITUA apenas o trecho indicado.
-8. A peça final corrigida deve ter densidade IGUAL OU SUPERIOR à anterior.
-9. PRESERVE INTEGRALMENTE os valores da Planilha de Cálculos — nunca altere valores ao fazer correção textual.
+INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
+1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
+2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
+5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos.
+6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
 `;
-      console.log("Dra. Luana: MODO CORREÇÃO detectado e ativado.");
+      console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
