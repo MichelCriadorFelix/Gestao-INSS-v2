@@ -535,7 +535,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-8);
+        const last = msgs.slice(-40);
         return last.map((m) => {
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
             return {

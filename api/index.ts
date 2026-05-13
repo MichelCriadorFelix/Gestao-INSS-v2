@@ -2388,7 +2388,8 @@ ${ragContext}`;
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content;
+          const rawContent = draftData.messages[0].content || "";
+          draftContent = rawContent.substring(0, 40000);
         }
       } catch (e) {
         console.error("Supabase petition_draft fetch error:", e);
@@ -2714,7 +2715,8 @@ ${ragContext}`;
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content;
+          const rawContent = draftData.messages[0].content || "";
+          draftContent = rawContent.substring(0, 40000);
         }
       } catch (e) {
         console.error("Supabase petition_draft fetch error:", e);

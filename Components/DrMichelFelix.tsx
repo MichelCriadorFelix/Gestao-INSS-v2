@@ -558,7 +558,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       // - Janela: últimas 8 mensagens (4 trocas)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-8); // últimas 8 mensagens
+        const last = msgs.slice(-40); // Preserva o histórico longo da conversa, podando apenas os textos gigantes
         return last.map((m) => {
           // Tomada de ciência: tem padrão "[FASE DE TOMADA DE CIÊNCIA]" ou conteúdo enorme com "CONTEÚDO:"
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
