@@ -97,6 +97,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -569,6 +570,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           customLaws,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
+          petitionLength,
           keyIndex: session?.uploadKeyIndex,
           sessionId: session?.id
         }),
@@ -1453,6 +1455,18 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                   >
                     <Users className="w-5 h-5" />
                   </button>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                  <select
+                    value={petitionLength}
+                    onChange={(e) => setPetitionLength(e.target.value)}
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-32"
+                    title="Tamanho Mínimo da Peça"
+                  >
+                    <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
+                    <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
+                    <option value="Mínimo 5000 palavras">Mínimo 5.000 palavras</option>
+                    <option value="Mínimo 7000 palavras">Mínimo 7.000 palavras</option>
+                  </select>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
                     value={selectedModel}

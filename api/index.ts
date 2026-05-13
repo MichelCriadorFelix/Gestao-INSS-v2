@@ -2248,7 +2248,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
@@ -2365,7 +2365,14 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
       console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
+    let lengthConstraint = "";
+    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
+      lengthConstraint = `\n\n[INSTRUÇÃO CRÍTICA DE TAMANHO DA PEÇA]
+O usuário exigiu explicitamente que esta peça tenha o tamanho de: **${petitionLength}**.
+Você está PROIBIDO de entregar uma peça reduzida ou resumida. Você DEVE expandir cada argumento, citar jurisprudências completas, analisar pormenorizadamente cada laudo, e aprofundar a fundamentação jurídica de forma exaustiva para ATINGIR E ULTRAPASSAR a marca estipulada de ${petitionLength}. Se você entregar menos palavras do que o exigido, seu output será reprovado e considerado uma infração grave.`;
+    }
+
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
     if (ragContext) {
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -2457,32 +2464,54 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
-      const responseStream = await callGeminiStream({
-        model: model || "gemini-3-flash-preview",
-        contents,
-        config: { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
-
-      let maxTokensHit = false;
+      let isFinished = false;
+      let attempt = 0;
       let fullResponseText = "";
-      for await (const chunk of responseStream) {
-        let text = "";
-        try { text = chunk.text || ""; } catch(e) {}
-        
-        if (chunk.candidates && chunk.candidates.length > 0) {
-          const candidate = chunk.candidates[0];
-          if (candidate.finishReason === 'MAX_TOKENS') {
-            maxTokensHit = true;
+      let currentContents = [...contents];
+      let finalMaxTokensHit = false;
+
+      while (!isFinished && attempt < 3) {
+        attempt++;
+        const responseStream = await callGeminiStream({
+          model: model || "gemini-3-flash-preview",
+          contents: currentContents,
+          config: { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools }
+        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+        let maxTokensHit = false;
+        let attemptText = "";
+        for await (const chunk of responseStream) {
+          let text = "";
+          try { text = chunk.text || ""; } catch(e) {}
+          
+          if (chunk.candidates && chunk.candidates.length > 0) {
+            const candidate = chunk.candidates[0];
+            if (candidate.finishReason === 'MAX_TOKENS') {
+              maxTokensHit = true;
+            }
+          }
+
+          if (text) {
+            attemptText += text;
+            fullResponseText += text;
+            res.write(`data: ${JSON.stringify({ text })}\n\n`);
           }
         }
 
-        if (text) {
-          fullResponseText += text;
-          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        if (maxTokensHit) {
+          console.log(`Max tokens atingido em DrMichel. Iniciando continuação automática (tentativa ${attempt + 1})...`);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: "A API foi interrompida pelo limite de tokens. Continue a sua resposta EXATAMENTE de onde parou, gerando o texto da próxima palavra em diante. Não adicione saudações ou explicações, apenas continue o texto." }] });
+          if (attempt >= 3) {
+            finalMaxTokensHit = true;
+          }
+        } else {
+          isFinished = true;
         }
       }
+      
       clearInterval(heartbeat);
-      if (maxTokensHit) {
+      if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
@@ -2523,7 +2552,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
     
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
@@ -2688,7 +2717,14 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
       console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction;
+    let lengthConstraint = "";
+    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
+      lengthConstraint = `\n\n[INSTRUÇÃO CRÍTICA DE TAMANHO DA PEÇA]
+O usuário exigiu explicitamente que esta peça tenha o tamanho de: **${petitionLength}**.
+Você está PROIBIDO de entregar uma peça reduzida ou resumida. Você DEVE expandir cada argumento, citar jurisprudências completas, analisar pormenorizadamente cada laudo, e aprofundar a fundamentação jurídica de forma exaustiva para ATINGIR E ULTRAPASSAR a marca estipulada de ${petitionLength}. Se você entregar menos palavras do que o exigido, seu output será reprovado e considerado uma infração grave.`;
+    }
+
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
     if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
@@ -2821,47 +2857,73 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
-      let responseStream;
-      
-      responseStream = await callGeminiStream({
-        model: model || "gemini-3-flash-preview",
-        contents: contents,
-        config: {
-          systemInstruction: selectedSystemPrompt,
-          temperature: finalTemperature,
-          maxOutputTokens: maxOutputTokens,
-          tools: tools,
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-          ]
-        }
-      }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) : undefined);
-
+      let isFinished = false;
+      let attempt = 0;
       let fullResponseText = "";
-      for await (const chunk of responseStream) {
-        let text = "";
-        try {
-          text = chunk.text || "";
-        } catch (e) {
-          // ignore
-        }
-        
-        if (!text && chunk.candidates && chunk.candidates.length > 0) {
-          const candidate = chunk.candidates[0];
-          if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-            text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+      let currentContents = [...contents];
+      let finalMaxTokensHit = false;
+
+      while (!isFinished && attempt < 3) {
+        attempt++;
+        const responseStream = await callGeminiStream({
+          model: model || "gemini-3-flash-preview",
+          contents: currentContents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: finalTemperature,
+            maxOutputTokens: maxOutputTokens,
+            tools: tools,
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          }
+        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+        let maxTokensHit = false;
+        let attemptText = "";
+        for await (const chunk of responseStream) {
+          let text = "";
+          try {
+            text = chunk.text || "";
+          } catch (e) {
+            // ignore
+          }
+          
+          if (chunk.candidates && chunk.candidates.length > 0) {
+            const candidate = chunk.candidates[0];
+            if (candidate.finishReason === 'MAX_TOKENS') {
+              maxTokensHit = true;
+            } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+              text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+            }
+          }
+
+          if (text) {
+            attemptText += text;
+            fullResponseText += text;
+            res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
           }
         }
 
-        if (text) {
-          fullResponseText += text;
-          res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
+        if (maxTokensHit) {
+          console.log(`Max tokens atingido em DraLuana. Iniciando continuação automática (tentativa ${attempt + 1})...`);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: "A API foi interrompida pelo limite de tokens. Continue a sua resposta EXATAMENTE de onde parou, gerando o texto da próxima palavra em diante. Não adicione saudações ou explicações, apenas continue o texto." }] });
+          if (attempt >= 3) {
+            finalMaxTokensHit = true;
+          }
+        } else {
+          isFinished = true;
         }
       }
+      
       clearInterval(heartbeat);
+      if (finalMaxTokensHit) {
+        res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
+      }
       
       // Salva a peça gerada como draft se for longa o suficiente
       if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
