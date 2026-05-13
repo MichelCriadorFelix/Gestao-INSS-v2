@@ -2340,6 +2340,7 @@ REGRAS DE OURO:
     // ============================================================
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
+    let isCorrectionRequest = false;
     let correctionInstruction = "";
     const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
     const lastAssistantWasLongGeneration = lastAssistantMsg && (
@@ -2349,13 +2350,14 @@ REGRAS DE OURO:
     const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
     if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
+      isCorrectionRequest = true;
       correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
 Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
 
 INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
 2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
 4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
 5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
 6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
@@ -2374,7 +2376,7 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
-    if (sessionId && isGenerationRequest) {
+    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
@@ -2661,6 +2663,7 @@ REGRAS DE OURO:
     // ============================================================
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
+    let isCorrectionRequest = false;
     let correctionInstruction = "";
     const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
     const lastAssistantWasLongGeneration = lastAssistantMsg && (
@@ -2670,13 +2673,14 @@ REGRAS DE OURO:
     const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
     if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      isCorrectionRequest = true;
       correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
 Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
 
 INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
 2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
 4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
 5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos.
 6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
@@ -2698,7 +2702,7 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
-    if (sessionId && isGenerationRequest) {
+    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
