@@ -2202,7 +2202,9 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
         messages: params.messages,
         temperature: params.temperature ?? 0.2,
         max_tokens: params.max_tokens || 16383,
-        stream: true
+        stream: true,
+        include_reasoning: true, // Habilita tokens de raciocínio (Chain of Thought)
+        reasoning_effort: "high" // Define esforço de raciocínio alto conforme suportado pelo modelo
       })
     });
 
@@ -2222,6 +2224,7 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let done = false;
+    let combinedText = "";
 
     while (!done) {
       const { value, done: readerDone } = await reader.read();
@@ -2233,9 +2236,19 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
           if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
             try {
               const data = JSON.parse(line.slice(6));
-              const text = data.choices[0]?.delta?.content || "";
-              if (text) {
-                res.write(`data: ${JSON.stringify({ text })}\n\n`);
+              const delta = data.choices[0]?.delta;
+              
+              // Captura tanto o conteúdo final quanto o raciocínio
+              const reasoning = delta?.reasoning || delta?.reasoning_content || "";
+              const content = delta?.content || "";
+              
+              if (reasoning) {
+                // Enviamos o raciocínio com um marcador para o frontend identificar se quiser
+                res.write(`data: ${JSON.stringify({ text: "", reasoning })}\n\n`);
+              }
+              
+              if (content) {
+                res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
               }
             } catch (e) {
               // Ignore parse errors for incomplete chunks
