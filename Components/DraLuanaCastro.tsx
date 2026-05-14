@@ -1290,8 +1290,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <FileText className="w-6 h-6 text-primary-700" />
                   </div>
                   <h4 className="font-bold text-slate-800 dark:text-white mb-2">Análise de Caso</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Resumo de fatos e estratégia para Reclamação Trabalhista.</p>

@@ -516,7 +516,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                               {STATUS_LABELS[status].label}
                             </span>
                             {event.isVirtual && (
-                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-primary-100 text-primary-800 dark:bg-blue-900/40 dark:text-gold-300">
                                 Automático
                               </span>
                             )}
@@ -711,7 +711,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       <div className="flex gap-2">
                         <button type="button"
                           onClick={() => setFormData({ ...formData, gender: 'M' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'M' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'M' ? 'bg-primary-700 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
                         >👨 Masculino</button>
                         <button type="button"
                           onClick={() => setFormData({ ...formData, gender: 'F' })}
@@ -726,7 +726,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       <div className="flex gap-2">
                         <button type="button"
                           onClick={() => setFormData({ ...formData, benefitType: 'incapacidade' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'incapacidade' || !formData.benefitType ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'incapacidade' || !formData.benefitType ? 'bg-primary-700 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
                         >🏥 Incapacidade</button>
                         <button type="button"
                           onClick={() => setFormData({ ...formData, benefitType: 'bpc' })}

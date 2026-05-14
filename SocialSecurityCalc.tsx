@@ -85,7 +85,7 @@ const STYLES = {
     CARD_SECTION: "bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 mb-4",
     CARD_HEADER: "bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/30 p-3 rounded-t-xl flex items-center gap-2",
     CARD_TITLE: "text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wide",
-    BTN_PRIMARY: "bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm",
+    BTN_PRIMARY: "bg-primary-700 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm",
     BTN_SECONDARY: "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2 text-sm",
     BTN_SUCCESS: "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2 text-sm",
     STEP_BADGE: "flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-amber-900 font-bold text-xs mr-2",
@@ -1854,7 +1854,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 flex justify-between items-center sticky top-0 z-10">
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <CalculatorIcon className="h-6 w-6 text-indigo-600" />
+                        <CalculatorIcon className="h-6 w-6 text-primary-700" />
                         Calculadora Previdenciária
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Análise de Tempo de Contribuição e RMI</p>
@@ -1930,7 +1930,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                         />
                                     </label>
                                 </div>
-                                <div className="flex-1 text-sm text-slate-600 dark:text-slate-400 border-l-4 border-blue-400 pl-4 bg-blue-50 dark:bg-blue-900/10 p-3 rounded-r-lg">
+                                <div className="flex-1 text-sm text-slate-600 dark:text-slate-400 border-l-4 border-blue-400 pl-4 bg-primary-50 dark:bg-blue-900/10 p-3 rounded-r-lg">
                                     <p>A importação do CNIS é opcional, mas <strong>altamente recomendada</strong>.</p>
                                     <p className="mt-1">Importando o CNIS você não precisa digitar os períodos contributivos e os salários de contribuição já reconhecidos pelo INSS.</p>
                                 </div>
@@ -2012,7 +2012,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                     type="checkbox" 
                                     checked={data.isTeacher || false}
                                     onChange={e => setData(prev => ({ ...prev, isTeacher: e.target.checked }))}
-                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                    className="rounded border-slate-300 text-primary-700 focus:ring-indigo-500 h-4 w-4"
                                 />
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Professor(a) (Magistério Exclusivo)</span>
                             </label>
@@ -2021,7 +2021,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                     type="checkbox" 
                                     checked={data.isPcd || false}
                                     onChange={e => setData(prev => ({ ...prev, isPcd: e.target.checked }))}
-                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                    className="rounded border-slate-300 text-primary-700 focus:ring-indigo-500 h-4 w-4"
                                 />
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pessoa com Deficiência (PCD)</span>
                             </label>
@@ -2033,7 +2033,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 {data.analysis && (
                     <div className={`${STYLES.CARD_SECTION} border-l-4 border-indigo-500`}>
                         <div className={STYLES.CARD_HEADER}>
-                            <span className={`${STYLES.STEP_BADGE} bg-indigo-600`}>IA</span>
+                            <span className={`${STYLES.STEP_BADGE} bg-primary-700`}>IA</span>
                             <h3 className={STYLES.CARD_TITLE}>Análise Jurídica Preliminar (Dr. Michel Felix)</h3>
                         </div>
                         <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 text-sm whitespace-pre-wrap font-serif">
@@ -2058,7 +2058,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                         name="calcType" 
                                         checked={data.calculationType === 'concession'}
                                         onChange={() => handleInputChange('calculationType', 'concession')}
-                                        className="text-indigo-600 focus:ring-indigo-500"
+                                        className="text-primary-700 focus:ring-indigo-500"
                                     />
                                     <span className="text-sm text-slate-700 dark:text-slate-300">Concessão de novo benefício e/ou planejamento</span>
                                 </label>
@@ -2068,7 +2068,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                         name="calcType" 
                                         checked={data.calculationType === 'revision'}
                                         onChange={() => handleInputChange('calculationType', 'revision')}
-                                        className="text-indigo-600 focus:ring-indigo-500"
+                                        className="text-primary-700 focus:ring-indigo-500"
                                     />
                                     <span className="text-sm text-slate-700 dark:text-slate-300">Revisão de benefício já concedido</span>
                                 </label>
@@ -2133,7 +2133,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                 id="smartPlanning"
                                 checked={data.smartPlanning}
                                 onChange={e => handleInputChange('smartPlanning', e.target.checked)}
-                                className="mt-1 text-indigo-600 rounded focus:ring-indigo-500"
+                                className="mt-1 text-primary-700 rounded focus:ring-indigo-500"
                             />
                             <label htmlFor="smartPlanning" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                                 <span className="font-bold block">Fazer Planejamento Previdenciário Inteligente</span>
@@ -2204,7 +2204,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                             <React.Fragment key={bond.id}>
                                                 <tr className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${bond.isBenefit ? 'bg-indigo-50/30 dark:bg-indigo-900/10' : ''}`}>
                                                     <td className="px-3 py-2 text-center">
-                                                        <input type="checkbox" checked={bond.useInCalculation} onChange={() => handleBondChange(bond.id, 'useInCalculation', !bond.useInCalculation)} className="rounded text-indigo-600" />
+                                                        <input type="checkbox" checked={bond.useInCalculation} onChange={() => handleBondChange(bond.id, 'useInCalculation', !bond.useInCalculation)} className="rounded text-primary-700" />
                                                         <span className="block text-[10px] text-slate-400 font-mono">{idx + 1}</span>
                                                     </td>
                                                     <td className={STYLES.TABLE_CELL}>
@@ -2222,9 +2222,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                         type="checkbox" 
                                                                         checked={bond.isBenefit} 
                                                                         onChange={e => handleBondChange(bond.id, 'isBenefit', e.target.checked)}
-                                                                        className="h-3 w-3 rounded text-indigo-600"
+                                                                        className="h-3 w-3 rounded text-primary-700"
                                                                     />
-                                                                    <span className="text-[9px] font-bold text-indigo-600 uppercase">Benefício</span>
+                                                                    <span className="text-[9px] font-bold text-primary-700 uppercase">Benefício</span>
                                                                 </label>
                                                                 {bond.isBenefit && !isIntercalated && (
                                                                     <span className="text-[9px] text-red-500 font-bold bg-red-50 px-1 rounded border border-red-100 animate-pulse">
@@ -2276,7 +2276,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                         <div className="flex gap-1">
                                                             <button 
                                                                 onClick={() => toggleBondExpansion(bond.id)}
-                                                                className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 ${expandedBonds.includes(bond.id) ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400'}`}
+                                                                className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 ${expandedBonds.includes(bond.id) ? 'text-primary-700 bg-indigo-50' : 'text-slate-400'}`}
                                                                 title="Ver Salários"
                                                             >
                                                                 <TableCellsIcon className="h-4 w-4" />
@@ -2329,7 +2329,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                     
                                                                     {batchEditBondId === bond.id && (
                                                                         <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 mb-3 animate-in slide-in-from-top-2 duration-200">
-                                                                            <h5 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-2 uppercase tracking-wide flex items-center gap-1">
+                                                                            <h5 className="text-xs font-bold text-primary-700 dark:text-indigo-400 mb-2 uppercase tracking-wide flex items-center gap-1">
                                                                                 <PencilSquareIcon className="h-3 w-3" />
                                                                                 Ferramenta de Edição em Lote
                                                                             </h5>
@@ -2385,7 +2385,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                 </button>
                                                                                 <button 
                                                                                     onClick={handleBatchEdit}
-                                                                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded flex items-center gap-1 shadow-sm"
+                                                                                    className="px-3 py-1 bg-primary-700 hover:bg-indigo-700 text-white text-xs font-bold rounded flex items-center gap-1 shadow-sm"
                                                                                 >
                                                                                     <CheckCircleIcon className="h-3 w-3" />
                                                                                     Aplicar Alterações
@@ -2455,7 +2455,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                                         bonds: prev.bonds.map(b => b.id === bond.id ? { ...b, sc: newSc } : b)
                                                                                                     }));
                                                                                                 }}
-                                                                                                className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded hover:bg-indigo-100 transition border border-indigo-200"
+                                                                                                className="text-xs bg-indigo-50 text-primary-700 px-3 py-1 rounded hover:bg-indigo-100 transition border border-indigo-200"
                                                                                             >
                                                                                                 Gerar Competências (Preencher Manualmente)
                                                                                             </button>
@@ -2486,7 +2486,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                 type="checkbox" 
                                                                                 checked={bond.isConcomitant} 
                                                                                 onChange={() => handleBondChange(bond.id, 'isConcomitant', !bond.isConcomitant)}
-                                                                                className="rounded text-indigo-600 focus:ring-indigo-500" 
+                                                                                className="rounded text-primary-700 focus:ring-indigo-500" 
                                                                             />
                                                                             <span className="text-xs text-slate-700 dark:text-slate-300">Marcar como concomitante (apenas informativo)</span>
                                                                         </label>
@@ -2526,7 +2526,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                     <div className="flex gap-3">
                         <button
                             onClick={() => setIsAnalysisModalOpen(true)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm"
+                            className="bg-primary-700 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm"
                         >
                             <ChartBarIcon className="h-5 w-5" />
                             Analisar Requisitos e RMI

@@ -37,11 +37,11 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
 
           <button 
             onClick={() => onConfirm('gemini', !isEliteSelected ? currentModel : undefined)}
-            className={`w-full text-left p-4 rounded-xl border transition-all group ${!isEliteSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+            className={`w-full text-left p-4 rounded-xl border transition-all group ${!isEliteSelected ? 'border-primary-600 bg-primary-50 dark:bg-bordeaux-900/30' : 'border-slate-200 dark:border-slate-700 hover:border-primary-600 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-bordeaux-900/30'}`}
           >
             <div className="flex justify-between items-start">
               <div>
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-primary-700 dark:group-hover:text-gold-400">
                   Prosseguir com {!isEliteSelected && currentModel ? currentModel.split('/')[1] || currentModel : 'Gemini'} (Padrão)
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">Usa o rodízio de chaves gratuito. Excelente para análise preliminar.</p>

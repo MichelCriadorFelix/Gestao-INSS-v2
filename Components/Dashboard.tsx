@@ -1854,7 +1854,7 @@ export default function Dashboard({
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${!record.type ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800'}`}>{record.type || 'N/D'}</span>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${!record.type ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-primary-50 text-primary-800 border-primary-300/60 dark:bg-bordeaux-900/30 dark:text-gold-300 dark:border-gold-500/30'}`}>{record.type || 'N/D'}</span>
                                                 </td>
                                                 <td className="px-4 py-3 dark:text-slate-400">{record.der || '-'}</td>
                                                 {renderDateCell(record.medExpertiseDate, record.id, '_med')}
@@ -1890,7 +1890,7 @@ export default function Dashboard({
                                                         <button 
                                                             onClick={() => handleEditClient(record)} 
                                                             disabled={isFetchingDetails}
-                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+                                                            className="p-1.5 text-primary-700 hover:bg-primary-50 rounded disabled:opacity-50"
                                                         >
                                                             {isFetchingDetails && currentRecord?.id === record.id ? (
                                                                 <ArrowPathIcon className="h-4 w-4 animate-spin" />
@@ -1943,7 +1943,7 @@ export default function Dashboard({
                                              </div>
                                          </div>
                                          <div className="flex gap-2">
-                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-primary-50 dark:bg-bordeaux-900/30 text-primary-700 dark:text-gold-400 rounded-lg">
                                                  <PencilSquareIcon className="h-5 w-5" />
                                              </button>
                                              <button onClick={() => handleClientDelete(record.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
@@ -1959,7 +1959,7 @@ export default function Dashboard({
                                          </div>
                                          <div>
                                              <p className="mb-1">Tipo</p>
-                                             <p className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded border border-blue-100 dark:border-blue-800">{record.type || 'N/D'}</p>
+                                             <p className="text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 p-1.5 rounded border border-primary-200/50 dark:border-gold-500/30">{record.type || 'N/D'}</p>
                                          </div>
                                          <div>
                                              <p className="mb-1">DER</p>
@@ -1978,7 +1978,7 @@ export default function Dashboard({
                                              </div>
                                          )}
                                          {record.socialExpertiseDate && (
-                                             <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
+                                             <div className="px-2 py-1 bg-primary-50 dark:bg-indigo-900/10 text-primary-700 dark:text-gold-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
                                                  P. Social: {record.socialExpertiseDate}
                                              </div>
                                          )}
@@ -2006,7 +2006,7 @@ export default function Dashboard({
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <div className="relative w-full md:w-[400px] group">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
                             </div>
                             <input
                                 type="text"
@@ -2027,7 +2027,7 @@ export default function Dashboard({
                             </button>
                             <button
                                 onClick={() => { setCurrentContract(null); setIsContractModalOpen(true); }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
+                                className="bg-primary-700 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
                             >
                                 <PlusIcon className="h-5 w-5" />
                                 Novo Contrato
@@ -2064,14 +2064,14 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="px-4 py-3 dark:text-slate-300">{contract.serviceType}</td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20' : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20'}`}>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-primary-50 text-primary-800 border-primary-300/60 dark:bg-bordeaux-900/30' : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20'}`}>
                                                         {contract.lawyer === 'Michel' ? '👨‍⚖️ Dr. Michel' : '👩‍⚖️ Dra. Luana'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 font-mono font-bold dark:text-slate-200">{formatCurrency(totalFee)}</td>
                                                 <td className="px-4 py-3 w-48">
                                                     <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-1">
-                                                        <div className={`h-2 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                                        <div className={`h-2 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between">
                                                         <span>Pago: {formatCurrency(totalPaid)}</span>
@@ -2088,7 +2088,7 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex justify-end gap-1">
-                                                        <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><PencilSquareIcon className="h-4 w-4" /></button>
+                                                        <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-1.5 text-primary-700 hover:bg-primary-50 rounded"><PencilSquareIcon className="h-4 w-4" /></button>
                                                         <button onClick={() => handleContractDelete(contract.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><TrashIcon className="h-4 w-4" /></button>
                                                     </div>
                                                 </td>
@@ -2129,7 +2129,7 @@ export default function Dashboard({
 
                                          <div className="flex justify-between items-center text-xs">
                                              <div className="text-slate-600 dark:text-slate-400 font-medium italic">{contract.serviceType}</div>
-                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
+                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-primary-50 text-primary-800 border-primary-200/50' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
                                                  {contract.lawyer === 'Michel' ? 'Michel' : 'Luana'}
                                              </span>
                                          </div>
@@ -2140,16 +2140,16 @@ export default function Dashboard({
                                                  <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
                                              </div>
                                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                              </div>
                                          </div>
 
                                          <div className="flex justify-between items-center pt-2">
                                              <div className="text-[10px] text-slate-500">
-                                                 Sinal/Pago: <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(totalPaid)}</span>
+                                                 Sinal/Pago: <span className="font-bold text-primary-700 dark:text-gold-400">{formatCurrency(totalPaid)}</span>
                                              </div>
                                              <div className="flex gap-2">
-                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-primary-50 dark:bg-indigo-900/20 text-primary-700 dark:text-gold-400 rounded-lg">
                                                      <PencilSquareIcon className="h-4 w-4" />
                                                  </button>
                                                  <button onClick={() => handleContractDelete(contract.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">

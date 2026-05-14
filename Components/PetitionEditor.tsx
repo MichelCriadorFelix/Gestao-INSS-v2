@@ -907,7 +907,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               </div>
               <button 
                 onClick={() => setSelectedClient(null)}
-                className="text-indigo-600 hover:text-indigo-700"
+                className="text-primary-700 hover:text-indigo-700"
                 title="Alterar cliente"
               >
                 <PencilSquareIcon className="w-4 h-4" />
@@ -915,14 +915,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             </div>
             {selectedClient ? (
               <div className="text-sm">
-                <p className="font-bold text-indigo-600">{selectedClient.name}</p>
+                <p className="font-bold text-primary-700">{selectedClient.name}</p>
                 <p className="text-xs text-slate-500">#{selectedClient.id.slice(0,4)}</p>
               </div>
             ) : (
               <div className="relative">
                 <button 
                   onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                  className="w-full flex items-center justify-between bg-transparent border-none text-sm font-bold text-indigo-600 focus:ring-0 p-0 cursor-pointer"
+                  className="w-full flex items-center justify-between bg-transparent border-none text-sm font-bold text-primary-700 focus:ring-0 p-0 cursor-pointer"
                 >
                   Selecionar Cliente
                   <ChevronDown className="w-4 h-4" />
@@ -988,7 +988,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               onClick={() => setIsHeaderFooterModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
-              <Layout className="w-4 h-4 text-blue-500" /> Cabeçalho e rodapé
+              <Layout className="w-4 h-4 text-primary-600" /> Cabeçalho e rodapé
             </button>
             <button 
               onClick={() => {
@@ -1025,7 +1025,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     type="radio" 
                     checked={type === 'model'} 
                     onChange={() => setType('model')}
-                    className="text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                    className="text-primary-700 focus:ring-indigo-500 w-4 h-4"
                   />
                   <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition">Modelo</span>
                 </label>
@@ -1034,7 +1034,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     type="radio" 
                     checked={type === 'concrete'} 
                     onChange={() => setType('concrete')}
-                    className="text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                    className="text-primary-700 focus:ring-indigo-500 w-4 h-4"
                   />
                   <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition">Caso concreto</span>
                 </label>
@@ -1062,7 +1062,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               >
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
                   <div className="flex items-center gap-2">
-                    <Scale className="w-5 h-5 text-indigo-500" />
+                    <Scale className="w-5 h-5 text-primary-600" />
                     <h3 className="font-bold text-sm text-slate-800 dark:text-white">Assistente IA</h3>
                   </div>
                   <button onClick={() => setIsAiPanelOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition">
@@ -1078,7 +1078,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                       onClick={() => fileInputRef.current?.click()}
                       className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-500 transition-colors group"
                     >
-                      <Upload className="w-6 h-6 mx-auto text-slate-400 group-hover:text-indigo-500 mb-2" />
+                      <Upload className="w-6 h-6 mx-auto text-slate-400 group-hover:text-primary-600 mb-2" />
                       <p className="text-xs text-slate-500">Clique para anexar arquivos do processo (PDF)</p>
                       <input 
                         type="file" 
@@ -1095,7 +1095,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                         {uploadedDocs.map(doc => (
                           <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <FileTextIcon className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                              <FileTextIcon className="w-3 h-3 text-primary-600 flex-shrink-0" />
                               <span className="text-[10px] font-medium truncate text-slate-700 dark:text-slate-300">{doc.name}</span>
                             </div>
                             <button 
@@ -1123,13 +1123,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
                   {aiProgressText && (
                     <div className="space-y-2">
-                      <div className="flex justify-between text-[10px] font-bold text-indigo-500">
+                      <div className="flex justify-between text-[10px] font-bold text-primary-600">
                         <span>{aiProgressText}</span>
                         <span>{aiProgress}%</span>
                       </div>
                       <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                         <motion.div 
-                          className="bg-indigo-500 h-full"
+                          className="bg-primary-500 h-full"
                           initial={{ width: 0 }}
                           animate={{ width: `${aiProgress}%` }}
                         />
@@ -1142,7 +1142,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                   <button
                     onClick={() => handleAiGenerate()}
                     disabled={isAiGenerating || (!aiPrompt.trim() && uploadedDocs.length === 0)}
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-primary-700 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition flex items-center justify-center gap-2"
                   >
                     {isAiGenerating ? (
                       <>
@@ -1240,7 +1240,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             <ToolbarButton 
               onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
               active={isAiPanelOpen}
-              icon={<Scale className="w-4 h-4 text-indigo-500" />}
+              icon={<Scale className="w-4 h-4 text-primary-600" />}
               title="Assistente de Petição IA"
             />
 
@@ -1325,7 +1325,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             >
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                  <TableIcon className="w-5 h-5 text-indigo-500" /> Configurar Tabela
+                  <TableIcon className="w-5 h-5 text-primary-600" /> Configurar Tabela
                 </h3>
                 <button onClick={() => setIsTableModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
                   <X className="w-5 h-5 text-slate-500" />
@@ -1363,7 +1363,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: true }).run();
                     setIsTableModalOpen(false);
                   }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition shadow-md"
+                  className="px-4 py-2 bg-primary-700 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition shadow-md"
                 >
                   Inserir Tabela
                 </button>
@@ -1417,7 +1417,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Sua logo (opcional)</label>
                       <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition cursor-pointer group">
-                        <Upload className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 mx-auto mb-2" />
+                        <Upload className="w-8 h-8 text-slate-400 group-hover:text-primary-600 mx-auto mb-2" />
                         <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Arraste o seu logo aqui ou clique em</p>
                         <button className="mt-2 px-4 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-xs font-bold flex items-center gap-2 mx-auto">
                           <Upload className="w-3 h-3" /> Selecionar arquivo
@@ -1443,7 +1443,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                       </div>
                       <div className="flex-1">
                         <label className="flex items-center gap-2 cursor-pointer mt-6">
-                          <input type="checkbox" className="text-indigo-600 focus:ring-indigo-500 rounded" />
+                          <input type="checkbox" className="text-primary-700 focus:ring-indigo-500 rounded" />
                           <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Também aplicar a cor ao imprimir as planilhas em PDF</span>
                         </label>
                       </div>
@@ -1452,9 +1452,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
                   {/* Right Column */}
                   <div className="space-y-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800 flex gap-3">
-                      <Settings className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                      <p className="text-xs text-blue-700 dark:text-blue-300">Todos os campos são opcionais: se não quiser utilizar algum, basta deixá-lo em branco.</p>
+                    <div className="bg-primary-50 dark:bg-bordeaux-900/30 p-3 rounded-xl border border-primary-200/50 dark:border-gold-500/30 flex gap-3">
+                      <Settings className="w-5 h-5 text-primary-600 flex-shrink-0" />
+                      <p className="text-xs text-primary-800 dark:text-gold-300">Todos os campos são opcionais: se não quiser utilizar algum, basta deixá-lo em branco.</p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
@@ -1530,7 +1530,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 </div>
                 <button 
                   onClick={() => setIsHeaderFooterModalOpen(false)}
-                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition shadow-md"
+                  className="px-6 py-2 bg-primary-700 hover:bg-indigo-700 text-white rounded-lg font-bold transition shadow-md"
                 >
                   Fechar
                 </button>
@@ -1548,7 +1548,7 @@ const ToolbarButton = ({ onClick, active = false, icon, onContextMenu, title }: 
     onClick={onClick}
     onContextMenu={onContextMenu}
     title={title}
-    className={`p-2 rounded transition ${active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+    className={`p-2 rounded transition ${active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-primary-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
   >
     {icon}
   </button>

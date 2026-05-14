@@ -321,7 +321,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                     }}
                                     className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition group"
                                 >
-                                    <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full group-hover:scale-110 transition">
+                                    <div className="bg-primary-100 dark:bg-bordeaux-900/40 p-4 rounded-full group-hover:scale-110 transition">
                                         <CameraIcon className="h-8 w-8 text-primary-600" />
                                     </div>
                                     <span className="font-bold text-slate-700 dark:text-slate-200">Câmera</span>

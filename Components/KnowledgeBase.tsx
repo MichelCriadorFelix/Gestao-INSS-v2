@@ -182,7 +182,7 @@ export default function KnowledgeBase() {
             setIsSuccess(false);
             setMessage({ text: '', type: '' });
           }}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-primary-700 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
         >
           <Plus size={20} />
           Adicionar Mais Leis
@@ -237,7 +237,7 @@ export default function KnowledgeBase() {
             <div className={`p-3 rounded-lg text-sm ${
               message.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
               message.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
-              'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+              'bg-primary-50 dark:bg-bordeaux-900/30 text-primary-800 dark:text-gold-400 border border-primary-300/60 dark:border-gold-500/30'
             }`}>
               {message.text}
             </div>
@@ -248,7 +248,7 @@ export default function KnowledgeBase() {
               onClick={handleProcess}
               disabled={isProcessing}
               className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+                isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-primary-700 hover:bg-indigo-700'
               }`}
             >
               {isProcessing ? 'Processando...' : 'Processar e Salvar'}
@@ -259,7 +259,7 @@ export default function KnowledgeBase() {
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
-          <BookOpen className="text-indigo-500" size={20} />
+          <BookOpen className="text-primary-600" size={20} />
           Documentos na Base
         </h3>
 
@@ -313,7 +313,7 @@ export default function KnowledgeBase() {
               <button
                 key={law}
                 onClick={() => handleSelectSuggested(law)}
-                className="w-full text-left p-2 text-xs bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded border border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-colors truncate"
+                className="w-full text-left p-2 text-xs bg-primary-50/50 dark:bg-indigo-900/10 text-primary-700 dark:text-gold-400 rounded border border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-colors truncate"
               >
                 + {law}
               </button>

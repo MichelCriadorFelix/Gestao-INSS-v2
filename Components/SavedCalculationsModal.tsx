@@ -129,7 +129,7 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            <FolderOpenIcon className="h-5 w-5 text-indigo-500" />
+                            <FolderOpenIcon className="h-5 w-5 text-primary-600" />
                             Cálculos Salvos
                         </h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -187,7 +187,7 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
                                         <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button 
                                                 onClick={() => handleLoad(calc)}
-                                                className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+                                                className="p-2 bg-primary-50 dark:bg-indigo-900/30 text-primary-700 dark:text-gold-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
                                                 title="Abrir"
                                             >
                                                 <FolderOpenIcon className="h-4 w-4" />

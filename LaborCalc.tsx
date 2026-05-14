@@ -27,7 +27,7 @@ const STYLES = {
   LABEL_TINY: "block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1",
   INPUT_FIELD: "w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition text-sm font-medium shadow-sm",
   INPUT_TINY: "w-full px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500",
-  BTN_PRIMARY: "px-5 py-2.5 text-white font-medium bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2 transform active:scale-95",
+  BTN_PRIMARY: "px-5 py-2.5 text-white font-medium bg-primary-700 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2 transform active:scale-95",
   BTN_SECONDARY: "px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition shadow-sm transform active:scale-95",
   BTN_SECONDARY_SM: "px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition",
   CARD_SECTION: "bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md border border-slate-200 dark:border-slate-800",
@@ -2010,7 +2010,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
       {/* Header da Calculadora */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex justify-between items-center shadow-sm z-10">
          <div className="flex items-center gap-3">
-             <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-indigo-600 dark:text-indigo-400">
+             <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-primary-700 dark:text-indigo-400">
                  <CalculatorIcon className="h-6 w-6" />
              </div>
              <div>
@@ -2026,7 +2026,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                 <TrashIcon className="h-4 w-4" /> Limpar
             </button>
             {totalValue > 0 && (
-                <button onClick={() => generatePDF()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition">
+                <button onClick={() => generatePDF()} className="bg-primary-700 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition">
                     <DocumentTextIcon className="h-4 w-4" />
                     Baixar PDF
                 </button>
@@ -2049,8 +2049,8 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                   <p className="text-xs text-slate-500">{new Date(calc.date).toLocaleDateString()} - {formatCurrency(calc.totalValue)}</p>
                               </div>
                               <div className="flex gap-1">
-                                  <button onClick={() => generatePDF(calc.data)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded" title="Baixar PDF"><DocumentTextIcon className="h-4 w-4" /></button>
-                                  <button onClick={() => loadCalculation(calc)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded" title="Editar / Visualizar"><PencilSquareIcon className="h-4 w-4" /></button>
+                                  <button onClick={() => generatePDF(calc.data)} className="p-1.5 text-primary-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded" title="Baixar PDF"><DocumentTextIcon className="h-4 w-4" /></button>
+                                  <button onClick={() => loadCalculation(calc)} className="p-1.5 text-primary-700 hover:bg-primary-50 dark:hover:bg-blue-900/20 rounded" title="Editar / Visualizar"><PencilSquareIcon className="h-4 w-4" /></button>
                                   <button onClick={() => onDeleteCalculation && onDeleteCalculation(calc.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded" title="Excluir"><TrashIcon className="h-4 w-4" /></button>
                               </div>
                           </div>
@@ -2068,7 +2068,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                 onClick={() => setActiveTab(idx + 1)}
                 className={`px-4 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
                     activeTab === idx + 1 
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' 
+                    ? 'border-indigo-500 text-primary-700 dark:text-indigo-400' 
                     : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
              >
@@ -2087,7 +2087,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className={`md:col-span-2 ${STYLES.CARD_SECTION}`}>
                           <h3 className={STYLES.CARD_TITLE}>
-                              <DocumentTextIcon className="h-5 w-5 text-indigo-500" /> Informações Básicas
+                              <DocumentTextIcon className="h-5 w-5 text-primary-600" /> Informações Básicas
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="md:col-span-2">
@@ -2141,7 +2141,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                       {/* Relato do Cliente */}
                       <div className={`md:col-span-2 ${STYLES.CARD_SECTION}`}>
                           <h3 className={STYLES.CARD_TITLE}>
-                              <DocumentTextIcon className="w-5 h-5 text-indigo-500" />
+                              <DocumentTextIcon className="w-5 h-5 text-primary-600" />
                               Relato do Cliente / Fatos Relevantes
                           </h3>
                           <div className="mt-4">
@@ -2158,7 +2158,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                       <div className={`md:col-span-2 ${STYLES.CARD_SECTION}`}>
                           <div className="flex justify-between items-center mb-4">
                               <h3 className={STYLES.CARD_TITLE}>
-                                  <ClockIcon className="w-5 h-5 text-indigo-500" />
+                                  <ClockIcon className="w-5 h-5 text-primary-600" />
                                   Jornada de Trabalho Prevista (Contratual)
                               </h3>
                               <button 
@@ -2269,7 +2269,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                                   }}
                                                                   className={`w-7 h-7 rounded-md text-[10px] font-bold transition-colors ${
                                                                       isSelected 
-                                                                          ? 'bg-indigo-600 text-white' 
+                                                                          ? 'bg-primary-700 text-white' 
                                                                           : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-700'
                                                                   }`}
                                                               >
@@ -2329,7 +2329,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               {/* Estimativa Mensal */}
                               <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between gap-4">
                                   <div className="flex flex-col flex-1">
-                                      <span className="text-xs uppercase font-bold text-indigo-600 dark:text-indigo-400 mb-1">Estimativa Mensal (Contratual)</span>
+                                      <span className="text-xs uppercase font-bold text-primary-700 dark:text-indigo-400 mb-1">Estimativa Mensal (Contratual)</span>
                                       <span className="text-xs text-slate-500">Baseada na escala e horários informados</span>
                                   </div>
                                   
@@ -2425,7 +2425,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                       <div className={`md:col-span-2 ${STYLES.CARD_SECTION}`}>
                           <div className="flex justify-between items-center mb-4">
                               <h3 className={STYLES.CARD_TITLE}>
-                                  <BanknotesIcon className="h-5 w-5 text-indigo-500" /> Histórico Salarial
+                                  <BanknotesIcon className="h-5 w-5 text-primary-600" /> Histórico Salarial
                               </h3>
                               <button onClick={addSalaryHistory} className={STYLES.BTN_SECONDARY_SM}>
                                   <PlusIcon className="h-4 w-4" /> Adicionar Período
@@ -2547,7 +2547,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
                       {/* Seção Adicionais Fixos */}
                       <div className={STYLES.CARD_SECTION}>
-                          <h3 className={`${STYLES.CARD_TITLE} text-indigo-600 dark:text-indigo-400`}>
+                          <h3 className={`${STYLES.CARD_TITLE} text-primary-700 dark:text-indigo-400`}>
                               <PlusIcon className="h-5 w-5" /> Adicionais Recorrentes
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
@@ -2572,7 +2572,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                           type="checkbox" 
                                           checked={data.periculosidade} 
                                           onChange={e => handleInputChange('periculosidade', e.target.checked)} 
-                                          className="w-5 h-5 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
+                                          className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
                                       />
                                       <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                                           Periculosidade (30%)
@@ -2688,7 +2688,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                           id={`cct-integra-${right.id}`}
                                           checked={right.integratesSalary || false}
                                           onChange={e => updateCctRight(right.id, 'integratesSalary', e.target.checked)}
-                                          className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500"
+                                          className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500"
                                       />
                                       <label htmlFor={`cct-integra-${right.id}`} className="text-[10px] text-slate-600 dark:text-slate-400 cursor-pointer select-none">
                                           Integra salário (Base FGTS)
@@ -2779,7 +2779,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-600 dark:text-slate-300 select-none">
                                                <input type="checkbox" checked={ot.applyDsr} onChange={(e) => {
                                                    const newOt = [...data.overtime]; newOt[idx].applyDsr = e.target.checked; setData({...data, overtime: newOt});
-                                               }} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                               }} className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                                Reflexo DSR
                                            </label>
                                       </div>
@@ -2790,7 +2790,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
 
                       <div className={STYLES.CARD_SECTION}>
-                          <h3 className={`${STYLES.CARD_TITLE} text-indigo-600 dark:text-indigo-400`}>
+                          <h3 className={`${STYLES.CARD_TITLE} text-primary-700 dark:text-indigo-400`}>
                               <ClockIcon className="h-5 w-5" /> Adicional Noturno e Intrajornada
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -2801,7 +2801,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                               type="checkbox" 
                                               checked={data.adicionalNoturno.active} 
                                               onChange={e => setData(prev => ({ ...prev, adicionalNoturno: { ...prev.adicionalNoturno, active: e.target.checked } }))} 
-                                              className="w-5 h-5 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
+                                              className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
                                           />
                                           <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                                               Adicional Noturno (20%)
@@ -2823,7 +2823,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                       type="checkbox" 
                                                       checked={data.adicionalNoturno.applySumula60 || false} 
                                                       onChange={e => setData(prev => ({ ...prev, adicionalNoturno: { ...prev.adicionalNoturno, applySumula60: e.target.checked } }))} 
-                                                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600" 
+                                                      className="w-4 h-4 text-primary-700 rounded focus:ring-indigo-500 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600" 
                                                   />
                                                   <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
                                                       Aplicar Súmula 60 TST (Prorrogação da Jornada Noturna)
@@ -2948,7 +2948,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                               type="checkbox" 
                                               checked={data.intrajornada.active} 
                                               onChange={e => setData(prev => ({ ...prev, intrajornada: { ...prev.intrajornada, active: e.target.checked } }))} 
-                                              className="w-5 h-5 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
+                                              className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" 
                                           />
                                           <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">
                                               Adicional Intrajornada (Intervalo Suprimido)
@@ -3033,11 +3033,11 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                       </div>
                       {/* Feriados, Domingos e Banco de Horas */}
                       <div className={STYLES.CARD_SECTION}>
-                          <h3 className={`${STYLES.CARD_TITLE} text-blue-600 dark:text-blue-400`}>
+                          <h3 className={`${STYLES.CARD_TITLE} text-primary-700 dark:text-gold-400`}>
                               <CalendarIcon className="h-5 w-5" /> Feriados, Domingos e Banco de Horas
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl space-y-4">
+                              <div className="p-4 bg-primary-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl space-y-4">
                                   <div>
                                       <label className={STYLES.LABEL_TEXT}>Feriados Trabalhados (Não Compensados)</label>
                                       <input type="number" className={STYLES.INPUT_FIELD} value={data.uncompensatedHolidays || ''} onChange={e => handleInputChange('uncompensatedHolidays', Number(e.target.value))} placeholder="Qtd. de dias" />
@@ -3153,7 +3153,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                    <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">Férias</h4>
                                        <label className="flex items-center gap-3 mb-2 cursor-pointer">
-                                            <input type="checkbox" checked={data.claimVacationProportional} onChange={e => handleInputChange('claimVacationProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                            <input type="checkbox" checked={data.claimVacationProportional} onChange={e => handleInputChange('claimVacationProportional', e.target.checked)} className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                             <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcionais + 1/3</span>
                                        </label>
                                        
@@ -3213,11 +3213,11 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">13º Salário</h4>
                                        <div className="flex flex-col gap-2 mb-3">
                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={data.claim13thProportional} onChange={e => handleInputChange('claim13thProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                                <input type="checkbox" checked={data.claim13thProportional} onChange={e => handleInputChange('claim13thProportional', e.target.checked)} className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                                 <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcional (Ano Saída)</span>
                                            </label>
                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={data.claim13thAdmissionProportional} onChange={e => handleInputChange('claim13thAdmissionProportional', e.target.checked)} className="w-4 h-4 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                                <input type="checkbox" checked={data.claim13thAdmissionProportional} onChange={e => handleInputChange('claim13thAdmissionProportional', e.target.checked)} className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                                 <span className="text-xs font-semibold dark:text-slate-300">Calcular Proporcional (Ano Admissão)</span>
                                            </label>
                                        </div>
@@ -3261,7 +3261,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </div>
                       </div>
                       <div className={STYLES.CARD_SECTION}>
-                          <h3 className={`${STYLES.CARD_TITLE} text-blue-600 dark:text-blue-400`}>
+                          <h3 className={`${STYLES.CARD_TITLE} text-primary-700 dark:text-gold-400`}>
                               <BanknotesIcon className="h-5 w-5" /> FGTS e Multas Rescisórias
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
@@ -3283,7 +3283,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                 type="checkbox" 
                                                 checked={data.fgtsAllDeposited} 
                                                 onChange={e => handleInputChange('fgtsAllDeposited', e.target.checked)} 
-                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                                className="w-4 h-4 text-primary-700 rounded focus:ring-indigo-500"
                                                 disabled={data.fgtsNoDeposits}
                                               />
                                               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">FGTS Totalmente Depositado (Período Integral)</span>
@@ -3306,7 +3306,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                 type="checkbox" 
                                                 checked={data.fgtsPenaltyAllDeposited} 
                                                 onChange={e => handleInputChange('fgtsPenaltyAllDeposited', e.target.checked)} 
-                                                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                                className="w-4 h-4 text-primary-700 rounded focus:ring-indigo-500"
                                                 disabled={data.fgtsNoDeposits}
                                               />
                                               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Multa 40% FGTS Totalmente Depositada (Período Integral)</span>
@@ -3375,11 +3375,11 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                       <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 text-sm">Multas Rescisórias</h4>
                                       <div className="space-y-3">
                                           <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
-                                              <input type="checkbox" checked={data.applyFine477} onChange={e => handleInputChange('applyFine477', e.target.checked)} className="w-5 h-5 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                              <input type="checkbox" checked={data.applyFine477} onChange={e => handleInputChange('applyFine477', e.target.checked)} className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                               <span className="text-sm font-semibold dark:text-slate-200">Multa Art. 477 (Atraso Pagamento)</span>
                                           </label>
                                           <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
-                                              <input type="checkbox" checked={data.applyFine467} onChange={e => handleInputChange('applyFine467', e.target.checked)} className="w-5 h-5 text-indigo-600 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
+                                              <input type="checkbox" checked={data.applyFine467} onChange={e => handleInputChange('applyFine467', e.target.checked)} className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                               <span className="text-sm font-semibold dark:text-slate-200">Multa Art. 467 (Verbas Incontroversas)</span>
                                           </label>
                                       </div>
@@ -3531,16 +3531,16 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                       <button onClick={() => handleSave(false)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-emerald-500/50 flex items-center gap-2 transition">
                                           <ArrowPathIcon className="h-5 w-5" /> Atualizar
                                       </button>
-                                      <button onClick={() => handleSave(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-500/50 flex items-center gap-2 transition">
+                                      <button onClick={() => handleSave(true)} className="px-4 py-2 bg-primary-700 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-500/50 flex items-center gap-2 transition">
                                           <PlusIcon className="h-5 w-5" /> Salvar Novo
                                       </button>
                                   </>
                               ) : (
-                                  <button onClick={() => handleSave(false)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-500/50 flex items-center gap-2 transition">
+                                  <button onClick={() => handleSave(false)} className="px-4 py-2 bg-primary-700 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-blue-500/50 flex items-center gap-2 transition">
                                       <ArchiveBoxIcon className="h-5 w-5" /> Salvar
                                   </button>
                               )}
-                              <button onClick={() => generatePDF()} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-bold text-sm shadow-lg shadow-indigo-500/50 flex items-center gap-2 transition">
+                              <button onClick={() => generatePDF()} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm shadow-lg shadow-indigo-500/50 flex items-center gap-2 transition">
                                   <DocumentTextIcon className="h-5 w-5" /> PDF
                               </button>
                           </div>

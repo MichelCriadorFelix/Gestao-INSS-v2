@@ -98,7 +98,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const AVAILABLE_TAGS = [
-      { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+      { id: 'pessoal', label: 'Pessoal', color: 'bg-primary-100 text-primary-800 border-primary-300/60' },
       { id: 'trabalhista', label: 'Trabalhista', color: 'bg-orange-100 text-orange-700 border-orange-200' },
       { id: 'medico', label: 'Médico', color: 'bg-red-100 text-red-700 border-red-200' },
       { id: 'previdenciario', label: 'Previdenciário', color: 'bg-purple-100 text-purple-700 border-purple-200' },
@@ -1034,7 +1034,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             <button 
                                 onClick={handleUnifiedOCR}
                                 disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
-                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
+                                className="flex items-center gap-2 bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
                             >
                                 {isGeneratingOCR ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <BoltIcon className="h-4 w-4" />}
                                 {isGeneratingOCR ? 'Lendo...' : 'Gerar OCR Unificado'}
@@ -1051,7 +1051,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
                         <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                            <DocumentTextIcon className="h-5 w-5 text-blue-500" />
+                            <DocumentTextIcon className="h-5 w-5 text-primary-600" />
                             Gerar Procuração
                         </button>
                         <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -1093,7 +1093,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <p className="font-bold text-sm text-slate-800 dark:text-white truncate" title={doc.name}>{doc.name}</p>
-                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-blue-500" title="Armazenado na Nuvem" />}
+                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-primary-600" title="Armazenado na Nuvem" />}
                                                     <button onClick={() => startEditingDoc(doc)} className="text-slate-400 hover:text-primary-600"><PencilSquareIcon className="h-4 w-4" /></button>
                                                 </div>
                                             )}
@@ -1107,7 +1107,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 sm:ml-auto">
-                                        {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
+                                        {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-primary-600 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
                                         {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
                                         {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Tentar Novamente</button>}
                                         
@@ -1180,7 +1180,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             formData.petitions.map((petition, idx) => (
                                 <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                                        <div className="h-10 w-10 bg-indigo-100 text-primary-700 rounded-lg flex items-center justify-center">
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
                                         <div>

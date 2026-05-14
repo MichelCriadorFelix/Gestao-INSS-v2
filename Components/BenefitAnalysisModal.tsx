@@ -66,7 +66,7 @@ const BenefitCard: React.FC<BenefitCardProps> = ({ benefit, onDetail }) => {
                     </div>
                     <button 
                         onClick={() => onDetail(benefit)}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition"
+                        className="px-3 py-1.5 bg-primary-700 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition"
                     >
                         <CalculatorIcon className="h-3.5 w-3.5" />
                         Detalhar RMI
@@ -97,7 +97,7 @@ const RMIDetailView = ({ details, onClose }: { details: NonNullable<BenefitResul
                         </div>
                         <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                             <span className="text-xs uppercase font-bold text-slate-500">Fator/Coeficiente</span>
-                            <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                            <div className="text-xl font-bold text-primary-700 dark:text-gold-400">
                                 {details.appliedFactor.toFixed(4)}
                             </div>
                         </div>
@@ -175,7 +175,7 @@ const BenefitAnalysisModal: React.FC<BenefitAnalysisModalProps> = ({ isOpen, onC
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            <DocumentTextIcon className="h-5 w-5 text-indigo-500" />
+                            <DocumentTextIcon className="h-5 w-5 text-primary-600" />
                             Análise de Requisitos e RMI
                         </h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -194,7 +194,7 @@ const BenefitAnalysisModal: React.FC<BenefitAnalysisModalProps> = ({ isOpen, onC
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                         <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tempo Total</span>
-                            <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            <div className="text-sm font-bold text-primary-700 dark:text-gold-400 mt-0.5">
                                 {result.totalTime.years}a {result.totalTime.months}m {result.totalTime.days}d
                             </div>
                         </div>
@@ -222,19 +222,19 @@ const BenefitAnalysisModal: React.FC<BenefitAnalysisModalProps> = ({ isOpen, onC
                     <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
                         <button 
                             onClick={() => setSelectedCategory('aposentadorias')}
-                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'aposentadorias' ? 'bg-white dark:bg-slate-800 text-indigo-600 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'aposentadorias' ? 'bg-white dark:bg-slate-800 text-primary-700 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                         >
                             Aposentadorias
                         </button>
                         <button 
                             onClick={() => setSelectedCategory('auxilios')}
-                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'auxilios' ? 'bg-white dark:bg-slate-800 text-indigo-600 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'auxilios' ? 'bg-white dark:bg-slate-800 text-primary-700 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                         >
                             Auxílios e Salários
                         </button>
                         <button 
                             onClick={() => setSelectedCategory('dependentes')}
-                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'dependentes' ? 'bg-white dark:bg-slate-800 text-indigo-600 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
+                            className={`px-4 py-2 text-xs font-bold rounded-t-lg transition whitespace-nowrap ${selectedCategory === 'dependentes' ? 'bg-white dark:bg-slate-800 text-primary-700 border-x border-t border-slate-200 dark:border-slate-700 relative -mb-px' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}
                         >
                             Benefícios aos Dependentes
                         </button>

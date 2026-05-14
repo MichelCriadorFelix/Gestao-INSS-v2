@@ -109,10 +109,10 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
 
     const getThemeColor = () => {
         if (type === 'revenue') return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
-        if (type === 'michel') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
+        if (type === 'michel') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 border-primary-300/60 dark:border-gold-500/30';
         if (type === 'luana') return 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800';
-        if (type === 'portfolio') return 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800';
-        if (type === 'total_concluded') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
+        if (type === 'portfolio') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800';
+        if (type === 'total_concluded') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 border-primary-300/60 dark:border-gold-500/30';
         return '';
     }
 

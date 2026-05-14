@@ -226,7 +226,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
                 <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
                     <div className="flex items-center gap-3">
-                         <div className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg">
+                         <div className="bg-primary-50 dark:bg-indigo-900/20 text-primary-700 dark:text-gold-400 p-2 rounded-lg">
                              <BriefcaseIcon className="h-6 w-6" />
                          </div>
                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -410,7 +410,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      
                      {formData.paymentMethod === 'Parcelado' && (
-                         <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                         <div className="md:col-span-2 bg-primary-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
                              <div className="flex items-center justify-between gap-4 mb-4">
                                  <div>
                                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Qtd. Parcelas</label>
@@ -426,7 +426,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                      </select>
                                  </div>
                                  <div className="text-right">
-                                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase mb-1">Valor por Parcela</p>
+                                     <p className="text-xs text-primary-700 dark:text-gold-400 font-bold uppercase mb-1">Valor por Parcela</p>
                                      <p className="text-xl font-bold text-slate-800 dark:text-white font-mono">
                                          {formatCurrency(installmentValue)}
                                      </p>
@@ -449,7 +449,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                          Number(formData.installmentsCount) || 2,
                                          Number(formData.totalFee) || 0
                                      )}
-                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition whitespace-nowrap"
+                                     className="px-4 py-2 bg-primary-700 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition whitespace-nowrap"
                                  >
                                      Gerar Parcelas
                                  </button>
@@ -549,7 +549,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                 Enviar Cobrança
                             </button>
                         )}
-                        <button type="submit" className="px-5 py-2.5 text-white font-medium bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2">
+                        <button type="submit" className="px-5 py-2.5 text-white font-medium bg-primary-700 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2">
                             <CheckIcon className="h-5 w-5" />
                             Salvar Contrato
                         </button>

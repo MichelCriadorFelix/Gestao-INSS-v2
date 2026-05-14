@@ -41,7 +41,7 @@ const Jurisprudence: React.FC = () => {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* BUSCADOR PRINCIPAL JUSBRASIL */}
-      <div className="bg-gradient-to-br from-indigo-600 to-primary-700 rounded-[2.5rem] p-10 md:p-16 shadow-2xl shadow-indigo-500/20 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-primary-700 to-primary-700 rounded-[2.5rem] p-10 md:p-16 shadow-2xl shadow-indigo-500/20 text-white relative overflow-hidden">
         {/* Elementos decorativos de fundo */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 bg-indigo-400/20 rounded-full blur-3xl"></div>
@@ -72,7 +72,7 @@ const Jurisprudence: React.FC = () => {
             <div className="absolute right-3 inset-y-3">
                <button 
                  onClick={() => handleQuickSearch(jusbrasil)}
-                 className="h-full px-8 bg-white text-indigo-600 font-bold text-lg rounded-2xl hover:bg-indigo-50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
+                 className="h-full px-8 bg-white text-primary-700 font-bold text-lg rounded-2xl hover:bg-primary-50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
                >
                  Buscar
                </button>
@@ -100,7 +100,7 @@ const Jurisprudence: React.FC = () => {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
-                <ScaleIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                <ScaleIcon className="w-6 h-6 text-primary-700 dark:text-gold-400" />
               </div>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Portal Jusbrasil</h3>
             </div>
@@ -113,7 +113,7 @@ const Jurisprudence: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => handleQuickSearch(jusbrasil)}
-              className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+              className="flex-1 py-4 bg-primary-700 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
             >
               <MagnifyingGlassIcon className="w-5 h-5" />
               Nova Pesquisa
@@ -132,7 +132,7 @@ const Jurisprudence: React.FC = () => {
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <ScaleIcon className="w-32 h-32 rotate-12" />
           </div>
-          <h4 className="text-indigo-400 font-bold uppercase tracking-widest text-xs mb-4">Dica de Produtividade</h4>
+          <h4 className="text-gold-400 font-bold uppercase tracking-widest text-xs mb-4">Dica de Produtividade</h4>
           <p className="text-slate-300 text-sm leading-relaxed relative z-10">
             Mantenha a janela de pesquisa aberta ao lado do seu editor de petições. 
             Isso permite que você consulte a jurisprudência e fundamente suas peças em tempo real, sem alternar abas.

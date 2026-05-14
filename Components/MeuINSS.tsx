@@ -23,7 +23,7 @@ const MeuINSS: React.FC = () => {
       </p>
       <button
         onClick={openMeuINSS}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg"
+        className="flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg"
       >
         <span>Acessar Meu INSS</span>
         <ArrowTopRightOnSquareIcon className="h-5 w-5" />

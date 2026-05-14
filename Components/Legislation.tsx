@@ -213,7 +213,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
       case 'Constitucional':
         return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400';
       case 'Civil':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+        return 'bg-primary-100 dark:bg-bordeaux-900/40 text-primary-800 dark:text-gold-400';
       case 'Trabalhista':
         return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400';
       case 'Previdenciário':

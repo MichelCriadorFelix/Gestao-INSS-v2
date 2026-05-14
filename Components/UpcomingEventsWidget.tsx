@@ -15,7 +15,7 @@ const EVENT_TYPES = {
   'perícia': { label: 'Perícia', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
   'atendimento': { label: 'Atendimento', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
   'prazo': { label: 'Prazo', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  'outro': { label: 'Outro', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
+  'outro': { label: 'Outro', color: 'bg-slate-100 text-slate-800 dark:bg-bordeaux-900/40 dark:text-slate-300' }
 };
 
 const UpcomingEventsWidget: React.FC<UpcomingEventsWidgetProps> = ({ events, onGoToAgenda, onUpdateEvent }) => {
@@ -57,7 +57,7 @@ const UpcomingEventsWidget: React.FC<UpcomingEventsWidgetProps> = ({ events, onG
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-5 flex flex-col h-full">
+    <div className="bg-white dark:bg-bordeaux-950/40 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/15 p-5 flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-primary-600" />
@@ -87,7 +87,7 @@ const UpcomingEventsWidget: React.FC<UpcomingEventsWidgetProps> = ({ events, onG
                 className={`flex flex-col gap-3 p-3 rounded-xl border transition-all ${
                   isOverdue 
                     ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' 
-                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'
+                    : 'bg-slate-50 dark:bg-bordeaux-900/40/50 border-slate-100 dark:border-gold-500/15/50'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -120,7 +120,7 @@ const UpcomingEventsWidget: React.FC<UpcomingEventsWidgetProps> = ({ events, onG
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-700 mt-1">
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-200 dark:border-gold-500/15 mt-1">
                   <button
                     onClick={() => handleResolve(event, 'resolved')}
                     className="flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
