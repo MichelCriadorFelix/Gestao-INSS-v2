@@ -718,6 +718,21 @@ function hasEchoRepetition(newChunk: string, previousText: string): boolean {
 }
 
 /**
+ * Detecta se a peça já está completa (tem encerramento jurídico).
+ * Se TRUE, não deve continuar mesmo abaixo do alvo de palavras —
+ * caso contrário a IA recomeça a petição do zero.
+ */
+function isPetitionComplete(text: string): boolean {
+  if (!text || text.length < 1500) return false;
+  const tail = text.slice(-2500).toLowerCase();
+  const hasPedeDeferimento = /pede\s+deferimento/i.test(tail);
+  const hasOABorAssinatura = /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(tail) || /assinatura/i.test(tail);
+  const hasDataLocal = /(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+\d{4}/i.test(tail);
+  // Se tem "Pede Deferimento" + (OAB OU data), a peça encerrou
+  return hasPedeDeferimento && (hasOABorAssinatura || hasDataLocal);
+}
+
+/**
  * Extrai sumário estrutural de uma peça (lista de tópicos H2/H3 + primeira linha de cada).
  * Usado em FULL_REGENERATION para guiar nova versão sem injetar a peça inteira.
  */
@@ -796,6 +811,7 @@ const ELITE_REDACTION_MANUAL = `
 11. ESTILO E ENCERRAMENTO:
     - Linguagem sóbria, elegante, técnica e COMBATIVA. Evite clichês.
     - Após "Pede Deferimento", Local, Data, Assinatura: ENCERRE imediatamente. Nada depois.
+    - **REGRA ABSOLUTA ANTI-EMPILHAMENTO:** É TERMINANTEMENTE PROIBIDO gerar uma SEGUNDA petição depois da primeira. Uma vez escrito "Pede Deferimento" + assinatura, PARE seu output. Nunca redija o cabeçalho novamente, nunca refaça "DOS FATOS", nunca duplique o conteúdo da peça. Se você sente que a peça ficou "curta", o caminho correto é DENSIFICAR cada tópico ANTES do "Pede Deferimento" — não criar outra peça depois.
 
 12. ORIENTAÇÃO ESPECÍFICA PARA OPENROUTER (DeepSeek/Qwen/Claude):
     - Ignore templates pré-treinados. Siga EXCLUSIVAMENTE a estrutura listada neste prompt.
@@ -831,6 +847,16 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 🔴 PROIBIDO pedir honorários sucumbenciais em ações no JEF (Juizado Especial Federal). Honorários sucumbenciais apenas na Justiça Comum (Vara Federal).
 
 🔴 PROIBIDO interromper a geração para perguntar se deve continuar. Entregue a petição COMPLETA de uma vez.
+
+🔴 COERÊNCIA TEMÁTICA DO BENEFÍCIO (REGRA CRÍTICA — ANTI-ALUCINAÇÃO):
+   Identifique no relatório/documentos QUAL é o benefício pleiteado e use EXCLUSIVAMENTE fundamentação jurídica daquele benefício:
+   • BPC/LOAS (Lei 8.742/93, Decreto 6.214/07, RE 567.985/MT, Súmulas 48 e 80 da TNU): regra de miserabilidade + deficiência. NUNCA citar Art. 25, 42, 48 da Lei 8.213/91 nem incapacidade laborativa.
+   • Aposentadoria por Idade/Tempo (Lei 8.213/91, EC 103/2019): NUNCA citar BPC.
+   • Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez — Art. 42 e 59 da Lei 8.213/91, Lei 14.331/22): NUNCA citar BPC nem aposentadoria comum.
+   • Pensão por Morte (Art. 74 da Lei 8.213/91): NUNCA citar BPC nem incapacidade.
+   PROIBIDO usar argumento por analogia entre benefícios distintos, exceto se o RAG trouxer essa analogia expressamente (ex.: Tema 640 STJ — analogia BPC/Estatuto do Idoso).
+
+🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte o advogado no final da peça para adicionar à base.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
@@ -1483,6 +1509,11 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 🔴 PROIBIDO interromper a geração para perguntar se deve continuar. Entregue a petição COMPLETA de uma vez.
 
 🔴 PROIBIDO usar placeholders genéricos como "[VALOR]" se o valor estiver disponível na planilha ou no histórico.
+
+🔴 COERÊNCIA TEMÁTICA TRABALHISTA (REGRA CRÍTICA — ANTI-ALUCINAÇÃO):
+   Use EXCLUSIVAMENTE fundamentação de Direito do Trabalho/Processual do Trabalho aplicável ao caso concreto. NUNCA citar institutos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019). Não use analogias entre Direito do Trabalho e Direito Previdenciário sem base expressa no RAG.
+
+🔴 PROIBIDO inventar ou citar Súmulas TST/STF, Temas, Leis ou OJs que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte a advogada no final da peça para adicionar à base.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
@@ -2464,9 +2495,19 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
-      lengthConstraint = `\n\n[ALVO DE TAMANHO DA PEÇA]
-Esta peça tem como alvo: **${petitionLength}**${target ? ` (~${target} palavras)` : ''}.
-Densifique cada tópico com fundamentação real (não com repetição). Cite leis em blockquote, correlacione provas com argumentos, esgote a subsunção fato-norma. O sistema fará continuação automática transparente se necessário — basta você gerar com profundidade. Nunca repita o mesmo argumento para inflar o texto: o alvo é densidade probatória, não volume oco.`;
+      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${target || 5000} palavras** em UMA ÚNICA REDAÇÃO COMPLETA.
+
+REGRAS DE EXECUÇÃO:
+1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
+2. Distribua o alvo entre os tópicos:
+   • DOS FATOS: ~${Math.floor((target || 5000) * 0.25)} palavras (storytelling do caso + provas individualizadas)
+   • DO DIREITO: ~${Math.floor((target || 5000) * 0.50)} palavras (cada tópico com lei em blockquote + subsunção fato-norma + jurisprudência se houver na base)
+   • DOS PEDIDOS: ~${Math.floor((target || 5000) * 0.10)} palavras (cada pedido com 3-5 linhas detalhadas)
+   • Demais seções (preliminares, tutela, valor, rol): o restante.
+3. NUNCA escreva "Pede Deferimento" antes de ter atingido aproximadamente o alvo. Se faltar densidade, APROFUNDE os tópicos atuais ANTES de encerrar.
+4. NUNCA recomece a petição depois do "Pede Deferimento". Após a assinatura, ENCERRE seu output imediatamente. PROIBIDO gerar uma segunda peça empilhada.
+5. NUNCA repita o mesmo argumento ou tópico já redigido. Densidade vem de NOVAS provas, NOVOS argumentos, NOVA subsunção — nunca de repetição.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -2595,7 +2636,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
-      const MAX_ATTEMPTS = wordTarget ? 4 : 3; // mais ciclos quando há alvo de palavras
+      const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
@@ -2606,8 +2647,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             systemInstruction: selectedSystemPrompt,
             temperature: finalTemperature,
             maxOutputTokens,
-            tools,
-            thinkingConfig: { thinkingBudget: 0 } // libera orçamento de output (Gemini Flash thinking consome tokens)
+            tools
+            // Thinking mantido em modo dinâmico padrão — essencial para qualidade jurídica
           } as any
         }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
@@ -2631,32 +2672,32 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
         }
 
-        // ANTI-ECO: se a continuação anterior repetiu mais de 200 chars do texto antigo, aborta
+        // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
         if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
-          console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação para evitar repetição.`);
+          console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
+          isFinished = true;
+          break;
+        }
+
+        // DETECTOR DE FIM DE PEÇA: se já tem "Pede Deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+        if (isPetitionComplete(fullResponseText)) {
+          const wc = countWords(fullResponseText);
+          console.log(`[Dr.Michel] Peça encerrada naturalmente (Pede Deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.92);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
+        // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
         if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nVocê está em ${currentWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''}. Continue EXATAMENTE de onde parou, sem repetir o texto anterior, sem recomeçar, sem saudações.\n\nÚltima linha gerada (use como âncora de continuidade sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga com o próximo parágrafo/tópico da estrutura. Foque em densidade real, sem encher linguiça.` }] });
-        } else if (!maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
-          // Modelo parou sozinho (STOP) antes do alvo — força continuação
-          console.log(`[Dr.Michel] STOP prematuro no ciclo ${attempt} (${currentWordCount}/${wordTarget} palavras). Forçando expansão...`);
-          const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[EXPANSÃO OBRIGATÓRIA — CICLO ${attempt + 1}]\nA peça está em ${currentWordCount} palavras, mas o alvo é ${wordTarget}. APROFUNDE os argumentos dos tópicos já redigidos, especialmente DOS FATOS e DO DIREITO. Adicione fundamentação jurídica adicional, mais provas correlacionadas, mais subsunção fato-norma.\n\nÚltima linha da peça atual: "${anchor.slice(-200)}"\n\nNÃO recomece a peça. NÃO escreva "continuando" nem similares. Apenas adicione novo conteúdo de qualidade na sequência natural.` }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Pede Deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
-          if (maxTokensHit && targetReached) {
-            console.log(`[Dr.Michel] Alvo atingido (${currentWordCount}/${wordTarget}) mesmo com MAX_TOKENS — encerrando.`);
-          }
-          if (attempt >= MAX_ATTEMPTS && maxTokensHit) {
+          if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
           }
           isFinished = true;
@@ -2883,9 +2924,19 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
-      lengthConstraint = `\n\n[ALVO DE TAMANHO DA PEÇA]
-Esta peça tem como alvo: **${petitionLength}**${target ? ` (~${target} palavras)` : ''}.
-Densifique cada tópico com fundamentação real (não com repetição). Cite leis em blockquote, correlacione provas com argumentos, esgote a subsunção fato-norma. O sistema fará continuação automática transparente se necessário — basta você gerar com profundidade. Nunca repita o mesmo argumento para inflar o texto: o alvo é densidade probatória, não volume oco.`;
+      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${target || 5000} palavras** em UMA ÚNICA REDAÇÃO COMPLETA.
+
+REGRAS DE EXECUÇÃO:
+1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
+2. Distribua o alvo entre os tópicos:
+   • DOS FATOS: ~${Math.floor((target || 5000) * 0.25)} palavras (storytelling do caso + provas individualizadas)
+   • DO DIREITO: ~${Math.floor((target || 5000) * 0.50)} palavras (cada tópico com lei em blockquote + subsunção fato-norma + jurisprudência se houver na base)
+   • DOS PEDIDOS: ~${Math.floor((target || 5000) * 0.10)} palavras (cada pedido com 3-5 linhas detalhadas)
+   • Demais seções (preliminares, tutela, valor, rol): o restante.
+3. NUNCA escreva "Pede Deferimento" antes de ter atingido aproximadamente o alvo. Se faltar densidade, APROFUNDE os tópicos atuais ANTES de encerrar.
+4. NUNCA recomece a petição depois do "Pede Deferimento". Após a assinatura, ENCERRE seu output imediatamente. PROIBIDO gerar uma segunda peça empilhada.
+5. NUNCA repita o mesmo argumento ou tópico já redigido. Densidade vem de NOVAS provas, NOVOS argumentos, NOVA subsunção — nunca de repetição.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -3052,7 +3103,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
-      const MAX_ATTEMPTS = wordTarget ? 4 : 3;
+      const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
@@ -3064,7 +3115,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             temperature: finalTemperature,
             maxOutputTokens: maxOutputTokens,
             tools: tools,
-            thinkingConfig: { thinkingBudget: 0 },
+            // Thinking mantido em modo dinâmico padrão — essencial para qualidade jurídica
             safetySettings: [
               { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
               { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -3101,26 +3152,30 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
 
         if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
-          console.log(`[Dra.Luana] ECO detectado no ciclo ${attempt} — interrompendo continuação para evitar repetição.`);
+          console.log(`[Dra.Luana] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
+          isFinished = true;
+          break;
+        }
+
+        // DETECTOR DE FIM DE PEÇA: se já tem "Pede Deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+        if (isPetitionComplete(fullResponseText)) {
+          const wc = countWords(fullResponseText);
+          console.log(`[Dra.Luana] Peça encerrada naturalmente (Pede Deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.92);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
+        // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
         if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
           console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nVocê está em ${currentWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''}. Continue EXATAMENTE de onde parou, sem repetir o texto anterior, sem recomeçar, sem saudações.\n\nÚltima linha gerada: "${anchor.slice(-200)}"\n\nProssiga com o próximo parágrafo/tópico. Foque em densidade real.` }] });
-        } else if (!maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
-          console.log(`[Dra.Luana] STOP prematuro no ciclo ${attempt} (${currentWordCount}/${wordTarget} palavras). Forçando expansão...`);
-          const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[EXPANSÃO OBRIGATÓRIA — CICLO ${attempt + 1}]\nA peça está em ${currentWordCount} palavras, alvo: ${wordTarget}. APROFUNDE os argumentos dos tópicos já redigidos, especialmente DOS FATOS e DO DIREITO.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nNÃO recomece. Adicione conteúdo de qualidade na sequência natural.` }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Pede Deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
-          if (attempt >= MAX_ATTEMPTS && maxTokensHit) {
+          if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
           }
           isFinished = true;

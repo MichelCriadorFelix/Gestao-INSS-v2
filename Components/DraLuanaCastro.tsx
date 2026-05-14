@@ -673,14 +673,16 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             isFinished = true;
           }
         } catch (readError: any) {
-          if (resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message?.includes('fetch'))) {
+          const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
+          if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message?.includes('fetch'))) {
             console.log(`[Dra.Luana] Auto-resume após interrupção (tentativa ${resumeCount + 1})...`);
             resumeCount++;
             await new Promise(r => setTimeout(r, 2000));
           } else {
-            if (resumeCount > 0) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática.]';
+            if (isComplete) console.log('[Dra.Luana] Peça já completa — não retomando.');
+            if (resumeCount > 0 && !isComplete) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática.]';
             isFinished = true;
-            if (resumeCount === 0) throw readError;
+            if (resumeCount === 0 && !isComplete) throw readError;
           }
         }
       }
