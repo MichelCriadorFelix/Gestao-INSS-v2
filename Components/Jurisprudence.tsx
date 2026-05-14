@@ -50,7 +50,7 @@ const Jurisprudence: React.FC = () => {
           <div className="inline-flex p-4 bg-white/10 backdrop-blur-xl rounded-2xl mb-6 border border-white/20">
             <ScaleIcon className="w-10 h-10 text-indigo-100" />
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Pesquisa Jusbrasil</h2>
+          <h2 className="fc-page-title text-4xl md:text-5xl font-serif font-semibold mb-4 tracking-tight inline-block">Pesquisa Jusbrasil</h2>
           <p className="text-indigo-100 text-lg mb-10 max-w-2xl mx-auto opacity-90">
             Acesse a maior base de dados jurídica do país. Pesquise em todos os tribunais simultaneamente com sua conta Pro.
           </p>

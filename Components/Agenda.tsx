@@ -305,7 +305,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   const renderHeader = () => {
     return (
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+        <h2 className="fc-page-title text-2xl font-serif font-semibold text-slate-800 dark:text-cream-50 flex items-center gap-2">
           <CalendarIcon className="h-7 w-7 text-primary-600" />
           Agenda
         </h2>

@@ -194,7 +194,7 @@ export default function KnowledgeBase() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6">
-        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">Base de Conhecimento (Treinar IA)</h2>
+        <h2 className="fc-page-title text-xl font-serif font-semibold text-slate-800 dark:text-cream-50 mb-4 inline-block">Base de Conhecimento (Treinar IA)</h2>
         <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
           Adicione leis, jurisprudências ou documentos padrão aqui. A IA usará essas informações para responder com mais precisão e embasamento jurídico.
         </p>

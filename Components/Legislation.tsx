@@ -290,7 +290,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
       <div className="bg-white dark:bg-bordeaux-900/40 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-gold-500/15">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="fc-page-title text-xl font-serif font-semibold text-slate-900 dark:text-cream-50 flex items-center gap-2">
               <BookOpenIcon className="w-6 h-6 text-primary-500" />
               Legislação e Normas
             </h2>
