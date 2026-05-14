@@ -169,7 +169,7 @@ export default function KnowledgeBase() {
 
   if (isSuccess) {
     return (
-      <div className="bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-8 text-center">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center">
         <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={32} />
         </div>
@@ -182,7 +182,7 @@ export default function KnowledgeBase() {
             setIsSuccess(false);
             setMessage({ text: '', type: '' });
           }}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-primary-700 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
         >
           <Plus size={20} />
           Adicionar Mais Leis
@@ -193,7 +193,7 @@ export default function KnowledgeBase() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6">
+      <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">Base de Conhecimento (Treinar IA)</h2>
         <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
           Adicione leis, jurisprudências ou documentos padrão aqui. A IA usará essas informações para responder com mais precisão e embasamento jurídico.
@@ -207,7 +207,7 @@ export default function KnowledgeBase() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Lei 8.213/91 - Planos de Benefícios da Previdência Social"
-              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -218,7 +218,7 @@ export default function KnowledgeBase() {
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="Ex: http://www.planalto.gov.br/ccivil_03/leis/l8213cons.htm"
-              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -229,7 +229,7 @@ export default function KnowledgeBase() {
               onChange={(e) => setContent(e.target.value)}
               placeholder="Cole o texto da lei ou jurisprudência aqui..."
               rows={10}
-              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -237,7 +237,7 @@ export default function KnowledgeBase() {
             <div className={`p-3 rounded-lg text-sm ${
               message.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
               message.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
-              'bg-primary-50 dark:bg-bordeaux-900/30 text-primary-800 dark:text-gold-400 border border-primary-300/60 dark:border-gold-500/30'
+              'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
             }`}>
               {message.text}
             </div>
@@ -248,7 +248,7 @@ export default function KnowledgeBase() {
               onClick={handleProcess}
               disabled={isProcessing}
               className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-primary-700 hover:bg-indigo-700'
+                isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
               }`}
             >
               {isProcessing ? 'Processando...' : 'Processar e Salvar'}
@@ -257,9 +257,9 @@ export default function KnowledgeBase() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6 flex flex-col h-full">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
-          <BookOpen className="text-primary-600" size={20} />
+          <BookOpen className="text-indigo-500" size={20} />
           Documentos na Base
         </h3>
 
@@ -269,7 +269,7 @@ export default function KnowledgeBase() {
             placeholder="Pesquisar documentos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-2 text-sm bg-cream-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+            className="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
           />
         </div>
         
@@ -288,7 +288,7 @@ export default function KnowledgeBase() {
               {filteredDocs.map((docTitle) => (
                 <div 
                   key={docTitle}
-                  className="group flex items-center justify-between p-3 bg-cream-50 dark:bg-bordeaux-900/40/50 border border-slate-200 dark:border-gold-500/20 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                  className="group flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
                 >
                   <span className="text-sm text-slate-700 dark:text-slate-300 font-medium truncate pr-2" title={docTitle}>
                     {docTitle}
@@ -306,14 +306,14 @@ export default function KnowledgeBase() {
           )}
         </div>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-gold-500/20">
+        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Leis Sugeridas para Adicionar</h4>
           <div className="space-y-2">
             {suggestedLaws.filter(law => !existingDocs.includes(law)).slice(0, 5).map(law => (
               <button
                 key={law}
                 onClick={() => handleSelectSuggested(law)}
-                className="w-full text-left p-2 text-xs bg-primary-50/50 dark:bg-indigo-900/10 text-primary-700 dark:text-gold-400 rounded border border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-colors truncate"
+                className="w-full text-left p-2 text-xs bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded border border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-colors truncate"
               >
                 + {law}
               </button>

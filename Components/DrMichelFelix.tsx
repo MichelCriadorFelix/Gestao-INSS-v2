@@ -589,8 +589,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       while (!isFinished && resumeCount <= MAX_RESUMES) {
         let currentMessage = messageText;
         if (resumeCount > 0) {
-          const anchor = fullText.slice(-400).replace(/\n/g, ' ');
-          currentMessage = `(GERAÇÃO INTERROMPIDA — CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, SEM RECOMEÇAR. Última linha gerada: "${anchor}")`;
+          const lastWords = fullText.slice(-100).replace(/\n/g, ' ');
+          currentMessage = `(A GERAÇÃO FOI INTERROMPIDA PELO LIMITE. CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, A PARTIR DESTE TRECHO: "${lastWords}")`;
         }
 
         try {
@@ -684,18 +684,15 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             isFinished = true;
           }
         } catch (readError: any) {
-          // Não retomar se a peça já está completa (tem Pede Deferimento + OAB)
-          const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
-          if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+          if (resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
             // Auto-resume gracefully
             console.log(`Auto-resuming after interruption (Attempt ${resumeCount + 1})...`);
             resumeCount++;
             await new Promise(r => setTimeout(r, 2000));
           } else {
-            if (isComplete) console.log('Peça já completa — não retomando.');
-            if (resumeCount > 0 && !isComplete) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática pelo servidor.]';
+            if (resumeCount > 0) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática pelo servidor.]';
             isFinished = true;
-            if (resumeCount === 0 && !isComplete) throw readError; 
+            if (resumeCount === 0) throw readError; 
           }
         }
       }
@@ -1200,7 +1197,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               createNewSession();
               if (window.innerWidth < 768) setIsSidebarOpen(false);
             }}
-            className="w-full bg-primary-700 hover:bg-primary-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" /> Nova Conversa
           </button>
@@ -1301,8 +1298,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-primary-700" />
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <FileText className="w-6 h-6 text-blue-600" />
                   </div>
                   <h4 className="font-bold text-slate-800 dark:text-white mb-2">Resumo de Caso</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Crie resumo de documentos, destacando fatos e argumentos jurídicos.</p>
@@ -1350,119 +1347,93 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto space-y-6 px-2 sm:px-4">
+            <div className="max-w-4xl mx-auto space-y-8">
               {currentSession.messages.map(msg => (
-                <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                  {msg.role === 'user' ? (
-                    // BUBBLE DO USUÁRIO — estilo Claude (cinza claro à direita, compacto)
-                    <div className="max-w-[85%] bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
-                      <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
-                        {(msg.content || '').length > 3000
-                          ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
-                          : (msg.content || '')}
-                      </div>
-                      <div className="flex justify-end mt-1.5">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                          {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                <div key={msg.id} className={`flex gap-4 ${msg.role === 'assistant' ? 'bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800' : ''}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${msg.role === 'assistant' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                    {msg.role === 'assistant' ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                        {msg.role === 'assistant' ? 'Dr. Michel Felix' : 'Você'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                  ) : (
-                    // BUBBLE DA IA — estilo Claude (largura total, avatar, prose tipográfico)
-                    <div className="w-full flex gap-3 sm:gap-4">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
-                        <Bot className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Michel Felix</span>
-                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
-                            {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {msg.role === 'assistant' ? (
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                      ) : (
+                        <div className="whitespace-pre-wrap">
+                          {(msg.content || '').length > 3000 
+                            ? (msg.content || '').substring(0, 800) + '\n\n[... Conteúdo longo ocultado na tela para evitar travamentos. A IA leu o texto completo ...]' 
+                            : (msg.content || '')}
                         </div>
-                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                        prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                        prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
-                                        prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
-                                        prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
-                                        prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
-                                        font-inter">
-                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
-                        </div>
-                        <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => copyToClipboard(msg.content || '', msg.id)}
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                            title="Copiar"
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {msg.role === 'assistant' && (
+                        <button 
+                          onClick={() => copyToClipboard(msg.content || '', msg.id)}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors"
+                          title="Copiar texto"
+                        >
+                          {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                        </button>
+                      )}
+                      {msg.role === 'assistant' && (
+                        /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(msg.content || '') || 
+                        (msg.content || '').length > 1000
+                      ) && (
+                        <div className="flex flex-wrap gap-2 ml-2">
+                          <button 
+                            onClick={() => generateDocx(msg.content || '')}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors shadow-sm"
                           >
-                            {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                            <Download className="w-3.5 h-3.5" /> Baixar Word
                           </button>
-                          {(
-                            /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(msg.content || '') ||
-                            (msg.content || '').length > 1000
-                          ) && (
-                            <>
-                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                              <button
-                                onClick={() => generateDocx(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
-                                title="Baixar Word"
-                              >
-                                <Download className="w-3.5 h-3.5" /> Word
-                              </button>
-                              <button
-                                onClick={() => handleOpenInEditor(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary-700 hover:bg-primary-800 text-white rounded-md text-xs font-semibold transition-colors shadow-sm"
-                                title="Editor"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" /> Editor
-                              </button>
-                            </>
-                          )}
+                          <button 
+                            onClick={() => handleOpenInEditor(msg.content || '')}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" /> Abrir no Editor
+                          </button>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
               {isLoading && (
-                <div className="w-full flex gap-3 sm:gap-4">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                <div className="flex gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
                   </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Michel Felix</span>
-                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded animate-pulse">{progressText}</span>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Dr. Michel Felix</span>
+                      <span className="text-[10px] text-slate-400">•</span>
+                      <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest animate-pulse">{progressText}</span>
                     </div>
-
+                    
                     {!streamingMessage && progress < 100 && (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                          <div className="bg-gradient-to-r from-primary-600 to-primary-700 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
+                      <>
+                        <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 mb-1 overflow-hidden">
+                          <div className="bg-emerald-600 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
                         </div>
-                        <div className="flex justify-between text-[11px] text-slate-500">
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">{progress}% • Padrão Ouro Felix & Castro</span>
-                          <span className="animate-pulse">Redigindo peça...</span>
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">{progress}% concluído</span>
+                          <span className="animate-pulse">Gerando resposta...</span>
                         </div>
-                      </div>
+                      </>
                     )}
-
+                    
                     {streamingMessage && (
-                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                      prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                      prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                      prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                      prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                      font-inter">
+                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base font-inter">
                         <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
-                        <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
+                        <span className="w-2 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle"></span>
                       </div>
                     )}
                   </div>
@@ -1475,21 +1446,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         {/* INPUT AREA */}
         <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <div className="max-w-4xl mx-auto relative">
-
-            {/* Badge de Tier de Petição Ativo */}
-            {petitionLength !== 'Padrão (Livre)' && (
-              <div className={`mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                /Premium/.test(petitionLength)
-                  ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                  : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${/Premium/.test(petitionLength) ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`}></span>
-                {/Premium/.test(petitionLength)
-                  ? `Tier Premium ativo · DeepSeek V3.2 (OpenRouter)`
-                  : `Tier ${petitionLength.replace(' palavras', 'p').replace(/(\d{4})/, '$1 palavras')} · Gemini 3 Flash`}
-              </div>
-            )}
-
+            
             {/* Resume Audit Notification */}
             {pendingAudit && !isUploading && (
               <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
@@ -1513,7 +1470,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   </button>
                   <button 
                     onClick={resumeAudit}
-                    className="px-4 py-1.5 bg-gold-600 hover:bg-gold-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
+                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
                   >
                     <History className="w-3 h-3" /> Retomar Auditoria
                   </button>
@@ -1563,14 +1520,13 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   <select
                     value={petitionLength}
                     onChange={(e) => setPetitionLength(e.target.value)}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-40"
-                    title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-32"
+                    title="Tamanho Mínimo da Peça"
                   >
                     <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
-                    <option value="Mínima 3000 palavras">Mínima · 3.000 palavras</option>
-                    <option value="Média 4000 palavras">Média · 4.000 palavras</option>
-                    <option value="Máxima 5000 palavras">Máxima · 5.000 palavras ⭐</option>
-                    <option value="Premium 7000 palavras">Premium · 7.000 palavras (API paga)</option>
+                    <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
+                    <option value="Mínimo 5000 palavras">Mínimo 5.000 palavras</option>
+                    <option value="Mínimo 7000 palavras">Mínimo 7.000 palavras</option>
                   </select>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
@@ -1586,16 +1542,18 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
-                    <optgroup label="Google Gemini · Gratuito (Padrão)">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview · Padrão Ouro ⭐</option>
+                    <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
-                    <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2 · Recomendado para 7.000 palavras</option>
+                    <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro — OpenRouter ($2/$12 por 1M tokens — Peças Complexas)</option>
+                      <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
+                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
-                      <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
-                      <option value="qwen/qwen-max">Qwen Max</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
-                      <option value="qwen/qwen-plus">Qwen Plus</option>
+                      <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
+                      <option value="qwen/qwen-plus">Qwen Plus (Qwen)</option>
+                      <option value="qwen/qwen-max">Qwen Max (Qwen)</option>
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>
@@ -1603,7 +1561,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 <button 
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
-                  className="bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white p-2.5 rounded-xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
                 >
                   <Send className="w-5 h-5" />
                 </button>

@@ -2647,18 +2647,17 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve ter aproximadamente **${target || 5000} palavras** em UMA ÚNICA REDAÇÃO COMPLETA.
+Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
 
-REGRAS DE EXECUÇÃO:
+REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
-2. Distribua o alvo entre os tópicos:
-   • DOS FATOS: ~${Math.floor((target || 5000) * 0.25)} palavras (storytelling do caso + provas individualizadas)
-   • DO DIREITO: ~${Math.floor((target || 5000) * 0.50)} palavras (cada tópico com lei em blockquote + subsunção fato-norma + jurisprudência se houver na base)
-   • DOS PEDIDOS: ~${Math.floor((target || 5000) * 0.10)} palavras (cada pedido com 3-5 linhas detalhadas)
-   • Demais seções (preliminares, tutela, valor, rol): o restante.
-3. NUNCA escreva "Pede Deferimento" antes de ter atingido aproximadamente o alvo. Se faltar densidade, APROFUNDE os tópicos atuais ANTES de encerrar.
-4. NUNCA recomece a petição depois do "Pede Deferimento". Após a assinatura, ENCERRE seu output imediatamente. PROIBIDO gerar uma segunda peça empilhada.
-5. NUNCA repita o mesmo argumento ou tópico já redigido. Densidade vem de NOVAS provas, NOVOS argumentos, NOVA subsunção — nunca de repetição.`;
+2. DISTRIBUIÇÃO E DENSIDADE:
+   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
+   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
+   • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
+3. NUNCA escreva "Pede Deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+4. NUNCA recomece a petição depois do "Pede Deferimento". PROIBIDO gerar uma segunda peça empilhada.
+5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -3105,18 +3104,17 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve ter aproximadamente **${target || 5000} palavras** em UMA ÚNICA REDAÇÃO COMPLETA.
+Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
 
-REGRAS DE EXECUÇÃO:
+REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
-2. Distribua o alvo entre os tópicos:
-   • DOS FATOS: ~${Math.floor((target || 5000) * 0.25)} palavras (storytelling do caso + provas individualizadas)
-   • DO DIREITO: ~${Math.floor((target || 5000) * 0.50)} palavras (cada tópico com lei em blockquote + subsunção fato-norma + jurisprudência se houver na base)
-   • DOS PEDIDOS: ~${Math.floor((target || 5000) * 0.10)} palavras (cada pedido com 3-5 linhas detalhadas)
-   • Demais seções (preliminares, tutela, valor, rol): o restante.
-3. NUNCA escreva "Pede Deferimento" antes de ter atingido aproximadamente o alvo. Se faltar densidade, APROFUNDE os tópicos atuais ANTES de encerrar.
-4. NUNCA recomece a petição depois do "Pede Deferimento". Após a assinatura, ENCERRE seu output imediatamente. PROIBIDO gerar uma segunda peça empilhada.
-5. NUNCA repita o mesmo argumento ou tópico já redigido. Densidade vem de NOVAS provas, NOVOS argumentos, NOVA subsunção — nunca de repetição.`;
+2. DISTRIBUIÇÃO E DENSIDADE:
+   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
+   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
+   • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
+3. NUNCA escreva "Pede Deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+4. NUNCA recomece a petição depois do "Pede Deferimento". PROIBIDO gerar uma segunda peça empilhada.
+5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;

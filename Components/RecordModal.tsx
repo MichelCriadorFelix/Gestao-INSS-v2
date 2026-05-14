@@ -98,7 +98,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const AVAILABLE_TAGS = [
-      { id: 'pessoal', label: 'Pessoal', color: 'bg-primary-100 text-primary-800 border-primary-300/60' },
+      { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
       { id: 'trabalhista', label: 'Trabalhista', color: 'bg-orange-100 text-orange-700 border-orange-200' },
       { id: 'medico', label: 'Médico', color: 'bg-red-100 text-red-700 border-red-200' },
       { id: 'previdenciario', label: 'Previdenciário', color: 'bg-purple-100 text-purple-700 border-purple-200' },
@@ -824,23 +824,23 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-bordeaux-950/60 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-gold-500/20 flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60 sticky top-0 z-10">
+      <div className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
                 {initialData ? <PencilSquareIcon className="h-6 w-6" /> : <PlusIcon className="h-6 w-6" />}
             </div>
-            <h3 className="text-xl font-serif font-semibold text-slate-900 dark:text-cream-50">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                 {initialData ? 'Editar Processo' : 'Novo Processo'}
             </h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-gold-500/20 px-6">
+        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6">
             <button 
                 onClick={() => setActiveTab('info')}
                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -879,7 +879,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name={field.name}
                                     value={(formData as any)[field.name] || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 >
                                     <option value="">Selecione...</option>
                                     {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -894,8 +894,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     readOnly={field.readOnly}
                                     className={`w-full px-4 py-2.5 border rounded-xl outline-none transition text-sm
                                         ${field.readOnly 
-                                            ? 'bg-cream-50 dark:bg-bordeaux-900/40/50 text-slate-500 cursor-not-allowed border-slate-200 dark:border-gold-500/15' 
-                                            : 'bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500'
+                                            ? 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 cursor-not-allowed border-slate-200 dark:border-slate-700' 
+                                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500'
                                         }`}
                                 />
                             )}
@@ -904,7 +904,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 })}
                 
                 <div className="md:col-span-6 mt-2 space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition group">
+                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group">
                         <input 
                             type="checkbox" 
                             checked={formData.isReferral || false}
@@ -922,7 +922,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </label>
 
                     {formData.isReferral && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-900/40/50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
                                     Nome do Indicador
@@ -932,7 +932,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="referrerName"
                                     value={formData.referrerName || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                             <div>
@@ -944,7 +944,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="referrerPercentage"
                                     value={formData.referrerPercentage || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                             <div>
@@ -956,13 +956,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="totalFee"
                                     value={formData.totalFee || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                         </div>
                     )}
                     
-                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition group">
+                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group">
                         <input 
                             type="checkbox" 
                             checked={formData.isDailyAttention || false}
@@ -980,11 +980,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </label>
                 </div>
 
-                <div className="md:col-span-6 flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="md:col-span-6 flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded-xl transition shadow-sm"
+                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition shadow-sm"
                     >
                     Cancelar
                     </button>
@@ -1010,7 +1010,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             await downloadFileRobust(doc.url, doc.name);
                                         }
                                     }}
-                                    className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                                    className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                                 >
                                     <ArrowDownTrayIcon className="h-4 w-4" />
                                     Baixar PDFs
@@ -1026,7 +1026,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             />
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
@@ -1034,7 +1034,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             <button 
                                 onClick={handleUnifiedOCR}
                                 disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
-                                className="flex items-center gap-2 bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
+                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
                             >
                                 {isGeneratingOCR ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <BoltIcon className="h-4 w-4" />}
                                 {isGeneratingOCR ? 'Lendo...' : 'Gerar OCR Unificado'}
@@ -1050,15 +1050,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
-                        <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
-                            <DocumentTextIcon className="h-5 w-5 text-primary-600" />
+                        <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <DocumentTextIcon className="h-5 w-5 text-blue-500" />
                             Gerar Procuração
                         </button>
-                        <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
+                        <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             <ScaleIcon className="h-5 w-5 text-purple-500" />
                             Gerar Declaração
                         </button>
-                        <button onClick={() => generatePDF('renuncia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
+                        <button onClick={() => generatePDF('renuncia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-500" />
                             Gerar Renúncia
                         </button>
@@ -1067,7 +1067,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="space-y-3">
                         {formData.documents && formData.documents.length > 0 ? (
                             formData.documents.map((doc, idx) => (
-                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-cream-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl gap-3">
+                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl gap-3">
                                     <div className="flex items-center gap-3 flex-1">
                                         <div className="flex flex-col gap-1">
                                             <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
@@ -1093,7 +1093,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <p className="font-bold text-sm text-slate-800 dark:text-white truncate" title={doc.name}>{doc.name}</p>
-                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-primary-600" title="Armazenado na Nuvem" />}
+                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-blue-500" title="Armazenado na Nuvem" />}
                                                     <button onClick={() => startEditingDoc(doc)} className="text-slate-400 hover:text-primary-600"><PencilSquareIcon className="h-4 w-4" /></button>
                                                 </div>
                                             )}
@@ -1107,7 +1107,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 sm:ml-auto">
-                                        {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-primary-600 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
+                                        {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
                                         {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
                                         {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Tentar Novamente</button>}
                                         
@@ -1121,14 +1121,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                         </button>
 
                                         <div className="relative">
-                                            <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 rounded-lg" title="Etiquetas">
+                                            <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg" title="Etiquetas">
                                                 <TagIcon className="h-5 w-5" />
                                             </button>
                                             {activeTagMenu === doc.id && (
-                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 rounded-xl shadow-lg z-10 p-2">
+                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 p-2">
                                                     <p className="text-xs font-bold text-slate-500 mb-2 px-2">Etiquetas</p>
                                                     {AVAILABLE_TAGS.map(t => (
-                                                        <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded cursor-pointer">
+                                                        <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
                                                             <input type="checkbox" checked={doc.tags?.includes(t.id) || false} onChange={() => toggleTag(doc.id, t.id)} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
                                                             <span className={`text-xs px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span>
                                                         </label>
@@ -1151,14 +1151,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                                 <DocumentPlusIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
                                 <p className="text-slate-500 text-sm">Nenhum documento anexado.</p>
                             </div>
                         )}
                     </div>
                     
-                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20 text-right">
+                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
                          <button
                             type="button"
                             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
@@ -1178,9 +1178,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="space-y-3">
                         {formData.petitions && formData.petitions.length > 0 ? (
                             formData.petitions.map((petition, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-cream-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl">
+                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
                                     <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 bg-indigo-100 text-primary-700 rounded-lg flex items-center justify-center">
+                                        <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
                                         <div>
@@ -1203,14 +1203,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                                 <DocumentPlusIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
                                 <p className="text-slate-500 text-sm">Nenhuma petição vinculada.</p>
                             </div>
                         )}
                     </div>
                     
-                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20 text-right">
+                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
                          <button
                             type="button"
                             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}

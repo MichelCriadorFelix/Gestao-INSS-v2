@@ -135,7 +135,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                     <select 
                         value={selectedYear} 
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="appearance-none bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 text-slate-700 dark:text-slate-200 py-1.5 pl-4 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-1.5 pl-4 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
                         <option value={0}>Tudo</option>
                         {availableYears.map(year => (
@@ -151,16 +151,16 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div 
                     onClick={() => setActiveModalType('total_concluded')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-primary-600 dark:hover:border-primary-600 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <BanknotesIcon className="h-24 w-24 text-primary-700" />
+                        <BanknotesIcon className="h-24 w-24 text-blue-600" />
                     </div>
                     <div className="flex justify-between items-start">
                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Valor Total ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
                         <MagnifyingGlassIcon className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <p className="text-2xl font-extrabold text-primary-700 dark:text-gold-400 mt-1">{formatCurrency(stats.totalConcludedValue)}</p>
+                    <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">{formatCurrency(stats.totalConcludedValue)}</p>
                     <div className="mt-3 text-[10px] text-slate-400 flex justify-between">
                         <span>Total dos processos concluídos</span>
                     </div>
@@ -168,10 +168,10 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
                 <div 
                     onClick={() => setActiveModalType('portfolio')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <WalletIcon className="h-24 w-24 text-primary-700" />
+                        <WalletIcon className="h-24 w-24 text-indigo-600" />
                     </div>
                     <div className="flex justify-between items-start">
                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Valor em Carteira ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
@@ -185,7 +185,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
                 <div 
                     onClick={() => setActiveModalType('revenue')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-green-500 dark:hover:border-green-500 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-green-500 dark:hover:border-green-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <BanknotesIcon className="h-24 w-24 text-green-600" />
@@ -200,14 +200,14 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
                 <div 
                     onClick={() => setActiveModalType('michel')}
-                    className="bg-gradient-to-br from-primary-700 to-blue-800 p-4 rounded-xl shadow-lg shadow-blue-500/20 text-white relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
+                    className="bg-gradient-to-br from-blue-600 to-blue-800 p-4 rounded-xl shadow-lg shadow-blue-500/20 text-white relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
                 >
                     <div className="flex justify-between items-start">
-                        <p className="text-xs font-bold text-gold-200 uppercase tracking-wide">Lucro Dr. Michel ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
+                        <p className="text-xs font-bold text-blue-200 uppercase tracking-wide">Lucro Dr. Michel ({selectedYear === 0 ? 'Tudo' : selectedYear})</p>
                         <MagnifyingGlassIcon className="h-4 w-4 text-white opacity-60" />
                     </div>
                     <p className="text-2xl font-extrabold mt-1">{formatCurrency(stats.michelIncome)}</p>
-                    <p className="text-[10px] text-gold-200 mt-1">Divisão de lucros no período</p>
+                    <p className="text-[10px] text-blue-200 mt-1">Divisão de lucros no período</p>
                 </div>
 
                 <div 

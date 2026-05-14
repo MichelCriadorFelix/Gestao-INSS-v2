@@ -285,7 +285,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
             onMouseMove={handleMouseMove}
             onTouchMove={handleTouchMove}
         >
-            <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-md flex flex-col h-[90vh] overflow-hidden border border-slate-200 dark:border-gold-500/20">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-800">
                 <div className="p-4 bg-primary-900 text-white flex justify-between items-center shrink-0">
                     <div>
                         <h3 className="font-bold text-lg">Scanner de Documentos</h3>
@@ -304,7 +304,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nome do Documento</label>
                                 <select 
-                                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/40 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                                     value={docType}
                                     onChange={(e) => setDocType(e.target.value)}
                                 >
@@ -319,9 +319,9 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                         if(!docType) { alert("Selecione o tipo de documento primeiro."); return; }
                                         cameraInputRef.current?.click();
                                     }}
-                                    className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-slate-300 dark:border-gold-500/15 rounded-2xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 transition group"
+                                    className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition group"
                                 >
-                                    <div className="bg-primary-100 dark:bg-bordeaux-900/40 p-4 rounded-full group-hover:scale-110 transition">
+                                    <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full group-hover:scale-110 transition">
                                         <CameraIcon className="h-8 w-8 text-primary-600" />
                                     </div>
                                     <span className="font-bold text-slate-700 dark:text-slate-200">Câmera</span>
@@ -332,7 +332,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                         if(!docType) { alert("Selecione o tipo de documento primeiro."); return; }
                                         galleryInputRef.current?.click();
                                     }}
-                                    className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-slate-300 dark:border-gold-500/15 rounded-2xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 transition group"
+                                    className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition group"
                                 >
                                     <div className="bg-purple-100 dark:bg-purple-900/30 p-4 rounded-full group-hover:scale-110 transition">
                                         <PhotoIcon className="h-8 w-8 text-purple-600" />
@@ -345,7 +345,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                             <input type="file" accept="image/*, application/pdf" ref={galleryInputRef} className="hidden" onChange={handleFileChange} />
 
                             {pages.length > 0 && (
-                                <button onClick={() => setStep('preview')} className="w-full py-3 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-xl transition">
+                                <button onClick={() => setStep('preview')} className="w-full py-3 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition">
                                     Voltar para Revisão ({pages.length} págs)
                                 </button>
                             )}
@@ -401,18 +401,18 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                 <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2"><DocumentDuplicateIcon className="h-5 w-5" /> Páginas ({pages.length})</h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     {pages.map((p, idx) => (
-                                        <div key={idx} className="relative group aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-gold-500/15">
+                                        <div key={idx} className="relative group aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                                             <img src={p} alt={`Página ${idx+1}`} className="w-full h-full object-contain" />
                                             <div className="absolute top-2 left-2 bg-black/60 text-white text-xs font-bold px-2 py-1 rounded">{idx + 1}</div>
                                             <button onClick={() => setPages(pages.filter((_, i) => i !== idx))} className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition shadow-sm"><TrashIcon className="h-4 w-4" /></button>
                                         </div>
                                     ))}
-                                    <button onClick={() => setStep('select')} className="aspect-[3/4] flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 dark:border-gold-500/15 rounded-lg hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 transition text-slate-400 hover:text-primary-600">
+                                    <button onClick={() => setStep('select')} className="aspect-[3/4] flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-400 hover:text-primary-600">
                                         <PlusIcon className="h-8 w-8" /><span className="text-xs font-bold">Adicionar Pág.</span>
                                     </button>
                                 </div>
                             </div>
-                            <div className="shrink-0 pt-4 border-t border-slate-100 dark:border-gold-500/20">
+                            <div className="shrink-0 pt-4 border-t border-slate-100 dark:border-slate-800">
                                 <button onClick={handleFinalizePDF} disabled={isProcessing || pages.length === 0} className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
                                     {isProcessing ? <><ArrowPathIcon className="h-5 w-5 animate-spin" /> Gerando PDF...</> : <><DocumentTextIcon className="h-5 w-5" /> Salvar Arquivo PDF</>}
                                 </button>

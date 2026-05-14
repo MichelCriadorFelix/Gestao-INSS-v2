@@ -109,19 +109,19 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
 
     const getThemeColor = () => {
         if (type === 'revenue') return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
-        if (type === 'michel') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 border-primary-300/60 dark:border-gold-500/30';
+        if (type === 'michel') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
         if (type === 'luana') return 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800';
-        if (type === 'portfolio') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800';
-        if (type === 'total_concluded') return 'text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 border-primary-300/60 dark:border-gold-500/30';
+        if (type === 'portfolio') return 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800';
+        if (type === 'total_concluded') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
         return '';
     }
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 animate-in fade-in duration-200">
-             <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-slate-200 dark:border-gold-500/20 flex flex-col">
-                <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60">
+             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
+                <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                     <div>
-                         <h3 className="text-xl font-serif font-semibold text-slate-900 dark:text-cream-50">{getTitle()}</h3>
+                         <h3 className="text-xl font-bold text-slate-900 dark:text-white">{getTitle()}</h3>
                          <p className="text-xs text-slate-500 dark:text-slate-400">{getSubtitle()}</p>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-lg transition">

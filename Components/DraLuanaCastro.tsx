@@ -26,7 +26,6 @@ import { safeSetLocalStorage } from '../utils';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import EliteRedactionModal from './EliteRedactionModal';
-import { markdownToHtml } from '../src/utils/markdownToHtml';
 
 interface ChatDocument {
   id: string;
@@ -557,132 +556,94 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
       const compressedHistory = compressHistory(session?.messages || []);
 
-      let fullText = '';
-      let isFinished = false;
-      let resumeCount = 0;
-      const MAX_RESUMES = 3;
+      const response = await apiFetch('/api/dra-luana/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: messageText,
+          documentContext: docSummaries,
+          history: compressedHistory,
+          images: images || [],
+          files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
+          minWage: localStorage.getItem('app_min_wage') || '1621.00',
+          ragContext,
+          customLaws,
+          modelProvider: eliteProviderOverride || selectedModelProvider,
+          model: eliteModelOverride || selectedModel,
+          petitionLength,
+          keyIndex: session?.uploadKeyIndex,
+          sessionId: session?.id
+        }),
+        signal: abortController.signal
+      });
 
-      while (!isFinished && resumeCount <= MAX_RESUMES) {
-        let currentMessage = messageText;
-        if (resumeCount > 0) {
-          const anchor = fullText.slice(-400).replace(/\n/g, ' ');
-          currentMessage = `(GERAÇÃO INTERROMPIDA — CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, SEM RECOMEÇAR. Última linha gerada: "${anchor}")`;
-        }
-
+      if (!response.ok) {
+        if (timeoutId) clearTimeout(timeoutId);
+        const errorText = await response.text();
+        let errorMessage = 'Falha na resposta da IA';
         try {
-          const response = await apiFetch('/api/dra-luana/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: currentMessage,
-              documentContext: docSummaries,
-              history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
-              images: resumeCount === 0 ? (images || []) : [],
-              files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
-              minWage: localStorage.getItem('app_min_wage') || '1621.00',
-              ragContext: resumeCount === 0 ? ragContext : undefined,
-              customLaws,
-              modelProvider: eliteProviderOverride || selectedModelProvider,
-              model: eliteModelOverride || selectedModel,
-              petitionLength,
-              keyIndex: session?.uploadKeyIndex,
-              sessionId: session?.id
-            }),
-            signal: abortController.signal
-          });
-
-          if (!response.ok) {
-            if (resumeCount === 0) {
-              if (timeoutId) clearTimeout(timeoutId);
-              const errorText = await response.text();
-              let errorMessage = 'Falha na resposta da IA';
-              try {
-                const errorData = JSON.parse(errorText);
-                if (response.status === 429 || (errorData.error && errorData.error.code === 429)) {
-                  errorMessage = 'Limite de uso atingido (Quota Exceeded). Por favor, aguarde cerca de 1 minuto antes de tentar novamente.';
-                } else if (response.status === 503 || (errorData.error && errorData.error.code === 503)) {
-                  errorMessage = 'O serviço de IA está temporariamente sobrecarregado (Erro 503). Por favor, aguarde alguns instantes e tente novamente.';
-                } else {
-                  errorMessage = errorData.error?.message || errorData.error || errorMessage;
-                }
-              } catch (e) {
-                errorMessage = errorText || errorMessage;
-              }
-              throw new Error(errorMessage);
-            } else {
-              throw new Error("Failed to resume stream");
-            }
-          }
-
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-
-          if (reader) {
-            let buffer = '';
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                  isFinished = true;
-                  break;
-                }
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    const dataStr = line.slice(6);
-                    if (dataStr === '[DONE]') {
-                      isFinished = true;
-                      continue;
-                    }
-
-                    let data;
-                    try {
-                      data = JSON.parse(dataStr);
-                    } catch (e) {
-                      continue;
-                    }
-
-                    if (data.error) throw new Error(data.error);
-                    if (data.max_tokens) {
-                      isFinished = false;
-                      throw new Error("MAX_TOKENS_HIT");
-                    }
-                    if (data.heartbeat) continue;
-
-                    if (data.text) {
-                      fullText += data.text;
-                      setStreamingMessage(fullText);
-                    }
-                  }
-                }
-              }
-            } catch (readError: any) {
-              if (readError.name === 'AbortError') {
-                console.log('Stream aborted after 800 seconds');
-                fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
-                isFinished = true;
-              } else {
-                throw readError;
-              }
-            }
+          const errorData = JSON.parse(errorText);
+          if (response.status === 429 || (errorData.error && errorData.error.code === 429)) {
+            errorMessage = 'Limite de uso atingido (Quota Exceeded). Por favor, aguarde cerca de 1 minuto antes de tentar novamente.';
+          } else if (response.status === 503 || (errorData.error && errorData.error.code === 503)) {
+            errorMessage = 'O serviço de IA está temporariamente sobrecarregado (Erro 503). Por favor, aguarde alguns instantes e tente novamente.';
           } else {
-            isFinished = true;
+            errorMessage = errorData.error?.message || errorData.error || errorMessage;
+          }
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      if (reader) {
+        let buffer = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6);
+                if (dataStr === '[DONE]') continue;
+                
+                let data;
+                try {
+                  data = JSON.parse(dataStr);
+                } catch (e) {
+                  continue;
+                }
+                
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+                
+                if (data.heartbeat) {
+                  continue;
+                }
+                
+                if (data.text) {
+                  fullText += data.text;
+                  setStreamingMessage(fullText);
+                }
+              }
+            }
           }
         } catch (readError: any) {
-          const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
-          if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message?.includes('fetch'))) {
-            console.log(`[Dra.Luana] Auto-resume após interrupção (tentativa ${resumeCount + 1})...`);
-            resumeCount++;
-            await new Promise(r => setTimeout(r, 2000));
+          if (readError.name === 'AbortError') {
+            console.log('Stream aborted after 800 seconds');
+            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
           } else {
-            if (isComplete) console.log('[Dra.Luana] Peça já completa — não retomando.');
-            if (resumeCount > 0 && !isComplete) fullText += '\n\n[Aviso: Geração interrompida após múltiplas tentativas de retomada automática.]';
-            isFinished = true;
-            if (resumeCount === 0 && !isComplete) throw readError;
+            throw readError;
           }
         }
       }
@@ -1290,8 +1251,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-primary-700" />
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <FileText className="w-6 h-6 text-blue-600" />
                   </div>
                   <h4 className="font-bold text-slate-800 dark:text-white mb-2">Análise de Caso</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Resumo de fatos e estratégia para Reclamação Trabalhista.</p>
@@ -1339,119 +1300,81 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto space-y-6 px-2 sm:px-4">
+            <div className="max-w-4xl mx-auto space-y-8">
               {currentSession.messages.map(msg => (
-                <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                  {msg.role === 'user' ? (
-                    // BUBBLE DO USUÁRIO — estilo Claude (cinza claro à direita, compacto)
-                    <div className="max-w-[85%] bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
-                      <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
-                        {(msg.content || '').length > 3000
-                          ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
-                          : (msg.content || '')}
-                      </div>
-                      <div className="flex justify-end mt-1.5">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                          {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                <div key={msg.id} className={`flex gap-4 ${msg.role === 'assistant' ? 'bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800' : ''}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${msg.role === 'assistant' ? 'bg-rose-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                    {msg.role === 'assistant' ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                        {msg.role === 'assistant' ? 'Dra. Luana Castro' : 'Você'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                  ) : (
-                    // BUBBLE DA IA — estilo Claude (largura total, avatar, prose tipográfico)
-                    <div className="w-full flex gap-3 sm:gap-4">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center flex-shrink-0 shadow-md shadow-rose-500/20 ring-2 ring-rose-100 dark:ring-rose-900/40">
-                        <Bot className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dra. Luana Castro</span>
-                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded">OAB/RJ 226.749</span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
-                            {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                        prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                                        prose-blockquote:border-l-4 prose-blockquote:border-rose-500 prose-blockquote:bg-rose-50/50 dark:prose-blockquote:bg-rose-950/20
-                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                        prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
-                                        prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
-                                        prose-a:text-rose-600 dark:prose-a:text-rose-400 prose-a:no-underline hover:prose-a:underline
-                                        prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
-                                        font-inter">
-                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
-                        </div>
-                        <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => copyToClipboard(msg.content || '', msg.id)}
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                            title="Copiar"
+                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {msg.role === 'user' && (msg.content || '').length > 3000 
+                        ? (msg.content || '').substring(0, 800) + '\n\n[... Conteúdo longo ocultado na tela para evitar travamentos. A IA leu o texto completo ...]' 
+                        : (msg.content || '')}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {msg.role === 'assistant' && (
+                        <button 
+                          onClick={() => copyToClipboard(msg.content || '', msg.id)}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors"
+                          title="Copiar texto"
+                        >
+                          {copiedId === msg.id ? <Check className="w-4 h-4 text-rose-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                        </button>
+                      )}
+                      {msg.role === 'assistant' && (
+                        /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(msg.content || '') || 
+                        (msg.content || '').length > 1000
+                      ) && (
+                        <div className="flex flex-wrap gap-2 ml-2">
+                          <button 
+                            onClick={() => generateDocx(msg.content || '')}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors shadow-sm"
                           >
-                            {copiedId === msg.id ? <Check className="w-4 h-4 text-rose-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                            <Download className="w-3.5 h-3.5" /> Baixar Word
                           </button>
-                          {(
-                            /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(msg.content || '') ||
-                            (msg.content || '').length > 1000
-                          ) && (
-                            <>
-                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                              <button
-                                onClick={() => generateDocx(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
-                                title="Baixar Word"
-                              >
-                                <Download className="w-3.5 h-3.5" /> Word
-                              </button>
-                              <button
-                                onClick={() => handleOpenInEditor(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-semibold transition-colors shadow-sm"
-                                title="Editor"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" /> Editor
-                              </button>
-                            </>
-                          )}
+                          <button 
+                            onClick={() => handleOpenInEditor(msg.content || '')}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-[10px] font-bold hover:bg-rose-700 transition-colors shadow-sm"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" /> Abrir no Editor
+                          </button>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
               {isLoading && (
-                <div className="w-full flex gap-3 sm:gap-4">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center flex-shrink-0 shadow-md shadow-rose-500/20 ring-2 ring-rose-100 dark:ring-rose-900/40">
-                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                <div className="flex gap-4 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                    <Bot className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dra. Luana Castro</span>
-                      <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded animate-pulse">{progressText}</span>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-rose-600">Dra. Luana Castro</span>
                     </div>
-
-                    {streamingMessage ? (
-                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                      prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                      prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                      prose-blockquote:border-l-4 prose-blockquote:border-rose-500 prose-blockquote:bg-rose-50/50 dark:prose-blockquote:bg-rose-950/20
-                                      prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                      font-inter">
-                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
-                        <span className="w-1.5 h-4 bg-rose-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
+                    <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {streamingMessage}
+                      <span className="inline-block w-1.5 h-4 ml-1 bg-rose-600 animate-pulse" />
+                    </div>
+                    {/* Barra de Progresso Mantida para Contexto de Longa Duração */}
+                    <div className="pt-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest animate-pulse">{progressText}</span>
                       </div>
-                    ) : (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                          <div className="bg-gradient-to-r from-rose-500 to-rose-600 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
-                        </div>
-                        <div className="flex justify-between text-[11px] text-slate-500">
-                          <span className="font-medium text-rose-600 dark:text-rose-400">{progress}% • Padrão Ouro Felix & Castro</span>
-                          <span className="animate-pulse">Redigindo peça...</span>
-                        </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-rose-600 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1462,21 +1385,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         {/* INPUT AREA */}
         <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <div className="max-w-4xl mx-auto relative">
-
-            {/* Badge de Tier de Petição Ativo */}
-            {petitionLength !== 'Padrão (Livre)' && (
-              <div className={`mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                /Premium/.test(petitionLength)
-                  ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                  : 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${/Premium/.test(petitionLength) ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse`}></span>
-                {/Premium/.test(petitionLength)
-                  ? `Tier Premium ativo · DeepSeek V3.2 (OpenRouter)`
-                  : `Tier ${petitionLength.replace(' palavras', 'p').replace(/(\d{4})/, '$1 palavras')} · Gemini 3 Flash`}
-              </div>
-            )}
-
+            
             {/* Resume Audit Notification */}
             {pendingAudit && !isUploading && (
               <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
@@ -1500,7 +1409,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                   </button>
                   <button 
                     onClick={resumeAudit}
-                    className="px-4 py-1.5 bg-gold-600 hover:bg-gold-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
+                    className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-2"
                   >
                     <History className="w-3 h-3" /> Retomar Auditoria
                   </button>
@@ -1550,14 +1459,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                   <select
                     value={petitionLength}
                     onChange={(e) => setPetitionLength(e.target.value)}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-40"
-                    title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-32"
+                    title="Tamanho Mínimo da Peça"
                   >
                     <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
-                    <option value="Mínima 3000 palavras">Mínima · 3.000 palavras</option>
-                    <option value="Média 4000 palavras">Média · 4.000 palavras</option>
-                    <option value="Máxima 5000 palavras">Máxima · 5.000 palavras ⭐</option>
-                    <option value="Premium 7000 palavras">Premium · 7.000 palavras (API paga)</option>
+                    <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
+                    <option value="Mínimo 5000 palavras">Mínimo 5.000 palavras</option>
+                    <option value="Mínimo 7000 palavras">Mínimo 7.000 palavras</option>
                   </select>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
@@ -1573,16 +1481,18 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     }}
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
-                    <optgroup label="Google Gemini · Gratuito (Padrão)">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview · Padrão Ouro ⭐</option>
+                    <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
-                    <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2 · Recomendado para 7.000 palavras</option>
+                    <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro — OpenRouter ($2/$12 por 1M tokens — Peças Complexas)</option>
+                      <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
+                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
-                      <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
-                      <option value="qwen/qwen-max">Qwen Max</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
-                      <option value="qwen/qwen-plus">Qwen Plus</option>
+                      <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
+                      <option value="qwen/qwen-plus">Qwen Plus (Qwen)</option>
+                      <option value="qwen/qwen-max">Qwen Max (Qwen)</option>
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>

@@ -166,10 +166,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-bordeaux-900 text-cream-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold-500 mb-4"></div>
-        <p className="text-gold-300/80 animate-pulse font-serif text-lg tracking-wide">Iniciando sistema jurídico...</p>
-        <p className="text-cream-100/40 text-[10px] uppercase tracking-[0.3em] mt-2">Felix &amp; Castro</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mb-4"></div>
+        <p className="text-slate-400 animate-pulse">Iniciando sistema jurídico...</p>
       </div>
     );
   }

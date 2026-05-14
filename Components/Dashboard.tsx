@@ -1396,226 +1396,208 @@ export default function Dashboard({
   };
 
   return (
-    <div className="flex min-h-screen h-screen bg-cream-50 dark:bg-bordeaux-950 font-sans transition-colors duration-200 overflow-hidden relative">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-200 overflow-hidden relative">
       
-      {/* OVERLAY (mobile + desktop quando sidebar aberta) */}
+      {/* OVERLAY FOR MOBILE MENU */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* SIDEBAR NAVIGATION - Felix & Castro Bordô */}
-      <aside className={`fixed inset-y-0 left-0 bg-bordeaux-900 text-cream-50 flex flex-col flex-shrink-0 transition-transform duration-300 ease-out z-50 w-72 shadow-2xl shadow-bordeaux-950/50 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-           {/* Padrão de balança decorativo no fundo */}
-           <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 0%, transparent 40%), radial-gradient(circle at 80% 70%, #C9A961 0%, transparent 40%)'}}></div>
-           
-           <div className="relative safe-top h-20 flex items-center justify-between px-6 border-b border-gold-500/20">
+      {/* SIDEBAR NAVIGATION */}
+      <aside className={`fixed inset-y-0 left-0 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-transform duration-300 z-50 w-64 lg:static lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+           <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
                <div className="flex items-center gap-3">
-                   <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-900/40 ring-1 ring-gold-300/50">
-                       <ScaleIcon className="h-6 w-6 text-bordeaux-900" />
+                   <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-500/30">
+                       <ScaleIcon className="h-6 w-6 text-white" />
                    </div>
-                   <div>
-                       <span className="font-serif font-semibold text-xl tracking-tight text-cream-50 leading-none">Felix &amp; Castro</span>
-                       <span className="block text-[10px] uppercase tracking-[0.2em] text-gold-300/80 mt-1">Advocacia Especializada</span>
-                   </div>
+                   <span className="font-bold text-lg tracking-tight">Gestão do Escritório</span>
                </div>
-               <button className="p-1.5 text-cream-50/60 hover:text-gold-400 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
-                   <XMarkIcon className="w-5 h-5" />
+               <button className="lg:hidden p-1 text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+                   <XMarkIcon className="w-6 h-6" />
                </button>
            </div>
 
-           <div className="relative flex-1 py-5 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+           <div className="flex-1 py-6 px-3 space-y-2 overflow-y-auto">
                <button 
                    onClick={() => handleViewChange('clients')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'clients' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'clients' ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'clients' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <UserGroupIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Clientes</span>
+                   <UserGroupIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Clientes</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('contracts')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'contracts' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'contracts' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'contracts' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <BriefcaseIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Contratos &amp; Fin.</span>
+                   <BriefcaseIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Contratos & Fin.</span>
                </button>
 
+                {/* NOVO MENU: CÁLCULOS */}
                <button 
                    onClick={() => handleViewChange('labor_calc')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'labor_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'labor_calc' ? 'bg-emerald-600 shadow-lg shadow-emerald-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'labor_calc' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <CalculatorIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Calc. Trabalhista</span>
+                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="font-medium">Calc. Trabalhista</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('dra_luana')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dra_luana' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dra_luana' ? 'bg-pink-600 shadow-lg shadow-pink-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'dra_luana' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Dra. Luana Castro (IA)</span>
+                   <StarIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="font-medium">Dra. Luana Castro (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('social_calc')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'social_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'social_calc' ? 'bg-orange-600 shadow-lg shadow-orange-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'social_calc' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <CalculatorIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Calc. Previdenciária</span>
+                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="font-medium">Calc. Previdenciária</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('dr_michel')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_michel' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dr_michel' ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'dr_michel' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Dr. Michel Felix (IA)</span>
+                   <StarIcon className="h-6 w-6 lg:mr-3" />
+                   <span className="font-medium">Dr. Michel Felix (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('agenda')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'agenda' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'agenda' ? 'bg-slate-600 shadow-lg shadow-slate-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'agenda' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <CalendarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Agenda</span>
+                   <CalendarIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Agenda</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('petition_editor')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'petition_editor' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'petition_editor' ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'petition_editor' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <PencilSquareIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Editor de Petições</span>
+                   <PencilSquareIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Editor de Petições</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('legislation')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'legislation' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'legislation' ? 'bg-teal-600 shadow-lg shadow-teal-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'legislation' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <BookOpenIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Legislação</span>
+                   <BookOpenIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Legislação</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('jurisprudence')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'jurisprudence' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'jurisprudence' ? 'bg-cyan-600 shadow-lg shadow-cyan-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'jurisprudence' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <ScaleIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Jurisprudência</span>
+                   <ScaleIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Jurisprudência</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('meu_inss')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'meu_inss' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'meu_inss' ? 'bg-amber-600 shadow-lg shadow-amber-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'meu_inss' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <GlobeAltIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Meu INSS</span>
+                   <GlobeAltIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Meu INSS</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('knowledge_base')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'knowledge_base' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'knowledge_base' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <AcademicCapIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm whitespace-nowrap">Base de Conhecimento</span>
+                   <AcademicCapIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('marketing')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'marketing' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   {currentView === 'marketing' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <SparklesIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm whitespace-nowrap">Marketing Jurídico</span>
+                   <SparklesIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Marketing Jurídico</span>
                </button>
            </div>
            
-           <div className="relative safe-bottom p-4 border-t border-gold-500/20 bg-bordeaux-950/40">
-               <div className="flex items-center gap-3">
-                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-xs font-bold text-bordeaux-900 ring-2 ring-gold-300/30">
+           <div className="p-4 border-t border-slate-800">
+               <div className="flex items-center justify-start gap-3">
+                   <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
                        {user.firstName[0]}
                    </div>
-                   <div>
-                       <p className="text-sm font-semibold text-cream-50 leading-tight">{user.firstName}</p>
-                       <p className="text-[10px] text-gold-300/70 uppercase tracking-wider">{user.role}</p>
+                   <div className="hidden lg:block">
+                       <p className="text-xs font-bold text-white">{user.firstName}</p>
+                       <p className="text-[10px] text-slate-400">{user.role}</p>
                    </div>
                </div>
-               <button onClick={onLogout} className="mt-3 w-full flex items-center justify-center gap-2 py-2 text-cream-100/60 hover:text-gold-300 hover:bg-bordeaux-800/60 rounded-lg transition border border-gold-500/10 hover:border-gold-500/30">
-                   <ArrowRightOnRectangleIcon className="h-4 w-4" />
-                   <span className="text-[11px] font-semibold uppercase tracking-wider">Sair</span>
+               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
+                   <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
+                   <span className="text-xs font-bold uppercase">Sair</span>
                </button>
            </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative h-screen min-h-screen overflow-hidden bg-cream-50 dark:bg-bordeaux-950">
-        {/* Navbar (Top) - Bordô premium */}
-        <header className="safe-top bg-bordeaux-900 dark:bg-bordeaux-950 border-b border-gold-500/30 h-16 flex items-center justify-between px-4 lg:px-6 z-30 shadow-lg shadow-bordeaux-950/20">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
+        {/* Navbar (Top) */}
+        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6 z-30">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
-                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-cream-50 hover:bg-bordeaux-800 hover:text-gold-300 rounded-lg shrink-0 transition-colors" title="Abrir menu">
-                     <Bars3Icon className="h-5 w-5" />
+                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 lg:hidden text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg shrink-0">
+                     <Bars3Icon className="h-6 w-6" />
                  </button>
-                 <h2 className="text-base lg:text-xl font-serif font-semibold text-cream-50 truncate tracking-tight">
+                 <h2 className="text-base lg:text-xl font-bold text-slate-800 dark:text-white truncate">
                      {currentView === 'clients' ? 'Painel de Clientes' : 
                       currentView === 'contracts' ? 'Gestão de Contratos' :
                       currentView === 'labor_calc' ? 'Cálculos Trabalhistas' :
                       currentView === 'petition_editor' ? 'Editor de Petições' :
-                      currentView === 'dr_michel' ? 'Dr. Michel Felix — IA Jurídica' :
-                      currentView === 'dra_luana' ? 'Dra. Luana Castro — IA Trabalhista' :
+                      currentView === 'dr_michel' ? 'Dr. Michel Felix - IA Jurídica' :
+                      currentView === 'dra_luana' ? 'Dra. Luana Castro - IA Trabalhista' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
                       'Cálculos Previdenciários'}
                  </h2>
                  {isSyncing ? (
-                      <span className="text-xs text-gold-300 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
+                      <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
                  ) : saveError ? (
                       <div className="flex items-center gap-2">
-                          <span className="text-xs text-red-300 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
+                          <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
                           <button 
                             onClick={handleRetrySync}
-                            className="text-[10px] bg-red-900/40 text-red-200 px-2 py-0.5 rounded hover:bg-red-900/60 transition-colors font-bold uppercase border border-red-500/30"
+                            className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors font-bold uppercase"
                           >
                             Tentar Novamente
                           </button>
                           <button 
                             onClick={() => setSaveError(null)}
-                            className="text-[10px] bg-bordeaux-800 text-cream-100/70 px-2 py-0.5 rounded hover:bg-bordeaux-700 transition-colors font-bold uppercase"
+                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 transition-colors font-bold uppercase"
                           >
                             Limpar
                           </button>
                       </div>
                  ) : isCloudConfigured ? (
-                     <span className="text-xs text-gold-200 flex items-center gap-1 font-medium bg-gold-500/10 px-2.5 py-1 rounded-full border border-gold-500/30"><CloudIcon className="h-3 w-3" /> Online</span>
+                     <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>
                  ) : (
-                     <span className="text-xs text-cream-100/60 flex items-center gap-1">Local</span>
+                     <span className="text-xs text-slate-400 flex items-center gap-1">Local</span>
                  )}
              </div>
 
-             <div className="flex items-center gap-2">
-                 <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg relative transition-colors">
+             <div className="flex items-center gap-3">
+                 <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg relative">
                      <BellIcon className="h-5 w-5" />
-                     {activeAlerts.length > 0 && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-gold-400 ring-2 ring-bordeaux-900 animate-pulse"></span>}
+                     {activeAlerts.length > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border border-white dark:border-slate-900 animate-pulse"></span>}
                  </button>
-                 <button onClick={onOpenSettings} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg transition-colors">
-                     <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-gold-400' : ''}`} />
+                 <button onClick={onOpenSettings} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                     <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-primary-500' : ''}`} />
                  </button>
-                 <button onClick={toggleDarkMode} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg transition-colors" title={darkMode ? 'Modo claro' : 'Modo escuro'}>
+                 <button onClick={toggleDarkMode} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
                      {darkMode ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
                  </button>
              </div>
@@ -1854,7 +1836,7 @@ export default function Dashboard({
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${!record.type ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-primary-50 text-primary-800 border-primary-300/60 dark:bg-bordeaux-900/30 dark:text-gold-300 dark:border-gold-500/30'}`}>{record.type || 'N/D'}</span>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${!record.type ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800'}`}>{record.type || 'N/D'}</span>
                                                 </td>
                                                 <td className="px-4 py-3 dark:text-slate-400">{record.der || '-'}</td>
                                                 {renderDateCell(record.medExpertiseDate, record.id, '_med')}
@@ -1890,7 +1872,7 @@ export default function Dashboard({
                                                         <button 
                                                             onClick={() => handleEditClient(record)} 
                                                             disabled={isFetchingDetails}
-                                                            className="p-1.5 text-primary-700 hover:bg-primary-50 rounded disabled:opacity-50"
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
                                                         >
                                                             {isFetchingDetails && currentRecord?.id === record.id ? (
                                                                 <ArrowPathIcon className="h-4 w-4 animate-spin" />
@@ -1943,7 +1925,7 @@ export default function Dashboard({
                                              </div>
                                          </div>
                                          <div className="flex gap-2">
-                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-primary-50 dark:bg-bordeaux-900/30 text-primary-700 dark:text-gold-400 rounded-lg">
+                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
                                                  <PencilSquareIcon className="h-5 w-5" />
                                              </button>
                                              <button onClick={() => handleClientDelete(record.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
@@ -1959,7 +1941,7 @@ export default function Dashboard({
                                          </div>
                                          <div>
                                              <p className="mb-1">Tipo</p>
-                                             <p className="text-primary-700 dark:text-gold-400 bg-primary-50 dark:bg-bordeaux-900/30 p-1.5 rounded border border-primary-200/50 dark:border-gold-500/30">{record.type || 'N/D'}</p>
+                                             <p className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded border border-blue-100 dark:border-blue-800">{record.type || 'N/D'}</p>
                                          </div>
                                          <div>
                                              <p className="mb-1">DER</p>
@@ -1978,7 +1960,7 @@ export default function Dashboard({
                                              </div>
                                          )}
                                          {record.socialExpertiseDate && (
-                                             <div className="px-2 py-1 bg-primary-50 dark:bg-indigo-900/10 text-primary-700 dark:text-gold-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
+                                             <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
                                                  P. Social: {record.socialExpertiseDate}
                                              </div>
                                          )}
@@ -2006,7 +1988,7 @@ export default function Dashboard({
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <div className="relative w-full md:w-[400px] group">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 group-focus-within:text-primary-600 transition-colors" />
+                                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                             </div>
                             <input
                                 type="text"
@@ -2027,7 +2009,7 @@ export default function Dashboard({
                             </button>
                             <button
                                 onClick={() => { setCurrentContract(null); setIsContractModalOpen(true); }}
-                                className="bg-primary-700 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2"
                             >
                                 <PlusIcon className="h-5 w-5" />
                                 Novo Contrato
@@ -2064,14 +2046,14 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="px-4 py-3 dark:text-slate-300">{contract.serviceType}</td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-primary-50 text-primary-800 border-primary-300/60 dark:bg-bordeaux-900/30' : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20'}`}>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20' : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20'}`}>
                                                         {contract.lawyer === 'Michel' ? '👨‍⚖️ Dr. Michel' : '👩‍⚖️ Dra. Luana'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 font-mono font-bold dark:text-slate-200">{formatCurrency(totalFee)}</td>
                                                 <td className="px-4 py-3 w-48">
                                                     <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-1">
-                                                        <div className={`h-2 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                                        <div className={`h-2 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between">
                                                         <span>Pago: {formatCurrency(totalPaid)}</span>
@@ -2088,7 +2070,7 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex justify-end gap-1">
-                                                        <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-1.5 text-primary-700 hover:bg-primary-50 rounded"><PencilSquareIcon className="h-4 w-4" /></button>
+                                                        <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><PencilSquareIcon className="h-4 w-4" /></button>
                                                         <button onClick={() => handleContractDelete(contract.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><TrashIcon className="h-4 w-4" /></button>
                                                     </div>
                                                 </td>
@@ -2129,7 +2111,7 @@ export default function Dashboard({
 
                                          <div className="flex justify-between items-center text-xs">
                                              <div className="text-slate-600 dark:text-slate-400 font-medium italic">{contract.serviceType}</div>
-                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-primary-50 text-primary-800 border-primary-200/50' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
+                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
                                                  {contract.lawyer === 'Michel' ? 'Michel' : 'Luana'}
                                              </span>
                                          </div>
@@ -2140,16 +2122,16 @@ export default function Dashboard({
                                                  <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
                                              </div>
                                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                              </div>
                                          </div>
 
                                          <div className="flex justify-between items-center pt-2">
                                              <div className="text-[10px] text-slate-500">
-                                                 Sinal/Pago: <span className="font-bold text-primary-700 dark:text-gold-400">{formatCurrency(totalPaid)}</span>
+                                                 Sinal/Pago: <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(totalPaid)}</span>
                                              </div>
                                              <div className="flex gap-2">
-                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-primary-50 dark:bg-indigo-900/20 text-primary-700 dark:text-gold-400 rounded-lg">
+                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
                                                      <PencilSquareIcon className="h-4 w-4" />
                                                  </button>
                                                  <button onClick={() => handleContractDelete(contract.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">

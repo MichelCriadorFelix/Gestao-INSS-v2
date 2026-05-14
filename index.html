@@ -2,120 +2,13 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>Felix e Castro Advocacia Especializada</title>
     <meta name="theme-color" content="#6B1A1F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- Fallback CSS antes do Tailwind carregar (evita tela branca no mobile) -->
-    <style>
-        html, body {
-            background-color: #FAF7F0;
-            color: #1a1a1a;
-            min-height: 100vh;
-            min-height: 100dvh;
-            margin: 0;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-            -webkit-tap-highlight-color: transparent;
-        }
-        html.dark, html.dark body {
-            background-color: #3e0f12;
-            color: #f1f5f9;
-        }
-        /* iOS PWA: status bar safe area */
-        @supports (padding: max(0px)) {
-            .safe-top {
-                padding-top: max(0.5rem, env(safe-area-inset-top));
-            }
-            .safe-bottom {
-                padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-            }
-        }
-        /* Mobile: evita zoom em inputs no iOS */
-        @media (max-width: 768px) {
-            input, textarea, select {
-                font-size: 16px !important;
-            }
-        }
-    </style>
-    
-    <!-- Anti-FOUC: aplica dark mode antes do React montar -->
-    <script>
-        try {
-            if (localStorage.getItem('inss_theme') === 'dark') {
-                document.documentElement.classList.add('dark');
-            }
-        } catch(e) {}
-    </script>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        // Paleta Felix & Castro - bordô (primary)
-                        primary: {
-                            50: '#fdf2f3',
-                            100: '#fce7e9',
-                            200: '#f9d2d6',
-                            300: '#f3acb4',
-                            400: '#ea7d8a',
-                            500: '#dd4f60',
-                            600: '#c83246',
-                            700: '#a8253a',
-                            800: '#8b2235',
-                            900: '#6B1A1F',
-                            950: '#3e0f12',
-                        },
-                        bordeaux: {
-                            50: '#fdf2f3',
-                            100: '#fce7e9',
-                            200: '#f9d2d6',
-                            300: '#f3acb4',
-                            400: '#ea7d8a',
-                            500: '#dd4f60',
-                            600: '#c83246',
-                            700: '#a8253a',
-                            800: '#8b2235',
-                            900: '#6B1A1F',
-                            950: '#3e0f12',
-                        },
-                        // Dourado/champanhe — acentos premium
-                        gold: {
-                            50: '#fdf9ed',
-                            100: '#faefce',
-                            200: '#f5dd9b',
-                            300: '#efc55f',
-                            400: '#e9b03a',
-                            500: '#C9A961',
-                            600: '#b8881f',
-                            700: '#98671d',
-                            800: '#7d521f',
-                            900: '#69431f',
-                            950: '#3c220d',
-                        },
-                        // Off-white / creme — fundos claros premium
-                        cream: {
-                            50: '#FAF7F0',
-                            100: '#F5F1E8',
-                            200: '#ecdfd2',
-                            300: '#d9b9a5',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        serif: ['"Cormorant Garamond"', 'serif'],
-                        display: ['"Cormorant Garamond"', 'serif'],
-                    }
-                }
-            }
-        }
-    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link id="manifest-placeholder" rel="manifest" href="">
     
@@ -303,7 +196,7 @@
 }
 </script>
 </head>
-<body class="bg-cream-50 dark:bg-bordeaux-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-900 selection:text-cream-50">
+<body class="bg-cream-50 dark:bg-[#0f0a0a] text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-900 selection:text-cream-50">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
