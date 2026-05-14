@@ -25,14 +25,14 @@ import { getMinWage, getProceduralRite } from './utils';
 const STYLES = {
   LABEL_TEXT: "block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5",
   LABEL_TINY: "block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1",
-  INPUT_FIELD: "w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition text-sm font-medium shadow-sm",
-  INPUT_TINY: "w-full px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500",
+  INPUT_FIELD: "w-full px-4 py-2.5 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition text-sm font-medium shadow-sm",
+  INPUT_TINY: "w-full px-3 py-2 bg-white dark:bg-bordeaux-950/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500",
   BTN_PRIMARY: "px-5 py-2.5 text-white font-medium bg-primary-700 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2 transform active:scale-95",
-  BTN_SECONDARY: "px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition shadow-sm transform active:scale-95",
-  BTN_SECONDARY_SM: "px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition",
-  CARD_SECTION: "bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md border border-slate-200 dark:border-slate-800",
+  BTN_SECONDARY: "px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded-xl transition shadow-sm transform active:scale-95",
+  BTN_SECONDARY_SM: "px-3 py-2 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 transition",
+  CARD_SECTION: "bg-white dark:bg-bordeaux-950/40 p-6 rounded-2xl shadow-md border border-slate-200 dark:border-gold-500/20",
   CARD_TITLE: "font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2 text-lg",
-  EMPTY_MSG: "text-center text-sm text-slate-500 dark:text-slate-400 italic py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/20"
+  EMPTY_MSG: "text-center text-sm text-slate-500 dark:text-slate-400 italic py-8 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl bg-slate-50/50 dark:bg-slate-900/20"
 };
 
 // --- Tipos e Interfaces ---
@@ -2006,9 +2006,9 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="flex flex-col h-full bg-cream-50 dark:bg-bordeaux-950/60 overflow-hidden">
       {/* Header da Calculadora */}
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex justify-between items-center shadow-sm z-10">
+      <div className="bg-white dark:bg-bordeaux-950/40 border-b border-slate-200 dark:border-gold-500/15 p-4 flex justify-between items-center shadow-sm z-10">
          <div className="flex items-center gap-3">
              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-primary-700 dark:text-indigo-400">
                  <CalculatorIcon className="h-6 w-6" />
@@ -2019,10 +2019,10 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
              </div>
          </div>
          <div className="flex gap-2">
-            <button onClick={() => setShowSavedList(!showSavedList)} className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition border border-slate-200 dark:border-slate-700">
+            <button onClick={() => setShowSavedList(!showSavedList)} className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-bordeaux-900/60 transition border border-slate-200 dark:border-gold-500/15">
                 <ArchiveBoxIcon className="h-4 w-4" /> {showSavedList ? 'Ocultar Salvos' : 'Ver Salvos'}
             </button>
-            <button onClick={() => { setData(INITIAL_LABOR_DATA); setEditingId(null); setCalcResult([]); setTotalValue(0); setActiveTab(1); }} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+            <button onClick={() => { setData(INITIAL_LABOR_DATA); setEditingId(null); setCalcResult([]); setTotalValue(0); setActiveTab(1); }} className="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-bordeaux-900/60 transition">
                 <TrashIcon className="h-4 w-4" /> Limpar
             </button>
             {totalValue > 0 && (
@@ -2036,14 +2036,14 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
       {/* Saved List Overlay */}
       {showSavedList && (
-          <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 animate-in slide-in-from-top-4">
+          <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-gold-500/15 p-4 animate-in slide-in-from-top-4">
               <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3">Cálculos Salvos</h3>
               {savedCalculations.length === 0 ? (
                   <p className="text-sm text-slate-500 italic">Nenhum cálculo salvo.</p>
               ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {savedCalculations.map(calc => (
-                          <div key={calc.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-sm">
+                          <div key={calc.id} className="bg-white dark:bg-bordeaux-950/60 p-3 rounded-lg border border-slate-200 dark:border-gold-500/15 flex justify-between items-center shadow-sm">
                               <div>
                                   <p className="font-bold text-slate-800 dark:text-white text-sm">{calc.employeeName}</p>
                                   <p className="text-xs text-slate-500">{new Date(calc.date).toLocaleDateString()} - {formatCurrency(calc.totalValue)}</p>
@@ -2061,7 +2061,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex overflow-x-auto border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 gap-1 shrink-0">
+      <div className="flex overflow-x-auto border-b border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/40 px-4 gap-1 shrink-0">
          {['Qualificação e Relato', 'Remuneração e Adicionais', 'Jornada de Trabalho', 'Rescisão e Pendências', 'Situações Especiais', 'Resultados'].map((label, idx) => (
              <button
                 key={idx}
@@ -2219,11 +2219,11 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               {/* Lista de Horários */}
                               <div className="space-y-4">
                                   {(data.contractualSchedule?.schedules || []).map((schedule, idx) => (
-                                      <div key={schedule.id} className="p-4 bg-slate-50 dark:bg-slate-900/30 rounded-xl border border-slate-200 dark:border-slate-800 relative group">
+                                      <div key={schedule.id} className="p-4 bg-cream-50 dark:bg-bordeaux-950/60/30 rounded-xl border border-slate-200 dark:border-gold-500/20 relative group">
                                           {idx > 0 && (
                                               <button 
                                                   onClick={() => removeContractualSchedule(schedule.id)}
-                                                  className="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-500 rounded-full shadow-sm hover:bg-red-50 transition opacity-0 group-hover:opacity-100"
+                                                  className="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 text-red-500 rounded-full shadow-sm hover:bg-red-50 transition opacity-0 group-hover:opacity-100"
                                               >
                                                   <TrashIcon className="h-3.5 w-3.5" />
                                               </button>
@@ -2270,7 +2270,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                                   className={`w-7 h-7 rounded-md text-[10px] font-bold transition-colors ${
                                                                       isSelected 
                                                                           ? 'bg-primary-700 text-white' 
-                                                                          : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-700'
+                                                                          : 'bg-slate-200 dark:bg-slate-800 text-slate-500 hover:bg-slate-300 dark:hover:bg-bordeaux-900/60'
                                                                   }`}
                                                               >
                                                                   {day.label}
@@ -2433,13 +2433,13 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </div>
                           
                           {data.salaryHistory.length === 0 ? (
-                              <div className="text-center py-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                              <div className="text-center py-4 bg-cream-50 dark:bg-bordeaux-950/60/50 rounded-xl border border-dashed border-slate-200 dark:border-gold-500/15">
                                   <p className="text-sm text-slate-500">Nenhum histórico adicionado. O cálculo usará o <strong>Último Salário Base</strong> para todo o período.</p>
                               </div>
                           ) : (
                               <div className="space-y-3">
                                   {data.salaryHistory.map((hist, idx) => (
-                                      <div key={hist.id} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                                      <div key={hist.id} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end p-3 bg-cream-50 dark:bg-bordeaux-950/60/50 rounded-xl border border-slate-200 dark:border-gold-500/15">
                                           <div className="md:col-span-2">
                                               <label className={STYLES.LABEL_TINY}>Início</label>
                                               <input type="date" className={STYLES.INPUT_TINY} value={hist.startDate} onChange={e => updateSalaryHistory(hist.id, 'startDate', e.target.value)} />
@@ -2482,7 +2482,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </div>
                           {data.wageGap.length === 0 && <p className={STYLES.EMPTY_MSG}>Nenhum período de diferença salarial cadastrado.</p>}
                           {data.wageGap.map((gap, idx) => (
-                              <div key={idx} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-3 relative group">
+                              <div key={idx} className="bg-cream-50 dark:bg-bordeaux-950/60/50 p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 mb-3 relative group">
                                   <button onClick={() => removeWageGap(idx)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500"><TrashIcon className="h-4 w-4" /></button>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                       <div>
@@ -2524,7 +2524,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </div>
                           {data.salaryOffTheBooks.length === 0 && <p className={STYLES.EMPTY_MSG}>Nenhum valor "por fora" cadastrado.</p>}
                           {data.salaryOffTheBooks.map((off, idx) => (
-                              <div key={off.id} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-3 relative group">
+                              <div key={off.id} className="bg-cream-50 dark:bg-bordeaux-950/60/50 p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 mb-3 relative group">
                                   <button onClick={() => removeSalaryOffTheBooks(off.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500"><TrashIcon className="h-4 w-4" /></button>
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                       <div>
@@ -2551,7 +2551,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               <PlusIcon className="h-5 w-5" /> Adicionais Recorrentes
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                              <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                              <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                   <label className={`${STYLES.LABEL_TEXT} mb-2`}>Insalubridade</label>
                                   <select 
                                       className={STYLES.INPUT_FIELD} 
@@ -2566,7 +2566,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                   <p className="text-[10px] text-slate-400 mt-1">Base: Salário Mínimo</p>
                               </div>
 
-                              <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 flex flex-col justify-center">
+                              <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50 flex flex-col justify-center">
                                   <label className="flex items-center gap-3 cursor-pointer">
                                       <input 
                                           type="checkbox" 
@@ -2597,7 +2597,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           {data.cctRights.length === 0 && <p className={STYLES.EMPTY_MSG}>Nenhum direito normativo cadastrado.</p>}
                           
                           {data.cctRights.map((right, idx) => (
-                              <div key={right.id} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-3 relative">
+                              <div key={right.id} className="bg-cream-50 dark:bg-bordeaux-950/60/50 p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 mb-3 relative">
                                   <button onClick={() => removeCctRight(right.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500"><TrashIcon className="h-4 w-4" /></button>
                                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                       <div className={right.frequency === 'daily' ? "md:col-span-3" : "md:col-span-4"}>
@@ -2724,7 +2724,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           {data.overtime.length === 0 && <p className={STYLES.EMPTY_MSG}>Nenhum lote de horas extras cadastrado.</p>}
                           
                           {data.overtime.map((ot, idx) => (
-                              <div key={ot.id} className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-3 relative">
+                              <div key={ot.id} className="bg-cream-50 dark:bg-bordeaux-950/60/50 p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 mb-3 relative">
                                   <button onClick={() => removeOvertimeBatch(ot.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500"><TrashIcon className="h-4 w-4" /></button>
                                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                                       <div className="col-span-1">
@@ -2794,7 +2794,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               <ClockIcon className="h-5 w-5" /> Adicional Noturno e Intrajornada
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                              <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 col-span-1 md:col-span-3">
+                              <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50 col-span-1 md:col-span-3">
                                   <div className="flex justify-between items-center mb-2">
                                       <label className="flex items-center gap-3 cursor-pointer">
                                           <input 
@@ -2823,7 +2823,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                       type="checkbox" 
                                                       checked={data.adicionalNoturno.applySumula60 || false} 
                                                       onChange={e => setData(prev => ({ ...prev, adicionalNoturno: { ...prev.adicionalNoturno, applySumula60: e.target.checked } }))} 
-                                                      className="w-4 h-4 text-primary-700 rounded focus:ring-indigo-500 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600" 
+                                                      className="w-4 h-4 text-primary-700 rounded focus:ring-indigo-500 bg-white dark:bg-bordeaux-950/40 border-slate-300 dark:border-slate-600" 
                                                   />
                                                   <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
                                                       Aplicar Súmula 60 TST (Prorrogação da Jornada Noturna)
@@ -2838,7 +2838,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                               type="time" 
                                                               value={data.adicionalNoturno.extendedEndTime || ''}
                                                               onChange={e => setData(prev => ({ ...prev, adicionalNoturno: { ...prev.adicionalNoturno, extendedEndTime: e.target.value } }))}
-                                                              className="w-24 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs font-bold focus:ring-1 focus:ring-indigo-500"
+                                                              className="w-24 px-2 py-1 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-slate-600 rounded text-xs font-bold focus:ring-1 focus:ring-indigo-500"
                                                           />
                                                       </div>
                                                       <span className="text-[10px] text-slate-400 italic leading-tight">
@@ -2853,7 +2853,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                           </p>
                                           {data.adicionalNoturno.periods.length === 0 && <p className="text-xs text-slate-400 italic">Nenhum período adicionado.</p>}
                                           {data.adicionalNoturno.periods.map((period, idx) => (
-                                              <div key={period.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 relative">
+                                              <div key={period.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end bg-white dark:bg-bordeaux-950/40 p-2 rounded border border-slate-200 dark:border-gold-500/15 relative">
                                                   <button onClick={() => removeNightShiftPeriod(period.id)} className="absolute top-1 right-1 text-slate-400 hover:text-red-500"><TrashIcon className="h-3 w-3" /></button>
                                                   <div>
                                                       <label className={STYLES.LABEL_TINY}>Horas/Dia</label>
@@ -2941,7 +2941,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
 
                               {/* Intrajornada */}
-                              <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 col-span-1 md:col-span-3">
+                              <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50 col-span-1 md:col-span-3">
                                   <div className="flex justify-between items-center mb-2">
                                       <label className="flex items-center gap-3 cursor-pointer">
                                           <input 
@@ -2968,7 +2968,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                           </p>
                                           {data.intrajornada.periods.length === 0 && <p className="text-xs text-slate-400 italic">Nenhum período adicionado.</p>}
                                           {data.intrajornada.periods.map((period, idx) => (
-                                              <div key={period.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 relative">
+                                              <div key={period.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end bg-white dark:bg-bordeaux-950/40 p-2 rounded border border-slate-200 dark:border-gold-500/15 relative">
                                                   <button onClick={() => removeIntrajornadaPeriod(period.id)} className="absolute top-1 right-1 text-slate-400 hover:text-red-500"><TrashIcon className="h-3 w-3" /></button>
                                                   <div>
                                                       <label className={STYLES.LABEL_TINY}>Qtd. Horas/Dia</label>
@@ -3150,7 +3150,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               <ExclamationTriangleIcon className="h-5 w-5" /> Férias e 13º Salário
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                                   <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                   <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">Férias</h4>
                                        <label className="flex items-center gap-3 mb-2 cursor-pointer">
                                             <input type="checkbox" checked={data.claimVacationProportional} onChange={e => handleInputChange('claimVacationProportional', e.target.checked)} className="w-4 h-4 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
@@ -3168,7 +3168,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                            ) : (
                                                <div className="space-y-2">
                                                    {data.vacationPeriods.map((vac, idx) => (
-                                                       <div key={vac.id} className="flex flex-col gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                       <div key={vac.id} className="flex flex-col gap-2 p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 rounded-lg shadow-sm">
                                                            <div className="flex items-center gap-2">
                                                                <div className="grid grid-cols-2 gap-2 flex-1">
                                                                    <div>
@@ -3209,7 +3209,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                    </div>
 
 
-                                   <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                   <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">13º Salário</h4>
                                        <div className="flex flex-col gap-2 mb-3">
                                            <label className="flex items-center gap-3 cursor-pointer">
@@ -3232,7 +3232,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                            ) : (
                                                <div className="space-y-2">
                                                    {data.unpaid13thPeriods.map((period, idx) => (
-                                                       <div key={period.id} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                       <div key={period.id} className="flex items-center gap-2 p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 rounded-lg shadow-sm">
                                                            <div className="flex-1 grid grid-cols-2 gap-2">
                                                                <input 
                                                                    type="number" 
@@ -3266,7 +3266,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                               <div className="space-y-4">
-                                  <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                  <div className="p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                       <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 text-sm">FGTS (Conta Vinculada)</h4>
                                       <div>
                                           <label className={STYLES.LABEL_TEXT}>Saldo FGTS (Conta Vinculada)</label>
@@ -3317,10 +3317,10 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                       </div>
                                   </div>
                                   
-                                  <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                  <div className="p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                       <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 text-sm">FGTS Não Depositado</h4>
                                       
-                                      <label className="flex items-center gap-3 mb-4 cursor-pointer p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                      <label className="flex items-center gap-3 mb-4 cursor-pointer p-2 bg-white dark:bg-bordeaux-950/40 rounded border border-slate-200 dark:border-gold-500/15">
                                            <input 
                                                type="checkbox" 
                                                checked={data.fgtsNoDeposits} 
@@ -3340,7 +3340,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                   {data.fgtsSpecificMissingPeriods.length > 0 ? (
                                                       <div className="space-y-2 mb-4">
                                                           {data.fgtsSpecificMissingPeriods.map((period, idx) => (
-                                                              <div key={period.id} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                              <div key={period.id} className="flex items-center gap-2 p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/15 rounded-lg shadow-sm">
                                                                   <div className="flex-1 grid grid-cols-2 gap-2">
                                                                       <input type="date" className={STYLES.INPUT_TINY} value={period.startDate} onChange={e => updateFgtsPeriod(period.id, 'startDate', e.target.value)} />
                                                                       <input type="date" className={STYLES.INPUT_TINY} value={period.endDate} onChange={e => updateFgtsPeriod(period.id, 'endDate', e.target.value)} />
@@ -3354,7 +3354,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                                   )}
                                               </div>
 
-                                              <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                              <div className="pt-4 border-t border-slate-200 dark:border-gold-500/15">
                                                   <label className={STYLES.LABEL_TINY}>Ou Quantidade de Meses (Simples)</label>
                                                   <input 
                                                       type="number" 
@@ -3371,14 +3371,14 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               </div>
                               
                               <div className="space-y-4">
-                                  <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                  <div className="p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                       <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-3 text-sm">Multas Rescisórias</h4>
                                       <div className="space-y-3">
-                                          <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
+                                          <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 transition cursor-pointer">
                                               <input type="checkbox" checked={data.applyFine477} onChange={e => handleInputChange('applyFine477', e.target.checked)} className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                               <span className="text-sm font-semibold dark:text-slate-200">Multa Art. 477 (Atraso Pagamento)</span>
                                           </label>
-                                          <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
+                                          <label className="flex items-center gap-3 p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 transition cursor-pointer">
                                               <input type="checkbox" checked={data.applyFine467} onChange={e => handleInputChange('applyFine467', e.target.checked)} className="w-5 h-5 text-primary-700 bg-slate-50 dark:bg-slate-700 border-slate-400 dark:border-slate-500 rounded focus:ring-indigo-500" />
                                               <span className="text-sm font-semibold dark:text-slate-200">Multa Art. 467 (Verbas Incontroversas)</span>
                                           </label>
@@ -3455,7 +3455,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                               <div className="space-y-4">
-                                  <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                  <div className="p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                     <div>
                                         <label className={STYLES.LABEL_TEXT}>Indenização por Danos Morais (Estimativa R$)</label>
                                         <input type="number" className={STYLES.INPUT_FIELD} value={data.moralDamages} onChange={e => handleInputChange('moralDamages', Number(e.target.value))} placeholder="0.00" />
@@ -3463,7 +3463,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                                   </div>
                               </div>
                               <div className="space-y-4">
-                                   <div className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                   <div className="p-3 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-cream-50 dark:bg-bordeaux-950/60/50">
                                        <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2 text-sm">Honorários Advocatícios</h4>
                                        <label className={STYLES.LABEL_TINY}>Percentual de Sucumbência</label>
                                        <select 
@@ -3546,9 +3546,9 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                           </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      <div className="bg-white dark:bg-bordeaux-950/40 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/15 overflow-hidden">
                           <table className="w-full text-left text-sm">
-                              <thead className="bg-slate-50 dark:bg-slate-900/50">
+                              <thead className="bg-cream-50 dark:bg-bordeaux-950/60/50">
                                   <tr>
                                       <th className="px-6 py-4 font-bold text-slate-600 dark:text-slate-400">Descrição</th>
                                       <th className="px-6 py-4 font-bold text-slate-600 dark:text-slate-400 text-right">Valor</th>
@@ -3556,7 +3556,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                   {calcResult.map((item, idx) => (
-                                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition">
                                           <td className="px-6 py-4">
                                               <span className="block font-medium text-slate-800 dark:text-slate-200">{item.desc}</span>
                                               <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">{item.category}</span>

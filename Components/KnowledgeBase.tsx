@@ -169,7 +169,7 @@ export default function KnowledgeBase() {
 
   if (isSuccess) {
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center">
+      <div className="bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-8 text-center">
         <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={32} />
         </div>
@@ -193,7 +193,7 @@ export default function KnowledgeBase() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+      <div className="lg:col-span-2 bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6">
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">Base de Conhecimento (Treinar IA)</h2>
         <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
           Adicione leis, jurisprudências ou documentos padrão aqui. A IA usará essas informações para responder com mais precisão e embasamento jurídico.
@@ -207,7 +207,7 @@ export default function KnowledgeBase() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Lei 8.213/91 - Planos de Benefícios da Previdência Social"
-              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -218,7 +218,7 @@ export default function KnowledgeBase() {
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="Ex: http://www.planalto.gov.br/ccivil_03/leis/l8213cons.htm"
-              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -229,7 +229,7 @@ export default function KnowledgeBase() {
               onChange={(e) => setContent(e.target.value)}
               placeholder="Cole o texto da lei ou jurisprudência aqui..."
               rows={10}
-              className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm text-slate-900 dark:text-slate-100"
+              className="w-full p-2 bg-white dark:bg-bordeaux-950/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm text-slate-900 dark:text-slate-100"
             />
           </div>
 
@@ -257,7 +257,7 @@ export default function KnowledgeBase() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full">
+      <div className="bg-white dark:bg-bordeaux-950/60 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6 flex flex-col h-full">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
           <BookOpen className="text-primary-600" size={20} />
           Documentos na Base
@@ -269,7 +269,7 @@ export default function KnowledgeBase() {
             placeholder="Pesquisar documentos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+            className="w-full p-2 text-sm bg-cream-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
           />
         </div>
         
@@ -288,7 +288,7 @@ export default function KnowledgeBase() {
               {filteredDocs.map((docTitle) => (
                 <div 
                   key={docTitle}
-                  className="group flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                  className="group flex items-center justify-between p-3 bg-cream-50 dark:bg-bordeaux-900/40/50 border border-slate-200 dark:border-gold-500/20 rounded-lg hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
                 >
                   <span className="text-sm text-slate-700 dark:text-slate-300 font-medium truncate pr-2" title={docTitle}>
                     {docTitle}
@@ -306,7 +306,7 @@ export default function KnowledgeBase() {
           )}
         </div>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-gold-500/20">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Leis Sugeridas para Adicionar</h4>
           <div className="space-y-2">
             {suggestedLaws.filter(law => !existingDocs.includes(law)).slice(0, 5).map(law => (
