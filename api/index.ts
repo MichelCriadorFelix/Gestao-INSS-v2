@@ -60,7 +60,7 @@ const getCurrentDateContext = () => {
 
 // Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/config") return next();
+  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
   authenticate(req, res, next);
 });
 

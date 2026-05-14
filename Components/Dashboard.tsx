@@ -1401,13 +1401,13 @@ export default function Dashboard({
       {/* OVERLAY (mobile + desktop quando sidebar aberta) */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* SIDEBAR NAVIGATION - Felix & Castro Bordô */}
-      <aside className={`fixed inset-y-0 left-0 bg-bordeaux-900 text-cream-50 flex flex-col flex-shrink-0 transition-transform duration-300 ease-out z-50 w-72 shadow-2xl shadow-bordeaux-950/50 lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 bg-bordeaux-900 text-cream-50 flex flex-col flex-shrink-0 transition-transform duration-300 ease-out z-50 w-72 shadow-2xl shadow-bordeaux-950/50 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
            {/* Padrão de balança decorativo no fundo */}
            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 0%, transparent 40%), radial-gradient(circle at 80% 70%, #C9A961 0%, transparent 40%)'}}></div>
            
@@ -1421,7 +1421,7 @@ export default function Dashboard({
                        <span className="block text-[10px] uppercase tracking-[0.2em] text-gold-300/80 mt-1">Advocacia Especializada</span>
                    </div>
                </div>
-               <button className="p-1.5 text-cream-50/60 hover:text-gold-400 transition-colors lg:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+               <button className="p-1.5 text-cream-50/60 hover:text-gold-400 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                    <XMarkIcon className="w-5 h-5" />
                </button>
            </div>
@@ -1563,11 +1563,11 @@ export default function Dashboard({
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden bg-cream-50 dark:bg-[#0f0a0a] lg:ml-72">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden bg-cream-50 dark:bg-[#0f0a0a]">
         {/* Navbar (Top) - Bordô premium */}
         <header className="bg-bordeaux-900 dark:bg-bordeaux-950 border-b border-gold-500/30 h-16 flex items-center justify-between px-4 lg:px-6 z-30 shadow-lg shadow-bordeaux-950/20">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
-                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-cream-50 hover:bg-bordeaux-800 hover:text-gold-300 rounded-lg shrink-0 transition-colors lg:hidden" title="Abrir menu">
+                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-cream-50 hover:bg-bordeaux-800 hover:text-gold-300 rounded-lg shrink-0 transition-colors" title="Abrir menu">
                      <Bars3Icon className="h-5 w-5" />
                  </button>
                  <h2 className="text-base lg:text-xl font-serif font-semibold text-cream-50 truncate tracking-tight">
