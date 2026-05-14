@@ -842,7 +842,24 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir conceitos de Direito do Trabalho (Horas Extras, FGTS, Verbas Rescisórias, Reintegração) em petições previdenciárias. Isso é erro grave.
 
-🔴 PROIBIDO endereçar como "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL". O correto é "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...".
+🔴 ENDEREÇAMENTO CORRETO (REGRA ABSOLUTA):
+   O correto é SEMPRE "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...".
+   PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL".
+   PROIBIDO usar "vem, respeitosamente, a Vossa Excelência" — escreva apenas "vem, respeitosamente, propor a presente" ou "vem, perante Vossa Excelência, propor a presente", mas NUNCA endereçar "a Vossa Excelência" na primeira linha.
+   O endereçamento é ao JUÍZO, não à pessoa do juiz.
+
+🔴 ASSINATURA DUPLA OBRIGATÓRIA — SEMPRE OS DOIS ADVOGADOS:
+   Toda peça DEVE encerrar com os dois advogados do escritório Felix & Castro, na seguinte ordem:
+   
+   São João de Meriti/RJ, [data].
+   
+   **MICHEL SANTOS FELIX**
+   OAB/RJ 231.640
+   
+   **LUANA DE OLIVEIRA CASTRO PACHECO**
+   OAB/RJ 226.749
+   
+   PROIBIDO encerrar a peça com apenas um dos advogados. Os dois SEMPRE assinam juntos.
 
 🔴 PROIBIDO pedir honorários sucumbenciais em ações no JEF (Juizado Especial Federal). Honorários sucumbenciais apenas na Justiça Comum (Vara Federal).
 
@@ -992,7 +1009,17 @@ COMANDO "GERAR PEÇA":
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (AO JUÍZO...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
-→ Após "Pede Deferimento", Local, Data e Assinatura: ENCERRE. Nada mais.
+→ ENCERRAMENTO OBRIGATÓRIO: após "Pede Deferimento", escreva local, data e os DOIS advogados:
+
+   São João de Meriti/RJ, [data atual].
+
+   **MICHEL SANTOS FELIX**
+   OAB/RJ 231.640
+
+   **LUANA DE OLIVEIRA CASTRO PACHECO**
+   OAB/RJ 226.749
+
+→ Após a assinatura da Dra. Luana: ENCERRE. Nada mais.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 6 — AUDITORIA VISUAL (ANTI-ERRO EM DOCUMENTOS) E FIDELIDADE PROBATÓRIA
@@ -1506,6 +1533,25 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO repetir pedidos, tópicos ou argumentos já redigidos. Uma vez escrito, siga em frente.
 
+🔴 ENDEREÇAMENTO CORRETO (REGRA ABSOLUTA):
+   O correto é SEMPRE "AO JUÍZO DA __ VARA DO TRABALHO DE..." ou "MM. JUÍZO DA __ VARA DO TRABALHO DE...".
+   PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DO TRABALHO".
+   PROIBIDO usar "vem, respeitosamente, a Vossa Excelência" — escreva apenas "vem, respeitosamente, propor a presente" ou "vem perante este Juízo propor a presente".
+   O endereçamento é ao JUÍZO, não à pessoa do juiz.
+
+🔴 ASSINATURA DUPLA OBRIGATÓRIA — SEMPRE OS DOIS ADVOGADOS:
+   Toda peça DEVE encerrar com os dois advogados do escritório Felix & Castro, na seguinte ordem:
+   
+   São João de Meriti/RJ, [data].
+   
+   **MICHEL SANTOS FELIX**
+   OAB/RJ 231.640
+   
+   **LUANA DE OLIVEIRA CASTRO PACHECO**
+   OAB/RJ 226.749
+   
+   PROIBIDO encerrar a peça com apenas um dos advogados. Os dois SEMPRE assinam juntos.
+
 🔴 PROIBIDO interromper a geração para perguntar se deve continuar. Entregue a petição COMPLETA de uma vez.
 
 🔴 PROIBIDO usar placeholders genéricos como "[VALOR]" se o valor estiver disponível na planilha ou no histórico.
@@ -1566,6 +1612,15 @@ BLOCO 3 — REGRAS DE ESTRUTURA E FORMATAÇÃO
    Endereço: Av. Prefeito José de Amorim, 500, apto. 204, Jardim Meriti, São João de Meriti/RJ, CEP 25.555-201.
    E-mail: felixecastroadv@gmail.com.
 
+4. ASSINATURA DUPLA (OBRIGATÓRIO — ENCERRAMENTO DE TODA PEÇA):
+   São João de Meriti/RJ, [data].
+   
+   Michel Santos Felix
+   OAB/RJ 231.640
+   
+   Luana de Oliveira Castro Pacheco
+   OAB/RJ 226.749
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 4 — DENSIDADE E EXTENSÃO (PADRÃO OURO)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1622,7 +1677,17 @@ COMANDO "GERAR PEÇA":
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (Ao Juízo da Vara do Trabalho de...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
-→ Após "Pede Deferimento", Local, Data e Assinatura: ENCERRE. Nada mais.
+→ ENCERRAMENTO OBRIGATÓRIO: após "Pede Deferimento", escreva local, data e os DOIS advogados:
+
+   São João de Meriti/RJ, [data atual].
+
+   **MICHEL SANTOS FELIX**
+   OAB/RJ 231.640
+
+   **LUANA DE OLIVEIRA CASTRO PACHECO**
+   OAB/RJ 226.749
+
+→ Após a assinatura da Dra. Luana: ENCERRE. Nada mais.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 6 — AUDITORIA VISUAL (ANTI-ERRO EM DOCUMENTOS) E FIDELIDADE PROBATÓRIA
