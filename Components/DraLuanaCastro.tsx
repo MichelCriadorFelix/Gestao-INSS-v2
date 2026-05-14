@@ -1553,7 +1553,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       const val = e.target.value;
                       setPetitionLength(val);
                       if (val === 'Premium 7000 palavras') {
-                        setSelectedModel('deepseek/deepseek-v4-flash');
+                        setSelectedModel('deepseek/deepseek-r1');
                         setSelectedModelProvider('openrouter');
                       }
                     }}
@@ -1564,7 +1564,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
                     <option value="Médio 4000 palavras">Médio 4.000 palavras</option>
                     <option value="Máximo 5000 palavras">Máximo 5.000 palavras</option>
-                    <option value="Premium 7000 palavras">Premium 7.000 palavras (Somente OpenRouter)</option>
+                    <option value="Premium 7000 palavras">Premium 7.000 palavras (Obrigatório Reasoning R1)</option>
                   </select>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
@@ -1584,8 +1584,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview · Padrão Ouro ⭐</option>
                     </optgroup>
                     <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Recomendado ⭐</option>
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="deepseek/deepseek-r1">DeepSeek R1 (Thinking) · Recomendado ⭐</option>
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
                       <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
                       <option value="qwen/qwen-max">Qwen Max</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>

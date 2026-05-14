@@ -2743,20 +2743,28 @@ ${message}`;
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
+
     if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
+      let orMaxTokens = 2048;
+      if (isGenerationRequest) orMaxTokens = 30000;
+      else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) orMaxTokens = 8192;
+
       const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
 REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
-2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
-3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
-4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
-5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
-7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
+1. PENSAMENTO JURÍDICO (REASONING): Se este for um modelo de "Reasoning" (R1, o1, etc.), use seu orçamento de pensamento para planejar a peça mais densa possível.
+2. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
+3. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022".
+4. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>).
+5. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever súmulas dentro da seção de Pedidos.
+6. DENSIDADE: A petição deve ter entre 4000 e 7000 palavras. Não resuma.
+7. VALOR DA CAUSA: Calcule com salário mínimo vigente se necessário.
+8. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]".`;
 
       const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
       for (const h of history) {
@@ -2764,12 +2772,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         orMessages.push({ role, content: h.content });
       }
       orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-r1", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: orMaxTokens }, res);
       return;
     }
-
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 2048;
     let thinkingConfig: any = { thinkingBudget: 4096 };
@@ -3235,29 +3240,34 @@ ${message}`;
     // Configuração de Tools (Google Search Grounding + URL Context)
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
+    const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
+
     if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
+      let orMaxTokens = 2048;
+      if (isGenerationRequest) orMaxTokens = 30000;
+      else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) orMaxTokens = 8192;
+
       const orSystemPromptLuana = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
 Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
 REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
-2. CITAÇÕES WITH RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
-3. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
-4. DENSITY: Entre 4000 e 6000 palavras. Não resuma.
-5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
+1. PENSAMENTO JURÍDICO (REASONING): Use seu orçamento de pensamento para planejar os melhores argumentos trabalhistas.
+2. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
+3. CITAÇÕES WITH RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
+4. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
+5. DENSITY: Entre 4000 e 7000 palavras. Não resuma.
+6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]".`;
 
       const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) {
-        // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
         const role = h.role === 'model' ? 'assistant' : h.role;
         orMessages.push({ role, content: h.content });
       }
       
       const userContent: any[] = [];
-      // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
-      // Mas se houver imagens, TEM que ser array. Se não houver, string simples é mais seguro.
       if (images && images.length > 0) {
         userContent.push({ type: "text", text: finalMessage });
         images.forEach((img: string) => {
@@ -3266,20 +3276,16 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       }
 
       orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
-
       const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
       await callOpenRouterStream({
-        model: model || "deepseek/deepseek-v3.2",
+        model: model || "deepseek/deepseek-r1",
         messages: orMessagesFinal,
         temperature: isGenerationRequest ? 0.15 : temperature,
-        max_tokens: 16383
+        max_tokens: orMaxTokens
       }, res);
       return;
     }
-
-    const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 2048;
     let thinkingConfig: any = { thinkingBudget: 4096 };
@@ -3290,11 +3296,6 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 16000 };
-    }
-
-    if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined;
     }
 
     // Temperature calibrada por intenção
