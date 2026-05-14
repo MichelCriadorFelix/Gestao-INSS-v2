@@ -1396,7 +1396,7 @@ export default function Dashboard({
   };
 
   return (
-    <div className="flex h-screen bg-cream-50 dark:bg-[#0f0a0a] font-sans transition-colors duration-200 overflow-hidden relative">
+    <div className="flex min-h-screen h-screen bg-cream-50 dark:bg-bordeaux-950 font-sans transition-colors duration-200 overflow-hidden relative">
       
       {/* OVERLAY (mobile + desktop quando sidebar aberta) */}
       {isMobileMenuOpen && (
@@ -1411,7 +1411,7 @@ export default function Dashboard({
            {/* Padrão de balança decorativo no fundo */}
            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 0%, transparent 40%), radial-gradient(circle at 80% 70%, #C9A961 0%, transparent 40%)'}}></div>
            
-           <div className="relative h-20 flex items-center justify-between px-6 border-b border-gold-500/20">
+           <div className="relative safe-top h-20 flex items-center justify-between px-6 border-b border-gold-500/20">
                <div className="flex items-center gap-3">
                    <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-900/40 ring-1 ring-gold-300/50">
                        <ScaleIcon className="h-6 w-6 text-bordeaux-900" />
@@ -1545,7 +1545,7 @@ export default function Dashboard({
                </button>
            </div>
            
-           <div className="relative p-4 border-t border-gold-500/20 bg-bordeaux-950/40">
+           <div className="relative safe-bottom p-4 border-t border-gold-500/20 bg-bordeaux-950/40">
                <div className="flex items-center gap-3">
                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-xs font-bold text-bordeaux-900 ring-2 ring-gold-300/30">
                        {user.firstName[0]}
@@ -1563,9 +1563,9 @@ export default function Dashboard({
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden bg-cream-50 dark:bg-[#0f0a0a]">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen min-h-screen overflow-hidden bg-cream-50 dark:bg-bordeaux-950">
         {/* Navbar (Top) - Bordô premium */}
-        <header className="bg-bordeaux-900 dark:bg-bordeaux-950 border-b border-gold-500/30 h-16 flex items-center justify-between px-4 lg:px-6 z-30 shadow-lg shadow-bordeaux-950/20">
+        <header className="safe-top bg-bordeaux-900 dark:bg-bordeaux-950 border-b border-gold-500/30 h-16 flex items-center justify-between px-4 lg:px-6 z-30 shadow-lg shadow-bordeaux-950/20">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
                  <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-cream-50 hover:bg-bordeaux-800 hover:text-gold-300 rounded-lg shrink-0 transition-colors" title="Abrir menu">
                      <Bars3Icon className="h-5 w-5" />

@@ -777,7 +777,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   };
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden bg-slate-50 dark:bg-[#0B1120]">
+    <div className="h-full flex flex-col relative overflow-hidden bg-slate-50 dark:bg-bordeaux-950">
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Calendar Section */}
