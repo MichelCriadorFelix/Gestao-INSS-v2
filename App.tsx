@@ -166,9 +166,33 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 mb-4"></div>
-        <p className="text-slate-400 animate-pulse">Iniciando sistema jurídico...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-bordeaux-950 via-bordeaux-900 to-bordeaux-950 text-cream-50 relative overflow-hidden">
+        {/* Decoração dourada */}
+        <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 30% 40%, #C9A961 0%, transparent 40%), radial-gradient(circle at 70% 60%, #C9A961 0%, transparent 40%)'}}></div>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-70"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-70"></div>
+        
+        {/* Logo F&C */}
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="bg-gradient-to-br from-gold-400 to-gold-600 w-24 h-24 rounded-2xl flex items-center justify-center mb-6 shadow-2xl shadow-gold-900/50 ring-2 ring-gold-300/40 animate-pulse">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-12 w-12 text-bordeaux-950">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+            </svg>
+          </div>
+          
+          <h1 className="text-4xl sm:text-5xl font-serif font-semibold text-cream-50 tracking-tight">Felix &amp; Castro</h1>
+          <div className="flex items-center justify-center gap-3 mt-2 mb-8">
+            <span className="h-px w-8 bg-gold-500/60"></span>
+            <p className="text-gold-300/90 font-serif text-xs tracking-[0.25em] uppercase">Advocacia Especializada</p>
+            <span className="h-px w-8 bg-gold-500/60"></span>
+          </div>
+          
+          {/* Spinner dourado */}
+          <div className="relative">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gold-500/20 border-t-gold-500"></div>
+          </div>
+          <p className="text-cream-100/60 text-xs uppercase tracking-[0.2em] mt-4 font-serif">Iniciando sistema jurídico</p>
+        </div>
       </div>
     );
   }

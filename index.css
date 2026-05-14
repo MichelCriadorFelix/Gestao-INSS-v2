@@ -86,4 +86,24 @@
   .fc-btn-gold:active {
     @apply scale-[0.98];
   }
+  /* Spinner premium Felix & Castro - dourado em fundo bordô */
+  .fc-spinner {
+    @apply animate-spin rounded-full border-2 border-gold-500/20;
+    border-top-color: #C9A961;
+  }
+  /* Loading inline com toque premium */
+  .fc-loading-pulse {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(201, 169, 97, 0.15) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: fc-shimmer 1.8s ease-in-out infinite;
+  }
+  @keyframes fc-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 }
