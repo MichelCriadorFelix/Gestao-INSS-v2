@@ -413,7 +413,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
                                 </div>
                             </div>
                             <div className="shrink-0 pt-4 border-t border-slate-100 dark:border-gold-500/20">
-                                <button onClick={handleFinalizePDF} disabled={isProcessing || pages.length === 0} className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
+                                <button onClick={handleFinalizePDF} disabled={isProcessing || pages.length === 0} className="w-full py-4 fc-btn-primary text-cream-50 font-bold rounded-xl shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
                                     {isProcessing ? <><ArrowPathIcon className="h-5 w-5 animate-spin" /> Gerando PDF...</> : <><DocumentTextIcon className="h-5 w-5" /> Salvar Arquivo PDF</>}
                                 </button>
                             </div>

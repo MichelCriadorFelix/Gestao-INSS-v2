@@ -62,4 +62,28 @@
   .dark .fc-page-title::before {
     background: linear-gradient(to right, #C9A961, rgba(201, 169, 97, 0.3));
   }
+  /* Botão primário premium - gradiente bordô + brilho dourado no hover */
+  .fc-btn-primary {
+    @apply relative bg-gradient-to-b from-primary-700 to-primary-900 text-cream-50 font-semibold transition-all duration-300 shadow-md shadow-bordeaux-900/30;
+    border: 1px solid rgba(201, 169, 97, 0.2);
+  }
+  .fc-btn-primary:hover {
+    @apply from-primary-600 to-primary-800 shadow-lg;
+    box-shadow: 0 4px 14px rgba(107, 26, 31, 0.4), 0 0 0 1px rgba(201, 169, 97, 0.4);
+  }
+  .fc-btn-primary:active {
+    @apply scale-[0.98];
+  }
+  /* Botão acentuado dourado (CTAs especiais) */
+  .fc-btn-gold {
+    @apply relative bg-gradient-to-b from-gold-400 to-gold-600 text-bordeaux-950 font-bold transition-all duration-300 shadow-md shadow-gold-900/30;
+    border: 1px solid rgba(201, 169, 97, 0.5);
+  }
+  .fc-btn-gold:hover {
+    @apply from-gold-300 to-gold-500 shadow-lg;
+    box-shadow: 0 4px 14px rgba(201, 169, 97, 0.5);
+  }
+  .fc-btn-gold:active {
+    @apply scale-[0.98];
+  }
 }

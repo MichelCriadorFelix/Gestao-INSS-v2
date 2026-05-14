@@ -1738,7 +1738,7 @@ export default function Dashboard({
                             {clientFilter === 'active' && (
                                 <button
                                     onClick={() => { setCurrentRecord(null); setIsModalOpen(true); }}
-                                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
+                                    className="fc-btn-primary text-cream-50 font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
                                 >
                                     <PlusIcon className="h-5 w-5" />
                                     Novo Processo
@@ -1747,7 +1747,7 @@ export default function Dashboard({
                             {clientFilter === 'referral' && (
                                 <button
                                     onClick={() => setIsReferralModalOpen(true)}
-                                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
+                                    className="fc-btn-primary text-cream-50 font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
                                 >
                                     <PlusIcon className="h-5 w-5" />
                                     Nova Indicação

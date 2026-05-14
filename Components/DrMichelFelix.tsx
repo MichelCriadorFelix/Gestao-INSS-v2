@@ -1200,7 +1200,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               createNewSession();
               if (window.innerWidth < 768) setIsSidebarOpen(false);
             }}
-            className="w-full bg-primary-700 hover:bg-primary-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full fc-btn-primary text-cream-50 font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" /> Nova Conversa
           </button>
@@ -1418,7 +1418,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                               </button>
                               <button
                                 onClick={() => handleOpenInEditor(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary-700 hover:bg-primary-800 text-white rounded-md text-xs font-semibold transition-colors shadow-sm"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-md text-xs font-semibold transition-colors shadow-sm"
                                 title="Editor"
                               >
                                 <Edit2 className="w-3.5 h-3.5" /> Editor
