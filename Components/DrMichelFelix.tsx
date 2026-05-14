@@ -1566,7 +1566,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       const val = e.target.value;
                       setPetitionLength(val);
                       if (val === 'Premium 7000 palavras') {
-                        setSelectedModel('deepseek/deepseek-v3.2');
+                        setSelectedModel('deepseek/deepseek-v4-flash');
                         setSelectedModelProvider('openrouter');
                       }
                     }}
@@ -1597,8 +1597,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview · Padrão Ouro ⭐</option>
                     </optgroup>
                     <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2 · Recomendado para 7.000 palavras</option>
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Recomendado ⭐</option>
+                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
                       <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
                       <option value="qwen/qwen-max">Qwen Max</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
