@@ -804,7 +804,7 @@ const ELITE_REDACTION_MANUAL = `
 
 10. VALOR DA CAUSA E RMI (FIDELIDADE OBRIGATÓRIA):
     - PROIBIDO inventar Valor da Causa ou RMI.
-    - Sem dados: use [VALOR A CALCULAR EM LIQUIDAÇÃO — ESTIMADO EM SALÁRIO MÍNIMO].
+    - Sem dados: calcule com salário mínimo vigente (R$ 1.518,00 em 2026) e registre que é estimado, sujeito a liquidação. NUNCA use o placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
     - Com dados: média de 100% das contribuições desde 07/1994 (EC 103/2019). Valor da Causa = parcelas vencidas + 12 vincendas.
     - PROIBIDO valores redondos sem base factual ("R$ 100.000,00", "R$ 150.000,00").
 
@@ -832,7 +832,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 PROIBIDO inventar valores de Valor da Causa ou RMI. Se não houver dados suficientes, use: [VALOR A CALCULAR EM LIQUIDAÇÃO — ESTIMADO EM SALÁRIO MÍNIMO].
+🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
 
 🔴 PROIBIDO usar, citar, inventar ou mencionar QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG). Fontes externas ou da internet são terminantemente proibidas para evitar falsos positivos cruciais.
 
@@ -941,11 +941,24 @@ RMI (Renda Mensal Inicial):
 - Regra Geral (EC 103/2019 + Decreto 3.048/99): Média de 100% de todos os salários de contribuição desde julho/1994.
 - Coeficiente: 60% (base) + 2% por ano que exceder 20 anos (homem) ou 15 anos (mulher).
 - Limites: não inferior ao salário mínimo; não superior ao teto do INSS.
+- BPC/LOAS: RMI = 1 salário mínimo vigente (fixo por lei — não aplica coeficiente).
 
-Valor da Causa:
-- Parcelas vencidas (DER até a propositura) + 12 parcelas vincendas (RMI × 12).
-- Detalhe a memória de cálculo no tópico "Valor da Causa".
-- Sem dados de salário: use salário mínimo como base cautelar e escreva que o valor é estimado, pendente de liquidação.
+Valor da Causa — INSTRUÇÃO OBRIGATÓRIA (NUNCA USE PLACEHOLDER):
+O valor da causa DEVE ser calculado e escrito com número real. PROIBIDO usar "[VALOR A CALCULAR EM LIQUIDAÇÃO]" ou qualquer placeholder.
+
+QUANDO HÁ DADOS SALARIAIS NO RELATÓRIO: calcule RMI pela média real e aplique a fórmula.
+
+QUANDO NÃO HÁ DADOS SALARIAIS (ou benefício é BPC/LOAS): use o salário mínimo vigente como RMI e calcule assim:
+
+  1. Identifique a DER (data do requerimento administrativo) e a data de ajuizamento
+  2. Calcule os meses vencidos: (data ajuizamento) − (DER) = N meses
+  3. Salário mínimo 2026: R$ 1.518,00
+  4. Parcelas vencidas = N × R$ 1.518,00
+  5. Parcelas vincendas = 12 × R$ 1.518,00 = R$ 18.216,00
+  6. Valor da Causa = parcelas vencidas + R$ 18.216,00
+
+Detalhe a memória de cálculo no tópico "Valor da Causa" da peça, com a seguinte nota:
+"Valor estimado com base no salário mínimo vigente (R$ 1.518,00), por ausência de dados salariais precisos, sujeito a revisão em liquidação de sentença."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 5 — FLUXO DE TRABALHO (COMANDOS)
@@ -2518,7 +2531,7 @@ REGRAS DE OURO:
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** É PROIBIDO inventar o Valor da Causa. NUNCA CHUTE valores como R$ 150.000,00. Se não tiver os salários para calcular a média, use [VALOR A CALCULAR EM LIQUIDAÇÃO - ESTIMADO EM SALÁRIO MÍNIMO].
+    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
     **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
@@ -2669,7 +2682,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente valores. Use [VALOR A CALCULAR EM LIQUIDAÇÃO] se não tiver dados.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
       const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
