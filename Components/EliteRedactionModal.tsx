@@ -50,7 +50,7 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
           </button>
           
           <button 
-            onClick={() => onConfirm('openrouter', isEliteSelected ? currentModel : 'deepseek/deepseek-r1')}
+            onClick={() => onConfirm('openrouter', isEliteSelected ? currentModel : 'qwen/qwen3.6-flash:nitro')}
             className={`w-full text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${isEliteSelected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-gold-500/15 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
           >
             <div className="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -59,10 +59,10 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
             <div className="flex justify-between items-start relative z-10">
               <div>
                 <h4 className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  Usar {isEliteSelected ? currentModel?.split('/')[1] : 'DeepSeek R1'} (Elite)
+                  Usar {isEliteSelected ? currentModel?.split('/')[1] : 'Qwen 3.6 Flash Nitro'} (Elite)
                   <span className="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Recomendado ⭐</span>
                 </h4>
-                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">Modelo de Raciocínio (Thinking) avançado para máxima densidade jurídica.</p>
+                <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">Alta velocidade e grande janela de contexto para peças complexas.</p>
               </div>
             </div>
           </button>

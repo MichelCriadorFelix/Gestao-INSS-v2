@@ -2772,7 +2772,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         orMessages.push({ role, content: h.content });
       }
       orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-r1", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: orMaxTokens }, res);
+      await callOpenRouterStream({ model: model || "qwen/qwen3.6-flash:nitro", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: orMaxTokens }, res);
       return;
     }
 
@@ -3279,7 +3279,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
       await callOpenRouterStream({
-        model: model || "deepseek/deepseek-r1",
+        model: model || "qwen/qwen3.6-flash:nitro",
         messages: orMessagesFinal,
         temperature: isGenerationRequest ? 0.15 : temperature,
         max_tokens: orMaxTokens
