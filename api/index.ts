@@ -3502,8 +3502,17 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/config", (req, res) => {
-  // Tenta buscar por diversos nomes comuns para garantir que encontre
-  // Prioriza SEM o prefixo VITE_ para uso no backend/Vercel
+  // Proteção: requer token secreto interno (CONFIG_TOKEN no Vercel)
+  // O frontend envia via header X-Config-Token ou query param token
+  const configToken = process.env.CONFIG_TOKEN;
+
+  if (configToken) {
+    const sentToken = req.headers['x-config-token'] || req.query.token;
+    if (!sentToken || sentToken !== configToken) {
+      return res.status(403).json({ error: "Acesso não autorizado." });
+    }
+  }
+
   const url = process.env.SUPABASE_URL || 
               process.env.VITE_SUPABASE_URL || 
               process.env.URL_SUPABASE ||
@@ -3513,8 +3522,6 @@ app.get("/api/config", (req, res) => {
               process.env.VITE_SUPABASE_ANON_KEY || 
               process.env.ANON_KEY_SUPABASE ||
               process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  console.log(`[DEBUG] /api/config chamado. URL presente: ${!!url}, Key presente: ${!!key}`);
   
   res.json({ url, key });
 });

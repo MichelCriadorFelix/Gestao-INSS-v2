@@ -38,7 +38,10 @@ export default function App() {
       }
 
       try {
-        const response = await fetch('/api/config');
+        const configToken = (import.meta as any).env?.VITE_CONFIG_TOKEN || '';
+        const response = await fetch('/api/config', {
+          headers: configToken ? { 'X-Config-Token': configToken } : {}
+        });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         
