@@ -2652,10 +2652,10 @@ Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por 
 REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
 2. DISTRIBUIÇÃO E DENSIDADE:
-   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
-   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
+   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
+   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
 4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
@@ -3109,10 +3109,10 @@ Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por 
 REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
 2. DISTRIBUIÇÃO E DENSIDADE:
-   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
-   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
+   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
+   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
 4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
