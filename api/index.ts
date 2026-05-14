@@ -2655,6 +2655,7 @@ REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
    • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
    • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
+   • DO ROL DE DOCUMENTOS: VOCÊ DEVE criar uma lista exaustiva, numerada (1., 2., 3...). NUNCA agrupe documentos em uma mesma linha. SE O USUÁRIO FORNECEU um OCR com "Doc. 1", "Doc. 2", você DEVE listar EXATAMENTE um documento por linha com o NOME EXATO do arquivo indicado no OCR (ex: "1. Doc. 1 - Laudo Médico"). É estritamente OBRIGATÓRIO ter 1 (um) documento individual por linha separadamente.
 3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
 4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
@@ -2770,10 +2771,21 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens dinâmico: Gemini 3 Flash suporta até 64k de output.
-    // Para peças, usamos 32k (suficiente para ~10k palavras com folga).
-    // Para OpenRouter, mantemos 16k para não estourar contexto da API.
-    const maxOutputTokens = (modelProvider === 'openrouter') ? 16383 : 32_000;
+    let maxOutputTokens = 2048;
+    let thinkingConfig: any = { thinkingBudget: 4096 };
+
+    if (isGenerationRequest) {
+      maxOutputTokens = 30000;
+      thinkingConfig = { thinkingBudget: 24576 };
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 8192;
+      thinkingConfig = { thinkingBudget: 16000 };
+    }
+
+    if (modelProvider === 'openrouter') {
+      maxOutputTokens = 16383;
+      thinkingConfig = undefined;
+    }
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -2806,8 +2818,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             systemInstruction: selectedSystemPrompt,
             temperature: finalTemperature,
             maxOutputTokens,
+            ...(thinkingConfig && { thinkingConfig }),
             tools
-            // Thinking mantido em modo dinâmico padrão — essencial para qualidade jurídica
           } as any
         }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
@@ -3112,6 +3124,7 @@ REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
    • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
    • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
+   • DO ROL DE DOCUMENTOS: VOCÊ DEVE criar uma lista exaustiva, numerada (1., 2., 3...). NUNCA agrupe documentos em uma mesma linha. SE O USUÁRIO FORNECEU um OCR com "Doc. 1", "Doc. 2", você DEVE listar EXATAMENTE um documento por linha com o NOME EXATO do arquivo indicado no OCR (ex: "1. Doc. 1 - Laudo Médico"). É estritamente OBRIGATÓRIO ter 1 (um) documento individual por linha separadamente.
 3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
 4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
@@ -3268,10 +3281,21 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens dinâmico: Gemini 3 Flash suporta até 64k de output.
-    // Para peças, usamos 32k (suficiente para ~10k palavras com folga).
-    // Para OpenRouter, mantemos 16k para não estourar contexto da API.
-    const maxOutputTokens = (modelProvider === 'openrouter') ? 16383 : 32_000;
+    let maxOutputTokens = 2048;
+    let thinkingConfig: any = { thinkingBudget: 4096 };
+
+    if (isGenerationRequest) {
+      maxOutputTokens = 30000;
+      thinkingConfig = { thinkingBudget: 24576 };
+    } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 8192;
+      thinkingConfig = { thinkingBudget: 16000 };
+    }
+
+    if (modelProvider === 'openrouter') {
+      maxOutputTokens = 16383;
+      thinkingConfig = undefined;
+    }
 
     // Temperature calibrada por intenção
     const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
@@ -3301,8 +3325,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             systemInstruction: selectedSystemPrompt,
             temperature: finalTemperature,
             maxOutputTokens: maxOutputTokens,
+            ...(thinkingConfig && { thinkingConfig }),
             tools: tools,
-            // Thinking mantido em modo dinâmico padrão — essencial para qualidade jurídica
             safetySettings: [
               { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
               { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
