@@ -760,10 +760,10 @@ function getInputBudget(modelProvider?: string, model?: string): number {
 function isPetitionComplete(text: string): boolean {
   if (!text || text.length < 1500) return false;
   const tail = text.slice(-2500).toLowerCase();
-  const hasPedeDeferimento = /pede\s+deferimento/i.test(tail);
+  const hasPedeDeferimento = /pede\s+(e\s+espera\s+)?deferimento/i.test(tail);
   const hasOABorAssinatura = /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(tail) || /assinatura/i.test(tail);
   const hasDataLocal = /(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+\d{4}/i.test(tail);
-  // Se tem "Pede Deferimento" + (OAB OU data), a peça encerrou
+  // Se tem "pede e espera deferimento" + (OAB OU data), a peça encerrou
   return hasPedeDeferimento && (hasOABorAssinatura || hasDataLocal);
 }
 
@@ -845,8 +845,8 @@ const ELITE_REDACTION_MANUAL = `
 
 11. ESTILO E ENCERRAMENTO:
     - Linguagem sóbria, elegante, técnica e COMBATIVA. Evite clichês.
-    - Após "Pede Deferimento", Local, Data, Assinatura: ENCERRE imediatamente. Nada depois.
-    - **REGRA ABSOLUTA ANTI-EMPILHAMENTO:** É TERMINANTEMENTE PROIBIDO gerar uma SEGUNDA petição depois da primeira. Uma vez escrito "Pede Deferimento" + assinatura, PARE seu output. Nunca redija o cabeçalho novamente, nunca refaça "DOS FATOS", nunca duplique o conteúdo da peça. Se você sente que a peça ficou "curta", o caminho correto é DENSIFICAR cada tópico ANTES do "Pede Deferimento" — não criar outra peça depois.
+    - Após "Nestes termos, pede e espera deferimento", Local, Data, Assinatura: ENCERRE imediatamente. Nada depois.
+    - **REGRA ABSOLUTA ANTI-EMPILHAMENTO:** É TERMINANTEMENTE PROIBIDO gerar uma SEGUNDA petição depois da primeira. Uma vez escrito "Nestes termos, pede e espera deferimento" + assinatura, PARE seu output. Nunca redija o cabeçalho novamente, nunca refaça "DOS FATOS", nunca duplique o conteúdo da peça. Se você sente que a peça ficou "curta", o caminho correto é DENSIFICAR cada tópico ANTES do "Nestes termos, pede e espera deferimento" — não criar outra peça depois.
 
 12. ORIENTAÇÃO ESPECÍFICA PARA OPENROUTER (DeepSeek/Qwen/Claude):
     - Ignore templates pré-treinados. Siga EXCLUSIVAMENTE a estrutura listada neste prompt.
@@ -1064,7 +1064,7 @@ COMANDO "GERAR PEÇA":
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (AO JUÍZO...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
-→ ENCERRAMENTO OBRIGATÓRIO: após "Pede Deferimento", escreva local, data e os DOIS advogados:
+→ ENCERRAMENTO OBRIGATÓRIO: após "Nestes termos, pede e espera deferimento", escreva local, data e os DOIS advogados:
 
    São João de Meriti/RJ, [data atual].
 
@@ -1737,7 +1737,7 @@ COMANDO "GERAR PEÇA":
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (Ao Juízo da Vara do Trabalho de...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
-→ ENCERRAMENTO OBRIGATÓRIO: após "Pede Deferimento", escreva local, data e os DOIS advogados:
+→ ENCERRAMENTO OBRIGATÓRIO: após "Nestes termos, pede e espera deferimento", escreva local, data e os DOIS advogados:
 
    São João de Meriti/RJ, [data atual].
 
@@ -2650,13 +2650,13 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
 
 REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
-1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
+1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
 2. DISTRIBUIÇÃO E DENSIDADE:
    • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
    • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-3. NUNCA escreva "Pede Deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
-4. NUNCA recomece a petição depois do "Pede Deferimento". PROIBIDO gerar uma segunda peça empilhada.
+3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
@@ -2838,10 +2838,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           break;
         }
 
-        // DETECTOR DE FIM DE PEÇA: se já tem "Pede Deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+        // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
         if (isPetitionComplete(fullResponseText)) {
           const wc = countWords(fullResponseText);
-          console.log(`[Dr.Michel] Peça encerrada naturalmente (Pede Deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
+          console.log(`[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
@@ -2854,7 +2854,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Pede Deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -3107,13 +3107,13 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
 
 REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
-1. Gere a petição INTEIRA, do endereçamento ao "Pede Deferimento" + assinatura, em UMA passada.
+1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
 2. DISTRIBUIÇÃO E DENSIDADE:
    • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada (não resuma). Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
    • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei e a jurisprudência fornecidos na [BASE DE CONHECIMENTO]. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento.
    • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-3. NUNCA escreva "Pede Deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
-4. NUNCA recomece a petição depois do "Pede Deferimento". PROIBIDO gerar uma segunda peça empilhada.
+3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. Se a petição estiver ficando curta, VOLTE a detalhar os fatos e APROFUNDE a análise das provas listadas. Explore exaustivamente a jurisprudência fornecida.
+4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
@@ -3344,10 +3344,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           break;
         }
 
-        // DETECTOR DE FIM DE PEÇA: se já tem "Pede Deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+        // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
         if (isPetitionComplete(fullResponseText)) {
           const wc = countWords(fullResponseText);
-          console.log(`[Dra.Luana] Peça encerrada naturalmente (Pede Deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
+          console.log(`[Dra.Luana] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
@@ -3360,7 +3360,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Pede Deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
