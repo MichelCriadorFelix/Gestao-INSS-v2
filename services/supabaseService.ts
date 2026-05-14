@@ -64,7 +64,7 @@ export const supabaseService = {
     return data;
   },
 
-  async getAIConversations(aiName: 'michel' | 'luana') {
+  async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro') {
     const supabase = getSupabase();
     if (!supabase) return [];
     

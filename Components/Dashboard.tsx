@@ -37,6 +37,7 @@ import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
 import DrMichelFelix from './DrMichelFelix';
 import DraLuanaCastro from './DraLuanaCastro';
+import DrFelixECastro from './DrFelixECastro';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
@@ -56,7 +57,7 @@ export default function Dashboard({
   onSettingsSaved,
   onRestoreBackup
 }: DashboardProps) {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
@@ -71,6 +72,7 @@ export default function Dashboard({
   const [savedSocialCalculations, setSavedSocialCalculations] = useState<SocialSecurityCalculationRecord[]>([]);
   const [drMichelSessions, setDrMichelSessions] = useState<any[]>([]);
   const [draLuanaSessions, setDraLuanaSessions] = useState<any[]>([]);
+  const [drFelixCastroSessions, setDrFelixCastroSessions] = useState<any[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
   const [resolvedAlerts, setResolvedAlerts] = useState<string[]>([]);
   const [customLaws, setCustomLaws] = useState<any[]>([]);
@@ -144,15 +146,17 @@ export default function Dashboard({
 
         setResolvedAlerts([]);
 
-        const [remoteSocial, remoteMichel, remoteLuana] = await Promise.all([
+        const [remoteSocial, remoteMichel, remoteLuana, remoteFelixCastro] = await Promise.all([
             supabaseService.getCalculations().catch(() => []),
             supabaseService.getAIConversations('michel').catch(() => []),
-            supabaseService.getAIConversations('luana').catch(() => [])
+            supabaseService.getAIConversations('luana').catch(() => []),
+            supabaseService.getAIConversations('felix_castro').catch(() => [])
         ]);
 
         setSavedSocialCalculations(remoteSocial || []);
         setDrMichelSessions(remoteMichel || []);
         setDraLuanaSessions(remoteLuana || []);
+        setDrFelixCastroSessions(remoteFelixCastro || []);
 
         // Fetch global data from 'clients' table (used as KV store)
         if (supabase) {
@@ -444,7 +448,7 @@ export default function Dashboard({
   };
 
   // Save Logic (Generic)
-  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
+  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
       setIsSyncing(true);
       setSaveError(null);
       setLastSavedType(type);
@@ -554,6 +558,17 @@ export default function Dashboard({
                   setIsSyncing(false);
                   return;
               }
+          } else if (type === 'dr_felix_castro') {
+              setDrFelixCastroSessions(newData);
+              if (supabase) {
+                  const error = await upsertWithRetry({ id: 11, data: newData });
+                  if (error) {
+                      console.error("Sync error (FelixCastro):", error);
+                      setSaveError("Erro de sincronização (Dr. Felix e Castro).");
+                  }
+                  setIsSyncing(false);
+                  return;
+              }
           } else if (type === 'agenda') {
               if (supabase) {
                   // Proteção: busca o estado atual do Supabase antes de salvar
@@ -635,6 +650,7 @@ export default function Dashboard({
           case 'social_calculations': dataToSave = savedSocialCalculations; break;
           case 'dr_michel': dataToSave = drMichelSessions; break;
           case 'dra_luana': dataToSave = draLuanaSessions; break;
+          case 'dr_felix_castro': dataToSave = drFelixCastroSessions; break;
           case 'agenda': dataToSave = agendaEvents; break;
           case 'resolved_alerts': dataToSave = resolvedAlerts; break;
       }
@@ -980,6 +996,11 @@ export default function Dashboard({
   const handleSaveDraLuanaSessions = async (sessions: any[]) => {
       setDraLuanaSessions(sessions);
       safeSetLocalStorage('dra_luana_sessions', JSON.stringify(sessions.slice(0, 3)));
+  };
+
+  const handleSaveDrFelixCastroSessions = async (sessions: any[]) => {
+      setDrFelixCastroSessions(sessions);
+      safeSetLocalStorage('dr_felix_castro_sessions', JSON.stringify(sessions.slice(0, 3)));
   };
 
   // Merge virtual events from clients into agenda
@@ -1464,6 +1485,15 @@ export default function Dashboard({
                </button>
 
                <button 
+                   onClick={() => handleViewChange('dr_felix_castro')}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_felix_castro' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+               >
+                   {currentView === 'dr_felix_castro' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Dr. Felix e Castro (IA)</span>
+               </button>
+
+               <button 
                    onClick={() => handleViewChange('social_calc')}
                    className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'social_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
@@ -1577,6 +1607,7 @@ export default function Dashboard({
                       currentView === 'petition_editor' ? 'Editor de Petições' :
                       currentView === 'dr_michel' ? 'Dr. Michel Felix — IA Jurídica' :
                       currentView === 'dra_luana' ? 'Dra. Luana Castro — IA Trabalhista' :
+                      currentView === 'dr_felix_castro' ? 'Dr. Felix e Castro — IA Generalista (CDC/Civil)' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
@@ -1638,6 +1669,13 @@ export default function Dashboard({
                  <DraLuanaCastro 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
+                    onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
+                  />
+             ) : currentView === 'dr_felix_castro' ? (
+                 <DrFelixECastro 
+                    initialSessions={drFelixCastroSessions} 
+                    onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
