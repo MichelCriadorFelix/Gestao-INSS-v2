@@ -1580,6 +1580,9 @@ export default function Dashboard({
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
+                      currentView === 'legislation' ? 'Legislação e Normas' :
+                      currentView === 'jurisprudence' ? 'Jurisprudência' :
+                      currentView === 'meu_inss' ? 'Meu INSS' :
                       'Cálculos Previdenciários'}
                  </h2>
                  {isSyncing ? (
