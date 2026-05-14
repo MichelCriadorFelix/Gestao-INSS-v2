@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Felix e Castro Advocacia Especializada</title>
-    <meta name="theme-color" content="#be123c">
+    <meta name="theme-color" content="#6B1A1F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
@@ -16,28 +16,65 @@
             theme: {
                 extend: {
                     colors: {
+                        // Paleta Felix & Castro - bordô (primary)
                         primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
-                            950: '#172554',
+                            50: '#fdf2f3',
+                            100: '#fce7e9',
+                            200: '#f9d2d6',
+                            300: '#f3acb4',
+                            400: '#ea7d8a',
+                            500: '#dd4f60',
+                            600: '#c83246',
+                            700: '#a8253a',
+                            800: '#8b2235',
+                            900: '#6B1A1F',
+                            950: '#3e0f12',
+                        },
+                        bordeaux: {
+                            50: '#fdf2f3',
+                            100: '#fce7e9',
+                            200: '#f9d2d6',
+                            300: '#f3acb4',
+                            400: '#ea7d8a',
+                            500: '#dd4f60',
+                            600: '#c83246',
+                            700: '#a8253a',
+                            800: '#8b2235',
+                            900: '#6B1A1F',
+                            950: '#3e0f12',
+                        },
+                        // Dourado/champanhe — acentos premium
+                        gold: {
+                            50: '#fdf9ed',
+                            100: '#faefce',
+                            200: '#f5dd9b',
+                            300: '#efc55f',
+                            400: '#e9b03a',
+                            500: '#C9A961',
+                            600: '#b8881f',
+                            700: '#98671d',
+                            800: '#7d521f',
+                            900: '#69431f',
+                            950: '#3c220d',
+                        },
+                        // Off-white / creme — fundos claros premium
+                        cream: {
+                            50: '#FAF7F0',
+                            100: '#F5F1E8',
+                            200: '#ecdfd2',
+                            300: '#d9b9a5',
                         }
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
+                        serif: ['"Cormorant Garamond"', 'serif'],
+                        display: ['"Cormorant Garamond"', 'serif'],
                     }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link id="manifest-placeholder" rel="manifest" href="">
     
     <script>
@@ -48,8 +85,8 @@
                 "short_name": "Felix e Castro",
                 "start_url": "/",
                 "display": "standalone",
-                "background_color": "#26190f",
-                "theme_color": "#be123c",
+                "background_color": "#6B1A1F",
+                "theme_color": "#6B1A1F",
                 "icons": [
                     {
                         "src": "https://cdn-icons-png.flaticon.com/512/924/924915.png",
@@ -72,7 +109,11 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Custom Scrollbar */
+        h1, h2, h3, .font-display, .font-serif {
+            font-family: 'Cormorant Garamond', serif;
+            letter-spacing: -0.01em;
+        }
+        /* Custom Scrollbar - Felix & Castro */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -81,14 +122,14 @@
             background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #d9c4a0;
             border-radius: 4px;
         }
         .dark ::-webkit-scrollbar-thumb {
-            background: #475569;
+            background: #5a3a1f;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+            background: #C9A961;
         }
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
@@ -220,7 +261,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-500 selection:text-white">
+<body class="bg-cream-50 dark:bg-[#0f0a0a] text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-900 selection:text-cream-50">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

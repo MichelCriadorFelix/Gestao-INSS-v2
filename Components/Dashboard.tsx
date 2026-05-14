@@ -1396,208 +1396,226 @@ export default function Dashboard({
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-200 overflow-hidden relative">
+    <div className="flex h-screen bg-cream-50 dark:bg-[#0f0a0a] font-sans transition-colors duration-200 overflow-hidden relative">
       
-      {/* OVERLAY FOR MOBILE MENU */}
+      {/* OVERLAY (mobile + desktop quando sidebar aberta) */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* SIDEBAR NAVIGATION */}
-      <aside className={`fixed inset-y-0 left-0 bg-slate-900 text-white flex flex-col flex-shrink-0 transition-transform duration-300 z-50 w-64 lg:static lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-           <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+      {/* SIDEBAR NAVIGATION - Felix & Castro Bordô */}
+      <aside className={`fixed inset-y-0 left-0 bg-bordeaux-900 text-cream-50 flex flex-col flex-shrink-0 transition-transform duration-300 ease-out z-50 w-72 shadow-2xl shadow-bordeaux-950/50 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+           {/* Padrão de balança decorativo no fundo */}
+           <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 0%, transparent 40%), radial-gradient(circle at 80% 70%, #C9A961 0%, transparent 40%)'}}></div>
+           
+           <div className="relative h-20 flex items-center justify-between px-6 border-b border-gold-500/20">
                <div className="flex items-center gap-3">
-                   <div className="bg-gradient-to-br from-primary-500 to-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-500/30">
-                       <ScaleIcon className="h-6 w-6 text-white" />
+                   <div className="bg-gradient-to-br from-gold-400 to-gold-600 p-2 rounded-lg shadow-lg shadow-gold-900/40 ring-1 ring-gold-300/50">
+                       <ScaleIcon className="h-6 w-6 text-bordeaux-900" />
                    </div>
-                   <span className="font-bold text-lg tracking-tight">Gestão do Escritório</span>
+                   <div>
+                       <span className="font-serif font-semibold text-xl tracking-tight text-cream-50 leading-none">Felix &amp; Castro</span>
+                       <span className="block text-[10px] uppercase tracking-[0.2em] text-gold-300/80 mt-1">Advocacia Especializada</span>
+                   </div>
                </div>
-               <button className="lg:hidden p-1 text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
-                   <XMarkIcon className="w-6 h-6" />
+               <button className="p-1.5 text-cream-50/60 hover:text-gold-400 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                   <XMarkIcon className="w-5 h-5" />
                </button>
            </div>
 
-           <div className="flex-1 py-6 px-3 space-y-2 overflow-y-auto">
+           <div className="relative flex-1 py-5 px-3 space-y-1 overflow-y-auto custom-scrollbar">
                <button 
                    onClick={() => handleViewChange('clients')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'clients' ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'clients' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <UserGroupIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Clientes</span>
+                   {currentView === 'clients' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <UserGroupIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Clientes</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('contracts')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'contracts' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'contracts' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <BriefcaseIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Contratos & Fin.</span>
+                   {currentView === 'contracts' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <BriefcaseIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Contratos &amp; Fin.</span>
                </button>
 
-                {/* NOVO MENU: CÁLCULOS */}
                <button 
                    onClick={() => handleViewChange('labor_calc')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'labor_calc' ? 'bg-emerald-600 shadow-lg shadow-emerald-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'labor_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="font-medium">Calc. Trabalhista</span>
+                   {currentView === 'labor_calc' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <CalculatorIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Calc. Trabalhista</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('dra_luana')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dra_luana' ? 'bg-pink-600 shadow-lg shadow-pink-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dra_luana' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="font-medium">Dra. Luana Castro (IA)</span>
+                   {currentView === 'dra_luana' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Dra. Luana Castro (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('social_calc')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'social_calc' ? 'bg-orange-600 shadow-lg shadow-orange-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'social_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="font-medium">Calc. Previdenciária</span>
+                   {currentView === 'social_calc' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <CalculatorIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Calc. Previdenciária</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('dr_michel')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dr_michel' ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_michel' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="font-medium">Dr. Michel Felix (IA)</span>
+                   {currentView === 'dr_michel' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Dr. Michel Felix (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('agenda')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'agenda' ? 'bg-slate-600 shadow-lg shadow-slate-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'agenda' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <CalendarIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Agenda</span>
+                   {currentView === 'agenda' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <CalendarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Agenda</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('petition_editor')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'petition_editor' ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'petition_editor' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <PencilSquareIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Editor de Petições</span>
+                   {currentView === 'petition_editor' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <PencilSquareIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Editor de Petições</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('legislation')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'legislation' ? 'bg-teal-600 shadow-lg shadow-teal-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'legislation' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <BookOpenIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Legislação</span>
+                   {currentView === 'legislation' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <BookOpenIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Legislação</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('jurisprudence')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'jurisprudence' ? 'bg-cyan-600 shadow-lg shadow-cyan-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'jurisprudence' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <ScaleIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Jurisprudência</span>
+                   {currentView === 'jurisprudence' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <ScaleIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Jurisprudência</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('meu_inss')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'meu_inss' ? 'bg-amber-600 shadow-lg shadow-amber-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'meu_inss' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <GlobeAltIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium">Meu INSS</span>
+                   {currentView === 'meu_inss' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <GlobeAltIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Meu INSS</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('knowledge_base')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'knowledge_base' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <AcademicCapIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
+                   {currentView === 'knowledge_base' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <AcademicCapIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm whitespace-nowrap">Base de Conhecimento</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('marketing')}
-                   className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'marketing' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
-                   <SparklesIcon className="h-6 w-6 mr-3" />
-                   <span className="font-medium whitespace-nowrap">Marketing Jurídico</span>
+                   {currentView === 'marketing' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <SparklesIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm whitespace-nowrap">Marketing Jurídico</span>
                </button>
            </div>
            
-           <div className="p-4 border-t border-slate-800">
-               <div className="flex items-center justify-start gap-3">
-                   <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
+           <div className="relative p-4 border-t border-gold-500/20 bg-bordeaux-950/40">
+               <div className="flex items-center gap-3">
+                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-xs font-bold text-bordeaux-900 ring-2 ring-gold-300/30">
                        {user.firstName[0]}
                    </div>
-                   <div className="hidden lg:block">
-                       <p className="text-xs font-bold text-white">{user.firstName}</p>
-                       <p className="text-[10px] text-slate-400">{user.role}</p>
+                   <div>
+                       <p className="text-sm font-semibold text-cream-50 leading-tight">{user.firstName}</p>
+                       <p className="text-[10px] text-gold-300/70 uppercase tracking-wider">{user.role}</p>
                    </div>
                </div>
-               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
-                   <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
-                   <span className="text-xs font-bold uppercase">Sair</span>
+               <button onClick={onLogout} className="mt-3 w-full flex items-center justify-center gap-2 py-2 text-cream-100/60 hover:text-gold-300 hover:bg-bordeaux-800/60 rounded-lg transition border border-gold-500/10 hover:border-gold-500/30">
+                   <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                   <span className="text-[11px] font-semibold uppercase tracking-wider">Sair</span>
                </button>
            </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
-        {/* Navbar (Top) */}
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6 z-30">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden bg-cream-50 dark:bg-[#0f0a0a]">
+        {/* Navbar (Top) - Bordô premium */}
+        <header className="bg-bordeaux-900 dark:bg-bordeaux-950 border-b border-gold-500/30 h-16 flex items-center justify-between px-4 lg:px-6 z-30 shadow-lg shadow-bordeaux-950/20">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
-                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 lg:hidden text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg shrink-0">
-                     <Bars3Icon className="h-6 w-6" />
+                 <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-cream-50 hover:bg-bordeaux-800 hover:text-gold-300 rounded-lg shrink-0 transition-colors" title="Abrir menu">
+                     <Bars3Icon className="h-5 w-5" />
                  </button>
-                 <h2 className="text-base lg:text-xl font-bold text-slate-800 dark:text-white truncate">
+                 <h2 className="text-base lg:text-xl font-serif font-semibold text-cream-50 truncate tracking-tight">
                      {currentView === 'clients' ? 'Painel de Clientes' : 
                       currentView === 'contracts' ? 'Gestão de Contratos' :
                       currentView === 'labor_calc' ? 'Cálculos Trabalhistas' :
                       currentView === 'petition_editor' ? 'Editor de Petições' :
-                      currentView === 'dr_michel' ? 'Dr. Michel Felix - IA Jurídica' :
-                      currentView === 'dra_luana' ? 'Dra. Luana Castro - IA Trabalhista' :
+                      currentView === 'dr_michel' ? 'Dr. Michel Felix — IA Jurídica' :
+                      currentView === 'dra_luana' ? 'Dra. Luana Castro — IA Trabalhista' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
                       'Cálculos Previdenciários'}
                  </h2>
                  {isSyncing ? (
-                      <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
+                      <span className="text-xs text-gold-300 flex items-center gap-1"><ArrowPathRoundedSquareIcon className="h-3 w-3 animate-spin" /> Salvando...</span>
                  ) : saveError ? (
                       <div className="flex items-center gap-2">
-                          <span className="text-xs text-red-500 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
+                          <span className="text-xs text-red-300 flex items-center gap-1 font-bold"><ExclamationTriangleIcon className="h-3 w-3" /> {saveError}</span>
                           <button 
                             onClick={handleRetrySync}
-                            className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 transition-colors font-bold uppercase"
+                            className="text-[10px] bg-red-900/40 text-red-200 px-2 py-0.5 rounded hover:bg-red-900/60 transition-colors font-bold uppercase border border-red-500/30"
                           >
                             Tentar Novamente
                           </button>
                           <button 
                             onClick={() => setSaveError(null)}
-                            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 transition-colors font-bold uppercase"
+                            className="text-[10px] bg-bordeaux-800 text-cream-100/70 px-2 py-0.5 rounded hover:bg-bordeaux-700 transition-colors font-bold uppercase"
                           >
                             Limpar
                           </button>
                       </div>
                  ) : isCloudConfigured ? (
-                     <span className="text-xs text-green-500 flex items-center gap-1 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full border border-green-100 dark:border-green-800"><CloudIcon className="h-3 w-3" /> Online</span>
+                     <span className="text-xs text-gold-200 flex items-center gap-1 font-medium bg-gold-500/10 px-2.5 py-1 rounded-full border border-gold-500/30"><CloudIcon className="h-3 w-3" /> Online</span>
                  ) : (
-                     <span className="text-xs text-slate-400 flex items-center gap-1">Local</span>
+                     <span className="text-xs text-cream-100/60 flex items-center gap-1">Local</span>
                  )}
              </div>
 
-             <div className="flex items-center gap-3">
-                 <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg relative">
+             <div className="flex items-center gap-2">
+                 <button onClick={() => setIsNotificationsOpen(true)} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg relative transition-colors">
                      <BellIcon className="h-5 w-5" />
-                     {activeAlerts.length > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 border border-white dark:border-slate-900 animate-pulse"></span>}
+                     {activeAlerts.length > 0 && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-gold-400 ring-2 ring-bordeaux-900 animate-pulse"></span>}
                  </button>
-                 <button onClick={onOpenSettings} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                     <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-primary-500' : ''}`} />
+                 <button onClick={onOpenSettings} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg transition-colors">
+                     <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-gold-400' : ''}`} />
                  </button>
-                 <button onClick={toggleDarkMode} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                 <button onClick={toggleDarkMode} className="p-2 text-cream-50/80 hover:text-gold-300 hover:bg-bordeaux-800 rounded-lg transition-colors" title={darkMode ? 'Modo claro' : 'Modo escuro'}>
                      {darkMode ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
                  </button>
              </div>
