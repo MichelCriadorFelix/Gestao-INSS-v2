@@ -718,6 +718,41 @@ function hasEchoRepetition(newChunk: string, previousText: string): boolean {
 }
 
 /**
+ * Estima quantidade de tokens de um texto em português (1 token ≈ 3.5 chars).
+ */
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / 3.5);
+}
+
+/**
+ * Comprime contexto pesado (documentContext, customLaws, ragContext) para caber no orçamento de input.
+ * Estratégia: prioriza início + final, corta o miolo se for muito grande.
+ */
+function smartTruncate(text: string, maxChars: number): string {
+  if (!text || text.length <= maxChars) return text;
+  const headSize = Math.floor(maxChars * 0.55);
+  const tailSize = Math.floor(maxChars * 0.40);
+  return text.substring(0, headSize)
+    + `\n\n[... ${text.length - headSize - tailSize} caracteres omitidos automaticamente para caber no orçamento de tokens ...]\n\n`
+    + text.substring(text.length - tailSize);
+}
+
+/**
+ * Limites de input por provedor de IA. Garante margem para output.
+ * Gemini Flash: 1M tokens contexto, mas com input gigante o output reduz.
+ * DeepSeek/Qwen via OpenRouter: 163k tokens total — usar 120k como limite seguro.
+ */
+function getInputBudget(modelProvider?: string, model?: string): number {
+  if (modelProvider === 'openrouter') {
+    // DeepSeek V3.2 e similares têm contexto de 163k. Deixar 30k para output + system + history.
+    return 120_000; // tokens
+  }
+  // Gemini Flash: input ideal abaixo de 100k tokens para preservar qualidade do output
+  return 100_000;
+}
+
+/**
  * Detecta se a peça já está completa (tem encerramento jurídico).
  * Se TRUE, não deve continuar mesmo abaixo do alvo de palavras —
  * caso contrário a IA recomeça a petição do zero.
@@ -867,11 +902,17 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 COERÊNCIA TEMÁTICA DO BENEFÍCIO (REGRA CRÍTICA — ANTI-ALUCINAÇÃO):
    Identifique no relatório/documentos QUAL é o benefício pleiteado e use EXCLUSIVAMENTE fundamentação jurídica daquele benefício:
-   • BPC/LOAS (Lei 8.742/93, Decreto 6.214/07, RE 567.985/MT, Súmulas 48 e 80 da TNU): regra de miserabilidade + deficiência. NUNCA citar Art. 25, 42, 48 da Lei 8.213/91 nem incapacidade laborativa.
+   • BPC/LOAS (Lei 8.742/93, Decreto 6.214/07, RE 567.985/MT, **SÚMULAS 48 E 80 DA TNU**): regra de miserabilidade + deficiência. NUNCA citar Art. 25, 42, 48 da Lei 8.213/91 nem incapacidade laborativa. NUNCA usar a Súmula 47 da TNU em BPC — a Súmula 47 é de benefício por incapacidade, NÃO de BPC.
    • Aposentadoria por Idade/Tempo (Lei 8.213/91, EC 103/2019): NUNCA citar BPC.
-   • Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez — Art. 42 e 59 da Lei 8.213/91, Lei 14.331/22): NUNCA citar BPC nem aposentadoria comum.
+   • Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez — Art. 42 e 59 da Lei 8.213/91, Lei 14.331/22, **SÚMULA 47 DA TNU**): NUNCA citar BPC nem aposentadoria comum.
    • Pensão por Morte (Art. 74 da Lei 8.213/91): NUNCA citar BPC nem incapacidade.
    PROIBIDO usar argumento por analogia entre benefícios distintos, exceto se o RAG trouxer essa analogia expressamente (ex.: Tema 640 STJ — analogia BPC/Estatuto do Idoso).
+   
+   **MAPA RÁPIDO DE SÚMULAS DA TNU (NÃO MISTURE):**
+   - Súmula 47 TNU = benefício por INCAPACIDADE (auxílio-doença, aposentadoria por invalidez). Análise das condições pessoais e sociais do segurado incapaz.
+   - Súmula 48 TNU = BPC/LOAS. Impedimento de longo prazo (≥ 2 anos), que não se confunde com incapacidade laborativa.
+   - Súmula 79 TNU = BPC/LOAS. Não desconsidera renda de membros do grupo familiar com benefícios assistenciais.
+   - Súmula 80 TNU = BPC/LOAS. Necessidade de avaliação social (fatores ambientais, sociais, econômicos e pessoais).
 
 🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte o advogado no final da peça para adicionar à base.
 
@@ -880,12 +921,13 @@ BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 A. SE O TEXTO ESTIVER NA BASE DE CONHECIMENTO (RAG):
-   → Cite TEXTUALMENTE em blockquote (>), com cada linha começando por >.
-   → O texto deve ser IDÊNTICO ao fornecido — nem uma vírgula a mais.
-   → Antes e depois da citação, contextualize: explique POR QUE aquele dispositivo se aplica ao caso.
-   → Súmulas e Temas com 1 chunk (ex: Súmula 75 TNU, Súmula 416 STJ, Tema 995 STJ): cite INTEGRALMENTE mesmo com score baixo.
-   → Itens com score ≥ 70%: citação direta em blockquote.
-   → Itens com score < 60%: use apenas como referência contextual, sem citar textualmente.
+   → REGRA DE OURO: SEMPRE transcreva TEXTUALMENTE em blockquote (>), com cada linha começando por >. PROIBIDO PARAFRASEAR quando o texto está disponível na base.
+   → O texto deve ser IDÊNTICO ao fornecido — nem uma vírgula a mais, nem a menos.
+   → Antes E depois da citação, contextualize: explique POR QUE aquele dispositivo se aplica ao caso (nexo fato-norma).
+   → Súmulas, Temas e Acórdãos: cite a EMENTA COMPLETA quando vier completa no RAG, sem resumir.
+   → REGRA DE PRIORIDADE: ainda que o score do RAG seja baixo, se o item recuperado é uma súmula/lei/decreto/tema EXATAMENTE pedido pela estrutura da peça (ex.: Súmula 48 TNU em BPC), TRANSCREVA DIRETAMENTE em blockquote. O score baixo significa apenas que o sistema teve dúvida na recuperação — não que você deva parafrasear.
+   → PROIBIDO escrever "conforme estabelece a Súmula X" sem citar o texto. Se a súmula está na base, transcreva.
+   → PROIBIDO citação direta entre aspas no meio do parágrafo: SEMPRE em blockquote separado.
 
 B. SE O TEXTO NÃO ESTIVER NA BASE (REGRA ABSOLUTA):
    → É ESTRITAMENTE PROIBIDO citar, mencionar ou parafrasear qualquer lei, artigo, decreto ou jurisprudência que não esteja no RAG.
@@ -1141,14 +1183,19 @@ ESTRUTURA OBRIGATÓRIA PARA BPC/LOAS (DEFICIENTE):
     4.3. A Negativa do INSS: Combater a fundamentação genérica da autarquia.
     4.4. O Grupo Familiar e a Situação de Miserabilidade: Detalhar renda per capita (limite de 1/4 salário mínimo), CadÚnico e "Custo da Deficiência" (gastos extras com saúde).
 - 5. FUNDAMENTAÇÃO JURÍDICA (DIREITO): Art. 20 da Lei 8.742/93 (LOAS), conceito de deficiência (impedimento de longo prazo) e critérios de miserabilidade.
-    5.1. Da Deficiência da Autora.
+    5.1. Da Deficiência da Autora (OBRIGATÓRIO — cite a SÚMULA 48 DA TNU EM BLOCKQUOTE INTEGRAL):
+        - A Súmula 48 da TNU é o pilar do conceito de deficiência para BPC: estabelece que o impedimento de longo prazo (mínimo 2 anos) NÃO se confunde com incapacidade laborativa.
+        - ATENÇÃO CRÍTICA: NÃO USE A SÚMULA 47 DA TNU — ela trata de benefício por INCAPACIDADE (auxílio-doença/aposentadoria por invalidez), não de BPC. Para BPC, a súmula correta é a 48.
+        - Transcreva a Súmula 48 em blockquote (>) com o texto IDÊNTICO ao que está na Base de Conhecimento.
     5.2. Da Miserabilidade/Vulnerabilidade Social: Mencionar que o Bolsa Família não entra no cálculo da renda per capita (Art. 20, §3º da Lei 8.742/93).
     5.3. DA FLEXIBILIZAÇÃO DO CRITÉRIO DE RENDA — INCONSTITUCIONALIDADE PARCIAL (OBRIGATÓRIO — NUNCA OMITIR):
         - O critério objetivo de 1/4 do salário mínimo (Art. 20, §3º da LOAS) foi declarado INCONSTITUCIONAL PARCIALMENTE pelo STF nos RE 567.985/MT e RE 580.963/PR (Tema 669 — repercussão geral), julgados em 18/04/2013.
         - O STF, sem pronúncia de nulidade (técnica da inconstitucionalidade sem redução de texto), assentou que o critério legal não pode ser o único e exclusivo meio de prova da miserabilidade — o juiz pode e deve analisar outros elementos probatórios para aferir a situação de vulnerabilidade social.
         - Transcrever em blockquote o julgado da base (RE 567.985/MT e/ou RE 580.963/PR).
-        - Reforçar que o STJ também sedimentou esse entendimento na Súmula 11 da TNU e no Tema 185/STJ.
         - Aplicação ao caso concreto: mesmo que a renda per capita supere 1/4 do salário mínimo, demonstrar outros elementos de miserabilidade (custo da deficiência, ausência de patrimônio, CadÚnico, CRAS, declarações de hipossuficiência).
+    5.4. Da Avaliação Biopsicossocial — SÚMULA 80 DA TNU (OBRIGATÓRIO em blockquote):
+        - A Súmula 80 da TNU exige avaliação social por assistente social além da perícia médica, valorando os fatores ambientais, sociais, econômicos e pessoais.
+        - Transcrever a súmula em blockquote (>) e fundamentar o pedido de estudo social judicial.
 - 6. DA TUTELA DE URGÊNCIA: Fumus boni iuris e Periculum in mora (caráter alimentar).
 - 7. PEDIDOS: Gratuidade, Tutela (implantação em 15 dias), Citação, Provas (Perícia Médica e Social), Procedência total, Parcelas vencidas/vincendas e Honorários (30% contratuais, e sucumbenciais apenas se Justiça Comum).
 - 8. VALOR DA CAUSA: Cálculo detalhado (Vencidas + 12 Vincendas).
@@ -2161,6 +2208,12 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
 
     if (!response.ok) {
       const errText = await response.text();
+      // Erro de contexto excedido — mensagem amigável
+      if (response.status === 400 && /maximum context length|context_length_exceeded/i.test(errText)) {
+        const match = errText.match(/requested about (\d+) tokens/);
+        const requested = match ? Math.round(parseInt(match[1], 10) / 1000) : '?';
+        throw new Error(`O input ficou maior que o limite do modelo OpenRouter (~${requested}k tokens, limite ~163k). Soluções: (1) reduza o número de documentos anexados; (2) gere com Gemini 3 Flash (contexto 1M); (3) selecione um tamanho menor de peça (3.000 ou 4.000 palavras). Detalhe técnico: ${errText.slice(0, 200)}`);
+      }
       throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
     }
 
@@ -2484,16 +2537,36 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
+    // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
+    // Calcula orçamento de input por provedor (Gemini: 100k | OpenRouter: 120k tokens)
+    const inputBudget = getInputBudget(modelProvider, model);
+    // Reserva: system prompt base (~10k) + ELITE_REDACTION (~3k) + history (~5k) + draft (~5k) + nova msg (~2k)
+    const reservedTokens = 25_000;
+    const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
+    // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
+    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
+
     if (documentContext) {
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
+      const originalDocSize = documentContext.length;
+      const compressed = smartTruncate(documentContext, maxDocCtxChars);
+      if (compressed.length < originalDocSize) {
+        console.log(`[Dr.Michel] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
+      }
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
     }
 
     if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
-      const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      const originalLawsSize = lawsContext.length;
+      lawsContext = smartTruncate(lawsContext, maxLawsChars);
+      if (lawsContext.length < originalLawsSize) {
+        console.log(`[Dr.Michel] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
+      }
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
 REGRAS DE USO:
 1. Priorize COMPLETAMENTE esta legislação adicional para fundamentação.
-2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>').
+2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>'). PROIBIDO parafrasear.
 3. PROIBIDO inventar citações fora do texto enviado.
 4. A legislação dinâmica do Supabase virá na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário — ambas as fontes são VÁLIDAS.
 
@@ -2698,8 +2771,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens fixo em 16383 para garantir petições e relatórios completos
-    const maxOutputTokens = 16383;
+    // maxOutputTokens dinâmico: Gemini 3 Flash suporta até 64k de output.
+    // Para peças, usamos 32k (suficiente para ~10k palavras com folga).
+    // Para OpenRouter, mantemos 16k para não estourar contexto da API.
+    const maxOutputTokens = (modelProvider === 'openrouter') ? 16383 : 32_000;
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -2715,6 +2790,13 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
+
+      // Telemetria de input — diagnóstico de orçamento de tokens
+      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      if (totalInputTokens > 90_000) {
+        console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
+      }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
@@ -2905,16 +2987,36 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
+    // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
+    // Calcula orçamento de input por provedor (Gemini: 100k | OpenRouter: 120k tokens)
+    const inputBudget = getInputBudget(modelProvider, model);
+    // Reserva: system prompt base (~10k) + ELITE_REDACTION (~3k) + history (~5k) + draft (~5k) + nova msg (~2k)
+    const reservedTokens = 25_000;
+    const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
+    // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
+    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
+
     if (documentContext) {
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${documentContext}`;
+      const originalDocSize = documentContext.length;
+      const compressed = smartTruncate(documentContext, maxDocCtxChars);
+      if (compressed.length < originalDocSize) {
+        console.log(`[Dra.Luana] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
+      }
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
     }
 
     if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
-      const lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
+      const originalLawsSize = lawsContext.length;
+      lawsContext = smartTruncate(lawsContext, maxLawsChars);
+      if (lawsContext.length < originalLawsSize) {
+        console.log(`[Dra.Luana] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
+      }
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
 REGRAS DE USO:
 1. Priorize COMPLETAMENTE esta legislação adicional para fundamentação.
-2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>').
+2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>'). PROIBIDO parafrasear.
 3. PROIBIDO inventar citações fora do texto enviado.
 4. A legislação dinâmica do Supabase virá na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário — ambas as fontes são VÁLIDAS.
 
@@ -3168,8 +3270,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    // maxOutputTokens fixo em 16383 para garantir petições e relatórios completos
-    const maxOutputTokens = 16383;
+    // maxOutputTokens dinâmico: Gemini 3 Flash suporta até 64k de output.
+    // Para peças, usamos 32k (suficiente para ~10k palavras com folga).
+    // Para OpenRouter, mantemos 16k para não estourar contexto da API.
+    const maxOutputTokens = (modelProvider === 'openrouter') ? 16383 : 32_000;
 
     // Temperature calibrada por intenção
     const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
@@ -3182,6 +3286,13 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
+
+      // Telemetria de input — diagnóstico de orçamento de tokens
+      const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      if (totalInputTokensLuana > 90_000) {
+        console.warn(`[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
+      }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
