@@ -438,6 +438,7 @@ export const supabaseService = {
       ninety_days_date: client.ninetyDaysDate,
       security_mandate_date: client.securityMandateDate,
       address: client.address,
+      gender: client.gender,
       legal_representative: client.legalRepresentative,
       legal_representative_gender: client.legalRepresentativeGender,
       legal_representative_cpf: client.legalRepresentativeCpf,
@@ -481,7 +482,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -505,6 +506,7 @@ export const supabaseService = {
       ninetyDaysDate: c.ninety_days_date,
       securityMandateDate: c.security_mandate_date,
       address: c.address,
+      gender: c.gender,
       legalRepresentative: c.legal_representative,
       legalRepresentativeGender: c.legal_representative_gender,
       legalRepresentativeCpf: c.legal_representative_cpf,
@@ -560,6 +562,7 @@ export const supabaseService = {
       ninetyDaysDate: data.ninety_days_date,
       securityMandateDate: data.security_mandate_date,
       address: data.address,
+      gender: data.gender,
       legalRepresentative: data.legal_representative,
       legalRepresentativeGender: data.legal_representative_gender,
       legalRepresentativeCpf: data.legal_representative_cpf,
@@ -854,20 +857,36 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return [];
     
-    // Select unique titles from metadata
-    // We fetch more rows to ensure we get all unique titles even if there are many chunks
-    const { data, error } = await supabase
-      .from('legal_documents')
-      .select('metadata')
-      .limit(10000);
+    let allData: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('legal_documents')
+        .select('metadata')
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+      if (error) {
+        console.error('Error fetching legal document titles from Supabase:', error);
+        break;
+      }
       
-    if (error) {
-      console.error('Error fetching legal document titles from Supabase:', error);
-      return [];
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
     }
     
     // Filter unique titles manually
-    const titles = (data || []).map(item => {
+    const titles = allData.map(item => {
       const metadata = item.metadata as any;
       return metadata?.title ? String(metadata.title) : null;
     }).filter(Boolean) as string[];
