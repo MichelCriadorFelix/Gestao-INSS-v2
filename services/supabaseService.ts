@@ -64,7 +64,7 @@ export const supabaseService = {
     return data;
   },
 
-  async getAIConversations(aiName: 'michel' | 'luana') {
+  async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro') {
     const supabase = getSupabase();
     if (!supabase) return [];
     
@@ -439,6 +439,7 @@ export const supabaseService = {
       security_mandate_date: client.securityMandateDate,
       address: client.address,
       legal_representative: client.legalRepresentative,
+      legal_representative_gender: client.legalRepresentativeGender,
       legal_representative_cpf: client.legalRepresentativeCpf,
       legal_representative_marital_status: client.legalRepresentativeMaritalStatus,
       legal_representative_profession: client.legalRepresentativeProfession,
@@ -480,7 +481,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -505,6 +506,7 @@ export const supabaseService = {
       securityMandateDate: c.security_mandate_date,
       address: c.address,
       legalRepresentative: c.legal_representative,
+      legalRepresentativeGender: c.legal_representative_gender,
       legalRepresentativeCpf: c.legal_representative_cpf,
       legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
       legalRepresentativeProfession: c.legal_representative_profession,
@@ -559,6 +561,7 @@ export const supabaseService = {
       securityMandateDate: data.security_mandate_date,
       address: data.address,
       legalRepresentative: data.legal_representative,
+      legalRepresentativeGender: data.legal_representative_gender,
       legalRepresentativeCpf: data.legal_representative_cpf,
       legalRepresentativeMaritalStatus: data.legal_representative_marital_status,
       legalRepresentativeProfession: data.legal_representative_profession,

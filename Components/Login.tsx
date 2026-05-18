@@ -73,30 +73,38 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-primary-900 to-slate-900 px-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')] opacity-20 pointer-events-none"></div>
-      
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bordeaux-950 via-bordeaux-900 to-bordeaux-950 px-4 py-8 relative overflow-hidden safe-top safe-bottom">
+      {/* Padrão decorativo dourado */}
+      <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{backgroundImage: 'radial-gradient(circle at 20% 30%, #C9A961 0%, transparent 30%), radial-gradient(circle at 80% 70%, #C9A961 0%, transparent 30%)'}}></div>
+      {/* Faixas douradas decorativas */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-60"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-60"></div>
+
       <InstallPrompt />
-      
-      <div className="max-w-md w-full bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-white/10 relative z-10">
-        <button onClick={onOpenSettings} className="absolute top-4 right-4 text-slate-400 hover:text-white transition p-2 rounded-full hover:bg-white/10 group" title="Configurar Banco de Dados">
-            <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-green-400' : 'text-slate-400 group-hover:text-white'}`} />
+
+      <div className="max-w-md w-full bg-bordeaux-950/40 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/60 p-6 sm:p-8 border border-gold-500/20 relative z-10">
+        <button onClick={onOpenSettings} className="absolute top-4 right-4 text-cream-100/50 hover:text-gold-300 transition p-2 rounded-full hover:bg-bordeaux-800/60 group" title="Configurar Banco de Dados">
+            <Cog6ToothIcon className={`h-5 w-5 ${isCloudConfigured ? 'text-gold-400' : ''}`} />
         </button>
 
         <div className="text-center mb-8">
-          <div className="bg-gradient-to-tr from-primary-600 to-primary-400 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/30 transform rotate-3 hover:rotate-6 transition-transform duration-300">
-            <ScaleIcon className="h-10 w-10 text-white" />
+          <div className="bg-gradient-to-br from-gold-400 to-gold-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-gold-900/40 ring-2 ring-gold-300/30 transform rotate-3 hover:rotate-6 transition-transform duration-300">
+            <ScaleIcon className="h-10 w-10 text-bordeaux-900" />
           </div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">Gestão do Escritório</h2>
-          <p className="text-slate-300 mt-2 font-medium">Acesso Exclusivo Jurídico</p>
+          <h2 className="text-3xl sm:text-4xl font-serif font-semibold text-cream-50 tracking-tight">Felix &amp; Castro</h2>
+          <div className="flex items-center justify-center gap-2 mt-1.5">
+            <span className="h-px w-6 sm:w-8 bg-gold-500/50"></span>
+            <p className="text-gold-300/90 font-serif text-[11px] sm:text-sm tracking-[0.2em] uppercase">Advocacia Especializada</p>
+            <span className="h-px w-6 sm:w-8 bg-gold-500/50"></span>
+          </div>
           {!isCloudConfigured && (
-              <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700/50">
+              <span className="inline-flex items-center gap-1.5 mt-4 px-3 py-1 rounded-full text-[10px] font-bold bg-bordeaux-800/60 text-cream-100/70 border border-gold-500/20">
                   <SignalSlashIcon className="h-3 w-3" />
                   MODO LOCAL (OFFLINE)
               </span>
           )}
           {isCloudConfigured && (
-              <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full text-[10px] font-bold bg-green-900/40 text-green-400 border border-green-800/50 shadow-[0_0_10px_rgba(74,222,128,0.2)]">
+              <span className="inline-flex items-center gap-1.5 mt-4 px-3 py-1 rounded-full text-[10px] font-bold bg-gold-500/10 text-gold-300 border border-gold-500/30 shadow-[0_0_15px_rgba(201,169,97,0.15)]">
                   <SignalIcon className="h-3 w-3" />
                   NUVEM CONECTADA
               </span>
@@ -106,22 +114,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-4">
             <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">E-mail</label>
+                <label className="block text-xs font-semibold text-gold-300/80 uppercase tracking-wider mb-1.5 ml-1">E-mail</label>
                 <input
                 type="email"
                 required
-                className="w-full px-5 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition text-white placeholder-slate-500"
+                className="w-full px-4 sm:px-5 py-3 bg-bordeaux-950/60 border border-gold-500/20 rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition text-cream-50 placeholder-cream-100/30"
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 />
             </div>
             <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">Senha</label>
+                <label className="block text-xs font-semibold text-gold-300/80 uppercase tracking-wider mb-1.5 ml-1">Senha</label>
                 <input
                 type="password"
                 required
-                className="w-full px-5 py-3 bg-slate-900/50 border border-slate-700/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition text-white placeholder-slate-500"
+                className="w-full px-4 sm:px-5 py-3 bg-bordeaux-950/60 border border-gold-500/20 rounded-xl focus:ring-2 focus:ring-gold-500 focus:border-transparent outline-none transition text-cream-50 placeholder-cream-100/30"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -131,7 +139,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
 
           {error && (
             <div className="space-y-3">
-              <div className="p-4 bg-red-500/10 text-red-200 text-sm rounded-xl border border-red-500/20 flex items-center gap-3 animate-pulse">
+              <div className="p-4 bg-red-900/30 text-red-200 text-sm rounded-xl border border-red-500/30 flex items-center gap-3 animate-pulse">
                 <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0" />
                 {error}
               </div>
@@ -139,7 +147,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
                 <button
                   type="button"
                   onClick={handleClearStorage}
-                  className="w-full py-2 text-xs font-bold text-primary-400 hover:text-primary-300 underline transition"
+                  className="w-full py-2 text-xs font-bold text-gold-300 hover:text-gold-200 underline transition"
                 >
                   Limpar Espaço do Navegador
                 </button>
@@ -150,15 +158,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onOpenSettings, isCloudConfigure
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-bold py-3.5 rounded-xl transition duration-300 shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 group disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-400 hover:to-gold-500 text-bordeaux-950 font-bold py-3.5 rounded-xl transition duration-300 shadow-lg shadow-gold-900/40 flex items-center justify-center gap-2 group disabled:opacity-50 ring-1 ring-gold-300/40"
           >
             <LockClosedIcon className="h-5 w-5 group-hover:scale-110 transition-transform" />
             {loading ? 'Acessando...' : 'Acessar Sistema'}
           </button>
         </form>
-        
-        <div className="mt-8 text-center text-xs text-slate-500">
-            &copy; 2025 Felix e Castro Advocacia Especializada
+
+        <div className="mt-8 text-center text-[10px] uppercase tracking-[0.25em] text-cream-100/40 font-serif">
+            &copy; 2025 Felix &amp; Castro
         </div>
       </div>
     </div>

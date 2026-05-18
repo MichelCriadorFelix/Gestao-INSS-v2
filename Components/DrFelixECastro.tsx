@@ -60,7 +60,7 @@ interface ChatSession {
   uploadKeyIndex?: number | null;
 }
 
-interface DrMichelFelixProps {
+interface DrFelixECastroProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: { title: string; content: string }) => void;
@@ -70,7 +70,7 @@ interface DrMichelFelixProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
+const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -113,9 +113,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
   useEffect(() => {
     if (pendingAudit) {
-      idbSet('pending_audit_dr_michel', pendingAudit).catch(console.error);
+      idbSet('pending_audit_dr_felix_castro', pendingAudit).catch(console.error);
     } else {
-      idbDel('pending_audit_dr_michel').catch(console.error);
+      idbDel('pending_audit_dr_felix_castro').catch(console.error);
     }
   }, [pendingAudit]);
 
@@ -135,14 +135,14 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     const loadFromSupabase = async () => {
       try {
         // Load pending audit from IndexedDB
-        idbGet('pending_audit_dr_michel').then(saved => {
+        idbGet('pending_audit_dr_felix_castro').then(saved => {
           if (saved) {
             console.log("Audit pendente recuperado:", saved);
             setPendingAudit(saved);
           }
         }).catch(console.error);
 
-        const dbSessions = await supabaseService.getAIConversations('michel');
+        const dbSessions = await supabaseService.getAIConversations('felix_castro');
         let formattedSessions = dbSessions && dbSessions.length > 0 ? dbSessions.map(s => ({
           id: s.id,
           title: s.title,
@@ -152,7 +152,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         })) : [];
 
         // Merge with local storage to prevent data loss on page refresh
-        const localSaved = localStorage.getItem('dr_michel_sessions');
+        const localSaved = localStorage.getItem('dr_felix_castro_sessions');
         if (localSaved) {
           try {
             const parsed = JSON.parse(localSaved);
@@ -246,7 +246,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             
             supabaseService.saveAIConversation({
               ...sessionToSync,
-              ai_name: 'michel'
+              ai_name: 'felix_castro'
             }).catch(err => {
               console.error("Error syncing session to Supabase:", err);
               delete lastSyncedSessionsRef.current[id];
@@ -444,8 +444,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       let ragContext = '';
       try {
         // Se for comando de geração, enriquece a query com
-        // termos jurídicos previdenciários para forçar o RAG
-        // a recuperar as leis principais do RGPS
+        // termos jurídicos consumeristas e cíveis para forçar o RAG
+        // a recuperar as leis principais de CDC e Direito Civil
         const isGenerationCommand =
           messageText.includes('GERAR') ||
           messageText.includes('Gerar');
@@ -594,7 +594,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         }
 
         try {
-          const response = await apiFetch('/api/dr-michel/chat', {
+          const response = await apiFetch('/api/dr-felix-castro/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -775,7 +775,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           try {
-            const aiResponse = await apiFetch('/api/dr-michel/chat', {
+            const aiResponse = await apiFetch('/api/dr-felix-castro/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -884,7 +884,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           
           try {
-            const aiResponse = await apiFetch('/api/dr-michel/chat', {
+            const aiResponse = await apiFetch('/api/dr-felix-castro/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1158,7 +1158,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const formattedContent = markdownToHtml(content);
 
       onOpenPetition({
-        title: `Petição Dr. Michel - ${new Date().toLocaleDateString('pt-BR')}`,
+        title: `Petição Dr. Felix e Castro - ${new Date().toLocaleDateString('pt-BR')}`,
         content: formattedContent
       });
     }
@@ -1294,9 +1294,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               <div className="text-center space-y-4">
                 <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
                   Olá, MICHEL!<br />
-                  <span className="text-emerald-600">Bem vindo ao Dr. Michel Felix IA</span>
+                  <span className="text-emerald-600">Bem vindo ao Dr. Felix e Castro IA</span>
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400">Seu assistente jurídico de elite para Direito Previdenciário.</p>
+                <p className="text-slate-500 dark:text-slate-400">Seu assistente jurídico de elite para Direito do Consumidor e Direito Civil.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1375,7 +1375,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                       </div>
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Michel Felix</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Felix e Castro</span>
                           <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
                             {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -1438,7 +1438,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   </div>
                   <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Michel Felix</span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Felix e Castro</span>
                       <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded animate-pulse">{progressText}</span>
                     </div>
 
@@ -1525,7 +1525,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               <textarea 
                 id="chat-input-michel"
                 rows={1}
-                placeholder="Como posso te ajudar, Dr. Michel?"
+                placeholder="Como posso te ajudar, Dr. Felix e Castro?"
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);
@@ -1617,7 +1617,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">
-              Dr. Michel Felix IA pode cometer erros. Verifique informações importantes.
+              Dr. Felix e Castro IA pode cometer erros. Verifique informações importantes.
             </p>
           </div>
         </div>
@@ -1671,4 +1671,4 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   );
 };
 
-export default DrMichelFelix;
+export default DrFelixECastro;

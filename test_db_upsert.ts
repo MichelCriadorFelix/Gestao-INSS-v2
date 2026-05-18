@@ -1,6 +1,17 @@
+// Arquivo de teste - NÃO usar chaves hardcoded aqui.
+// Use variáveis de ambiente:
+// SUPABASE_URL=... SUPABASE_ANON_KEY=... npx ts-node test_db_upsert.ts
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient("https://nnhatyvrtlbkyfadumqo.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg");
+const url = process.env.SUPABASE_URL || '';
+const key = process.env.SUPABASE_ANON_KEY || '';
+
+if (!url || !key) {
+  console.error('Configure SUPABASE_URL e SUPABASE_ANON_KEY como variáveis de ambiente.');
+  process.exit(1);
+}
+
+const supabase = createClient(url, key);
 
 async function run() {
   const { data, error } = await supabase.from('ai_conversations').upsert({
