@@ -16,7 +16,7 @@ export interface ChatSession {
   title: string;
   date: string;
   messages: Message[];
-  ai_name: 'michel' | 'luana';
+  ai_name: 'michel' | 'luana' | 'felix_castro';
   documents?: any[];
 }
 
