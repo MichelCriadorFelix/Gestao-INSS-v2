@@ -37,7 +37,6 @@ import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
 import DrMichelFelix from './DrMichelFelix';
 import DraLuanaCastro from './DraLuanaCastro';
-import DrFelixECastro from './DrFelixECastro';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
@@ -57,7 +56,7 @@ export default function Dashboard({
   onSettingsSaved,
   onRestoreBackup
 }: DashboardProps) {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
@@ -72,7 +71,6 @@ export default function Dashboard({
   const [savedSocialCalculations, setSavedSocialCalculations] = useState<SocialSecurityCalculationRecord[]>([]);
   const [drMichelSessions, setDrMichelSessions] = useState<any[]>([]);
   const [draLuanaSessions, setDraLuanaSessions] = useState<any[]>([]);
-  const [drFelixCastroSessions, setDrFelixCastroSessions] = useState<any[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
   const [resolvedAlerts, setResolvedAlerts] = useState<string[]>([]);
   const [customLaws, setCustomLaws] = useState<any[]>([]);
@@ -146,17 +144,15 @@ export default function Dashboard({
 
         setResolvedAlerts([]);
 
-        const [remoteSocial, remoteMichel, remoteLuana, remoteFelixCastro] = await Promise.all([
+        const [remoteSocial, remoteMichel, remoteLuana] = await Promise.all([
             supabaseService.getCalculations().catch(() => []),
             supabaseService.getAIConversations('michel').catch(() => []),
-            supabaseService.getAIConversations('luana').catch(() => []),
-            supabaseService.getAIConversations('felix_castro').catch(() => [])
+            supabaseService.getAIConversations('luana').catch(() => [])
         ]);
 
         setSavedSocialCalculations(remoteSocial || []);
         setDrMichelSessions(remoteMichel || []);
         setDraLuanaSessions(remoteLuana || []);
-        setDrFelixCastroSessions(remoteFelixCastro || []);
 
         // Fetch global data from 'clients' table (used as KV store)
         if (supabase) {
@@ -448,7 +444,7 @@ export default function Dashboard({
   };
 
   // Save Logic (Generic)
-  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
+  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
       setIsSyncing(true);
       setSaveError(null);
       setLastSavedType(type);
@@ -558,17 +554,6 @@ export default function Dashboard({
                   setIsSyncing(false);
                   return;
               }
-          } else if (type === 'dr_felix_castro') {
-              setDrFelixCastroSessions(newData);
-              if (supabase) {
-                  const error = await upsertWithRetry({ id: 11, data: newData });
-                  if (error) {
-                      console.error("Sync error (FelixCastro):", error);
-                      setSaveError("Erro de sincronização (Dr. Felix e Castro).");
-                  }
-                  setIsSyncing(false);
-                  return;
-              }
           } else if (type === 'agenda') {
               if (supabase) {
                   // Proteção: busca o estado atual do Supabase antes de salvar
@@ -650,7 +635,6 @@ export default function Dashboard({
           case 'social_calculations': dataToSave = savedSocialCalculations; break;
           case 'dr_michel': dataToSave = drMichelSessions; break;
           case 'dra_luana': dataToSave = draLuanaSessions; break;
-          case 'dr_felix_castro': dataToSave = drFelixCastroSessions; break;
           case 'agenda': dataToSave = agendaEvents; break;
           case 'resolved_alerts': dataToSave = resolvedAlerts; break;
       }
@@ -998,11 +982,6 @@ export default function Dashboard({
       safeSetLocalStorage('dra_luana_sessions', JSON.stringify(sessions.slice(0, 3)));
   };
 
-  const handleSaveDrFelixCastroSessions = async (sessions: any[]) => {
-      setDrFelixCastroSessions(sessions);
-      safeSetLocalStorage('dr_felix_castro_sessions', JSON.stringify(sessions.slice(0, 3)));
-  };
-
   // Merge virtual events from clients into agenda
   const mergedAgendaEvents = useMemo(() => {
     const virtualEvents: AgendaEvent[] = [];
@@ -1333,7 +1312,7 @@ export default function Dashboard({
 
   const ThSortable = ({ label, columnKey, align = "left" }: { label: string, columnKey: string, align?: "left"|"center"|"right" }) => (
       <th 
-        className={`px-4 py-3.5 font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-bordeaux-900/40/80 cursor-pointer hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition select-none text-xs uppercase tracking-wider text-${align}`}
+        className={`px-4 py-3.5 font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition select-none text-xs uppercase tracking-wider text-${align}`}
         onClick={() => requestSort(columnKey)}
       >
         <div className={`flex items-center ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : "justify-start"}`}>
@@ -1368,13 +1347,13 @@ export default function Dashboard({
   };
 
   const PaginationControls = () => (
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-gold-500/20 bg-slate-50/50 dark:bg-bordeaux-900/40/30">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
           <div className="flex items-center gap-3">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Linhas por página:</span>
               <select 
                   value={itemsPerPage} 
                   onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
               >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1388,7 +1367,7 @@ export default function Dashboard({
               <button 
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/60 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                   <ChevronLeftIcon className="h-4 w-4" />
               </button>
@@ -1398,7 +1377,7 @@ export default function Dashboard({
               <button 
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className="p-1.5 rounded-lg border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/60 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-bordeaux-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                   <ChevronRightIcon className="h-4 w-4" />
               </button>
@@ -1482,15 +1461,6 @@ export default function Dashboard({
                    {currentView === 'dra_luana' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
                    <StarIcon className="h-5 w-5 mr-3 shrink-0" />
                    <span className="font-medium text-sm">Dra. Luana Castro (IA)</span>
-               </button>
-
-               <button 
-                   onClick={() => handleViewChange('dr_felix_castro')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_felix_castro' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
-               >
-                   {currentView === 'dr_felix_castro' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Dr. Felix e Castro (IA)</span>
                </button>
 
                <button 
@@ -1607,13 +1577,9 @@ export default function Dashboard({
                       currentView === 'petition_editor' ? 'Editor de Petições' :
                       currentView === 'dr_michel' ? 'Dr. Michel Felix — IA Jurídica' :
                       currentView === 'dra_luana' ? 'Dra. Luana Castro — IA Trabalhista' :
-                      currentView === 'dr_felix_castro' ? 'Dr. Felix e Castro — IA Generalista (CDC/Civil)' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
-                      currentView === 'legislation' ? 'Legislação e Normas' :
-                      currentView === 'jurisprudence' ? 'Jurisprudência' :
-                      currentView === 'meu_inss' ? 'Meu INSS' :
                       'Cálculos Previdenciários'}
                  </h2>
                  {isSyncing ? (
@@ -1669,13 +1635,6 @@ export default function Dashboard({
                  <DraLuanaCastro 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
-                    onOpenPetition={handleOpenPetition}
-                    customLaws={customLaws}
-                  />
-             ) : currentView === 'dr_felix_castro' ? (
-                 <DrFelixECastro 
-                    initialSessions={drFelixCastroSessions} 
-                    onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
@@ -1739,24 +1698,24 @@ export default function Dashboard({
                     {/* Action Bar Clients */}
                     <div className="flex flex-col gap-4 mb-6">
                          {/* Toggle Tabs */}
-                         <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 p-1 rounded-xl w-fit">
+                         <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl w-fit">
                             <button 
                                 onClick={() => handleClientFilterChange('active')} 
-                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'active' ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'active' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <UserGroupIcon className="h-4 w-4" />
                                 Ativos
                             </button>
                             <button 
                                 onClick={() => handleClientFilterChange('referral')} 
-                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'referral' ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'referral' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <StarIcon className="h-4 w-4" />
                                 Indicações
                             </button>
                             <button 
                                 onClick={() => handleClientFilterChange('archived')} 
-                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'archived' ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'archived' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <ArchiveBoxIcon className="h-4 w-4" />
                                 Arquivados
@@ -1771,7 +1730,7 @@ export default function Dashboard({
                                 <input
                                 type="text"
                                 placeholder={clientFilter === 'archived' ? "Buscar em arquivados..." : "Buscar cliente por nome ou CPF..."}
-                                className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none shadow-sm transition-all"
+                                className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
                                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 />
@@ -1779,7 +1738,7 @@ export default function Dashboard({
                             {clientFilter === 'active' && (
                                 <button
                                     onClick={() => { setCurrentRecord(null); setIsModalOpen(true); }}
-                                    className="fc-btn-primary text-cream-50 font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
+                                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
                                 >
                                     <PlusIcon className="h-5 w-5" />
                                     Novo Processo
@@ -1788,7 +1747,7 @@ export default function Dashboard({
                             {clientFilter === 'referral' && (
                                 <button
                                     onClick={() => setIsReferralModalOpen(true)}
-                                    className="fc-btn-primary text-cream-50 font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
+                                    className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-primary-500/25 flex items-center gap-2"
                                 >
                                     <PlusIcon className="h-5 w-5" />
                                     Nova Indicação
@@ -1798,11 +1757,11 @@ export default function Dashboard({
                     </div>
 
                     {/* Clients Table / Cards */}
-                    <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-xl border border-slate-200 dark:border-gold-500/20 flex flex-col">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
                         {/* Desktop Table (Visible only on md screens and up) */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-slate-50 dark:bg-bordeaux-900/40/80">
+                                <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
                                         <th className="px-4 py-3.5 text-center w-14 font-bold text-slate-600 dark:text-slate-400">★</th>
                                         <ThSortable label="Nome" columnKey="name" />
@@ -1837,7 +1796,7 @@ export default function Dashboard({
                                         const isYellow = record.isDailyAttention;
                                         const isRed = record.isUrgentAttention;
                                         
-                                        let rowClass = 'hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50';
+                                        let rowClass = 'hover:bg-slate-50 dark:hover:bg-slate-800/50';
                                         if (isYellow) rowClass = 'bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100/50 dark:hover:bg-yellow-900/20';
                                         if (isRed) rowClass = 'bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20';
 
@@ -1890,7 +1849,7 @@ export default function Dashboard({
                                                 )}
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-xs bg-slate-100 dark:bg-bordeaux-900/40 px-2 py-1 rounded">{record.password}</span>
+                                                        <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{record.password}</span>
                                                         <CopyButton text={record.password} />
                                                     </div>
                                                 </td>
@@ -1996,7 +1955,7 @@ export default function Dashboard({
                                      <div className="grid grid-cols-2 gap-3 text-[10px] font-bold uppercase text-slate-400">
                                          <div>
                                              <p className="mb-1">Senha</p>
-                                             <p className="text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-bordeaux-900/40 p-1.5 rounded">{record.password}</p>
+                                             <p className="text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded">{record.password}</p>
                                          </div>
                                          <div>
                                              <p className="mb-1">Tipo</p>
@@ -2012,7 +1971,7 @@ export default function Dashboard({
                                          </div>
                                      </div>
                                       
-                                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50 dark:border-gold-500/20/50">
+                                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50 dark:border-slate-800/50">
                                          {record.medExpertiseDate && (
                                              <div className="px-2 py-1 bg-primary-50 dark:bg-primary-900/10 text-primary-600 dark:text-primary-400 rounded text-[9px] font-bold border border-primary-100 dark:border-primary-800">
                                                  P. Médica: {record.medExpertiseDate}
@@ -2052,7 +2011,7 @@ export default function Dashboard({
                             <input
                                 type="text"
                                 placeholder="Buscar contrato por nome ou CPF..."
-                                className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
+                                className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
                                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             />
@@ -2076,11 +2035,11 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-xl border border-slate-200 dark:border-gold-500/20 flex flex-col">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-slate-50 dark:bg-bordeaux-900/40/80">
+                                <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
                                         <ThSortable label="Cliente" columnKey="firstName" />
                                         <ThSortable label="Serviço" columnKey="serviceType" />
@@ -2098,7 +2057,7 @@ export default function Dashboard({
                                         const percentPaid = totalFee > 0 ? (totalPaid / totalFee) * 100 : 0;
                                         
                                         return (
-                                            <tr key={contract.id} className="hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition-colors">
+                                            <tr key={contract.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                 <td className="px-4 py-3">
                                                     <div className="font-semibold dark:text-slate-200">{contract.firstName} {contract.lastName}</div>
                                                     <div className="text-xs text-slate-400 font-mono">{contract.cpf}</div>
@@ -2111,7 +2070,7 @@ export default function Dashboard({
                                                 </td>
                                                 <td className="px-4 py-3 font-mono font-bold dark:text-slate-200">{formatCurrency(totalFee)}</td>
                                                 <td className="px-4 py-3 w-48">
-                                                    <div className="w-full bg-slate-200 dark:bg-bordeaux-900/60 rounded-full h-2 mb-1">
+                                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-1">
                                                         <div className={`h-2 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between">
@@ -2180,7 +2139,7 @@ export default function Dashboard({
                                                  <span className="text-slate-500">Valor Total: <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalFee)}</span></span>
                                                  <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
                                              </div>
-                                             <div className="w-full bg-slate-100 dark:bg-bordeaux-900/40 rounded-full h-1.5 overflow-hidden">
+                                             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                                  <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
                                              </div>
                                          </div>

@@ -118,13 +118,13 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4 animate-in fade-in duration-200">
-             <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-slate-200 dark:border-gold-500/20 flex flex-col">
-                <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60">
+             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
+                <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                     <div>
                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{getTitle()}</h3>
                          <p className="text-xs text-slate-500 dark:text-slate-400">{getSubtitle()}</p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-bordeaux-900/40 p-1.5 rounded-lg transition">
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-lg transition">
                         <XMarkIcon className="h-6 w-6" />
                     </button>
                 </div>

@@ -272,7 +272,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
             </span>
             {title}
           </h2>
-          <span className="text-xs font-medium px-2.5 py-1 bg-slate-200 dark:bg-bordeaux-900/40 text-slate-600 dark:text-slate-300 rounded-full">
+          <span className="text-xs font-medium px-2.5 py-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full">
             {tasks.length} / 3 Tarefas
           </span>
         </div>
@@ -314,7 +314,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
                   {task.description}
                 </p>
                 
-                <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-gold-500/15">
+                <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-slate-700">
                   <button 
                     onClick={() => handleAction(task, 'completed')}
                     title="Marcar como Concluído"
@@ -334,7 +334,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
                   <button 
                     onClick={() => handleAction(task, 'discarded')}
                     title="Não é mais necessário"
-                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-bordeaux-900/40 dark:text-slate-400 dark:hover:bg-bordeaux-900/60 transition-colors"
+                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
                   >
                     <XMarkIcon className="w-5 h-5" />
                     <span className="text-[9px] font-bold uppercase">Descartar</span>

@@ -220,7 +220,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
       case 'Previdenciária':
         return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400';
       case 'Instruções Normativas':
-        return 'bg-slate-100 dark:bg-bordeaux-950/60/30 text-slate-700 dark:text-slate-400';
+        return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-400';
       case 'Atividades Especiais':
         return 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400';
       case 'Temas e Teses':
@@ -232,12 +232,12 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
 
   if (selectedLaw) {
     return (
-      <div className="flex flex-col h-[calc(100vh-120px)] bg-white dark:bg-bordeaux-900/40 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/15 overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gold-500/15 bg-slate-50 dark:bg-bordeaux-900/40/50">
+      <div className="flex flex-col h-[calc(100vh-120px)] bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSelectedLaw(null)}
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 text-slate-600 dark:text-slate-300 transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
               title="Voltar para a lista"
             >
               <ArrowLeftIcon className="w-5 h-5" />
@@ -254,7 +254,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIframeKey(k => k + 1)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
               title="Voltar para a lei original"
             >
               <ArrowPathIcon className="w-4 h-4" />
@@ -287,10 +287,10 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-bordeaux-900/40 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-gold-500/15">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
-            <h2 className="fc-page-title text-xl font-serif font-semibold text-slate-900 dark:text-cream-50 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <BookOpenIcon className="w-6 h-6 text-primary-500" />
               Legislação e Normas
             </h2>
@@ -315,13 +315,13 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
             <input
               type="text"
               placeholder="Buscar lei por nome ou descrição..."
-              className="pl-10 pr-4 py-2 w-full border border-slate-200 dark:border-gold-500/15 bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+              className="pl-10 pr-4 py-2 w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select
-            className="px-4 py-2 border border-slate-200 dark:border-gold-500/15 bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+            className="px-4 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
@@ -336,7 +336,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
             <div
               key={law.id}
               onClick={() => setSelectedLaw(law)}
-              className="text-left block p-5 rounded-xl border border-slate-200 dark:border-gold-500/15 bg-slate-50 dark:bg-bordeaux-900/40/50 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 transition-colors group cursor-pointer"
+              className="text-left block p-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group cursor-pointer"
             >
               <div className="flex justify-between items-start mb-2">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCategoryColor(law.category)}`}>
@@ -374,8 +374,8 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
       {/* Modal Adicionar Lei */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-bordeaux-900/40 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gold-500/15">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Adicionar Nova Lei</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -394,7 +394,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
                   required
                   value={newLaw.title}
                   onChange={e => setNewLaw({ ...newLaw, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-gold-500/15 rounded-lg bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Ex: Lei do Inquilinato"
                 />
               </div>
@@ -407,7 +407,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
                   required
                   value={newLaw.link}
                   onChange={e => setNewLaw({ ...newLaw, link: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-gold-500/15 rounded-lg bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="https://..."
                 />
               </div>
@@ -419,7 +419,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
                   type="text"
                   value={newLaw.category}
                   onChange={e => setNewLaw({ ...newLaw, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-gold-500/15 rounded-lg bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="Ex: Civil, Penal, Outros"
                 />
               </div>
@@ -430,7 +430,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
                 <textarea
                   value={newLaw.description}
                   onChange={e => setNewLaw({ ...newLaw, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-gold-500/15 rounded-lg bg-slate-50 dark:bg-bordeaux-950/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none resize-none h-24"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none resize-none h-24"
                   placeholder="Breve descrição sobre a lei..."
                 />
               </div>
@@ -438,7 +438,7 @@ const Legislation: React.FC<LegislationProps> = ({ customLaws, onSaveCustomLaws 
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-bordeaux-900/60 rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg font-medium transition-colors"
                 >
                   Cancelar
                 </button>

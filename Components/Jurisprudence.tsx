@@ -50,7 +50,7 @@ const Jurisprudence: React.FC = () => {
           <div className="inline-flex p-4 bg-white/10 backdrop-blur-xl rounded-2xl mb-6 border border-white/20">
             <ScaleIcon className="w-10 h-10 text-indigo-100" />
           </div>
-          <h2 className="fc-page-title text-4xl md:text-5xl font-serif font-semibold mb-4 tracking-tight inline-block">Pesquisa Jusbrasil</h2>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">Pesquisa Jusbrasil</h2>
           <p className="text-indigo-100 text-lg mb-10 max-w-2xl mx-auto opacity-90">
             Acesse a maior base de dados jurídica do país. Pesquise em todos os tribunais simultaneamente com sua conta Pro.
           </p>
@@ -96,7 +96,7 @@ const Jurisprudence: React.FC = () => {
 
       {/* CARD DE INFORMAÇÃO JUSBRASIL */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 bg-white dark:bg-bordeaux-900/40 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-gold-500/15 flex flex-col justify-between">
+        <div className="md:col-span-2 bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
@@ -120,7 +120,7 @@ const Jurisprudence: React.FC = () => {
             </button>
             <button
               onClick={() => window.open(jusbrasil.link, '_blank')}
-              className="flex-1 py-4 bg-slate-100 dark:bg-bordeaux-950/60 text-slate-700 dark:text-slate-300 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition-all flex items-center justify-center gap-2"
+              className="flex-1 py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
             >
               <ArrowTopRightOnSquareIcon className="w-5 h-5" />
               Abrir Site Principal

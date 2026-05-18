@@ -135,7 +135,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                     <select 
                         value={selectedYear} 
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="appearance-none bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 text-slate-700 dark:text-slate-200 py-1.5 pl-4 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-1.5 pl-4 pr-8 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
                         <option value={0}>Tudo</option>
                         {availableYears.map(year => (
@@ -151,7 +151,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div 
                     onClick={() => setActiveModalType('total_concluded')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <BanknotesIcon className="h-24 w-24 text-blue-600" />
@@ -168,7 +168,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
                 <div 
                     onClick={() => setActiveModalType('portfolio')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <WalletIcon className="h-24 w-24 text-indigo-600" />
@@ -185,7 +185,7 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
 
                 <div 
                     onClick={() => setActiveModalType('revenue')}
-                    className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-gold-500/15 relative overflow-hidden group cursor-pointer hover:border-green-500 dark:hover:border-green-500 transition-all hover:shadow-md"
+                    className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group cursor-pointer hover:border-green-500 dark:hover:border-green-500 transition-all hover:shadow-md"
                 >
                     <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                         <BanknotesIcon className="h-24 w-24 text-green-600" />

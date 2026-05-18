@@ -223,8 +223,8 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-gold-500/20 flex flex-col">
-                <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60 sticky top-0 z-10">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
+                <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
                     <div className="flex items-center gap-3">
                          <div className="bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg">
                              <BriefcaseIcon className="h-6 w-6" />
@@ -240,7 +240,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                 <form onSubmit={handleSubmit} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                      <div className="md:col-span-2">
-                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-gold-500/20 pb-2 mb-4">Dados do Cliente</h4>
+                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Dados do Cliente</h4>
                      </div>
 
                      <div className="md:col-span-2">
@@ -249,7 +249,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                             <button
                                 type="button"
                                 onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                                className="w-full flex items-center justify-between px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white text-left"
+                                className="w-full flex items-center justify-between px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white text-left"
                             >
                                 <span className="truncate">
                                     {formData.clientId 
@@ -262,15 +262,15 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                             {isClientDropdownOpen && createPortal(
                                 <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
                                     onMouseDown={(e) => { if (e.target === e.currentTarget) { setIsClientDropdownOpen(false); setClientSearchQuery(''); } }}>
-                                    <div className="w-full max-w-lg bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
                                         onMouseDown={e => e.stopPropagation()}
                                         onClick={e => e.stopPropagation()}>
-                                        <div className="p-4 border-b border-slate-100 dark:border-gold-500/20 flex items-center justify-between bg-white dark:bg-bordeaux-950/60 sticky top-0 z-20">
+                                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-20">
                                             <span className="font-bold text-slate-800 dark:text-white text-sm">Selecionar Cliente</span>
                                             <button type="button" onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}
                                                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold">✕</button>
                                         </div>
-                                        <div className="p-3 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60 sticky top-[56px] z-20">
+                                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-[56px] z-20">
                                             <div className="relative">
                                                 <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                                 <input
@@ -278,12 +278,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     placeholder="Buscar cliente..."
                                                     value={clientSearchQuery}
                                                     onChange={(e) => setClientSearchQuery(e.target.value)}
-                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
                                                     autoFocus
                                                 />
                                             </div>
                                         </div>
-                                        <div className="overflow-y-auto flex-1 bg-white dark:bg-bordeaux-950/60 min-h-0">
+                                        <div className="overflow-y-auto flex-1 bg-white dark:bg-slate-900 min-h-0">
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -291,7 +291,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                     setIsClientDropdownOpen(false);
                                                     setClientSearchQuery('');
                                                 }}
-                                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 text-primary-600 dark:text-primary-400 transition font-bold border-b border-slate-50 dark:border-gold-500/20 flex items-center gap-2"
+                                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-primary-600 dark:text-primary-400 transition font-bold border-b border-slate-50 dark:border-slate-800 flex items-center gap-2"
                                             >
                                                 <PlusIcon className="w-4 h-4" /> Novo Cliente
                                             </button>
@@ -318,7 +318,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                             setIsClientDropdownOpen(false);
                                                             setClientSearchQuery('');
                                                         }}
-                                                        className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 text-slate-700 dark:text-slate-200 transition border-b border-slate-50 dark:border-gold-500/20 last:border-0"
+                                                        className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 transition border-b border-slate-50 dark:border-slate-800 last:border-0"
                                                     >
                                                         <p className="font-bold uppercase truncate">{c.name}</p>
                                                         <p className="text-[10px] text-slate-500 font-mono tracking-wider">{c.cpf}</p>
@@ -338,28 +338,28 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                      <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Nome <span className="text-red-500">*</span></label>
-                        <input type="text" name="firstName" required value={formData.firstName || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                        <input type="text" name="firstName" required value={formData.firstName || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Sobrenome</label>
-                        <input type="text" name="lastName" value={formData.lastName || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                        <input type="text" name="lastName" value={formData.lastName || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">CPF</label>
-                        <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                        <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Tipo de Serviço <span className="text-red-500">*</span></label>
-                        <input type="text" name="serviceType" required value={formData.serviceType || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                        <input type="text" name="serviceType" required value={formData.serviceType || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
 
                      <div className="md:col-span-2 mt-2">
-                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-gold-500/20 pb-2 mb-4">Financeiro & Responsável</h4>
+                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Financeiro & Responsável</h4>
                      </div>
 
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Advogado Responsável <span className="text-red-500">*</span></label>
-                         <select name="lawyer" required value={formData.lawyer || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="lawyer" required value={formData.lawyer || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="">Selecione...</option>
                              <option value="Michel">Dr. Michel</option>
                              <option value="Luana">Dra. Luana</option>
@@ -367,7 +367,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">% Responsável Principal</label>
-                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData(prev => ({...prev, lawyerSplit: Number(e.target.value)}))} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData(prev => ({...prev, lawyerSplit: Number(e.target.value)}))} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value={100}>100% / 0%</option>
                              <option value={70}>70% / 30%</option>
                              <option value={60}>60% / 40%</option>
@@ -377,7 +377,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Valor Total Honorários (R$)</label>
-                         <input type="number" name="totalFee" value={formData.totalFee || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white font-mono" placeholder="0.00" />
+                         <input type="number" name="totalFee" value={formData.totalFee || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white font-mono" placeholder="0.00" />
                      </div>
 
                      <div>
@@ -389,7 +389,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                  update.concludedAt = new Date().toISOString().split('T')[0];
                              }
                              setFormData(update);
-                         }} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         }} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="Pendente">Pendente</option>
                              <option value="Em Andamento">Em Andamento</option>
                              <option value="Concluído">Concluído</option>
@@ -398,12 +398,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      {formData.status === 'Concluído' && (
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Data de Conclusão</label>
-                         <input type="date" name="concludedAt" value={formData.concludedAt || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                         <input type="date" name="concludedAt" value={formData.concludedAt || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
                      </div>
                      )}
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Forma de Pagamento</label>
-                         <select name="paymentMethod" value={formData.paymentMethod || 'Parcelado'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="paymentMethod" value={formData.paymentMethod || 'Parcelado'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="À Vista">À Vista</option>
                              <option value="Parcelado">Parcelado</option>
                          </select>
@@ -418,7 +418,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                          name="installmentsCount"
                                          value={formData.installmentsCount || 2}
                                          onChange={(e) => setFormData(prev => ({...prev, installmentsCount: Number(e.target.value)}))}
-                                         className="w-32 px-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-lg outline-none text-sm dark:text-white"
+                                         className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
                                      >
                                          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                                              <option key={num} value={num}>{num}x</option>
@@ -439,7 +439,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                          type="date"
                                          value={firstInstallmentDate}
                                          onChange={(e) => setFirstInstallmentDate(e.target.value)}
-                                         className="w-full px-3 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                         className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                      />
                                  </div>
                                  <button
@@ -457,11 +457,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                          </div>
                      )}
 
-                     <div className="md:col-span-2 bg-slate-50 dark:bg-bordeaux-900/40/50 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/15 mt-2">
+                     <div className="md:col-span-2 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 mt-2">
                         <div className="flex justify-between items-end mb-4">
                             <div>
                                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">Registro de Pagamentos</h4>
-                                <div className="mt-2 w-full bg-slate-200 dark:bg-bordeaux-900/60 rounded-full h-2.5 w-64">
+                                <div className="mt-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 w-64">
                                     <div className="bg-green-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(progress, 100)}%` }}></div>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -474,11 +474,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                         <div className="flex gap-2 mb-4 items-end">
                             <div className="flex-1">
                                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Valor</label>
-                                <input type="number" value={newPaymentAmount} onChange={e => setNewPaymentAmount(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-bordeaux-950/60 border border-slate-300 dark:border-slate-600 rounded-lg text-sm" placeholder="R$ 0,00" />
+                                <input type="number" value={newPaymentAmount} onChange={e => setNewPaymentAmount(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm" placeholder="R$ 0,00" />
                             </div>
                             <div className="flex-1">
                                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Data Vencimento</label>
-                                <input type="date" value={newPaymentDueDate} onChange={e => setNewPaymentDueDate(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-bordeaux-950/60 border border-slate-300 dark:border-slate-600 rounded-lg text-sm" />
+                                <input type="date" value={newPaymentDueDate} onChange={e => setNewPaymentDueDate(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm" />
                             </div>
                             <button type="button" onClick={handleAddPayment} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition">
                                 <PlusIcon className="h-5 w-5" />
@@ -488,7 +488,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                         <div className="space-y-2 max-h-40 overflow-y-auto">
                             {formData.payments && formData.payments.length > 0 ? (
                                 formData.payments.map((p, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-bordeaux-950/60 p-2.5 rounded-lg border border-slate-200 dark:border-gold-500/15 text-sm">
+                                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">
                                         <div className="flex items-center gap-3">
                                             <div className={`p-1.5 rounded ${p.isPaid ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'}`}>
                                                 <BanknotesIcon className="h-4 w-4" />
@@ -535,8 +535,8 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                         </div>
                      </div>
 
-                     <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-gold-500/20">
-                        <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 rounded-xl transition">Cancelar</button>
+                     <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 rounded-xl transition">Cancelar</button>
                         {formData.clientId && (clients || []).find(c => c.id === formData.clientId)?.whatsapp && (
                             <button
                                 type="button"

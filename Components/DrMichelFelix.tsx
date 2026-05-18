@@ -1169,7 +1169,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   );
 
   return (
-    <div className="flex h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] w-full bg-white dark:bg-bordeaux-950/60 rounded-lg md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-gold-500/20">
+    <div className="flex h-[calc(100dvh-110px)] md:h-[calc(100vh-120px)] w-full bg-white dark:bg-slate-900 rounded-lg md:rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <EliteRedactionModal 
         isOpen={showEliteModal} 
         onClose={() => setShowEliteModal(false)}
@@ -1184,12 +1184,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       />
       
       {/* SIDEBAR: HISTÓRICO */}
-      <aside className={`${isSidebarOpen ? 'w-full md:w-80' : 'w-0'} absolute md:relative z-20 h-full overflow-hidden shrink-0 transition-all duration-300 border-r border-slate-200 dark:border-gold-500/20 flex flex-col bg-slate-50 dark:bg-bordeaux-950/60/50`}>
-        <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between">
+      <aside className={`${isSidebarOpen ? 'w-full md:w-80' : 'w-0'} absolute md:relative z-20 h-full overflow-hidden shrink-0 transition-all duration-300 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900/50`}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <History className="w-4 h-4" /> Histórico
           </h3>
-          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 hover:bg-slate-200 dark:hover:bg-bordeaux-900/50 rounded">
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded">
             <ChevronLeft className="w-4 h-4" />
           </button>
         </div>
@@ -1200,7 +1200,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               createNewSession();
               if (window.innerWidth < 768) setIsSidebarOpen(false);
             }}
-            className="w-full fc-btn-primary text-cream-50 font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full bg-primary-700 hover:bg-primary-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-900/30 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" /> Nova Conversa
           </button>
@@ -1212,7 +1212,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               placeholder="Buscar conversas..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
             />
           </div>
 
@@ -1224,7 +1224,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   setCurrentSessionId(session.id);
                   if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
-                className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-bordeaux-900/40 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-bordeaux-900/50/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
+                className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-slate-800 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
               >
                 {editingSessionId === session.id ? (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1237,7 +1237,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                         if (e.key === 'Escape') cancelEditing(e as any);
                       }}
                       autoFocus
-                      className="flex-1 min-w-0 bg-white dark:bg-bordeaux-950/60 border border-emerald-500 rounded px-2 py-1 text-sm outline-none"
+                      className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-emerald-500 rounded px-2 py-1 text-sm outline-none"
                     />
                     <button onClick={(e) => saveTitle(session.id, e)} className="text-emerald-600 hover:text-emerald-700">
                       <Check className="w-4 h-4" />
@@ -1277,11 +1277,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       </aside>
 
       {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0">
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-slate-950 min-w-0">
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
-            className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-bordeaux-900/40 shadow-md rounded-full border border-slate-200 dark:border-gold-500/15 hover:scale-110 transition-transform"
+            className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-slate-800 shadow-md rounded-full border border-slate-200 dark:border-slate-700 hover:scale-110 transition-transform"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -1300,7 +1300,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
                   <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <FileText className="w-6 h-6 text-primary-700" />
                   </div>
@@ -1314,7 +1314,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   </button>
                 </div>
 
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
                   <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Briefcase className="w-6 h-6 text-purple-600" />
                   </div>
@@ -1328,7 +1328,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   </button>
                 </div>
 
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
                   <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Search className="w-6 h-6 text-orange-600" />
                   </div>
@@ -1344,9 +1344,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               </div>
 
               <div className="flex items-center gap-4 py-4">
-                <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
+                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ou gerencie manualmente abaixo</span>
-                <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
+                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
               </div>
             </div>
           ) : (
@@ -1355,7 +1355,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
                   {msg.role === 'user' ? (
                     // BUBBLE DO USUÁRIO — estilo Claude (cinza claro à direita, compacto)
-                    <div className="max-w-[85%] bg-slate-100 dark:bg-bordeaux-900/40 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
+                    <div className="max-w-[85%] bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
                       <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
                         {(msg.content || '').length > 3000
                           ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
@@ -1398,7 +1398,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => copyToClipboard(msg.content || '', msg.id)}
-                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-md transition-colors"
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
                             title="Copiar"
                           >
                             {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
@@ -1408,17 +1408,17 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                             (msg.content || '').length > 1000
                           ) && (
                             <>
-                              <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900/60 mx-1"></div>
+                              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                               <button
                                 onClick={() => generateDocx(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
                                 title="Baixar Word"
                               >
                                 <Download className="w-3.5 h-3.5" /> Word
                               </button>
                               <button
                                 onClick={() => handleOpenInEditor(msg.content || '')}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-md text-xs font-semibold transition-colors shadow-sm"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary-700 hover:bg-primary-800 text-white rounded-md text-xs font-semibold transition-colors shadow-sm"
                                 title="Editor"
                               >
                                 <Edit2 className="w-3.5 h-3.5" /> Editor
@@ -1444,7 +1444,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
                     {!streamingMessage && progress < 100 && (
                       <div className="space-y-1.5 pt-1">
-                        <div className="w-full bg-slate-100 dark:bg-bordeaux-900/40 rounded-full h-1.5 overflow-hidden">
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                           <div className="bg-gradient-to-r from-primary-600 to-primary-700 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
                         </div>
                         <div className="flex justify-between text-[11px] text-slate-500">
@@ -1473,7 +1473,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         </div>
 
         {/* INPUT AREA */}
-        <div className="p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
+        <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <div className="max-w-4xl mx-auto relative">
 
             {/* Badge de Tier de Petição Ativo */}
@@ -1521,7 +1521,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               </div>
             )}
 
-            <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 
                 id="chat-input-michel"
                 rows={1}
@@ -1534,7 +1534,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <input 
                     type="file" 
@@ -1559,7 +1559,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   >
                     <Users className="w-5 h-5" />
                   </button>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
                     value={petitionLength}
                     onChange={(e) => {
@@ -1579,7 +1579,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     <option value="Máximo 5000 palavras">Máximo 5.000 palavras</option>
                     <option value="Premium 7000 palavras">Premium 7.000 palavras (Somente OpenRouter)</option>
                   </select>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
                   <select
                     value={selectedModel}
                     onChange={(e) => {
@@ -1626,12 +1626,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       {/* Client Import Modal */}
       {isClientModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex justify-between items-center">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
               <h3 className="text-lg font-bold text-slate-800 dark:text-white">Importar Cliente (GED)</h3>
               <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-slate-600"><XMark className="w-6 h-6" /></button>
             </div>
-            <div className="p-4 border-b border-slate-200 dark:border-gold-500/20">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input 
@@ -1639,7 +1639,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                   placeholder="Buscar por nome ou CPF..." 
                   value={clientSearchTerm}
                   onChange={(e) => setClientSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 />
               </div>
             </div>
@@ -1652,7 +1652,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     <button 
                       key={client.id}
                       onClick={() => handleImportClient(client)}
-                      className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex justify-between items-center"
+                      className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all flex justify-between items-center"
                     >
                       <div>
                         <p className="font-bold text-slate-800 dark:text-white">{client.name}</p>

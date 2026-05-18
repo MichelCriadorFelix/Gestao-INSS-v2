@@ -56,6 +56,7 @@ export interface ClientRecord {
   
   // Campos do Representante Legal
   legalRepresentative?: string; // Nome
+  legalRepresentativeGender?: string;
   legalRepresentativeCpf?: string;
   legalRepresentativeMaritalStatus?: string;
   legalRepresentativeProfession?: string;

@@ -76,8 +76,8 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-gold-500/20 flex flex-col max-h-[85vh]">
-        <div className="flex justify-between items-center p-5 border-b border-slate-200 dark:border-gold-500/20">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-800 flex flex-col max-h-[85vh]">
+        <div className="flex justify-between items-center p-5 border-b border-slate-200 dark:border-slate-800">
           <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
             <CalendarIcon className="h-6 w-6 text-primary-600" />
             Próximos Compromissos
@@ -102,7 +102,7 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
                     className={`p-4 rounded-xl border transition-all ${
                       isOverdue 
                         ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30 shadow-sm shadow-red-100 dark:shadow-none' 
-                        : 'bg-slate-50 dark:bg-bordeaux-900/40 border-slate-100 dark:border-gold-500/15'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -126,7 +126,7 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
                       {event.description}
                     </p>
 
-                    <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-gold-500/15/50">
+                    <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-700/50">
                       <button
                         onClick={() => handleResolve(event, 'resolved')}
                         className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
@@ -147,7 +147,7 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
                       {onEditEvent && (
                         <button
                           onClick={() => onEditEvent(event)}
-                          className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-bordeaux-900/40 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition-colors"
+                          className="flex-1 py-2 text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                         >
                           Editar
                         </button>
@@ -161,11 +161,11 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
         </div>
 
         {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 dark:border-gold-500/20 flex justify-between items-center bg-slate-50/50 dark:bg-bordeaux-900/40/50 rounded-b-2xl">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 rounded-b-2xl">
             <button 
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 disabled:opacity-50 transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
@@ -173,7 +173,7 @@ const AgendaModal: React.FC<AgendaModalProps> = ({ isOpen, onClose, events, user
             <button 
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 disabled:opacity-50 transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
             >
               <ChevronRightIcon className="h-5 w-5" />
             </button>

@@ -123,10 +123,10 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col border border-slate-200 dark:border-gold-500/20 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in duration-200">
                 
                 {/* Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-gold-500/20 flex justify-between items-center bg-slate-50 dark:bg-bordeaux-950">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                             <FolderOpenIcon className="h-5 w-5 text-indigo-500" />
@@ -136,21 +136,21 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
                             Gerencie seus cálculos previdenciários salvos localmente.
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-full hover:bg-slate-200 dark:hover:bg-bordeaux-900/50">
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800">
                         <XCircleIcon className="h-6 w-6" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50 dark:bg-bordeaux-950/60/50">
+                <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50 dark:bg-slate-900/50">
                     {calculations.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 italic border-2 border-dashed border-slate-200 dark:border-gold-500/15 rounded-xl bg-slate-50 dark:bg-bordeaux-900/40/50">
+                        <div className="text-center py-12 text-slate-500 italic border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                             <p>Nenhum cálculo salvo encontrado.</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
                             {calculations.map((calc) => (
-                                <div key={calc.id} className="bg-white dark:bg-bordeaux-900/40 p-4 rounded-xl border border-slate-200 dark:border-gold-500/15 shadow-sm hover:shadow-md transition flex justify-between items-center group">
+                                <div key={calc.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex justify-between items-center group">
                                     <div className="flex-1 mr-4">
                                         {editingId === calc.id ? (
                                             <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
                                                     type="text" 
                                                     value={editName}
                                                     onChange={(e) => setEditName(e.target.value)}
-                                                    className="w-full bg-slate-50 dark:bg-bordeaux-950/60 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
+                                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
                                                     autoFocus
                                                 />
                                                 <button onClick={() => saveEditing(calc.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
@@ -215,8 +215,8 @@ const SavedCalculationsModal: React.FC<SavedCalculationsModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-950 flex justify-end">
-                    <button onClick={onClose} className="px-5 py-2 bg-slate-200 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 transition">
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex justify-end">
+                    <button onClick={onClose} className="px-5 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-700 transition">
                         Fechar
                     </button>
                 </div>
