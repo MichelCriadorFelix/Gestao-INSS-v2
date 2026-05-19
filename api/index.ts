@@ -815,6 +815,15 @@ function extractStructuralSummary(petitionText: string): string {
 }
 
 // AI Service Logic Integrated
+
+const SEC_FABRICIA_PROMPT = `Você é a Sec. Fabrícia Felix, a secretária jurídica sênior e chefe de atendimento do escritório Felix & Castro Advocacia Especializada.
+Sua função é ESSENCIALMENTE administrativa e de atendimento ao cliente, você NÃO redige petições jurídicas e NÃO gera teses ou relatórios complexos. Se te pedirem para fazer peças jurídicas (ex: GERAR PEÇA), informe educadamente que essa função é dos doutores Michel ou Luana.
+Você tem as seguintes responsabilidades:
+1. Analisar documentos anexados pelos clientes ou advogados para extrair um resumo prático (andamentos processuais, dados de qualificação, periciais, etc).
+2. Escrever mensagens cordiais, extremamente educadas e claras destinadas a clientes via WhatsApp. Suas mensagens para clientes devem ser formatadas com espaçamento legível, usando emojis com moderação, e NUNCA devem incluir jargões jurídicos confusos sem explicar o significado em parênteses.
+3. Organizar os dados cadastrais.
+4. Responder a dúvidas simples de clientes e repassar casos complexos.`;
+
 const ELITE_REDACTION_MANUAL = `
 [MANUAL DE REDAÇÃO JURÍDICA DE ELITE — PADRÃO OURO]
 
@@ -4272,6 +4281,367 @@ app.use((err: any, req: any, res: any, next: any) => {
   });
 });
 
+app.post("/api/sec-fabricia/chat", async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
+  
+  try {
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    message = message || "";
+
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    if (petitionLength && /premium|7000/i.test(petitionLength)) {
+modelProvider = 'openrouter';
+model = 'deepseek/deepseek-v3.2';
+console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+    }
+    const intent = await detectUserIntent(message);
+    const isGenerationIntent = intent === "[GERAÇÃO]";
+    const isCasualIntent = intent === "[CASUAL]";
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+
+    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
+    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
+
+    
+    let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
+    let temperature = 0.3; // A bit more creative for writing Whatsapp messages
+
+    // ====== COMPRESSÃO INTELIGENTE DE INPUT ======
+    const inputBudget = getInputBudget(modelProvider, model);
+    const reservedTokens = 15_000;
+    const availableForContext = inputBudget - reservedTokens;
+    const maxDocCtxChars = Math.floor(availableForContext * 0.80 * 3.5);
+
+    if (documentContext) {
+      const originalDocSize = documentContext.length;
+      const compressed = smartTruncate(documentContext, maxDocCtxChars);
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO/DOCUMENTOS ANEXADOS]\n${compressed}`;
+    }
+
+    // Janela de histórico
+    if (history.length > 8) history = history.slice(-8);
+
+    const REINFORCEMENT_PROMPT = `
+    [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
+    Lembre-se que você é a secretária, não a advogada. 
+    Se você estiver preparando uma mensagem para o cliente (WhatsApp), utilize linguagem acolhedora, humana e clara, sem termos difíceis.
+    Se estiver fazendo um resumo para os Doutores, seja objetiva e estruturada.
+    Nunca redija relatórios jurídicos extensos com citações a leis ou pedidos de deferimento.`;
+
+    const historyParts = history.map((h: any) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
+
+    let isCorrectionRequest = false;
+    let correctionInstruction = "";
+    let lengthConstraint = "";
+
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
+    if (ragContext) {
+finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
+ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
+Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
+NUNCA afirme algo que contradiga o texto abaixo.
+ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO, você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
+Leis/jurisprudências recuperadas:
+${ragContext}`;
+    }
+
+    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
+let draftContent = "";
+try {
+  const { data: draftData } = await supabaseAdmin
+    .from('ai_conversations')
+    .select('messages')
+    .eq('lawyer_type', 'petition_draft')
+    .eq('id', `draft_dr_michel_${sessionId}`)
+    .maybeSingle();
+
+  if (draftData && draftData.messages && draftData.messages.length > 0) {
+    draftContent = draftData.messages[0].content || "";
+  }
+} catch (e) {
+  console.error("Supabase petition_draft fetch error:", e);
+}
+
+const revisionIntent = detectRevisionIntent(message, !!draftContent);
+console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
+
+if (draftContent) {
+  if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+    // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
+    const draftEnxuto = draftContent.substring(0, 15000);
+    finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
+A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
+Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
+Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+  } else if (revisionIntent === 'ADDITION') {
+    // Adição — devolve só o trecho novo.
+    const draftEnxuto = draftContent.substring(0, 15000);
+    finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
+A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
+Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
+Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+
+[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+[FIM DA REFERÊNCIA]`;
+  } else {
+    // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
+    const sumarioEstrutural = extractStructuralSummary(draftContent);
+    finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
+O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
+Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+
+[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
+${sumarioEstrutural}
+[FIM DO SUMÁRIO]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+  }
+}
+    }
+
+    const currentMessageParts: any[] = [{ text: finalMessage }];
+    if (images && Array.isArray(images)) {
+images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
+    }
+    if (files && Array.isArray(files)) {
+files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
+    }
+
+    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
+    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
+
+    if (modelProvider === 'openrouter') {
+clearInterval(heartbeat);
+const orSystemPrompt = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
+Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
+REGRAS ABSOLUTAS E INEGOCIÁVEIS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
+2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
+3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
+4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
+5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
+
+const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+for (const h of history) {
+  const role = h.role === 'model' ? 'assistant' : h.role;
+  orMessages.push({ role, content: h.content });
+}
+orMessages.push({ role: "user", content: finalMessage });
+await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
+return;
+    }
+
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
+(message || "").includes("GERAR RELATORIO");
+
+    let maxOutputTokens = 2048;
+    let thinkingConfig: any = { thinkingBudget: 4096 };
+
+    if (isGenerationRequest) {
+maxOutputTokens = 30000;
+thinkingConfig = { thinkingBudget: 24576 };
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+maxOutputTokens = 8192;
+thinkingConfig = { thinkingBudget: 16000 };
+    }
+
+    if (modelProvider === 'openrouter') {
+maxOutputTokens = 16383;
+thinkingConfig = undefined;
+    }
+
+    // Temperature calibrada por intenção:
+    // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
+    // - Dúvida: 0.1 (máxima precisão, resposta determinística)
+    // - Peça/outros: temperature já definida (0.2)
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
+
+    try {
+let isFinished = false;
+let attempt = 0;
+let fullResponseText = "";
+let currentContents = [...contents];
+let finalMaxTokensHit = false;
+const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
+const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
+
+// Telemetria de input — diagnóstico de orçamento de tokens
+const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+if (totalInputTokens > 90_000) {
+  console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
+}
+
+while (!isFinished && attempt < MAX_ATTEMPTS) {
+  attempt++;
+  const responseStream = await callGeminiStream({
+    model: model || "gemini-3-flash-preview",
+    contents: currentContents,
+    config: {
+      systemInstruction: selectedSystemPrompt,
+      temperature: finalTemperature,
+      maxOutputTokens,
+      ...(thinkingConfig && { thinkingConfig }),
+      tools
+    } as any
+  }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+  let maxTokensHit = false;
+  let attemptText = "";
+  for await (const chunk of responseStream) {
+    let text = "";
+    try { text = chunk.text || ""; } catch(e) {}
+
+    if (chunk.candidates && chunk.candidates.length > 0) {
+      const candidate = chunk.candidates[0];
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        maxTokensHit = true;
+      }
+    }
+
+    if (text) {
+      attemptText += text;
+      fullResponseText += text;
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
+  }
+
+  // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
+  if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+    console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
+    isFinished = true;
+    break;
+  }
+
+  // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+  if (isPetitionComplete(fullResponseText)) {
+    const wc = countWords(fullResponseText);
+    console.log(`[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
+    isFinished = true;
+    break;
+  }
+
+  const currentWordCount = countWords(fullResponseText);
+  const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+
+  // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
+  if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+    console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
+    const anchor = fullResponseText.slice(-600);
+    currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+    currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+  } else {
+    if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
+      finalMaxTokensHit = true;
+    }
+    isFinished = true;
+  }
+}
+
+const finalWordCount = countWords(fullResponseText);
+console.log(`[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
+
+clearInterval(heartbeat);
+if (finalMaxTokensHit) {
+  res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
+}
+
+// Salva a peça gerada como draft se for longa o suficiente
+if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+  try {
+    await supabaseAdmin.from('ai_conversations').upsert({
+      id: `draft_dr_michel_${sessionId}`,
+      lawyer_type: 'petition_draft',
+      title: 'DrMichel',
+      date: new Date().toISOString(),
+      messages: [{ role: 'assistant', content: fullResponseText }]
+    });
+  } catch (e) {
+    console.error("Erro salvando petition_draft (DrMichel):", e);
+  }
+}
+
+res.write(`data: [DONE]\n\n`);
+res.end();
+    } catch (err: any) {
+clearInterval(heartbeat);
+res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+res.end();
+    }
+  } catch (err: any) {
+    clearInterval(heartbeat);
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.end();
+  }
+});
+
+
+app.post("/api/sec-fabricia/generate-docx", async (req, res) => {
+  try {
+    const { content } = req.body;
+    
+    const lines = content.split('\n');
+    const paragraphs = lines.map((line: string) => {
+const isBold = line.startsWith('**') && line.endsWith('**');
+const text = line.replace(/\*\*/g, '');
+
+return new Paragraph({
+  alignment: AlignmentType.JUSTIFIED,
+  spacing: { line: 360 },
+  children: [
+    new TextRun({
+      text: text,
+      size: 24,
+      font: "Times New Roman",
+      bold: isBold
+    }),
+  ],
+});
+    });
+
+    const doc = new Document({
+sections: [{
+  properties: {
+    page: {
+      margin: {
+        top: 1701,
+        left: 1701,
+        bottom: 1134,
+        right: 1134,
+      },
+    },
+  },
+  children: paragraphs,
+}],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename=peticao.docx');
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error generating DOCX:", error);
+    res.status(500).json({ error: "Falha ao gerar documento Word" });
+  }
+});
+
 // Manipulador 404 para rotas /api que não foram encontradas
 app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
@@ -4288,477 +4658,6 @@ if (process.env.NODE_ENV !== "production") {
       appType: "spa",
     }).then((vite) => {
       app.use(vite.middlewares);
-      app.post("/api/sec-fabricia/chat", async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
-  
-  try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
-    message = message || "";
-
-    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
-    if (petitionLength && /premium|7000/i.test(petitionLength)) {
-      modelProvider = 'openrouter';
-      model = 'deepseek/deepseek-v3.2';
-      console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
-    }
-    const intent = await detectUserIntent(message);
-    const isGenerationIntent = intent === "[GERAÇÃO]";
-    const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
-
-    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
-
-    let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
-    let temperature = 0.2;
-
-    if (isStorageRequest && !isGenerationRequest) {
-      selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
-      temperature = 0.1;
-    } else if (isCasualIntent) {
-      selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
-      selectedSystemPrompt = DR_MICHEL_DUVIDA_PROMPT + getCurrentDateContext();
-    }
-
-    if (isGenerationRequest) {
-      selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
-    }
-
-    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
-      selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
-    }
-
-    // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
-    // Calcula orçamento de input por provedor (Gemini: 100k | OpenRouter: 120k tokens)
-    const inputBudget = getInputBudget(modelProvider, model);
-    // Reserva: system prompt base (~10k) + ELITE_REDACTION (~3k) + history (~5k) + draft (~5k) + nova msg (~2k)
-    const reservedTokens = 25_000;
-    const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
-    // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
-    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
-
-    if (documentContext) {
-      const originalDocSize = documentContext.length;
-      const compressed = smartTruncate(documentContext, maxDocCtxChars);
-      if (compressed.length < originalDocSize) {
-        console.log(`[Dr.Michel] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
-      }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
-    }
-
-    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
-      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
-      const originalLawsSize = lawsContext.length;
-      lawsContext = smartTruncate(lawsContext, maxLawsChars);
-      if (lawsContext.length < originalLawsSize) {
-        console.log(`[Dr.Michel] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
-      }
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
-REGRAS DE USO:
-1. Priorize COMPLETAMENTE esta legislação adicional para fundamentação.
-2. Citações diretas devem ser IDÊNTICAS ao texto fornecido e em BLOCKQUOTE (caractere '>'). PROIBIDO parafrasear.
-3. PROIBIDO inventar citações fora do texto enviado.
-4. A legislação dinâmica do Supabase virá na tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário — ambas as fontes são VÁLIDAS.
-
-CONTEÚDO:
-${lawsContext}`;
-    } else {
-      selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO]\n
-A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] na mensagem do usuário (Supabase). Use-a como fonte única de verdade para transcrições em blockquote.
-
-REGRAS DE OURO:
-1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
-2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
-3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ, Tema 905/STJ etc.) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
-    }
-
-    // Janela de histórico calibrada por intenção:
-    // - GERAÇÃO: até 6 turnos (já comprimidos pelo frontend) — contexto suficiente
-    // - DÚVIDA: até 10 turnos
-    // - CASUAL/outros: até 6 turnos
-    if (isGenerationRequest) {
-      if (history.length > 6) history = history.slice(-6);
-    } else if (intent === "[DÚVIDA]") {
-      if (history.length > 10) history = history.slice(-10);
-    } else {
-      if (history.length > 6) history = history.slice(-6);
-    }
-
-    // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
-    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
-    ` : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
-    **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
-    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
-    Sua redação deve ser densa, citando provas específicas.
-    `;
-    const historyParts = history.map((h: any) => ({
-      role: h.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: h.content }]
-    }));
-
-    // ============================================================
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
-    // ============================================================
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
-4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
-5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
-6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
-`;
-      console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
-    }
-
-    let lengthConstraint = "";
-    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
-      const target = parsePetitionTarget(petitionLength);
-      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
-
-REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
-1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
-2. DISTRIBUIÇÃO E DENSIDADE:
-   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
-   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
-   • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-   • DO ROL DE DOCUMENTOS: VOCÊ DEVE criar uma lista exaustiva, numerada (1., 2., 3...). NUNCA agrupe documentos em uma mesma linha. SE O USUÁRIO FORNECEU um OCR com "Doc. 1", "Doc. 2", você DEVE listar EXATAMENTE um documento por linha com o NOME EXATO do arquivo indicado no OCR (ex: "1. Doc. 1 - Laudo Médico"). É estritamente OBRIGATÓRIO ter 1 (um) documento individual por linha separadamente.
-3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
-4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
-5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
-    }
-
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
-    if (ragContext) {
-      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
-ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
-Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
-NUNCA afirme algo que contradiga o texto abaixo.
-ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO, você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
-Leis/jurisprudências recuperadas:
-${ragContext}`;
-    }
-
-    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
-      let draftContent = "";
-      try {
-        const { data: draftData } = await supabaseAdmin
-          .from('ai_conversations')
-          .select('messages')
-          .eq('lawyer_type', 'petition_draft')
-          .eq('id', `draft_dr_michel_${sessionId}`)
-          .maybeSingle();
-
-        if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content || "";
-        }
-      } catch (e) {
-        console.error("Supabase petition_draft fetch error:", e);
-      }
-
-      const revisionIntent = detectRevisionIntent(message, !!draftContent);
-      console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
-
-      if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
-          // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-          const draftEnxuto = draftContent.substring(0, 15000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
-A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
-Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
-Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
-
-[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-        } else if (revisionIntent === 'ADDITION') {
-          // Adição — devolve só o trecho novo.
-          const draftEnxuto = draftContent.substring(0, 15000);
-          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
-A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
-Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
-Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
-
-[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-        } else {
-          // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          const sumarioEstrutural = extractStructuralSummary(draftContent);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
-O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
-Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
-
-[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
-${sumarioEstrutural}
-[FIM DO SUMÁRIO]
-
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
-${message}`;
-        }
-      }
-    }
-
-    const currentMessageParts: any[] = [{ text: finalMessage }];
-    if (images && Array.isArray(images)) {
-      images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
-    }
-    if (files && Array.isArray(files)) {
-      files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
-    }
-
-    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
-
-    if (modelProvider === 'openrouter') {
-      clearInterval(heartbeat);
-      const orSystemPrompt = selectedSystemPrompt + `
-
-[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
-Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
-REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
-2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
-3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
-4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
-5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
-7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
-
-      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-      for (const h of history) {
-        const role = h.role === 'model' ? 'assistant' : h.role;
-        orMessages.push({ role, content: h.content });
-      }
-      orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
-      return;
-    }
-
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
-
-    let maxOutputTokens = 2048;
-    let thinkingConfig: any = { thinkingBudget: 4096 };
-
-    if (isGenerationRequest) {
-      maxOutputTokens = 30000;
-      thinkingConfig = { thinkingBudget: 24576 };
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 16000 };
-    }
-
-    if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined;
-    }
-
-    // Temperature calibrada por intenção:
-    // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
-    // - Dúvida: 0.1 (máxima precisão, resposta determinística)
-    // - Peça/outros: temperature já definida (0.2)
-    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
-
-    try {
-      let isFinished = false;
-      let attempt = 0;
-      let fullResponseText = "";
-      let currentContents = [...contents];
-      let finalMaxTokensHit = false;
-      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
-      const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
-
-      // Telemetria de input — diagnóstico de orçamento de tokens
-      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-      if (totalInputTokens > 90_000) {
-        console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
-      }
-
-      while (!isFinished && attempt < MAX_ATTEMPTS) {
-        attempt++;
-        const responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
-          contents: currentContents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: finalTemperature,
-            maxOutputTokens,
-            ...(thinkingConfig && { thinkingConfig }),
-            tools
-          } as any
-        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-
-        let maxTokensHit = false;
-        let attemptText = "";
-        for await (const chunk of responseStream) {
-          let text = "";
-          try { text = chunk.text || ""; } catch(e) {}
-
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason === 'MAX_TOKENS') {
-              maxTokensHit = true;
-            }
-          }
-
-          if (text) {
-            attemptText += text;
-            fullResponseText += text;
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
-          }
-        }
-
-        // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
-        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
-          console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
-          isFinished = true;
-          break;
-        }
-
-        // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
-        if (isPetitionComplete(fullResponseText)) {
-          const wc = countWords(fullResponseText);
-          console.log(`[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
-          isFinished = true;
-          break;
-        }
-
-        const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
-
-        // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
-          console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
-          const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
-        } else {
-          if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
-            finalMaxTokensHit = true;
-          }
-          isFinished = true;
-        }
-      }
-
-      const finalWordCount = countWords(fullResponseText);
-      console.log(`[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
-
-      clearInterval(heartbeat);
-      if (finalMaxTokensHit) {
-        res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
-      }
-      
-      // Salva a peça gerada como draft se for longa o suficiente
-      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
-        try {
-          await supabaseAdmin.from('ai_conversations').upsert({
-            id: `draft_dr_michel_${sessionId}`,
-            lawyer_type: 'petition_draft',
-            title: 'DrMichel',
-            date: new Date().toISOString(),
-            messages: [{ role: 'assistant', content: fullResponseText }]
-          });
-        } catch (e) {
-          console.error("Erro salvando petition_draft (DrMichel):", e);
-        }
-      }
-
-      res.write(`data: [DONE]\n\n`);
-      res.end();
-    } catch (err: any) {
-      clearInterval(heartbeat);
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-      res.end();
-    }
-  } catch (err: any) {
-    clearInterval(heartbeat);
-    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-    res.end();
-  }
-});
-
-
-app.post("/api/sec-fabricia/generate-docx", async (req, res) => {
-  try {
-    const { content } = req.body;
-    
-    const lines = content.split('\n');
-    const paragraphs = lines.map((line: string) => {
-      const isBold = line.startsWith('**') && line.endsWith('**');
-      const text = line.replace(/\*\*/g, '');
-      
-      return new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { line: 360 },
-        children: [
-          new TextRun({
-            text: text,
-            size: 24,
-            font: "Times New Roman",
-            bold: isBold
-          }),
-        ],
-      });
-    });
-
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            margin: {
-              top: 1701,
-              left: 1701,
-              bottom: 1134,
-              right: 1134,
-            },
-          },
-        },
-        children: paragraphs,
-      }],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', 'attachment; filename=peticao.docx');
-    res.send(buffer);
-  } catch (error: any) {
-    console.error("Error generating DOCX:", error);
-    res.status(500).json({ error: "Falha ao gerar documento Word" });
-  }
-});
-
 
 app.listen(PORT, "0.0.0.0", () => {
         console.log(`Development server running on http://localhost:${PORT}`);

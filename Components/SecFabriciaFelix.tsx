@@ -970,7 +970,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `✅ **Auditoria concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e mapeei os dados jurídicos essenciais de cada documento. Estou pronto para **GERAR RELATÓRIO** ou **GERAR PEÇA** com base nas informações consolidadas. Como deseja prosseguir?`,
+        content: `✅ **Análise e indexação concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e estruturei os dados e andamentos. Posso te ajudar a **elaborar a mensagem do WhatsApp** para enviar ao cliente ou responder dúvidas sobre os documentos para atualizar o sistema interno. Como deseja prosseguir?`,
         timestamp: new Date().toISOString()
       };
       
@@ -1103,11 +1103,24 @@ CPF: ${fullClient.cpf}
 Nacionalidade: ${fullClient.nationality || 'Não informada'}
 Estado Civil: ${fullClient.maritalStatus || 'Não informado'}
 Profissão: ${fullClient.profession || 'Não informada'}
+E-mail/Endereço: ${fullClient.address || 'Não informado'}
+Telefone/WhatsApp: ${fullClient.whatsapp || 'Não informado'}
 DER: ${fullClient.der || 'Não informada'}
 Data da Perícia: ${fullClient.medExpertiseDate || 'Não informada'}
-Certidões Narratórias Anexadas: ${hasCertidao ? 'SIM' : 'NÃO'}
+Certidões Narratórias Anexadas: ${hasCertidao ? 'SIM' : 'NÃO'}`;
 
-Por favor, faça um pequeno resumo dessas informações do cliente e pergunte como pode ajudar. ${!hasCertidao ? 'Lembre a secretária de anexar a Certidão Narratória no cadastro do cliente caso deseje extrair o andamento processual para informar ao cliente via WhatsApp.' : ''}`;
+      if (fullClient.legalRepresentative) {
+        informativeText += `\n\n[SISTEMA: DADOS DO REPRESENTANTE LEGAL]
+Nome do Representante: ${fullClient.legalRepresentative}
+Gênero do Representante: ${fullClient.legalRepresentativeGender || 'Não informado'}
+Nacionalidade do Representante: ${fullClient.legalRepresentativeNationality || 'Não informada'}
+Estado Civil do Representante: ${fullClient.legalRepresentativeMaritalStatus || 'Não informado'}
+Profissão do Representante: ${fullClient.legalRepresentativeProfession || 'Não informada'}
+CPF do Representante: ${fullClient.legalRepresentativeCpf || 'Não informado'}
+Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não informado'}`;
+      }
+
+      informativeText += `\n\nPor favor, como você é a secretária, recepcione essas informações do novo cliente, faça um resumo amigável e pergunte como pode ajudar o doutor ou a equipe, seja elaborando mensagens de andamento processual, organizando dados ou revisando atas. ${!hasCertidao ? 'Lembre a equipe de anexar a Certidão Narratória no cadastro do cliente caso deseje extrair o andamento processual para informar ao cliente via WhatsApp.' : ''}`;
 
       const readingMsg: Message = {
         id: generateId(),
@@ -1401,7 +1414,7 @@ Por favor, faça um pequeno resumo dessas informações do cliente e pergunte co
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Sec. Fabrícia Felix</span>
-                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
+                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">Secretaria</span>
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
                             {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
