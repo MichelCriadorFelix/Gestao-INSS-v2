@@ -1508,24 +1508,6 @@ export default function Dashboard({
                </button>
 
                <button 
-                   onClick={() => handleViewChange('dr_felix_castro')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_felix_castro' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
-               >
-                   {currentView === 'dr_felix_castro' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Dr. Felix e Castro (IA)</span>
-               </button>
-
-               <button 
-                   onClick={() => handleViewChange('sec_fabricia')}
-                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'sec_fabricia' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
-               >
-                   {currentView === 'sec_fabricia' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
-                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
-                   <span className="font-medium text-sm">Sec. Fabrícia Felix (IA)</span>
-               </button>
-
-               <button 
                    onClick={() => handleViewChange('social_calc')}
                    className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'social_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
@@ -1550,6 +1532,15 @@ export default function Dashboard({
                    {currentView === 'agenda' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
                    <CalendarIcon className="h-5 w-5 mr-3 shrink-0" />
                    <span className="font-medium text-sm">Agenda</span>
+               </button>
+
+               <button 
+                   onClick={() => handleViewChange('dr_felix_castro')}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'dr_felix_castro' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+               >
+                   {currentView === 'dr_felix_castro' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Dr. Felix e Castro (IA)</span>
                </button>
 
                <button 
@@ -1604,6 +1595,15 @@ export default function Dashboard({
                    {currentView === 'marketing' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
                    <SparklesIcon className="h-5 w-5 mr-3 shrink-0" />
                    <span className="font-medium text-sm whitespace-nowrap">Marketing Jurídico</span>
+               </button>
+
+               <button 
+                   onClick={() => handleViewChange('sec_fabricia')}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'sec_fabricia' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+               >
+                   {currentView === 'sec_fabricia' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Sec. Fabrícia Felix (IA)</span>
                </button>
            </div>
            
