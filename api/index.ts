@@ -4307,7 +4307,18 @@ console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via Op
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
 
-    
+    // Fabrícia deve ser BREVE por padrão (1-200 palavras)
+    let maxOutputTokens = 600; 
+    let thinkingConfig: any = { thinkingBudget: 2048 }; 
+
+    if (isGenerationRequest) {
+      maxOutputTokens = 15000;
+      thinkingConfig = { thinkingBudget: 4096 };
+    } else if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 4096;
+      thinkingConfig = { thinkingBudget: 4096 };
+    }
+
     let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
     let temperature = 0.3; // A bit more creative for writing Whatsapp messages
 
@@ -4330,6 +4341,7 @@ console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via Op
     [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
     Lembre-se que você é a secretária, não a advogada. 
     Linguagem: Acolhedora, humana e clara. Use emojis com moderação.
+    LIMITE DE TAMANHO: Sua resposta DEVE ter entre 1 e 200 palavras. Seja concisa e vá direto ao ponto.
     FORMATO: Gere APENAS o conteúdo que será enviado ao cliente ou o dado solicitado.
     PROIBIDO: Nunca adicione seções direcionadas a advogados, meta-comentários ou feedbacks internos (ex: "Doutores...", "Como posso ajudar a equipe?") na sua resposta.`;
 
@@ -4360,7 +4372,7 @@ try {
     .from('ai_conversations')
     .select('messages')
     .eq('lawyer_type', 'petition_draft')
-    .eq('id', `draft_dr_michel_${sessionId}`)
+    .eq('id', `draft_sec_fabricia_${sessionId}`)
     .maybeSingle();
 
   if (draftData && draftData.messages && draftData.messages.length > 0) {
@@ -4371,7 +4383,7 @@ try {
 }
 
 const revisionIntent = detectRevisionIntent(message, !!draftContent);
-console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
+console.log(`[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
 if (draftContent) {
   if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
@@ -4449,24 +4461,7 @@ await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages:
 return;
     }
 
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-(message || "").includes("GERAR RELATORIO");
-
-    let maxOutputTokens = 2048;
-    let thinkingConfig: any = { thinkingBudget: 4096 };
-
-    if (isGenerationRequest) {
-maxOutputTokens = 30000;
-thinkingConfig = { thinkingBudget: 24576 };
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-maxOutputTokens = 8192;
-thinkingConfig = { thinkingBudget: 16000 };
-    }
-
-    if (modelProvider === 'openrouter') {
-maxOutputTokens = 16383;
-thinkingConfig = undefined;
-    }
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -4483,12 +4478,12 @@ let finalMaxTokensHit = false;
 const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
 const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
-// Telemetria de input — diagnóstico de orçamento de tokens
-const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-if (totalInputTokens > 90_000) {
-  console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
-}
+      // Telemetria de input
+      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      if (totalInputTokens > 90_000) {
+        console.warn(`[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`);
+      }
 
 while (!isFinished && attempt < MAX_ATTEMPTS) {
   attempt++;
@@ -4526,15 +4521,15 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
 
   // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
   if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
-    console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
+    console.log(`[Sec.Fabricia] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
     isFinished = true;
     break;
   }
 
-  // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
+  // DETECTOR DE FIM DE PEÇA
   if (isPetitionComplete(fullResponseText)) {
     const wc = countWords(fullResponseText);
-    console.log(`[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
+    console.log(`[Sec.Fabricia] Resposta encerrada naturalmente com ${wc} palavras.`);
     isFinished = true;
     break;
   }
@@ -4542,9 +4537,9 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
   const currentWordCount = countWords(fullResponseText);
   const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-  // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
+  // CONTINUAÇÃO APENAS em MAX_TOKENS
   if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
-    console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
+    console.log(`[Sec.Fabricia] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
     const anchor = fullResponseText.slice(-600);
     currentContents.push({ role: "model", parts: [{ text: attemptText }] });
     currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
@@ -4557,25 +4552,25 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
 }
 
 const finalWordCount = countWords(fullResponseText);
-console.log(`[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
+console.log(`[Sec.Fabricia] ✓ Interação concluída: ${finalWordCount} palavras em ${attempt} ciclo(s).`);
 
 clearInterval(heartbeat);
 if (finalMaxTokensHit) {
   res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
 }
 
-// Salva a peça gerada como draft se for longa o suficiente
-if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+// Salva a resposta gerada como draft se for longa o suficiente
+if (sessionId && fullResponseText.length > 500 && isGenerationRequest) {
   try {
     await supabaseAdmin.from('ai_conversations').upsert({
-      id: `draft_dr_michel_${sessionId}`,
+      id: `draft_sec_fabricia_${sessionId}`,
       lawyer_type: 'petition_draft',
-      title: 'DrMichel',
+      title: 'Fabricia',
       date: new Date().toISOString(),
       messages: [{ role: 'assistant', content: fullResponseText }]
     });
   } catch (e) {
-    console.error("Erro salvando petition_draft (DrMichel):", e);
+    console.error("Erro salvando rascunho de Fabrícia:", e);
   }
 }
 

@@ -107,3 +107,16 @@
     100% { background-position: -200% 0; }
   }
 }
+
+/* Hide Vercel Toolbar and feedback elements */
+#vercel-live-feedback,
+.__vercel-toolbar,
+.vercel-toolbar,
+#vercel-toolbar,
+[data-vercel-toolbar],
+vercel-live-feedback {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
