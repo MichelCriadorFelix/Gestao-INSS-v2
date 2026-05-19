@@ -970,7 +970,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `✅ **Análise e indexação concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e estruturei os dados e andamentos. Posso te ajudar a **elaborar a mensagem do WhatsApp** para enviar ao cliente ou responder dúvidas sobre os documentos para atualizar o sistema interno. Como deseja prosseguir?`,
+        content: `✅ **Análise e indexação concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s). Estou pronta para te ajudar a **elaborar a mensagem do WhatsApp** para o cliente ou detalhar qualquer informação dos documentos. Como deseja prosseguir?`,
         timestamp: new Date().toISOString()
       };
       
@@ -1120,7 +1120,7 @@ CPF do Representante: ${fullClient.legalRepresentativeCpf || 'Não informado'}
 Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não informado'}`;
       }
 
-      informativeText += `\n\nPor favor, como você é a secretária, recepcione essas informações do novo cliente, faça um resumo amigável e pergunte como pode ajudar o doutor ou a equipe, seja elaborando mensagens de andamento processual, organizando dados ou revisando atas. ${!hasCertidao ? 'Lembre a equipe de anexar a Certidão Narratória no cadastro do cliente caso deseje extrair o andamento processual para informar ao cliente via WhatsApp.' : ''}`;
+      informativeText += `\n\nPor favor, como você é a secretária, recepcione essas informações do novo cliente e faça um acolhimento inicial. Seu objetivo é estar pronta para gerar mensagens de atualização via WhatsApp para o cliente de forma clara e humana. ${!hasCertidao ? 'Caso a Certidão Narratória não esteja anexada, informe que isso será necessário para detalhar os andamentos futuramente.' : ''}`;
 
       const readingMsg: Message = {
         id: generateId(),
