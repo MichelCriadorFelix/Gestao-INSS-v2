@@ -88,7 +88,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       maritalStatus: 'Solteiro(a)',
       profession: ''
   });
-  const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions' | 'certidao'>('info');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDocName, setEditDocName] = useState('');
@@ -96,6 +96,80 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const certidaoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCertidaoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      const newDocs: ScannedDocument[] = [];
+      const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
+      const clientId = formData.id || 'temp';
+
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          // Accept pdf or text
+          if (file.type !== 'application/pdf' && file.type !== 'text/plain') continue;
+
+          const id = Date.now().toString() + 'cert' + i;
+          newSyncStatus[id] = 'syncing';
+          
+          try {
+              const reader = new FileReader();
+              const base64Promise = new Promise<string>((resolve, reject) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+              });
+              reader.readAsDataURL(file);
+              const base64Url = await base64Promise;
+
+              // Tenta fazer upload para o Supabase Storage
+              let finalUrl = base64Url;
+              try {
+                  const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/certidao_${id}`, base64Url);
+                  if (storageUrl) {
+                      finalUrl = storageUrl;
+                  }
+              } catch (storageErr) {
+                  console.warn("Storage upload failed for file:", file.name, storageErr);
+              }
+
+              const newDoc: ScannedDocument = {
+                  id,
+                  name: file.name,
+                  type: file.type || 'application/pdf',
+                  url: finalUrl,
+                  date: new Date().toISOString()
+              };
+              
+              newDocs.push(newDoc);
+          } catch (error) {
+              console.error("Error reading file:", error);
+              newSyncStatus[id] = 'error';
+          }
+      }
+
+      if (newDocs.length > 0) {
+          const updatedDocs = [...(formData.narrativeCertificates || []), ...newDocs];
+          const updatedFormData = { ...formData, narrativeCertificates: updatedDocs };
+          setFormData(updatedFormData);
+          setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+
+          try {
+              await onSave(updatedFormData as ClientRecord);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'success');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          } catch (e) {
+              console.error("Error saving uploaded certificates:", e);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'error');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          }
+      }
+      
+      if (e.target) {
+          e.target.value = '';
+      }
+  };
 
   const AVAILABLE_TAGS = [
       { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -208,6 +282,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const handleRemoveDocument = (docId: string) => {
       const updatedDocs = (formData.documents || []).filter(d => d.id !== docId);
       setFormData({ ...formData, documents: updatedDocs });
+  }
+
+  const handleRemoveCertidao = (docId: string) => {
+      const updatedDocs = (formData.narrativeCertificates || []).filter(d => d.id !== docId);
+      setFormData({ ...formData, narrativeCertificates: updatedDocs });
   }
 
   const handleUnifiedOCR = async () => {
@@ -870,6 +949,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
             >
                 Petições ({formData.petitions?.length || 0})
             </button>
+            <button 
+                onClick={() => setActiveTab('certidao')}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'certidao' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+                Certidão Narratória ({formData.narrativeCertificates?.length || 0})
+            </button>
         </div>
         
         <div className="p-8">
@@ -1180,7 +1265,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </button>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'petitions' ? (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <h4 className="font-bold text-slate-700 dark:text-white">Petições do Cliente</h4>
@@ -1232,7 +1317,80 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </button>
                     </div>
                 </div>
-            )}
+            ) : activeTab === 'certidao' ? (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-slate-700 dark:text-white">Certidões Narratórias</h4>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="file" 
+                                multiple 
+                                accept=".pdf,image/*,.txt"
+                                ref={certidaoFileInputRef} 
+                                onChange={handleCertidaoUpload} 
+                                className="hidden" 
+                            />
+                            <button 
+                                onClick={() => certidaoFileInputRef.current?.click()}
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                            >
+                                <ArrowUpTrayIcon className="h-4 w-4" />
+                                Upload
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {formData.narrativeCertificates && formData.narrativeCertificates.length > 0 ? (
+                            formData.narrativeCertificates.map((doc, idx) => (
+                                <div key={doc.id || idx} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="h-10 w-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center shrink-0">
+                                                <DocumentTextIcon className="h-6 w-6" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-slate-800 dark:text-white truncate">
+                                                    {doc.name}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {doc.type} • {doc.date ? new Date(doc.date).toLocaleDateString('pt-BR') : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => downloadFileRobust(doc.url, doc.name)}
+                                                className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
+                                                title="Baixar"
+                                            >
+                                                <ArrowDownTrayIcon className="h-5 w-5" />
+                                            </button>
+                                            <button onClick={() => handleRemoveCertidao(doc.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Excluir">
+                                                <TrashIcon className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 w-full mt-2">
+                                        {syncStatus[doc.id] === 'syncing' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 w-fit">Salvando...</span>
+                                        ) : syncStatus[doc.id] === 'error' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 w-fit">Recarregue e tente novamente</span>
+                                        ) : syncStatus[doc.id] === 'success' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 w-fit">Salvo no Supabase</span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
+                                <DocumentTextIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                                <p className="text-slate-500 text-sm">Nenhuma certidão narratória enviada.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : null}
       </div>
       <ScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onSave={handleScannerSave} />
     </div>

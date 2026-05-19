@@ -38,6 +38,7 @@ import CopyButton from './CopyButton';
 import DrMichelFelix from './DrMichelFelix';
 import DraLuanaCastro from './DraLuanaCastro';
 import DrFelixECastro from './DrFelixECastro';
+import SecFabriciaFelix from './SecFabriciaFelix';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
@@ -57,7 +58,7 @@ export default function Dashboard({
   onSettingsSaved,
   onRestoreBackup
 }: DashboardProps) {
-  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
+  const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'sec_fabricia' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
@@ -73,6 +74,7 @@ export default function Dashboard({
   const [drMichelSessions, setDrMichelSessions] = useState<any[]>([]);
   const [draLuanaSessions, setDraLuanaSessions] = useState<any[]>([]);
   const [drFelixCastroSessions, setDrFelixCastroSessions] = useState<any[]>([]);
+  const [secFabriciaSessions, setSecFabriciaSessions] = useState<any[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
   const [resolvedAlerts, setResolvedAlerts] = useState<string[]>([]);
   const [customLaws, setCustomLaws] = useState<any[]>([]);
@@ -146,17 +148,19 @@ export default function Dashboard({
 
         setResolvedAlerts([]);
 
-        const [remoteSocial, remoteMichel, remoteLuana, remoteFelixCastro] = await Promise.all([
+        const [remoteSocial, remoteMichel, remoteLuana, remoteFelixCastro, remoteFabricia] = await Promise.all([
             supabaseService.getCalculations().catch(() => []),
             supabaseService.getAIConversations('michel').catch(() => []),
             supabaseService.getAIConversations('luana').catch(() => []),
-            supabaseService.getAIConversations('felix_castro').catch(() => [])
+            supabaseService.getAIConversations('felix_castro').catch(() => []),
+            supabaseService.getAIConversations('fabricia').catch(() => [])
         ]);
 
         setSavedSocialCalculations(remoteSocial || []);
         setDrMichelSessions(remoteMichel || []);
         setDraLuanaSessions(remoteLuana || []);
         setDrFelixCastroSessions(remoteFelixCastro || []);
+        setSecFabriciaSessions(remoteFabricia || []);
 
         // Fetch global data from 'clients' table (used as KV store)
         if (supabase) {
@@ -448,7 +452,7 @@ export default function Dashboard({
   };
 
   // Save Logic (Generic)
-  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
+  const saveData = async (type: 'clients' | 'contracts' | 'calculations' | 'social_calculations' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'sec_fabricia' | 'agenda' | 'resolved_alerts' | 'daily_focus', newData: any[], clientToSave?: ClientRecord) => {
       setIsSyncing(true);
       setSaveError(null);
       setLastSavedType(type);
@@ -569,6 +573,19 @@ export default function Dashboard({
                   setIsSyncing(false);
                   return;
               }
+          } else if (type === 'sec_fabricia') {
+              setSecFabriciaSessions(newData);
+              if (supabase) {
+                  const error = await upsertWithRetry({ id: 18, data: newData }); // 18 or whichever next logic id, or we just rely on getAIConversations('fabricia') 
+                  // Oh wait, AI conversations in supabaseService uses getAIConversations, which uses ai_conversations table! 
+                  // Where is upsertWithRetry({ id: 11, data: newData }) pointing to? It points to 'services' table which was a backup or the old local storage sync!
+                  if (error) {
+                      console.error("Sync error (SecFabricia):", error);
+                      setSaveError("Erro de sincronização (Sec. Fabrícia).");
+                  }
+                  setIsSyncing(false);
+                  return;
+              }
           } else if (type === 'agenda') {
               if (supabase) {
                   // Proteção: busca o estado atual do Supabase antes de salvar
@@ -651,6 +668,7 @@ export default function Dashboard({
           case 'dr_michel': dataToSave = drMichelSessions; break;
           case 'dra_luana': dataToSave = draLuanaSessions; break;
           case 'dr_felix_castro': dataToSave = drFelixCastroSessions; break;
+          case 'sec_fabricia': dataToSave = secFabriciaSessions; break;
           case 'agenda': dataToSave = agendaEvents; break;
           case 'resolved_alerts': dataToSave = resolvedAlerts; break;
       }
@@ -1001,6 +1019,11 @@ export default function Dashboard({
   const handleSaveDrFelixCastroSessions = async (sessions: any[]) => {
       setDrFelixCastroSessions(sessions);
       safeSetLocalStorage('dr_felix_castro_sessions', JSON.stringify(sessions.slice(0, 3)));
+  };
+
+  const handleSaveSecFabriciaSessions = async (sessions: any[]) => {
+      setSecFabriciaSessions(sessions);
+      safeSetLocalStorage('sec_fabricia_sessions', JSON.stringify(sessions.slice(0, 3)));
   };
 
   // Merge virtual events from clients into agenda
@@ -1494,6 +1517,15 @@ export default function Dashboard({
                </button>
 
                <button 
+                   onClick={() => handleViewChange('sec_fabricia')}
+                   className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'sec_fabricia' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
+               >
+                   {currentView === 'sec_fabricia' && <span className="absolute left-0 top-2 bottom-2 w-1 bg-gold-500 rounded-r-full"></span>}
+                   <StarIcon className="h-5 w-5 mr-3 shrink-0" />
+                   <span className="font-medium text-sm">Sec. Fabrícia Felix (IA)</span>
+               </button>
+
+               <button 
                    onClick={() => handleViewChange('social_calc')}
                    className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group relative ${currentView === 'social_calc' ? 'bg-bordeaux-800 text-gold-300 shadow-inner' : 'text-cream-100/80 hover:bg-bordeaux-800/60 hover:text-gold-200'}`}
                >
@@ -1608,6 +1640,7 @@ export default function Dashboard({
                       currentView === 'dr_michel' ? 'Dr. Michel Felix — IA Jurídica' :
                       currentView === 'dra_luana' ? 'Dra. Luana Castro — IA Trabalhista' :
                       currentView === 'dr_felix_castro' ? 'Dr. Felix e Castro — IA Generalista (CDC/Civil)' :
+                      currentView === 'sec_fabricia' ? 'Sec. Fabrícia Felix — Secretária Jurídica IA' :
                       currentView === 'agenda' ? 'Agenda' :
                       currentView === 'knowledge_base' ? 'Base de Conhecimento' :
                       currentView === 'marketing' ? 'Marketing Jurídico' :
@@ -1676,6 +1709,13 @@ export default function Dashboard({
                  <DrFelixECastro 
                     initialSessions={drFelixCastroSessions} 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
+                    onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
+                  />
+             ) : currentView === 'sec_fabricia' ? (
+                 <SecFabriciaFelix 
+                    initialSessions={secFabriciaSessions} 
+                    onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />

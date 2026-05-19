@@ -16,7 +16,7 @@ export interface ChatSession {
   title: string;
   date: string;
   messages: Message[];
-  ai_name: 'michel' | 'luana' | 'felix_castro';
+  ai_name: 'michel' | 'luana' | 'felix_castro' | 'fabricia';
   documents?: any[];
 }
 
@@ -64,7 +64,7 @@ export const supabaseService = {
     return data;
   },
 
-  async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro') {
+  async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
     const supabase = getSupabase();
     if (!supabase) return [];
     
@@ -455,6 +455,7 @@ export const supabaseService = {
       referrer_percentage: client.referrerPercentage || 0,
       total_fee: client.totalFee || 0,
       documents: client.documents || [],
+      narrative_certificates: client.narrativeCertificates || [],
     };
 
     // Only include petitions if they are provided (prevent overwriting with empty array from summaries)
@@ -482,7 +483,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -524,7 +525,9 @@ export const supabaseService = {
       totalFee: c.total_fee,
       documents: [],
       documentCount: 0,
-      petitionCount: 0
+      petitionCount: 0,
+      narrativeCertificates: [],
+      narrativeCertificateCount: 0
     }));
   },
 
@@ -579,7 +582,8 @@ export const supabaseService = {
       referrerPercentage: data.referrer_percentage,
       totalFee: data.total_fee,
       documents: data.documents || [],
-      petitions: data.petitions || []
+      petitions: data.petitions || [],
+      narrativeCertificates: data.narrative_certificates || []
     };
   },
 

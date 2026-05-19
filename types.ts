@@ -75,7 +75,9 @@ export interface ClientRecord {
   documents?: ScannedDocument[];
   documentCount?: number;
   petitionCount?: number;
+  narrativeCertificateCount?: number;
   petitions?: Petition[];
+  narrativeCertificates?: ScannedDocument[];
 }
 
 export enum UserRole {
