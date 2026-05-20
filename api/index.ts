@@ -3160,15 +3160,15 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 2048;
-    let thinkingConfig: any = { thinkingBudget: 4096 };
+    let maxOutputTokens = 1536;
+    let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 30000;
-      thinkingConfig = { thinkingBudget: 24576 };
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 16000 };
+      thinkingConfig = { thinkingBudget: 4096 };
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 4096;
+      thinkingConfig = { thinkingBudget: 2048 };
     }
 
     if (modelProvider === 'openrouter') {
@@ -3670,15 +3670,15 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 2048;
-    let thinkingConfig: any = { thinkingBudget: 4096 };
+    let maxOutputTokens = 1536;
+    let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 30000;
-      thinkingConfig = { thinkingBudget: 24576 };
-    } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 16000 };
+      thinkingConfig = { thinkingBudget: 4096 };
+    } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 4096;
+      thinkingConfig = { thinkingBudget: 2048 };
     }
 
     if (modelProvider === 'openrouter') {
@@ -4061,15 +4061,15 @@ REGRAS ABSOLUTAS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 2048;
-    let thinkingConfig: any = { thinkingBudget: 4096 };
+    let maxOutputTokens = 1536;
+    let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 30000;
-      thinkingConfig = { thinkingBudget: 24576 };
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 16000 };
+      thinkingConfig = { thinkingBudget: 4096 };
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 4096;
+      thinkingConfig = { thinkingBudget: 2048 };
     }
 
     if (modelProvider === 'openrouter') {
@@ -4310,14 +4310,14 @@ console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via Op
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
     let maxOutputTokens = 600; 
-    let thinkingConfig: any = { thinkingBudget: 2048 }; 
+    let thinkingConfig: any = { thinkingBudget: 512 }; 
 
     if (isGenerationRequest) {
-      maxOutputTokens = 15000;
-      thinkingConfig = { thinkingBudget: 4096 };
-    } else if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 4096;
-      thinkingConfig = { thinkingBudget: 4096 };
+      thinkingConfig = { thinkingBudget: 1024 };
+    } else if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 2048;
+      thinkingConfig = { thinkingBudget: 1024 };
     }
 
     let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
