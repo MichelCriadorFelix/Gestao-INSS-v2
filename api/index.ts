@@ -3160,14 +3160,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 1536;
+    let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      maxOutputTokens = 4096;
+      maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
@@ -3670,14 +3670,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 1536;
+    let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
     } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      maxOutputTokens = 4096;
+      maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
@@ -4061,14 +4061,14 @@ REGRAS ABSOLUTAS:
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
-    let maxOutputTokens = 1536;
+    let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
     if (isGenerationRequest) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      maxOutputTokens = 4096;
+      maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
