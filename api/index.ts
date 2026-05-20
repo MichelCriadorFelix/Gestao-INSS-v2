@@ -231,7 +231,7 @@ app.post("/api/ocr", async (req, res) => {
     });
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
@@ -480,7 +480,7 @@ REGRAS ABSOLUTAS DE EXTRAÇÃO:
 ${specialInstructions}`;
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: {
         role: "user",
         parts: [
@@ -572,7 +572,7 @@ REGRAS:
 
       try {
         const response = await callGemini({
-          model: "gemini-3-flash-preview",
+          model: "gemini-3.5-flash",
           contents: { role: "user", parts },
           config: { temperature: 0.1, maxOutputTokens: 16383 }
         });
@@ -667,7 +667,7 @@ async function detectUserIntent(message: string): Promise<string> {
   const safeMessage = message || "";
   try {
     const response = await callGemini({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: { role: "user", parts: [{ text: safeMessage }] },
       config: {
         systemInstruction: INTENT_DETECTOR_PROMPT,
@@ -2240,14 +2240,14 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
+  "gemini-3.5-flash",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
   "gemini-3.1-pro-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-1.5-flash-latest": "gemini-3-flash-preview",
+  "gemini-1.5-flash-latest": "gemini-3.5-flash",
   "gemini-1.5-pro-latest": "gemini-3.1-pro-preview"
 };
 
@@ -2707,11 +2707,11 @@ app.post("/api/rag/embed", async (req, res) => {
 
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
-    const { cnisContent, model = "gemini-3-flash-preview" } = req.body;
+    const { cnisContent, model = "gemini-3.5-flash" } = req.body;
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
-      model: "gemini-3-flash-preview", // Garante o uso do Flash para CNIS como solicitado
+      model: "gemini-3.5-flash", // Garante o uso do Flash para CNIS como solicitado
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
@@ -2854,7 +2854,7 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
     Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
     });
@@ -3193,7 +3193,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
@@ -3201,7 +3201,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         const responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
+          model: model || "gemini-3.5-flash",
           contents: currentContents,
           config: {
             systemInstruction: selectedSystemPrompt,
@@ -3700,7 +3700,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokensLuana > 90_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
@@ -3708,7 +3708,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         const responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
+          model: model || "gemini-3.5-flash",
           contents: currentContents,
           config: {
             systemInstruction: selectedSystemPrompt,
@@ -4089,7 +4089,7 @@ REGRAS ABSOLUTAS:
       const MAX_ATTEMPTS = 3;
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 90k tokens — output pode degradar.`);
       }
@@ -4097,7 +4097,7 @@ REGRAS ABSOLUTAS:
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         const responseStream = await callGeminiStream({
-          model: model || "gemini-3-flash-preview",
+          model: model || "gemini-3.5-flash",
           contents: currentContents,
           config: {
             systemInstruction: selectedSystemPrompt,
@@ -4481,7 +4481,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`);
       }
@@ -4489,7 +4489,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 while (!isFinished && attempt < MAX_ATTEMPTS) {
   attempt++;
   const responseStream = await callGeminiStream({
-    model: model || "gemini-3-flash-preview",
+    model: model || "gemini-3.5-flash",
     contents: currentContents,
     config: {
       systemInstruction: selectedSystemPrompt,

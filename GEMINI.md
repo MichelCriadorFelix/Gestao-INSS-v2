@@ -3,7 +3,7 @@
 ## Infraestrutura e Serviços
 - **Database e Storage:** Supabase Pro (PostgreSQL, pgvector para RAG, Auth, Storage).
 - **Hospedagem:** Vercel Pro (Deployment principal).
-- **Modelo de IA Padrão:** O modelo principal e padrão de todo o sistema é SEMPRE o `gemini-3-flash-preview` (via `@google/genai` SSR stream).
+- **Modelo de IA Padrão:** O modelo principal e padrão de todo o sistema é SEMPRE o `gemini-3.5-flash` (via `@google/genai` SSR stream).
 - **Modelos Alternativos:** Integração com OpenRouter (Modelos Elite) para requisições específicas via API.
 
 ## Funcionalidades Core
@@ -37,6 +37,6 @@ O sistema possui duas personas principais de IA: **Dr. Michel Felix** (Civil/Tra
 1. **NUNCA DESTRUA A LÓGICA DE DRAFT:** O bloco que busca o `petition_draft` no Supabase e o injeta como "ESTRUTURA PRINCIPAL" no `/api/index.ts` NUNCA deve ser removido, otimizado negativamente ou reescrito a menos que visando sua expansão de buffer superior a 50k caracteres.
 2. **NUNCA MODIFIQUE O MÁXIMO DE TOKENS:** `maxOutputTokens: 16383` deve seguir inalterado nas respostas da IA principal em `/api/dr-michel/chat` e `/api/dra-luana/chat`.
 3. **NUNCA AFUNILE O `compressHistory` ABAIXO DE 40 MENSAGENS:** Mexer na compressão destruirá as longas defesas baseadas em relatórios gigantescos de clientes complexos.
-4. **NÃO OMITA O MODELO BASE:** `gemini-3-flash-preview` foi testado vastamente; se uma refatoração exigir alterar para versões superiores (como Pro), isso só pode ocorrer de forma paralela via opções configuráveis no frontend.
+4. **NÃO OMITA O MODELO BASE:** `gemini-3.5-flash` foi testado vastamente; se uma refatoração exigir alterar para versões superiores (como Pro), isso só pode ocorrer de forma paralela via opções configuráveis no frontend.
 
 > Você, como IA assistente, comprometa-se a ler o estado de `api/index.ts` e arquivos React frontais sempre analisando as dependências de cada mudança na arquitetura de Rascunhos Supabase antes de intervir em falhas.

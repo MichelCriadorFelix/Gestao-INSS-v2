@@ -100,7 +100,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -782,7 +782,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
-                model: "gemini-3-flash-preview", 
+                model: "gemini-3.5-flash", 
                 keyIndex: preferredKeyIndex
               })
             });
@@ -891,7 +891,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
-                model: "gemini-3-flash-preview", // Use flash for mapping to be faster and cheaper
+                model: "gemini-3.5-flash", // Use flash for mapping to be faster and cheaper
                 keyIndex: preferredKeyIndex
               })
             });
@@ -1594,7 +1594,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini · Gratuito (Padrão)">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview · Padrão Ouro ⭐</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash · Padrão Ouro ⭐</option>
                     </optgroup>
                     <optgroup label="OpenRouter · API Paga (Premium)">
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Recomendado ⭐</option>
