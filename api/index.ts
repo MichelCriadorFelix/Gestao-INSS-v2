@@ -2829,7 +2829,7 @@ app.post("/api/client-rag/index", async (req, res) => {
       return res.status(400).json({ error: "clientId, compartment, fileName, and text are required" });
     }
 
-    // Split text into chunks (e.g. 800 characters with 150 overlapping)
+    // Split text into chunks (e.g. 800 characters with 150 overlapping, for semantic RAG)
     const chunkSize = 800;
     const overlap = 150;
     const chunks: string[] = [];
