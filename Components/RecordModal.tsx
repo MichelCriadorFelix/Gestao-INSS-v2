@@ -8,6 +8,7 @@ import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
 import { supabaseService } from '../services/supabaseService';
+import { supabase } from '../supabaseClient';
 
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
@@ -107,6 +108,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       try {
           console.log(`[RAG Indexing] Starting indexing for file: ${doc.name} (${doc.id})`);
           
+          let token = "";
+          try {
+              if (supabase) {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (session) {
+                      token = session.access_token;
+                  }
+              }
+          } catch (sessionErr) {
+              console.warn("Could not get Supabase session token:", sessionErr);
+          }
+
           let extractedText = "";
           
           if (doc.type === 'text/plain') {
@@ -115,7 +128,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           } else if (doc.type === 'application/pdf' || doc.type.startsWith('image/')) {
               const ocrRes = await fetch('/api/ocr-unified', {
                    method: 'POST',
-                   headers: { 'Content-Type': 'application/json' },
+                   headers: { 
+                       'Content-Type': 'application/json',
+                       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                   },
                    body: JSON.stringify({ 
                        documents: [{
                            url: doc.url,
@@ -137,7 +153,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
           const indexRes = await fetch('/api/client-rag/index', {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
+               headers: { 
+                   'Content-Type': 'application/json',
+                   ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+               },
                body: JSON.stringify({
                    clientId: formData.id,
                    compartment: doc.compartment || 'proof_documents',
@@ -255,6 +274,36 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     setActiveTab('info');
   }, [initialData, isOpen]);
 
+  // Load existing RAG indexed files for this client
+  useEffect(() => {
+    const fetchIndexedFiles = async () => {
+      if (!isOpen || !formData.id || !supabase) return;
+      try {
+        const { data, error } = await supabase
+          .from('client_document_chunks')
+          .select('file_name')
+          .eq('client_id', formData.id);
+        
+        if (!error && data) {
+          const indexedNames = new Set(data.map((item: any) => item.file_name));
+          const newStatus: Record<string, 'indexing' | 'indexed' | 'error' | 'none'> = {};
+          
+          (formData.documents || []).forEach(doc => {
+            if (indexedNames.has(doc.name)) {
+              newStatus[doc.id] = 'indexed';
+            }
+          });
+          
+          setIndexStatus(prev => ({ ...prev, ...newStatus }));
+        }
+      } catch (err) {
+        console.error("Error loading indexed documents:", err);
+      }
+    };
+    
+    fetchIndexedFiles();
+  }, [isOpen, formData.id, formData.documents?.length]);
+
   useEffect(() => {
     if (formData.der && formData.der.length === 10) {
        const derDate = parseDate(formData.der);
@@ -356,9 +405,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
       if (docToRemove && formData.id) {
           try {
+              let token = "";
+              try {
+                  if (supabase) {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (session) {
+                          token = session.access_token;
+                      }
+                  }
+              } catch (sessionErr) {}
+
               await fetch('/api/client-rag/delete-file', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 
+                      'Content-Type': 'application/json',
+                      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                  },
                   body: JSON.stringify({
                       clientId: formData.id,
                       fileName: docToRemove.name,
@@ -401,9 +463,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               name: doc.name
           }));
 
+          let token = "";
+          try {
+              if (supabase) {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (session) {
+                      token = session.access_token;
+                  }
+              }
+          } catch (sessionErr) {}
+
           const ocrRes = await fetch('/api/ocr-unified', {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
+               headers: { 
+                   'Content-Type': 'application/json',
+                   ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+               },
                body: JSON.stringify({ documents: documentsToProcess })
           });
           
