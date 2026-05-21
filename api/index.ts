@@ -2884,6 +2884,7 @@ app.post("/api/client-rag/index", async (req, res) => {
           };
         });
         
+        console.log(`[ClientRAG] Inserindo lote sem 'chunk_index' na raiz (movido para metadata)...`);
         // Insert this batch immediately to the database
         const { error } = await supabaseAdmin
             .from('client_document_chunks')
