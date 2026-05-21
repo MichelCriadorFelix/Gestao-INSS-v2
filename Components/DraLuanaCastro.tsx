@@ -55,6 +55,7 @@ interface ChatSession {
   messages: Message[];
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
+  tokens?: { input: number; output: number; total: number };
 }
 
 interface DraLuanaCastroProps {
@@ -656,6 +657,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     if (data.text) {
                       fullText += data.text;
                       setStreamingMessage(fullText);
+                    }
+
+                    if (data.tokens) {
+                      setSessions(prev => prev.map(s => 
+                        s.id === sessionId ? { ...s, tokens: data.tokens } : s
+                      ));
                     }
                   }
                 }
@@ -1593,6 +1600,19 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>
+                  {currentSession?.tokens && (
+                    <>
+                      <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2 hidden sm:block"></div>
+                      <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-rose-50/50 dark:bg-rose-950/25 border border-rose-100/40 dark:border-rose-900/45 rounded-md text-[10px] font-mono font-medium text-rose-700 dark:text-rose-300" title="Consumo estimado de tokens neste chat">
+                        <Bot className="w-3 h-3 text-rose-500" />
+                        <span>In: {currentSession.tokens.input.toLocaleString()}</span>
+                        <span className="opacity-40">|</span>
+                        <span>Out: {currentSession.tokens.output.toLocaleString()}</span>
+                        <span className="opacity-40">|</span>
+                        <span className="font-bold">Total: {currentSession.tokens.total.toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <button 
                   onClick={() => handleSendMessage()}

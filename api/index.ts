@@ -2555,6 +2555,52 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   }
 }
 
+async function retrieveClientRagContext(clientId: string, message: string): Promise<string> {
+  try {
+    console.log(`[RAG Inteligente] Iniciando busca RAG para cliente ID: ${clientId}, Query: "${message.substring(0, 60)}..."`);
+    const queryEmbedding = await callGeminiEmbed(message);
+    
+    const rpcParams = {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.25,
+      match_count: 20,
+      filter_client_id: clientId
+    };
+
+    const { data: chunks, error: matchError } = await supabaseAdmin.rpc('match_client_documents', rpcParams);
+    
+    if (matchError) {
+      console.error("[RAG Inteligente] Erro no match_client_documents:", matchError);
+      return "";
+    }
+    
+    if (chunks && chunks.length > 0) {
+      console.log(`[RAG Inteligente] Sucesso! Encontrados ${chunks.length} trechos relevantes.`);
+      
+      const formattedChunksSummaries = chunks.map((chunk: any) => {
+        const tag = chunk.compartment === 'proof_documents' ? 'PROVA DO PROCESSO (Inicial)' :
+                    chunk.compartment === 'new_proof_documents' ? 'NOVA PROVA (Superveniente)' :
+                    chunk.compartment === 'judicial_process' ? 'HISTÓRICO DO PROCESSO JUDICIAL' :
+                    chunk.compartment === 'petitions' ? 'PETIÇÃO DO HISTÓRICO' : chunk.compartment;
+        
+        const sub = chunk.subfolder ? ` [Pasta: ${chunk.subfolder}]` : '';
+        return `---
+[FONTE / COMPARTIMENTO]: ${tag}${sub}
+[ARQUIVO]: ${chunk.file_name}
+[TRECHO / CONTEÚDO]:
+${chunk.content}`;
+      }).join('\n\n');
+
+      return `\n\n[DADOS RAG DO CLIENTE - BUSCA SEMÂNTICA EM TEMPO REAL]\nForam localizados os seguintes trechos altamente relevantes nos documentos do cliente (provas, andamentos do processo, petições anteriores). Baseie suas decisões, citações, fatos e peticionamentos exclusivamente nestas informações quando aplicável:\n\n${formattedChunksSummaries}\n`;
+    }
+    console.log("[RAG Inteligente] Nenhum trecho correspondente no banco. Cliente sem documentos indexados ou score baixo.");
+    return "";
+  } catch (ragErr) {
+    console.error("[RAG Inteligente] Falha de processamento geral no RAG:", ragErr);
+    return "";
+  }
+}
+
 async function callOpenRouterStream(params: any, res: any): Promise<void> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -2624,6 +2670,7 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
               }
               
               if (content) {
+                combinedText += content;
                 res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
               }
             } catch (e) {
@@ -2633,6 +2680,11 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
         }
       }
     }
+
+    const promptText = JSON.stringify(params.messages);
+    const inputEst = estimateTokens(promptText);
+    const outputEst = estimateTokens(combinedText);
+    res.write(`data: ${JSON.stringify({ tokens: { input: inputEst, output: outputEst, total: inputEst + outputEst } })}\n\n`);
 
     res.write(`data: [DONE]\n\n`);
     res.end();
@@ -2702,6 +2754,110 @@ app.post("/api/rag/embed", async (req, res) => {
   } catch (error: any) {
     console.error("Error generating embedding:", error);
     res.status(500).json({ error: error.message || "Failed to generate embedding" });
+  }
+});
+
+app.post("/api/client-rag/index", async (req, res) => {
+  try {
+    const { clientId, compartment, subfolder, fileName, fileUrl, text } = req.body;
+    if (!clientId || !compartment || !fileName || !text) {
+      return res.status(400).json({ error: "clientId, compartment, fileName, and text are required" });
+    }
+
+    // Split text into chunks (e.g. 800 characters with 150 overlapping)
+    const chunkSize = 800;
+    const overlap = 150;
+    const chunks: string[] = [];
+    
+    let i = 0;
+    while (i < text.length) {
+      const chunk = text.substring(i, i + chunkSize);
+      chunks.push(chunk);
+      i += chunkSize - overlap;
+    }
+
+    console.log(`[ClientRAG] Indexing file "${fileName}" with ${chunks.length} chunks for client ${clientId} (${compartment})`);
+
+    const processedChunks = [];
+    
+    // First, delete any existing chunks for this specific file in this client to prevent duplicates
+    await supabaseAdmin
+      .from('client_document_chunks')
+      .delete()
+      .eq('client_id', clientId)
+      .eq('compartment', compartment)
+      .eq('file_name', fileName);
+
+    for (let index = 0; index < chunks.length; index++) {
+      const chunkText = chunks[index];
+      if (!chunkText.trim()) continue;
+
+      // Rate limit safety
+      if (index > 0) {
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+
+      const embedding = await callGeminiEmbed(chunkText);
+      processedChunks.push({
+        client_id: clientId,
+        compartment,
+        subfolder: subfolder || null,
+        file_name: fileName,
+        file_url: fileUrl || null,
+        chunk_index: index,
+        content: chunkText,
+        embedding,
+        metadata: {
+          charLength: chunkText.length,
+          indexedAt: new Date().toISOString()
+        }
+      });
+    }
+
+    // Insert to database in batches
+    if (processedChunks.length > 0) {
+      const { error } = await supabaseAdmin
+        .from('client_document_chunks')
+        .insert(processedChunks);
+
+      if (error) {
+        console.error("Error inserting client document chunks:", error);
+        throw error;
+      }
+    }
+
+    res.json({ success: true, chunksCount: processedChunks.length });
+  } catch (error: any) {
+    console.error("Error in /api/client-rag/index:", error);
+    res.status(500).json({ error: error.message || "Failed to index client document" });
+  }
+});
+
+app.post("/api/client-rag/delete-file", async (req, res) => {
+  try {
+    const { clientId, fileName, compartment } = req.body;
+    if (!clientId || !fileName || !compartment) {
+      return res.status(400).json({ error: "clientId, fileName, and compartment are required" });
+    }
+
+    console.log(`[ClientRAG] Deleting chunks for file "${fileName}" under client ${clientId} (${compartment})`);
+
+    const { error } = await supabaseAdmin
+      .from('client_document_chunks')
+      .delete()
+      .eq('client_id', clientId)
+      .eq('compartment', compartment)
+      .eq('file_name', fileName);
+
+    if (error) {
+      console.error("Error deleting client document chunks:", error);
+      throw error;
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error in /api/client-rag/delete-file:", error);
+    res.status(500).json({ error: error.message || "Failed to delete chunks" });
   }
 });
 
@@ -2888,8 +3044,19 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, clientId } = req.body;
     message = message || "";
+
+    if (clientId) {
+      const clientRagContext = await retrieveClientRagContext(clientId, message);
+      if (clientRagContext) {
+        if (!documentContext) {
+          documentContext = clientRagContext;
+        } else {
+          documentContext += "\n\n" + clientRagContext;
+        }
+      }
+    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
@@ -2899,6 +3066,18 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
+    
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera/i.test(message);
+    if (isGenerationIntent && !isGeneratingCommand) {
+      clearInterval(heartbeat);
+      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
+      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+      return;
+    }
+
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
@@ -2972,12 +3151,40 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // Janela de histórico calibrada por intenção:
-    // - GERAÇÃO: até 6 turnos (já comprimidos pelo frontend) — contexto suficiente
-    // - DÚVIDA: até 10 turnos
-    // - CASUAL/outros: até 6 turnos
-    if (isGenerationRequest) {
-      if (history.length > 6) history = history.slice(-6);
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO") || (message || "").includes("gerar relatório") || (message || "").includes("gerar relatorio");
+    let isCorrectionRequest = false;
+    let correctionInstruction = "";
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
+    );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
+
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
+      isCorrectionRequest = true;
+      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
+
+INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
+1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
+2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
+5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
+6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
+`;
+      console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
+    }
+
+    // MODO API LIMPA (Padrão Ouro Felix & Castro):
+    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
+    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
+    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
+    if ((isGenerationRequest || isReportRequest) && !isCorrectionRequest) {
+      console.log(`[Dr.Michel] 🧼 Geração/Relatório fresca detectada. Ativando MODO API LIMPA: limpando histórico (~${history.length} mensagens removidas do payload)`);
+      history = [];
     } else if (intent === "[DÚVIDA]") {
       if (history.length > 10) history = history.slice(-10);
     } else {
@@ -3003,34 +3210,6 @@ REGRAS DE OURO:
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
-
-    // ============================================================
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
-    // ============================================================
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
-4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
-5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
-6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
-`;
-      console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
-    }
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
@@ -3156,9 +3335,6 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
       return;
     }
-
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -3287,6 +3463,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
+      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
+      const inputTokens = estimateTokens(promptTextToEstimate);
+      const outputTokens = estimateTokens(fullResponseText);
+      res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (err: any) {
@@ -3309,8 +3490,19 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, clientId } = req.body;
     message = message || "";
+
+    if (clientId) {
+      const clientRagContext = await retrieveClientRagContext(clientId, message);
+      if (clientRagContext) {
+        if (!documentContext) {
+          documentContext = clientRagContext;
+        } else {
+          documentContext += "\n\n" + clientRagContext;
+        }
+      }
+    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
@@ -3322,6 +3514,18 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
+    
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera/i.test(message);
+    if (isGenerationIntent && !isGeneratingCommand) {
+      clearInterval(heartbeat);
+      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
+      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+      return;
+    }
+
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
@@ -3433,13 +3637,40 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // 3. GESTÃO DE JANELA DESLIZANTE CALIBRADA POR INTENÇÃO - Pilar 4
-    // GERAÇÃO: 6 turnos (já comprimidos pelo frontend) | DÚVIDA: 10 | CASUAL: 6
-    if (isGenerationRequest) {
-      if (history.length > 6) {
-        console.log(`Pilar 4: GERAÇÃO — limitando histórico de ${history.length} para 6 turnos.`);
-        history = history.slice(-6);
-      }
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO") || (message || "").includes("gerar relatório") || (message || "").includes("gerar relatorio");
+    let isCorrectionRequest = false;
+    let correctionInstruction = "";
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
+    );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
+
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      isCorrectionRequest = true;
+      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
+
+INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
+1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
+2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
+3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
+4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
+5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos.
+6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
+`;
+      console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
+    }
+
+    // MODO API LIMPA (Padrão Ouro Felix & Castro):
+    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
+    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
+    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
+    if ((isGenerationRequest || isReportRequest) && !isCorrectionRequest) {
+      console.log(`[Dra.Luana] 🧼 Geração/Relatório fresca detectada. Ativando MODO API LIMPA: limpando histórico de chat (~${history.length} mensagens removidas do payload)`);
+      history = [];
     } else if (intent === "[DÚVIDA]") {
       if (history.length > 10) history = history.slice(-10);
       console.log(`Pilar 4: Modo DÚVIDA — limitando histórico a 10 turnos.`);
@@ -3472,34 +3703,6 @@ REGRAS DE OURO:
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
-
-    // ============================================================
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
-    // ============================================================
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
-4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
-5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos.
-6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
-`;
-      console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
-    }
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
@@ -3805,6 +4008,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
+      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
+      const inputTokens = estimateTokens(promptTextToEstimate);
+      const outputTokens = estimateTokens(fullResponseText);
+      res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (streamError: any) {
@@ -3832,8 +4040,19 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, clientId } = req.body;
     message = message || "";
+
+    if (clientId) {
+      const clientRagContext = await retrieveClientRagContext(clientId, message);
+      if (clientRagContext) {
+        if (!documentContext) {
+          documentContext = clientRagContext;
+        } else {
+          documentContext += "\n\n" + clientRagContext;
+        }
+      }
+    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
@@ -3844,6 +4063,18 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
+    
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera/i.test(message);
+    if (isGenerationIntent && !isGeneratingCommand) {
+      clearInterval(heartbeat);
+      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
+      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+      return;
+    }
+
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
@@ -3914,9 +4145,36 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // Janela de histórico calibrada por intenção
-    if (isGenerationRequest) {
-      if (history.length > 6) history = history.slice(-6);
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO") || (message || "").includes("gerar relatório") || (message || "").includes("gerar relatorio");
+    let isCorrectionRequest = false;
+    let correctionInstruction = "";
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
+    );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
+
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
+      isCorrectionRequest = true;
+      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
+Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
+
+INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
+1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
+2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
+3. Mantenha o MESMO padrão de formatação (Markdown, blockquotes, negrito).
+4. Se o usuário não especificou qual tópico, peça esclarecimento em UMA frase.`;
+    }
+
+    // MODO API LIMPA (Padrão Ouro Felix & Castro):
+    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
+    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
+    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
+    if ((isGenerationRequest || isReportRequest) && !isCorrectionRequest) {
+      console.log(`[Dr.FelixCastro] 🧼 Geração/Relatório fresca detectada. Ativando MODO API LIMPA: limpando histórico (~${history.length} mensagens removidas do payload)`);
+      history = [];
     } else if (intent === "[DÚVIDA]") {
       if (history.length > 10) history = history.slice(-10);
     } else {
@@ -3941,28 +4199,6 @@ REGRAS DE OURO:
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
-
-    // DETECÇÃO DE CORREÇÃO
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Mantenha o MESMO padrão de formatação (Markdown, blockquotes, negrito).
-4. Se o usuário não especificou qual tópico, peça esclarecimento em UMA frase.`;
-    }
 
     let finalMessage = message;
     if (ragContext) { finalMessage += `\n\n${ragContext}`; }
@@ -4057,9 +4293,6 @@ REGRAS ABSOLUTAS:
       await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
       return;
     }
-
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -4182,6 +4415,11 @@ REGRAS ABSOLUTAS:
         }
       }
 
+      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
+      const inputTokens = estimateTokens(promptTextToEstimate);
+      const outputTokens = estimateTokens(fullResponseText);
+      res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (err: any) {
@@ -4291,8 +4529,19 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, clientId } = req.body;
     message = message || "";
+
+    if (clientId) {
+      const clientRagContext = await retrieveClientRagContext(clientId, message);
+      if (clientRagContext) {
+        if (!documentContext) {
+          documentContext = clientRagContext;
+        } else {
+          documentContext += "\n\n" + clientRagContext;
+        }
+      }
+    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
@@ -4574,6 +4823,11 @@ if (sessionId && fullResponseText.length > 500 && isGenerationRequest) {
     console.error("Erro salvando rascunho de Fabrícia:", e);
   }
 }
+
+const promptTextToEstimate = (selectedSystemPrompt || "") + (finalMessage || "") + JSON.stringify(historyParts || []);
+const inputTokens = estimateTokens(promptTextToEstimate);
+const outputTokens = estimateTokens(fullResponseText);
+res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
 
 res.write(`data: [DONE]\n\n`);
 res.end();
