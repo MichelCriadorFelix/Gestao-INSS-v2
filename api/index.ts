@@ -3427,7 +3427,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
         // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        if (maxTokensHit && (wordTarget === null || !targetReached) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
@@ -3972,7 +3972,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
         // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        if (maxTokensHit && (wordTarget === null || !targetReached) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
@@ -4379,7 +4379,7 @@ REGRAS ABSOLUTAS:
         const currentWordCount = countWords(fullResponseText);
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        if (maxTokensHit && (wordTarget === null || !targetReached) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.FelixCastro] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           currentContents.push({ role: "model", parts: [{ text: attemptText }] });
@@ -4788,7 +4788,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
   const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
   // CONTINUAÇÃO APENAS em MAX_TOKENS
-  if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+  if (maxTokensHit && (wordTarget === null || !targetReached) && attempt < MAX_ATTEMPTS) {
     console.log(`[Sec.Fabricia] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
     const anchor = fullResponseText.slice(-600);
     currentContents.push({ role: "model", parts: [{ text: attemptText }] });
