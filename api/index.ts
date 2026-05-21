@@ -2511,8 +2511,16 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const apiKey = keys[currentKeyIndex % keys.length];
-  const ai = new GoogleGenAI({ apiKey });
+  const validKeys = keys.filter(k => !invalidKeys.has(k));
+  if (validKeys.length === 0) {
+    invalidKeys.clear();
+  }
+  
+  const usableKeys = validKeys.length > 0 ? validKeys : keys;
+  const currentKey = usableKeys[currentKeyIndex % usableKeys.length];
+  const originalKeyIndex = keys.indexOf(currentKey);
+
+  const ai = new GoogleGenAI({ apiKey: currentKey });
 
   try {
     const result = await ai.models.embedContent({
@@ -2528,10 +2536,10 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
     
     if (isInvalidKey) {
-      invalidKeys.add(apiKey);
+      invalidKeys.add(currentKey);
     }
 
-    console.error(`Erro ao gerar embedding com a chave ${currentKeyIndex}:`, errorMessage);
+    console.error(`Erro ao gerar embedding com a chave ${originalKeyIndex}:`, errorMessage);
     
     // Rotate key
     currentKeyIndex = (currentKeyIndex + 1) % keys.length;
@@ -2559,8 +2567,17 @@ async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<numb
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const apiKey = keys[currentKeyIndex % keys.length];
-  const ai = new GoogleGenAI({ apiKey });
+  const validKeys = keys.filter(k => !invalidKeys.has(k));
+  if (validKeys.length === 0) {
+    // If all keys are marked invalid, clear the set and try again as a last resort
+    invalidKeys.clear();
+  }
+  
+  const usableKeys = validKeys.length > 0 ? validKeys : keys;
+  const currentKey = usableKeys[currentKeyIndex % usableKeys.length];
+  const originalKeyIndex = keys.indexOf(currentKey);
+
+  const ai = new GoogleGenAI({ apiKey: currentKey });
 
   try {
     const result = await ai.models.embedContent({
@@ -2576,12 +2593,12 @@ async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<numb
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
     
     if (isInvalidKey) {
-      invalidKeys.add(apiKey);
+      invalidKeys.add(currentKey);
     }
 
-    console.error(`Erro ao gerar embedding BATCH com a chave ${currentKeyIndex}:`, errorMessage);
+    console.error(`Erro ao gerar embedding BATCH com a chave ${originalKeyIndex}:`, errorMessage);
     
-    // Rotate key
+    // Rotate to next key overall
     currentKeyIndex = (currentKeyIndex + 1) % keys.length;
     
     if (retries > 0) {
@@ -2857,10 +2874,10 @@ app.post("/api/client-rag/index", async (req, res) => {
             subfolder: subfolder || null,
             file_name: fileName,
             file_url: fileUrl || null,
-            chunk_index: globalIndex,
             content: chunkText,
             embedding: batchEmbeddings[batchIdx],
             metadata: {
+              chunk_index: globalIndex,
               charLength: chunkText.length,
               indexedAt: new Date().toISOString()
             }
