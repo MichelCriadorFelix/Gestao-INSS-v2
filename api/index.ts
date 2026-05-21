@@ -3067,8 +3067,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
-    const isGeneratingCommand = /gerar|gera/i.test(message);
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(message);
     if (isGenerationIntent && !isGeneratingCommand) {
       clearInterval(heartbeat);
       const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
@@ -3515,8 +3515,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
-    const isGeneratingCommand = /gerar|gera/i.test(message);
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(message);
     if (isGenerationIntent && !isGeneratingCommand) {
       clearInterval(heartbeat);
       const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
@@ -4064,8 +4064,8 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM "GERAR" OU "GERA" NO PRÓPRIO COMANDO)
-    const isGeneratingCommand = /gerar|gera/i.test(message);
+    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
+    const isGeneratingCommand = /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(message);
     if (isGenerationIntent && !isGeneratingCommand) {
       clearInterval(heartbeat);
       const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
