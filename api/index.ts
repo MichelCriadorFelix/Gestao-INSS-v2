@@ -2555,6 +2555,54 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   }
 }
 
+async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<number[][]> {
+  const keys = getApiKeys();
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
+
+  const apiKey = keys[currentKeyIndex % keys.length];
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const result = await ai.models.embedContent({
+      model: 'gemini-embedding-2-preview',
+      contents: texts,
+      config: {
+        outputDimensionality: 768
+      }
+    });
+    return result.embeddings?.map(e => e.values || []) || texts.map(() => []);
+  } catch (error: any) {
+    const errorMessage = error.message || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    
+    if (isInvalidKey) {
+      invalidKeys.add(apiKey);
+    }
+
+    console.error(`Erro ao gerar embedding BATCH com a chave ${currentKeyIndex}:`, errorMessage);
+    
+    // Rotate key
+    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    
+    if (retries > 0) {
+      // If we hit a 429, we should wait longer. Let's extract retryDelay if present, or default to 5 seconds.
+      let delay = 2000;
+      if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+         delay = 10000; // Wait 10 seconds on quota errors before trying the next key
+         const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
+         if (match && match[1]) {
+             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000); // Max 65s wait
+         }
+      }
+
+      console.log(`[BatchEmbed] Aguardando ${delay}ms antes de tentar novamente com a próxima chave... (${retries} tentativas restantes)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callGeminiEmbedBatch(texts, retries - 1);
+    }
+    throw error;
+  }
+}
+
 async function retrieveClientRagContext(clientId: string, message: string): Promise<string> {
   try {
     console.log(`[RAG Inteligente] Iniciando busca RAG para cliente ID: ${clientId}, Query: "${message.substring(0, 60)}..."`);
@@ -2788,41 +2836,56 @@ app.post("/api/client-rag/index", async (req, res) => {
       .eq('compartment', compartment)
       .eq('file_name', fileName);
 
-    for (let index = 0; index < chunks.length; index++) {
-      const chunkText = chunks[index];
-      if (!chunkText.trim()) continue;
+    // Process embeddings in batches of 50 to avoid timeouts
+    const BATCH_SIZE = 50;
+    
+    // Pre-filter empty chunks
+    const validChunks = chunks.filter(c => c.trim().length > 0);
+    
+    for (let i = 0; i < validChunks.length; i += BATCH_SIZE) {
+      const batchChunks = validChunks.slice(i, i + BATCH_SIZE);
+      console.log(`[ClientRAG] Embedding batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(validChunks.length / BATCH_SIZE)} (size: ${batchChunks.length})`);
+      
+      try {
+        const batchEmbeddings = await callGeminiEmbedBatch(batchChunks);
+        
+        const chunkObjects = batchChunks.map((chunkText, batchIdx) => {
+           const globalIndex = i + batchIdx;
+           return {
+            client_id: clientId,
+            compartment,
+            subfolder: subfolder || null,
+            file_name: fileName,
+            file_url: fileUrl || null,
+            chunk_index: globalIndex,
+            content: chunkText,
+            embedding: batchEmbeddings[batchIdx],
+            metadata: {
+              charLength: chunkText.length,
+              indexedAt: new Date().toISOString()
+            }
+          };
+        });
+        
+        // Insert this batch immediately to the database
+        const { error } = await supabaseAdmin
+            .from('client_document_chunks')
+            .insert(chunkObjects);
 
-      // Rate limit safety
-      if (index > 0) {
-        await new Promise(resolve => setTimeout(resolve, 350));
-      }
-
-      const embedding = await callGeminiEmbed(chunkText);
-      processedChunks.push({
-        client_id: clientId,
-        compartment,
-        subfolder: subfolder || null,
-        file_name: fileName,
-        file_url: fileUrl || null,
-        chunk_index: index,
-        content: chunkText,
-        embedding,
-        metadata: {
-          charLength: chunkText.length,
-          indexedAt: new Date().toISOString()
+        if (error) {
+          console.error(`[ClientRAG] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error);
+          throw error;
         }
-      });
-    }
-
-    // Insert to database in batches
-    if (processedChunks.length > 0) {
-      const { error } = await supabaseAdmin
-        .from('client_document_chunks')
-        .insert(processedChunks);
-
-      if (error) {
-        console.error("Error inserting client document chunks:", error);
-        throw error;
+        
+        processedChunks.push(...chunkObjects);
+        
+        // Slight delay between batches to respect rate limits
+        if (i + BATCH_SIZE < validChunks.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (batchError) {
+         console.error(`[ClientRAG] Failed to process batch ${Math.floor(i / BATCH_SIZE) + 1}:`, batchError);
+         throw batchError;
       }
     }
 
