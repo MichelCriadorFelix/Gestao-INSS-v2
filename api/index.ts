@@ -3078,7 +3078,6 @@ REGRAS DE OURO:
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
-    const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
     // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
@@ -3103,7 +3102,7 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // correctionInstruction removido (Fix#1)
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (ragContext) {
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -3563,7 +3562,6 @@ REGRAS DE OURO:
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
-    const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
     // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
@@ -3584,7 +3582,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // correctionInstruction removido (Fix#1)
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
@@ -4036,8 +4034,6 @@ REGRAS DE OURO:
 
     // DETECÇÃO DE CORREÇÃO
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
-    const correctionInstruction = ""; // mantido para compatibilidade
-
     let finalMessage = message;
     if (ragContext) { finalMessage += `\n\n${ragContext}`; }
     if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
