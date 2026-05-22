@@ -572,7 +572,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
           if (m.role === 'assistant' && m.content.length > 3000) {
             return {
               ...m,
-              content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
+              content: m.content.substring(0, 2000) + '\n\n[... FIX-E: Contexto expandido (2000 chars) para manter coerência entre peças. Peça completa no Editor de Petições ...]'
             };
           }
           return m;
