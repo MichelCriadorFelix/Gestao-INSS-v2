@@ -2966,6 +2966,32 @@ app.post("/api/client-rag/delete-file", async (req, res) => {
   }
 });
 
+app.post("/api/client-rag/clear-all", async (req, res) => {
+  try {
+    const { clientId } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required" });
+    }
+
+    console.log(`[ClientRAG] Full database wipe requested for client ${clientId}`);
+
+    const { error } = await supabaseAdmin
+      .from('client_document_chunks')
+      .delete()
+      .eq('client_id', clientId);
+
+    if (error) {
+      console.error("Error full clearing RAG chunks:", error);
+      throw error;
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error in /api/client-rag/clear-all:", error);
+    res.status(500).json({ error: error.message || "Failed to clear all RAG chunks" });
+  }
+});
+
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
     const { cnisContent, model = "gemini-3.5-flash" } = req.body;

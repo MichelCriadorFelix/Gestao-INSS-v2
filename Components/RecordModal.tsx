@@ -177,6 +177,50 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       }
   };
 
+  const clearAllClientRAG = async () => {
+      if (!formData.id) return;
+      
+      const confirmClear = window.confirm("Tem certeza que deseja excluir permanentemente toda a base de conhecimento (RAG) deste cliente? Isso irá apagar todos os vetores indexados no Supabase e liberar espaço no banco.");
+      if (!confirmClear) return;
+
+      try {
+          let token = "";
+          try {
+              if (supabase) {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (session) {
+                      token = session.access_token;
+                  }
+              }
+          } catch (sessionErr) {
+              console.warn("Could not get Supabase session token:", sessionErr);
+          }
+
+          const res = await fetch('/api/client-rag/clear-all', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({ clientId: formData.id })
+          });
+
+          if (!res.ok) throw new Error("Falha ao limpar RAG no Supabase.");
+
+          // Update index status to none for all documents
+          const updatedStatus: Record<string, 'indexing' | 'indexed' | 'error' | 'none'> = {};
+          (formData.documents || []).forEach(doc => {
+              updatedStatus[doc.id] = 'none';
+          });
+          setIndexStatus(updatedStatus);
+
+          alert("Base de conhecimento (RAG) excluída com sucesso para este cliente!");
+      } catch (err: any) {
+          console.error("Erro ao limpar RAG do cliente:", err);
+          alert(`Erro ao excluir RAG: ${err.message || err}`);
+      }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certidaoFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1408,6 +1452,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             📝 Petições Salvas ({formData.documents?.filter(d => d.compartment === 'petitions').length || 0})
                         </button>
                     </div>
+
+                    {/* GERENCIAMENTO SEMÂNTICO DE RAG */}
+                    {formData.id && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-indigo-50/40 dark:bg-bordeaux-950/20 border border-indigo-100/60 dark:border-gold-500/10 rounded-2xl gap-3 font-sans text-xs">
+                            <div className="text-slate-600 dark:text-slate-300">
+                                🧠 <span className="font-bold text-slate-800 dark:text-white">Base de Inteligência (RAG):</span> {Object.values(indexStatus).filter(s => s === 'indexed').length} documento(s) com busca semântica ativa para as IAs do escritório.
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={clearAllClientRAG}
+                                className="px-3 py-1.5 bg-red-50 hover:bg-red-600 dark:bg-red-950/20 dark:hover:bg-red-900/60 text-red-700 hover:text-white dark:text-red-400 dark:hover:text-white rounded-xl transition font-bold border border-red-200/50 dark:border-red-500/20 flex items-center justify-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
+                            >
+                                <TrashIcon className="h-4 w-4" /> Excluir RAG Completo
+                            </button>
+                        </div>
+                    )}
 
                     <div className="space-y-3">
                         {formData.documents && formData.documents.length > 0 ? (
