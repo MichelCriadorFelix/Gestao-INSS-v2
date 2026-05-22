@@ -572,7 +572,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             };
           }
           // Resposta de IA com peça/relatório longo
-          if (m.role === 'assistant' && m.content.length > 3000) {
+          if (m.role === 'assistant' && m.content.length > 20000) {
             return {
               ...m,
               content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
