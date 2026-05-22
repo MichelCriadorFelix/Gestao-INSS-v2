@@ -1626,14 +1626,14 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
                   </select>
                   {currentSession?.tokens && (
                     <>
-                      <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2 hidden sm:block"></div>
-                      <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50/50 dark:bg-emerald-950/25 border border-emerald-100/40 dark:border-emerald-900/45 rounded-md text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-300" title="Consumo estimado de tokens neste chat">
-                        <Bot className="w-3 h-3 text-emerald-500" />
-                        <span>In: {currentSession.tokens.input.toLocaleString()}</span>
-                        <span className="opacity-40">|</span>
-                        <span>Out: {currentSession.tokens.output.toLocaleString()}</span>
-                        <span className="opacity-40">|</span>
-                        <span className="font-bold">Total: {currentSession.tokens.total.toLocaleString()}</span>
+                      <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50/50 dark:bg-emerald-950/25 border border-emerald-100/40 dark:border-emerald-900/45 rounded-md text-[9px] sm:text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-300" title="Consumo estimado de tokens neste chat">
+                        <Bot className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span className="hidden md:inline">In: {currentSession.tokens.input.toLocaleString()}</span>
+                        <span className="hidden md:inline opacity-40">|</span>
+                        <span className="hidden md:inline">Out: {currentSession.tokens.output.toLocaleString()}</span>
+                        <span className="hidden md:inline opacity-40">|</span>
+                        <span className="font-bold">T: {currentSession.tokens.total.toLocaleString()}</span>
                       </div>
                     </>
                   )}

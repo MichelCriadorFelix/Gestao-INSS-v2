@@ -20,6 +20,7 @@ export interface ChatSession {
   documents?: any[];
   clientId?: string;
   clientName?: string;
+  tokens?: { input: number; output: number; total: number };
 }
 
 export interface SavedCalculation {
@@ -37,7 +38,8 @@ export const supabaseService = {
     
     let messagesToSave = session.messages.filter(m => 
       !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]') && 
-      !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]')
+      !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]') &&
+      !m.content?.startsWith('[SYSTEM_TOKENS_METADATA]')
     );
 
     if (session.documents && session.documents.length > 0) {
@@ -54,6 +56,15 @@ export const supabaseService = {
         id: 'system-client-metadata',
         role: 'user',
         content: `[SYSTEM_CLIENT_METADATA]\n${JSON.stringify({ clientId: session.clientId, clientName: session.clientName })}`,
+        timestamp: new Date().toISOString()
+      }];
+    }
+
+    if (session.tokens) {
+      messagesToSave = [...messagesToSave, {
+        id: 'system-tokens-metadata',
+        role: 'user',
+        content: `[SYSTEM_TOKENS_METADATA]\n${JSON.stringify(session.tokens)}`,
         timestamp: new Date().toISOString()
       }];
     }
@@ -98,6 +109,7 @@ export const supabaseService = {
       let documents = [];
       let clientId = undefined;
       let clientName = undefined;
+      let tokens = undefined;
       let messages = session.messages || [];
 
       const docsMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
@@ -122,10 +134,21 @@ export const supabaseService = {
         }
       }
 
+      const tokensMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_TOKENS_METADATA]'));
+      if (tokensMsgIndex !== -1) {
+        try {
+          const tokensJson = messages[tokensMsgIndex].content.replace('[SYSTEM_TOKENS_METADATA]\n', '');
+          tokens = JSON.parse(tokensJson);
+        } catch (e) {
+          console.error('Error parsing tokens metadata', e);
+        }
+      }
+
       // Filter out the system messages from the messages visible to the UI
       messages = messages.filter((m: any) => 
         !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]') && 
-        !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]')
+        !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]') &&
+        !m.content?.startsWith('[SYSTEM_TOKENS_METADATA]')
       );
 
       return {
@@ -133,7 +156,8 @@ export const supabaseService = {
         messages,
         documents,
         clientId,
-        clientName
+        clientName,
+        tokens
       };
     });
   },
