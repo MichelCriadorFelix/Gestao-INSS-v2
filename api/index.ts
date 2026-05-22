@@ -3103,14 +3103,16 @@ ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]
 [FIM DA REFERÊNCIA]`;
         } else {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          const sumarioEstrutural = extractStructuralSummary(draftContent);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
-O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
-Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
+          const draftParaRegen = draftContent.substring(0, 20000);
+          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
+O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
+Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
-${sumarioEstrutural}
-[FIM DO SUMÁRIO]
+[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+[FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
@@ -3571,14 +3573,16 @@ Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS 
 ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
-          const sumarioEstrutural = extractStructuralSummary(draftContent);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
-O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
-Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
+          const draftParaRegen = draftContent.substring(0, 20000);
+          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
+O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
+Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
-${sumarioEstrutural}
-[FIM DO SUMÁRIO]
+[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+[FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
@@ -4001,13 +4005,16 @@ Indique onde o trecho deve ser inserido.
 ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
-          const sumarioEstrutural = extractStructuralSummary(draftContent);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
-O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
+          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
+          const draftParaRegen = draftContent.substring(0, 20000);
+          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
+O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
+Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
-${sumarioEstrutural}
-[FIM DO SUMÁRIO]
+[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+[FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
@@ -4435,14 +4442,15 @@ ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]
 [FIM DA REFERÊNCIA]`;
   } else {
     // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-    const sumarioEstrutural = extractStructuralSummary(draftContent);
-    finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
-O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
-Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
+    // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
+    const draftParaRegen = draftContent.substring(0, 20000);
+    finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
+O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[SUMÁRIO ESTRUTURAL DA PEÇA ANTERIOR]
-${sumarioEstrutural}
-[FIM DO SUMÁRIO]
+[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+${draftParaRegen}${draftContent.length > 20000 ? '\n[... mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+[FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
