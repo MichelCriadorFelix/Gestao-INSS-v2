@@ -3594,8 +3594,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
-      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
-      const inputTokens = estimateTokens(promptTextToEstimate);
+      const inputTokens = totalInputTokens;
       const outputTokens = estimateTokens(fullResponseText);
       res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
 
@@ -4139,8 +4138,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
-      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
-      const inputTokens = estimateTokens(promptTextToEstimate);
+      const inputTokens = totalInputTokensLuana;
       const outputTokens = estimateTokens(fullResponseText);
       res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
 
@@ -4546,8 +4544,7 @@ REGRAS ABSOLUTAS:
         }
       }
 
-      const promptTextToEstimate = selectedSystemPrompt + (ragContext || "") + (documentContext || "") + JSON.stringify(historyParts || []);
-      const inputTokens = estimateTokens(promptTextToEstimate);
+      const inputTokens = totalInputTokens;
       const outputTokens = estimateTokens(fullResponseText);
       res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
 
@@ -4955,8 +4952,7 @@ if (sessionId && fullResponseText.length > 500 && isGenerationRequest) {
   }
 }
 
-const promptTextToEstimate = (selectedSystemPrompt || "") + (finalMessage || "") + JSON.stringify(historyParts || []);
-const inputTokens = estimateTokens(promptTextToEstimate);
+const inputTokens = totalInputTokens;
 const outputTokens = estimateTokens(fullResponseText);
 res.write(`data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`);
 
