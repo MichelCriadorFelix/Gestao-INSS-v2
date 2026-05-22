@@ -2563,14 +2563,17 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   }
 }
 
-async function callOpenRouterStream(params: any, res: any): Promise<void> {
+async function callOpenRouterStream(params: any, res: any, shouldEndStream = true): Promise<{ fullText: string; maxTokensHit: boolean }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     res.write(`data: ${JSON.stringify({ error: "OPENROUTER_API_KEY não configurada no servidor." })}\n\n`);
     res.write(`data: [DONE]\n\n`);
     res.end();
-    return;
+    return { fullText: "", maxTokensHit: false };
   }
+
+  let combinedText = "";
+  let maxTokensHit = false;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -2608,7 +2611,6 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let done = false;
-    let combinedText = "";
 
     while (!done) {
       const { value, done: readerDone } = await reader.read();
@@ -2620,7 +2622,12 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
           if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
             try {
               const data = JSON.parse(line.slice(6));
-              const delta = data.choices[0]?.delta;
+              const choice = data.choices?.[0];
+              const delta = choice?.delta;
+              
+              if (choice?.finish_reason === 'length') {
+                maxTokensHit = true;
+              }
               
               // Captura tanto o conteúdo final quanto o raciocínio
               const reasoning = delta?.reasoning || delta?.reasoning_content || "";
@@ -2632,6 +2639,7 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
               }
               
               if (content) {
+                combinedText += content;
                 res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
               }
             } catch (e) {
@@ -2642,14 +2650,20 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
       }
     }
 
-    res.write(`data: [DONE]\n\n`);
-    res.end();
+    if (shouldEndStream) {
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    }
   } catch (error: any) {
     console.error("OpenRouter stream error:", error);
     res.write(`data: ${JSON.stringify({ error: error.message || "Erro na geração do OpenRouter" })}\n\n`);
-    res.write(`data: [DONE]\n\n`);
-    res.end();
+    if (shouldEndStream) {
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    }
   }
+
+  return { fullText: combinedText, maxTokensHit };
 }
 
 // API Routes
@@ -3140,47 +3154,23 @@ ${message}`;
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === 'openrouter') {
-      clearInterval(heartbeat);
-      const orSystemPrompt = selectedSystemPrompt + `
-
-[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
-Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
-REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
-2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
-3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
-4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
-5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
-7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
-
-      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-      for (const h of history) {
-        const role = h.role === 'model' ? 'assistant' : h.role;
-        orMessages.push({ role, content: h.content });
-      }
-      orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
-      return;
-    }
-
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
+    // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = { thinkingBudget: 4096 };
+      maxOutputTokens = 16384; // Limite máximo da API para saída
+      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 2048 };
+      thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16383;
+      maxOutputTokens = 16384;
       thinkingConfig = undefined;
     }
 
@@ -3208,35 +3198,79 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream({
-          model: model || "gemini-3.5-flash",
-          contents: currentContents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: finalTemperature,
-            maxOutputTokens,
-            ...(thinkingConfig && { thinkingConfig }),
-            tools
-          } as any
-        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-
         let maxTokensHit = false;
         let attemptText = "";
-        for await (const chunk of responseStream) {
-          let text = "";
-          try { text = chunk.text || ""; } catch(e) {}
 
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason === 'MAX_TOKENS') {
-              maxTokensHit = true;
-            }
+        if (modelProvider === 'openrouter') {
+          const orSystemPrompt = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
+Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
+REGRAS ABSOLUTAS E INEGOCIÁVEIS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
+2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
+3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
+4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro della seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
+5. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
+
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
           }
 
-          if (text) {
-            attemptText += text;
-            fullResponseText += text;
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          if (attempt > 1) {
+            orMessages.push({ role: 'assistant', content: fullResponseText });
+            const anchor = fullResponseText.slice(-600);
+            orMessages.push({
+              role: 'user',
+              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+            });
+          } else {
+            orMessages.push({ role: "user", content: finalMessage });
+          }
+
+          const orResult = await callOpenRouterStream({
+            model: model || "deepseek/deepseek-v3.2",
+            messages: orMessages,
+            temperature: isGenerationRequest ? 0.15 : temperature,
+            max_tokens: maxOutputTokens || 16384
+          }, res, false);
+
+          attemptText = orResult.fullText;
+          fullResponseText += attemptText;
+          maxTokensHit = orResult.maxTokensHit;
+        } else {
+          const responseStream = await callGeminiStream({
+            model: model || "gemini-3.5-flash",
+            contents: currentContents,
+            config: {
+              systemInstruction: selectedSystemPrompt,
+              temperature: finalTemperature,
+              maxOutputTokens,
+              ...(thinkingConfig && { thinkingConfig }),
+              tools
+            } as any
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+          for await (const chunk of responseStream) {
+            let text = "";
+            try { text = chunk.text || ""; } catch(e) {}
+
+            if (chunk.candidates && chunk.candidates.length > 0) {
+              const candidate = chunk.candidates[0];
+              if (candidate.finishReason === 'MAX_TOKENS') {
+                maxTokensHit = true;
+              }
+            }
+
+            if (text) {
+              attemptText += text;
+              fullResponseText += text;
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
           }
         }
 
@@ -3262,8 +3296,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          if (modelProvider !== 'openrouter') {
+            currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+            currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          }
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -3632,65 +3668,23 @@ ${message}`;
     // Configuração de Tools (Google Search Grounding + URL Context)
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === 'openrouter') {
-      clearInterval(heartbeat);
-      const orSystemPromptLuana = selectedSystemPrompt + `
-
-[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
-Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
-REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
-2. CITAÇÕES WITH RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
-3. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
-4. DENSITY: Entre 4000 e 6000 palavras. Não resuma.
-5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
-
-      const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
-      for (const h of history) {
-        // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
-        const role = h.role === 'model' ? 'assistant' : h.role;
-        orMessages.push({ role, content: h.content });
-      }
-      
-      const userContent: any[] = [];
-      // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
-      // Mas se houver imagens, TEM que ser array. Se não houver, string simples é mais seguro.
-      if (images && images.length > 0) {
-        userContent.push({ type: "text", text: finalMessage });
-        images.forEach((img: string) => {
-          userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
-        });
-      }
-
-      orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
-
-      const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
-
-      await callOpenRouterStream({
-        model: model || "deepseek/deepseek-v3.2",
-        messages: orMessagesFinal,
-        temperature: isGenerationRequest ? 0.15 : temperature,
-        max_tokens: 16383
-      }, res);
-      return;
-    }
-
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
+    // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = { thinkingBudget: 4096 };
+      maxOutputTokens = 16384; // Limite máximo da API para saída
+      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
     } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 2048 };
+      thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16383;
+      maxOutputTokens = 16384;
       thinkingConfig = undefined;
     }
 
@@ -3715,47 +3709,98 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream({
-          model: model || "gemini-3.5-flash",
-          contents: currentContents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: finalTemperature,
-            maxOutputTokens: maxOutputTokens,
-            ...(thinkingConfig && { thinkingConfig }),
-            tools: tools,
-            safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
-          } as any
-        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-
         let maxTokensHit = false;
         let attemptText = "";
-        for await (const chunk of responseStream) {
-          let text = "";
-          try {
-            text = chunk.text || "";
-          } catch (e) {
-            // ignore
+
+        if (modelProvider === 'openrouter') {
+          const orSystemPromptLuana = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
+Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
+REGRAS ABSOLUTAS E INEGOCIÁVEIS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
+2. CITAÇÕES COM RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
+3. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
+4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
+5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
+
+          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
           }
 
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason === 'MAX_TOKENS') {
-              maxTokensHit = true;
-            } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-              text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+          if (attempt > 1) {
+            orMessages.push({ role: 'assistant', content: fullResponseText });
+            const anchor = fullResponseText.slice(-600);
+            orMessages.push({
+              role: 'user',
+              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+            });
+          } else {
+            const userContent: any[] = [];
+            if (images && images.length > 0) {
+              userContent.push({ type: "text", text: finalMessage });
+              images.forEach((img: string) => {
+                userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+              });
             }
+            orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
           }
 
-          if (text) {
-            attemptText += text;
-            fullResponseText += text;
-            res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
+          const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
+
+          const orResult = await callOpenRouterStream({
+            model: model || "deepseek/deepseek-v3.2",
+            messages: orMessagesFinal,
+            temperature: isGenerationRequest ? 0.15 : temperature,
+            max_tokens: maxOutputTokens || 16384
+          }, res, false);
+
+          attemptText = orResult.fullText;
+          fullResponseText += attemptText;
+          maxTokensHit = orResult.maxTokensHit;
+        } else {
+          const responseStream = await callGeminiStream({
+            model: model || "gemini-3.5-flash",
+            contents: currentContents,
+            config: {
+              systemInstruction: selectedSystemPrompt,
+              temperature: finalTemperature,
+              maxOutputTokens: maxOutputTokens,
+              ...(thinkingConfig && { thinkingConfig }),
+              tools: tools,
+              safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+              ]
+            } as any
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+          for await (const chunk of responseStream) {
+            let text = "";
+            try {
+              text = chunk.text || "";
+            } catch (e) {
+              // ignore
+            }
+
+            if (chunk.candidates && chunk.candidates.length > 0) {
+              const candidate = chunk.candidates[0];
+              if (candidate.finishReason === 'MAX_TOKENS') {
+                maxTokensHit = true;
+              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+              }
+            }
+
+            if (text) {
+              attemptText += text;
+              fullResponseText += text;
+              res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
+            }
           }
         }
 
@@ -3780,8 +3825,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
           console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          if (modelProvider !== 'openrouter') {
+            currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+            currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          }
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -4042,46 +4089,23 @@ ${message}`;
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === 'openrouter') {
-      clearInterval(heartbeat);
-      const orSystemPrompt = selectedSystemPrompt + `
-
-[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
-Você está gerando uma peça jurídica de Direito do Consumidor ou Direito Civil para o escritório Felix & Castro Advocacia.
-REGRAS ABSOLUTAS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
-2. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
-3. SÚMULAS NOS PEDIDOS: TERMINANTEMENTE PROIBIDO transcrever súmulas na seção de Pedidos.
-4. DENSIDADE: A petição deve ter entre 3000 e 5000 palavras. Não resuma.
-5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
-6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
-
-      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-      for (const h of history) {
-        const role = h.role === 'model' ? 'assistant' : h.role;
-        orMessages.push({ role, content: h.content });
-      }
-      orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
-      return;
-    }
-
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
 
+    // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = { thinkingBudget: 4096 };
+      maxOutputTokens = 16384; // Limite máximo da API para saída
+      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 2048 };
+      thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16383;
+      maxOutputTokens = 16384;
       thinkingConfig = undefined;
     }
 
@@ -4104,35 +4128,78 @@ REGRAS ABSOLUTAS:
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream({
-          model: model || "gemini-3.5-flash",
-          contents: currentContents,
-          config: {
-            systemInstruction: selectedSystemPrompt,
-            temperature: finalTemperature,
-            maxOutputTokens,
-            ...(thinkingConfig && { thinkingConfig }),
-            tools
-          } as any
-        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-
         let maxTokensHit = false;
         let attemptText = "";
-        for await (const chunk of responseStream) {
-          let text = "";
-          try { text = chunk.text || ""; } catch(e) {}
 
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason === 'MAX_TOKENS') {
-              maxTokensHit = true;
-            }
+        if (modelProvider === 'openrouter') {
+          const orSystemPrompt = selectedSystemPrompt + `
+
+[INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
+Você está gerando uma peça jurídica de Direito do Consumidor ou Direito Civil para o escritório Felix & Castro Advocacia.
+REGRAS ABSOLUTAS:
+1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
+2. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
+3. SÚMULAS NOS PEDIDOS: TERMINANTEMENTE PROIBIDO transcrever súmulas na seção de Pedidos.
+4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
+5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
+6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
+
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
           }
 
-          if (text) {
-            attemptText += text;
-            fullResponseText += text;
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          if (attempt > 1) {
+            orMessages.push({ role: 'assistant', content: fullResponseText });
+            const anchor = fullResponseText.slice(-600);
+            orMessages.push({
+              role: 'user',
+              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+            });
+          } else {
+            orMessages.push({ role: "user", content: finalMessage });
+          }
+
+          const orResult = await callOpenRouterStream({
+            model: model || "deepseek/deepseek-v3.2",
+            messages: orMessages,
+            temperature: isGenerationRequest ? 0.15 : temperature,
+            max_tokens: maxOutputTokens || 16384
+          }, res, false);
+
+          attemptText = orResult.fullText;
+          fullResponseText += attemptText;
+          maxTokensHit = orResult.maxTokensHit;
+        } else {
+          const responseStream = await callGeminiStream({
+            model: model || "gemini-3.5-flash",
+            contents: currentContents,
+            config: {
+              systemInstruction: selectedSystemPrompt,
+              temperature: finalTemperature,
+              maxOutputTokens,
+              ...(thinkingConfig && { thinkingConfig }),
+              tools
+            } as any
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+
+          for await (const chunk of responseStream) {
+            let text = "";
+            try { text = chunk.text || ""; } catch(e) {}
+
+            if (chunk.candidates && chunk.candidates.length > 0) {
+              const candidate = chunk.candidates[0];
+              if (candidate.finishReason === 'MAX_TOKENS') {
+                maxTokensHit = true;
+              }
+            }
+
+            if (text) {
+              attemptText += text;
+              fullResponseText += text;
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
           }
         }
 
@@ -4157,8 +4224,10 @@ REGRAS ABSOLUTAS:
         if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.FelixCastro] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
-          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          if (modelProvider !== 'openrouter') {
+            currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+            currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+          }
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
