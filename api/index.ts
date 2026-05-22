@@ -3081,25 +3081,25 @@ ${ragContext}`;
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
           // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
 Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else if (revisionIntent === 'ADDITION') {
           // Adição — devolve só o trecho novo.
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
 Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
@@ -3551,24 +3551,24 @@ ${ragContext}`;
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
 Mantenha densidade, valores da planilha e formatação idênticas ao padrão da peça original.
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
 Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           const sumarioEstrutural = extractStructuralSummary(draftContent);
@@ -3982,23 +3982,23 @@ REGRAS DE OURO:
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO.
 Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftEnxuto = draftContent.substring(0, 15000);
+          const draftEnxuto = draftContent.substring(0, 40000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
 Devolva APENAS o novo trecho no estilo e densidade da peça original.
 Indique onde o trecho deve ser inserido.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           const sumarioEstrutural = extractStructuralSummary(draftContent);
@@ -4413,25 +4413,25 @@ console.log(`[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe
 if (draftContent) {
   if (revisionIntent === 'POINT_CORRECTION') {
     // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-    const draftEnxuto = draftContent.substring(0, 15000);
+    const draftEnxuto = draftContent.substring(0, 40000);
     finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
 Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
 [FIM DA REFERÊNCIA]`;
   } else if (revisionIntent === 'ADDITION') {
     // Adição — devolve só o trecho novo.
-    const draftEnxuto = draftContent.substring(0, 15000);
+    const draftEnxuto = draftContent.substring(0, 40000);
     finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
 Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
+${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
   } else {
     // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
