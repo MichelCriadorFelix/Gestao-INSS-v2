@@ -3166,7 +3166,7 @@ ${message}`;
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = undefined;
+      thinkingConfig = { thinkingBudget: 16000 };
     }
 
     // Temperature calibrada por intenção:
@@ -3678,7 +3678,7 @@ ${message}`;
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = undefined;
+      thinkingConfig = { thinkingBudget: 16000 };
     }
 
     // Temperature calibrada por intenção
@@ -4103,7 +4103,7 @@ ${message}`;
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = undefined;
+      thinkingConfig = { thinkingBudget: 16000 };
     }
 
     const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
