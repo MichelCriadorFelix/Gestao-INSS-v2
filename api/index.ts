@@ -3129,7 +3129,8 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
 
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
@@ -3622,7 +3623,8 @@ ${message}`;
     ];
 
     // Configuração de Tools (Google Search Grounding + URL Context)
-    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
 
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
@@ -4031,7 +4033,8 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
 
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
@@ -4467,7 +4470,8 @@ files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: fi
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
 
     if (modelProvider === 'openrouter') {
 clearInterval(heartbeat);
