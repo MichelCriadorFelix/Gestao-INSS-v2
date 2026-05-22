@@ -714,8 +714,15 @@ function countWords(text: string): number {
  * Decide se o pedido do usuário é correção pontual, adição ou regeneração total.
  * Crítico para evitar a degradação da 2ª petição.
  */
-type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'NEW_GENERATION';
+type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'NEW_GENERATION' | 'NO_ACTION';
 
+/**
+ * FIX RESIDUAL #1: fallback alterado de POINT_CORRECTION para NO_ACTION.
+ * Antes: qualquer mensagem com draft mas sem keyword de correção caia em POINT_CORRECTION,
+ * injetando 40k chars de draft no prompt desnecessariamente (ex: pergunta sobre o caso).
+ * Agora: apenas mensagens com keyword explícita de correção/adição/regen injetam o draft.
+ * Sem keyword → NO_ACTION: modelo responde normalmente sem o draft no prompt.
+ */
 function detectRevisionIntent(message: string, hasDraft: boolean): RevisionIntent {
   if (!hasDraft) return 'NEW_GENERATION';
   const msg = message.toLowerCase();
@@ -725,7 +732,8 @@ function detectRevisionIntent(message: string, hasDraft: boolean): RevisionInten
   if (isFullRegen) return 'FULL_REGENERATION';
   if (isPointCorrection) return 'POINT_CORRECTION';
   if (isAddition) return 'ADDITION';
-  return 'POINT_CORRECTION';
+  // FIX RESIDUAL #1: sem keyword explícita → não injetar draft
+  return 'NO_ACTION';
 }
 
 /**
