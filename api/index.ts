@@ -4773,6 +4773,127 @@ app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
 });
 
+// ============================================================
+// FIX D — ENDPOINT ADMIN: RECHUNKING DE DOCUMENTOS GIGANTES
+// Chamada única pelo administrador para dividir chunks > 8000 chars
+// e regenerar embeddings com precisão máxima
+// ============================================================
+app.post("/api/admin/rechunk-large-docs", async (req, res) => {
+  const { adminKey } = req.body;
+  // Proteção mínima — só pode ser chamado por quem sabe a chave
+  if (adminKey !== (process.env.ADMIN_KEY || "felix-castro-rechunk-2026")) {
+    return res.status(403).json({ error: "Não autorizado." });
+  }
+
+  res.setHeader('Content-Type', 'application/json');
+
+  try {
+    // 1. Buscar todos os chunks gigantes (> 8000 chars)
+    const { data: bigChunks, error: fetchErr } = await supabaseAdmin
+      .from('legal_documents')
+      .select('id, content, metadata')
+      .gt('content', '') // necessário para filtro funcionar
+      .order('id');
+
+    if (fetchErr) throw fetchErr;
+
+    // Filtrar > 8000 chars (Supabase não suporta length() em .select filter)
+    const targets = (bigChunks || []).filter(r => r.content.length > 8000);
+
+    const CHUNK_SIZE = 2500; // chars — tamanho ideal para embeddings de 768 dims
+    const OVERLAP = 200;     // overlap entre chunks para manter contexto
+
+    /**
+     * Divide texto em chunks semânticos respeitando quebras de artigo/parágrafo.
+     * Prioriza quebras em: "Art. X", "
+
+", ". " no limite
+     */
+    function splitSemantic(text: string, maxChars: number, overlap: number): string[] {
+      const chunks: string[] = [];
+      let pos = 0;
+      while (pos < text.length) {
+        let end = Math.min(pos + maxChars, text.length);
+        if (end < text.length) {
+          // Tentar quebrar em artigo ("Art. " ou "§")
+          const artBreak = text.lastIndexOf('\nArt. ', end);
+          const parBreak = text.lastIndexOf('\n\n', end);
+          const sentBreak = text.lastIndexOf('. ', end);
+          if (artBreak > pos + maxChars * 0.5) end = artBreak;
+          else if (parBreak > pos + maxChars * 0.5) end = parBreak + 2;
+          else if (sentBreak > pos + maxChars * 0.5) end = sentBreak + 2;
+        }
+        chunks.push(text.slice(pos, end).trim());
+        pos = end - overlap; // overlap para manter contexto entre chunks
+        if (pos <= 0) break;
+      }
+      return chunks.filter(c => c.length > 50);
+    }
+
+    let processed = 0;
+    let newChunks = 0;
+    let errors = 0;
+    const log: string[] = [];
+
+    for (const doc of targets) {
+      try {
+        const subChunks = splitSemantic(doc.content, CHUNK_SIZE, OVERLAP);
+        log.push(`[${doc.id}] "${(doc.metadata?.title || 'sem título').substring(0, 50)}" → ${doc.content.length} chars → ${subChunks.length} sub-chunks`);
+
+        const inserted: any[] = [];
+        for (const chunk of subChunks) {
+          // Gerar embedding via callGeminiEmbed existente
+          const embedding = await callGeminiEmbed(chunk);
+          if (!embedding || embedding.length === 0) {
+            log.push(`  ⚠️  Embedding falhou para sub-chunk de ${chunk.length} chars`);
+            errors++;
+            continue;
+          }
+          inserted.push({
+            content: chunk,
+            metadata: { ...doc.metadata, rechunked: true, original_id: doc.id },
+            embedding
+          });
+        }
+
+        if (inserted.length > 0) {
+          // Inserir novos sub-chunks
+          const { error: insertErr } = await supabaseAdmin
+            .from('legal_documents')
+            .insert(inserted);
+          if (insertErr) throw insertErr;
+
+          // Deletar chunk original apenas se todos os novos foram inseridos
+          const { error: deleteErr } = await supabaseAdmin
+            .from('legal_documents')
+            .delete()
+            .eq('id', doc.id);
+          if (deleteErr) throw deleteErr;
+
+          newChunks += inserted.length;
+          log.push(`  ✅ ${inserted.length} sub-chunks inseridos, original deletado`);
+        }
+        processed++;
+      } catch (docErr: any) {
+        log.push(`  ❌ Erro no doc ${doc.id}: ${docErr.message}`);
+        errors++;
+      }
+    }
+
+    return res.json({
+      ok: true,
+      total_targets: targets.length,
+      processed,
+      new_chunks: newChunks,
+      errors,
+      log
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Development server setup
 const PORT = 3000;
 
