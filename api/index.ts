@@ -3031,30 +3031,8 @@ REGRAS DE OURO:
     // ============================================================
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
-4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
-5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos ou no valor da causa anterior.
-6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
-`;
-      console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
-    }
+    // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
+    const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
@@ -3079,7 +3057,8 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
-    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
+    // FIX#1: sempre busca draft quando há sessionId (não depende mais de isCorrectionRequest)
+      if (sessionId) {
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
@@ -3100,7 +3079,7 @@ ${ragContext}`;
       console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION') {
           // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
@@ -3520,30 +3499,8 @@ REGRAS DE OURO:
     // ============================================================
     // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
     // ============================================================
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Se o usuário colou o tópico atual na mensagem informando o que corrigir, use a cola como base integral para a correção. Se ele não colou, encontre o tópico na [PETIÇÃO BASE ANTERIOR - IMPORTANTE] inserida no final do prompt, preservando toda a sua densidade (citações em blockquote, provas OCR e formatações).
-4. O trecho final corrigido deve ter densidade IGUAL OU SUPERIOR à anterior, aprofundando os argumentos solicitados sem jamais "resumir" o conteúdo.
-5. Se aplicável, NUNCA altere os valores financeiros estipulados nos cálculos.
-6. Direto ao ponto: inicie sua resposta já entregando o tópico corrigido.
-`;
-      console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
-    }
+    // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
+    const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
     let lengthConstraint = "";
     if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
@@ -3571,7 +3528,8 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
-    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
+    // FIX#1: sempre busca draft quando há sessionId
+      if (sessionId) {
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
@@ -3592,7 +3550,7 @@ ${ragContext}`;
       console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION') {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
@@ -3996,34 +3954,15 @@ REGRAS DE OURO:
     }));
 
     // DETECÇÃO DE CORREÇÃO
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
-    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
-    const lastAssistantWasLongGeneration = lastAssistantMsg && (
-      lastAssistantMsg.content.length > 3000 ||
-      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
-    );
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
-
-    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
-      isCorrectionRequest = true;
-      correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
-Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
-
-INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
-1. RETORNE EXCLUSIVAMENTE O TÓPICO OU TRECHO CORRIGIDO. É ESTRITAMENTE PROIBIDO GERAR A PETIÇÃO INTEIRA DE NOVO!
-2. APLIQUE A CORREÇÃO ESPECÍFICA pedida pelo usuário.
-3. Mantenha o MESMO padrão de formatação (Markdown, blockquotes, negrito).
-4. Se o usuário não especificou qual tópico, peça esclarecimento em UMA frase.`;
-    }
+    // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
+    const correctionInstruction = ""; // mantido para compatibilidade
 
     let finalMessage = message;
     if (ragContext) { finalMessage += `\n\n${ragContext}`; }
     if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
-    if (correctionInstruction) { finalMessage += correctionInstruction; }
 
-    // Draft injection para revisão
-    if (sessionId && (isCorrectionRequest || isGenerationRequest)) {
+    // Draft injection para revisão — sempre busca quando há sessionId
+    if (sessionId) {
       let draftContent = "";
       try {
         const { data: draftRow } = await supabaseAdmin
@@ -4042,7 +3981,7 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
       console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION') {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO.
@@ -4437,11 +4376,10 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
       parts: [{ text: h.content }]
     }));
 
-    let isCorrectionRequest = false;
-    let correctionInstruction = "";
+    // FIX#1: isCorrectionRequest removido — dead variable (Fabrícia não gera petições)
     let lengthConstraint = "";
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint;
     if (ragContext) {
 finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -4452,7 +4390,7 @@ Leis/jurisprudências recuperadas:
 ${ragContext}`;
     }
 
-    if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
+    if (sessionId) {
 let draftContent = "";
 try {
   const { data: draftData } = await supabaseAdmin
@@ -4473,7 +4411,7 @@ const revisionIntent = detectRevisionIntent(message, !!draftContent);
 console.log(`[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
 if (draftContent) {
-  if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+  if (revisionIntent === 'POINT_CORRECTION') {
     // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
     const draftEnxuto = draftContent.substring(0, 15000);
     finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
