@@ -253,32 +253,56 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
-    if (!confirm('Isso vai dividir os 58 documentos grandes em trechos menores e regenerar embeddings. Processa em lotes de 3 por vez — clique novamente após cada lote concluir. Continuar?')) return;
+    const msg = rechunkResult && !rechunkResult.done && rechunkResult.remaining > 0
+      ? `Processar o próximo documento? (${rechunkResult.remaining} restantes)`
+      : 'Iniciar otimização da base? Processa 1 documento por vez com streaming em tempo real.';
+    if (!confirm(msg)) return;
+
     setIsRechunking(true);
-    setRechunkResult(null);
-    setRechunkLog(prev => [...prev, '⏳ Iniciando lote de rechunking...']);
+    setRechunkLog(prev => [...prev, '⏳ Conectando...']);
+
     try {
-      const currentOffset = rechunkResult?.next_offset ?? 0;
       const response = await apiFetch('/api/admin/rechunk-large-docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026', batchOffset: currentOffset })
+        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
       });
-      let data: any;
-      try {
-        data = await response.json();
-      } catch {
-        const text = await response.text().catch(() => 'Erro desconhecido');
-        throw new Error(`Servidor retornou resposta inválida: ${text.substring(0, 120)}`);
+
+      if (!response.ok || !response.body) {
+        const txt = await response.text().catch(() => `HTTP ${response.status}`);
+        throw new Error(txt.substring(0, 200));
       }
-      if (!response.ok) throw new Error(data?.error || `Erro ${response.status}`);
-      setRechunkResult(data);
-      setRechunkLog(prev => [...prev, ...(data.log || []),
-        data.done
-          ? `✅ Base totalmente otimizada! Total: ${data.new_chunks || 0} trechos gerados.`
-          : `⏩ Lote concluído. Ainda restam ${data.remaining} docs grandes. Clique novamente para continuar.`
-      ]);
-      if (data.done) fetchDocs();
+
+      // Ler SSE stream linha a linha
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('
+
+');
+        buffer = parts.pop() || '';
+        for (const part of parts) {
+          const line = part.replace(/^data: /, '').trim();
+          if (!line) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.error) {
+              setRechunkLog(prev => [...prev, `❌ ${evt.error}`]);
+            } else {
+              if (evt.log) setRechunkLog(prev => [...prev, evt.log]);
+              if (evt.done !== undefined || evt.remaining !== undefined) {
+                setRechunkResult(evt);
+                if (evt.done) fetchDocs();
+              }
+            }
+          } catch { /* linha incompleta */ }
+        }
+      }
     } catch (err: any) {
       setRechunkLog(prev => [...prev, `❌ Erro: ${err.message}`]);
     } finally {
@@ -694,9 +718,9 @@ export default function KnowledgeBase() {
             >
               {isRechunking ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
               {isRechunking
-                  ? 'Processando lote... (30-60 segundos)'
-                  : rechunkResult && !rechunkResult.done
-                  ? `Continuar (${rechunkResult.remaining} docs restantes)`
+                  ? 'Processando...'
+                  : rechunkResult && !rechunkResult.done && rechunkResult.remaining > 0
+                  ? `▶ Próximo (${rechunkResult.remaining} restantes)`
                   : 'Executar Rechunking'}
             </button>
 

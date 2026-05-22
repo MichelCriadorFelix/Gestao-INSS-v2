@@ -4783,108 +4783,142 @@ app.all("/api/*", (req, res) => {
 // Usa SQL function para filtrar por tamanho — sem carregar todos na memória
 // Processa BATCH_SIZE documentos por chamada — sem timeout
 // ============================================================
+// ============================================================
+// ENDPOINT ADMIN — RECHUNKING STREAMING (padrão SSE igual aos chats)
+// Processa 1 doc por chamada, transmite progresso em tempo real
+// SSE mantém conexão aberta → sem timeout Vercel
+// ============================================================
 app.post("/api/admin/rechunk-large-docs", async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
+  // SSE headers — mantém conexão aberta durante todo o processamento
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const send = (obj: object) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
   try {
-    const { adminKey, batchOffset = 0 } = req.body;
+    const { adminKey, batchOffset = 0 } = req.body || {};
+
     if (adminKey !== (process.env.ADMIN_KEY || "felix-castro-rechunk-2026")) {
-      return res.status(403).json({ error: "Não autorizado." });
+      send({ error: "Não autorizado." });
+      return res.end();
     }
 
-    const BATCH_SIZE = 3;
-    const CHUNK_SIZE = 2500;
-    const OVERLAP    = 200;
-
+    // Quantos docs grandes ainda existem
     const { data: countData, error: countErr } = await supabaseAdmin
       .rpc('count_large_legal_documents', { min_chars: 8000 });
     if (countErr) throw countErr;
     const totalGrandes = Number(countData) || 0;
 
+    send({ log: `📊 Total de documentos grandes: ${totalGrandes}` });
+
+    if (totalGrandes === 0) {
+      send({ done: true, log: '✅ Base já está otimizada!' });
+      return res.end();
+    }
+
+    // Buscar apenas 1 documento por vez (o maior primeiro)
     const { data: targets, error: fetchErr } = await supabaseAdmin
-      .rpc('get_large_legal_documents', {
-        min_chars: 8000,
-        batch_limit: BATCH_SIZE,
-        batch_offset: Number(batchOffset)
-      });
+      .rpc('get_large_legal_documents', { min_chars: 8000, batch_limit: 1, batch_offset: 0 });
     if (fetchErr) throw fetchErr;
-
     if (!targets || targets.length === 0) {
-      return res.json({ ok: true, done: true, total_grandes: totalGrandes,
-        message: 'Base já está otimizada!', log: [] });
+      send({ done: true, log: '✅ Nenhum documento encontrado.' });
+      return res.end();
     }
 
-    function splitSemantic(text: string, maxChars: number, overlap: number): string[] {
-      const chunks: string[] = [];
-      let pos = 0;
-      while (pos < text.length) {
-        let end = Math.min(pos + maxChars, text.length);
-        if (end < text.length) {
-          const artBreak = text.lastIndexOf('\nArt. ', end);
-          const parBreak = text.lastIndexOf('\n\n', end);
-          const sentBreak = text.lastIndexOf('. ', end);
-          if (artBreak > pos + maxChars * 0.5)      end = artBreak;
-          else if (parBreak > pos + maxChars * 0.5)  end = parBreak + 2;
-          else if (sentBreak > pos + maxChars * 0.5) end = sentBreak + 2;
-        }
-        const chunk = text.slice(pos, end).trim();
-        if (chunk.length > 80) chunks.push(chunk);
-        pos = end - overlap;
-        if (pos <= 0) break;
+    const doc = targets[0];
+    const titulo = String(doc.metadata?.title || '').substring(0, 60);
+    send({ log: `🔄 Processando: "${titulo}" (${doc.content.length.toLocaleString()} chars)` });
+
+    // Split semântico
+    const CHUNK_SIZE = 2500;
+    const OVERLAP = 200;
+    const subChunks: string[] = [];
+    let pos = 0;
+    const text: string = doc.content;
+
+    while (pos < text.length) {
+      let end = Math.min(pos + CHUNK_SIZE, text.length);
+      if (end < text.length) {
+        const artBreak = text.lastIndexOf('\nArt. ', end);
+        const parBreak  = text.lastIndexOf('\n\n', end);
+        const sentBreak = text.lastIndexOf('. ', end);
+        if (artBreak > pos + CHUNK_SIZE * 0.5)      end = artBreak;
+        else if (parBreak > pos + CHUNK_SIZE * 0.5)  end = parBreak + 2;
+        else if (sentBreak > pos + CHUNK_SIZE * 0.5) end = sentBreak + 2;
       }
-      return chunks;
+      const chunk = text.slice(pos, end).trim();
+      if (chunk.length > 80) subChunks.push(chunk);
+      pos = end - OVERLAP;
+      if (pos <= 0) break;
     }
 
-    let processed = 0, newChunks = 0, errors = 0;
-    const log: string[] = [];
+    send({ log: `✂️  Dividido em ${subChunks.length} trechos` });
 
-    for (const doc of targets) {
+    // Gerar embeddings — transmite progresso de cada um
+    const inserted: any[] = [];
+    let errors = 0;
+
+    for (let i = 0; i < subChunks.length; i++) {
+      send({ log: `  ⚙️  Embedding ${i + 1}/${subChunks.length}...`, progress: Math.round((i / subChunks.length) * 100) });
       try {
-        const subChunks = splitSemantic(doc.content, CHUNK_SIZE, OVERLAP);
-        log.push(`[${doc.id}] "${String(doc.metadata?.title || '').substring(0, 55)}" → ${doc.content.length} chars → ${subChunks.length} trechos`);
-
-        const inserted: any[] = [];
-        for (let i = 0; i < subChunks.length; i++) {
-          const embedding = await callGeminiEmbed(subChunks[i]);
-          if (!embedding || embedding.length === 0) { errors++; continue; }
-          inserted.push({
-            content: subChunks[i],
-            metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
-              chunk_index: i, total_chunks: subChunks.length },
-            embedding
-          });
+        const embedding = await callGeminiEmbed(subChunks[i]);
+        if (!embedding || embedding.length === 0) {
+          send({ log: `  ⚠️  Embedding ${i + 1} falhou — pulando` });
+          errors++;
+          continue;
         }
-
-        if (inserted.length > 0) {
-          const { error: insertErr } = await supabaseAdmin.from('legal_documents').insert(inserted);
-          if (insertErr) throw new Error('Insert: ' + insertErr.message);
-          const { error: deleteErr } = await supabaseAdmin.from('legal_documents').delete().eq('id', doc.id);
-          if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
-          newChunks += inserted.length;
-          log.push(`  ✅ ${inserted.length} trechos gerados`);
-        }
-        processed++;
-      } catch (docErr: any) {
-        log.push(`  ❌ Erro: ${String(docErr.message)}`);
+        inserted.push({
+          content: subChunks[i],
+          metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
+            chunk_index: i, total_chunks: subChunks.length },
+          embedding
+        });
+      } catch (embErr: any) {
+        send({ log: `  ⚠️  Erro embedding ${i + 1}: ${String(embErr.message)}` });
         errors++;
       }
     }
 
-    const { data: remaining } = await supabaseAdmin
-      .rpc('count_large_legal_documents', { min_chars: 8000 });
-    const remainingCount = Number(remaining) || 0;
-    const done = remainingCount === 0;
+    send({ log: `💾 Salvando ${inserted.length} trechos no banco...` });
 
-    return res.json({
-      ok: true, done, processed, new_chunks: newChunks, errors,
-      remaining: remainingCount, total_grandes: totalGrandes,
-      next_offset: done ? null : Number(batchOffset) + BATCH_SIZE,
-      log
+    if (inserted.length > 0) {
+      // Inserir novos
+      const { error: insertErr } = await supabaseAdmin.from('legal_documents').insert(inserted);
+      if (insertErr) throw new Error('Insert: ' + insertErr.message);
+      // Deletar original
+      const { error: deleteErr } = await supabaseAdmin.from('legal_documents').delete().eq('id', doc.id);
+      if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
+    }
+
+    // Contar quantos restam
+    const { data: remainingData } = await supabaseAdmin
+      .rpc('count_large_legal_documents', { min_chars: 8000 });
+    const remaining = Number(remainingData) || 0;
+
+    send({
+      log: `✅ "${titulo}" → ${inserted.length} trechos salvos${errors > 0 ? ` (${errors} erros)` : ''}`,
+      done: remaining === 0,
+      remaining,
+      total_grandes: totalGrandes,
+      new_chunks: inserted.length,
+      errors
     });
 
+    if (remaining === 0) {
+      send({ log: '🎉 Base totalmente otimizada! Todos os documentos foram rechunked.' });
+    } else {
+      send({ log: `⏩ Restam ${remaining} documentos grandes. Clique em "Continuar" para processar o próximo.` });
+    }
+
   } catch (err: any) {
-    return res.status(500).json({ error: String(err?.message || 'Erro interno') });
+    send({ error: String(err?.message || 'Erro interno desconhecido') });
   }
+
+  res.end();
 });
+
 
 
 
