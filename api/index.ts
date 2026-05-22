@@ -2312,6 +2312,29 @@ function getApiKeys() {
 }
 
 
+
+/**
+ * FIX#8: Remove mensagens consecutivas do mesmo papel do histórico.
+ * A Gemini API exige alternância estrita user/model.
+ * Mensagens assistant consecutivas (auditoria de docs) são mescladas em uma única.
+ */
+function sanitizeHistory(history: any[]): any[] {
+  if (!history || history.length === 0) return [];
+  const result: any[] = [];
+  for (const msg of history) {
+    if (result.length > 0 && result[result.length - 1].role === msg.role) {
+      // Mesclar conteúdo no último do mesmo role
+      result[result.length - 1] = {
+        ...result[result.length - 1],
+        content: result[result.length - 1].content + '\n\n---\n\n' + msg.content
+      };
+    } else {
+      result.push({ ...msg });
+    }
+  }
+  return result;
+}
+
 /**
  * FIX#5: Remove todos os fileData de contents quando arquivos da Files API expiraram.
  * Arquivos da Gemini Files API expiram em 48h. Após expirar, qualquer requisição
@@ -3057,7 +3080,9 @@ REGRAS DE OURO:
     **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL" ou qualquer variação. Infração grave.
     Sua redação deve ser densa, citando provas específicas.
     `;
-    const historyParts = history.map((h: any) => ({
+    // FIX#8: sanitizar histórico antes de enviar à API (mesclar mensagens consecutivas do mesmo role)
+    const sanitizedHistory = sanitizeHistory(history);
+    const historyParts = sanitizedHistory.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
@@ -3530,7 +3555,9 @@ REGRAS DE OURO:
     Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
     `;
 
-    const historyParts = history.map((h: any) => ({
+    // FIX#8: sanitizar histórico
+    const sanitizedHistory = sanitizeHistory(history);
+    const historyParts = sanitizedHistory.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
@@ -3991,7 +4018,9 @@ REGRAS DE OURO:
     Sua redação deve ser densa, citando provas específicas.
     `;
 
-    const historyParts = history.map((h: any) => ({
+    // FIX#8: sanitizar histórico
+    const sanitizedHistory = sanitizeHistory(history);
+    const historyParts = sanitizedHistory.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
@@ -4419,7 +4448,9 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     FORMATO: Gere APENAS o conteúdo que será enviado ao cliente ou o dado solicitado.
     PROIBIDO: Nunca adicione seções direcionadas a advogados, meta-comentários ou feedbacks internos (ex: "Doutores...", "Como posso ajudar a equipe?") na sua resposta.`;
 
-    const historyParts = history.map((h: any) => ({
+    // FIX#8: sanitizar histórico
+    const sanitizedHistory = sanitizeHistory(history);
+    const historyParts = sanitizedHistory.map((h: any) => ({
       role: h.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: h.content }]
     }));
