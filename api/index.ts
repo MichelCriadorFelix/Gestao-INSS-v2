@@ -2876,6 +2876,7 @@ app.post("/api/client-rag/index", async (req, res) => {
             file_url: fileUrl || null,
             content: chunkText,
             embedding: batchEmbeddings[batchIdx],
+            chunk_index: globalIndex,
             metadata: {
               chunk_index: globalIndex,
               charLength: chunkText.length,
@@ -2884,7 +2885,7 @@ app.post("/api/client-rag/index", async (req, res) => {
           };
         });
         
-        console.log(`[ClientRAG] Inserindo lote sem 'chunk_index' na raiz (movido para metadata)...`);
+        console.log(`[ClientRAG] Inserindo lote com 'chunk_index' na raiz e dentro de metadata...`);
         // Insert this batch immediately to the database
         const { error } = await supabaseAdmin
             .from('client_document_chunks')
