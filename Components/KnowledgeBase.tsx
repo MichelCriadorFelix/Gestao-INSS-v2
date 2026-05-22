@@ -253,21 +253,32 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
-    if (!confirm('Isso vai dividir os documentos grandes em trechos menores e gerar novos embeddings. Pode levar alguns minutos. Continuar?')) return;
+    if (!confirm('Isso vai dividir os 58 documentos grandes em trechos menores e regenerar embeddings. Processa em lotes de 3 por vez — clique novamente após cada lote concluir. Continuar?')) return;
     setIsRechunking(true);
     setRechunkResult(null);
-    setRechunkLog(['⏳ Iniciando rechunking dos documentos gigantes...']);
+    setRechunkLog(prev => [...prev, '⏳ Iniciando lote de rechunking...']);
     try {
+      const currentOffset = rechunkResult?.next_offset ?? 0;
       const response = await apiFetch('/api/admin/rechunk-large-docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
+        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026', batchOffset: currentOffset })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Erro no servidor');
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        const text = await response.text().catch(() => 'Erro desconhecido');
+        throw new Error(`Servidor retornou resposta inválida: ${text.substring(0, 120)}`);
+      }
+      if (!response.ok) throw new Error(data?.error || `Erro ${response.status}`);
       setRechunkResult(data);
-      setRechunkLog(data.log || []);
-      fetchDocs(); // atualizar lista
+      setRechunkLog(prev => [...prev, ...(data.log || []),
+        data.done
+          ? `✅ Base totalmente otimizada! Total: ${data.new_chunks || 0} trechos gerados.`
+          : `⏩ Lote concluído. Ainda restam ${data.remaining} docs grandes. Clique novamente para continuar.`
+      ]);
+      if (data.done) fetchDocs();
     } catch (err: any) {
       setRechunkLog(prev => [...prev, `❌ Erro: ${err.message}`]);
     } finally {
@@ -682,7 +693,11 @@ export default function KnowledgeBase() {
               }`}
             >
               {isRechunking ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
-              {isRechunking ? 'Processando... (pode levar alguns minutos)' : 'Executar Rechunking'}
+              {isRechunking
+                  ? 'Processando lote... (30-60 segundos)'
+                  : rechunkResult && !rechunkResult.done
+                  ? `Continuar (${rechunkResult.remaining} docs restantes)`
+                  : 'Executar Rechunking'}
             </button>
 
             {rechunkResult && (
