@@ -2985,7 +2985,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // FIX#9: usar regex precisa em vez de includes("GERAR") simples
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
+    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)\n    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RECURSO|PETIÇÃO|PETICAO|INICIAL)\b/i.test(message);
 
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
@@ -3118,7 +3118,7 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // correctionInstruction removido (Fix#1)
     if (ragContext) {
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -3599,7 +3599,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // correctionInstruction removido (Fix#1)
     if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
@@ -3951,7 +3951,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // FIX#9: usar regex precisa em vez de includes("GERAR") simples
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
+    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)\n    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RECURSO|PETIÇÃO|PETICAO|INICIAL)\b/i.test(message);
 
     let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
@@ -4442,7 +4442,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // FIX#9: usar regex precisa em vez de includes("GERAR") simples
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
+    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)\n    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RECURSO|PETIÇÃO|PETICAO|INICIAL)\b/i.test(message);
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
     let maxOutputTokens = 600; 
