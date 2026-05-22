@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabaseService } from '../services/supabaseService';
 import { apiFetch } from '../services/apiService';
-import { CheckCircle2, Plus, Trash2, BookOpen, Loader2, AlertTriangle, Info, FileText, Gavel, Scale, BookMarked, Landmark, ClipboardList } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, BookOpen, Loader2, AlertTriangle, Info, FileText, Gavel, Scale, BookMarked, Landmark, ClipboardList, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ============================================================
 // PADRÃO OURO — NOMENCLATURA DA BASE DE CONHECIMENTO
@@ -245,6 +245,35 @@ export default function KnowledgeBase() {
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showGuide, setShowGuide] = useState(false);
+
+  // Rechunking admin
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [isRechunking, setIsRechunking] = useState(false);
+  const [rechunkResult, setRechunkResult] = useState<any>(null);
+  const [rechunkLog, setRechunkLog] = useState<string[]>([]);
+
+  const handleRechunk = async () => {
+    if (!confirm('Isso vai dividir os documentos grandes em trechos menores e gerar novos embeddings. Pode levar alguns minutos. Continuar?')) return;
+    setIsRechunking(true);
+    setRechunkResult(null);
+    setRechunkLog(['⏳ Iniciando rechunking dos documentos gigantes...']);
+    try {
+      const response = await apiFetch('/api/admin/rechunk-large-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erro no servidor');
+      setRechunkResult(data);
+      setRechunkLog(data.log || []);
+      fetchDocs(); // atualizar lista
+    } catch (err: any) {
+      setRechunkLog(prev => [...prev, `❌ Erro: ${err.message}`]);
+    } finally {
+      setIsRechunking(false);
+    }
+  };
 
   // Validação em tempo real do título
   const titleWarnings = useMemo(() => validateTitle(title), [title]);
@@ -620,6 +649,64 @@ export default function KnowledgeBase() {
           </div>
         </div>
       </div>
+
+      {/* ── Painel Admin — Rechunking ─────────────────────────── */}
+      <div className="bg-slate-50 dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/10 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowAdmin(!showAdmin)}
+          className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Wrench size={15} className="text-slate-400" />
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Manutenção da Base — Otimizar Chunks</span>
+          </div>
+          {showAdmin ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+        </button>
+
+        {showAdmin && (
+          <div className="px-5 pb-5 pt-2 space-y-3 border-t border-slate-200 dark:border-gold-500/10">
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/20 rounded-lg p-3">
+              <p className="text-xs text-amber-800 dark:text-amber-300 font-medium mb-1">O que faz?</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Documentos maiores que 8.000 caracteres têm embeddings "diluídos" que reduzem a precisão da busca.
+                Este processo divide cada um em trechos de ~2.500 chars, gera embeddings precisos para cada trecho
+                e substitui o documento original. Roda uma única vez.
+              </p>
+            </div>
+
+            <button
+              onClick={handleRechunk}
+              disabled={isRechunking}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${
+                isRechunking ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500'
+              }`}
+            >
+              {isRechunking ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
+              {isRechunking ? 'Processando... (pode levar alguns minutos)' : 'Executar Rechunking'}
+            </button>
+
+            {rechunkResult && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-700/20 rounded-lg p-3">
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mb-1">✅ Concluído</p>
+                <div className="grid grid-cols-3 gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+                  <div><span className="font-bold">{rechunkResult.processed}</span> documentos processados</div>
+                  <div><span className="font-bold">{rechunkResult.new_chunks}</span> novos chunks gerados</div>
+                  <div><span className="font-bold">{rechunkResult.errors}</span> erros</div>
+                </div>
+              </div>
+            )}
+
+            {rechunkLog.length > 0 && (
+              <div className="bg-slate-900 rounded-lg p-3 max-h-48 overflow-y-auto">
+                {rechunkLog.map((line, i) => (
+                  <p key={i} className="text-xs font-mono text-slate-300 leading-5">{line}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
