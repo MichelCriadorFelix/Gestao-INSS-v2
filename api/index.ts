@@ -2983,7 +2983,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
+    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
+    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
+    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
 
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
@@ -3928,7 +3930,9 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
+    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
+    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
+    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
 
     let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
@@ -4408,7 +4412,9 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
+    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
+    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
+    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PEÇA|RELAT[ÓO]RIO|RECURSO|PETIÇÃO|PETICAO|INICIAL|RELATÓRIO|RELATORIO)\b/i.test(message);
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
     let maxOutputTokens = 600; 
