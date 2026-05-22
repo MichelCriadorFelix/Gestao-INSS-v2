@@ -400,7 +400,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
       s.id === sessionId ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? messageText.slice(0, 30) : s.title } : s
     ));
     setInput('');
-    const textarea = document.getElementById('chat-input-michel');
+    const textarea = document.getElementById('chat-input-felix-castro');
     if (textarea) textarea.style.height = 'auto';
     setIsLoading(true);
 
@@ -610,7 +610,8 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
               petitionLength,
               keyIndex: session?.uploadKeyIndex,
               sessionId: session?.id
-            })
+            }),
+            signal: abortController.signal
           });
 
           if (!response.ok) {
@@ -1523,7 +1524,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
 
             <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 
-                id="chat-input-michel"
+                id="chat-input-felix-castro"
                 rows={1}
                 placeholder="Como posso te ajudar, Dr. Felix e Castro?"
                 value={input}

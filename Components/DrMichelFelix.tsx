@@ -610,7 +610,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               petitionLength,
               keyIndex: session?.uploadKeyIndex,
               sessionId: session?.id
-            })
+            }),
+            signal: abortController.signal
           });
 
           if (!response.ok) {
