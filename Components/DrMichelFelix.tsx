@@ -59,6 +59,8 @@ interface ChatSession {
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
   tokens?: { input: number; output: number; total: number };
+  clientId?: string;
+  clientName?: string;
 }
 
 interface DrMichelFelixProps {
@@ -610,7 +612,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
               model: eliteModelOverride || selectedModel,
               petitionLength,
               keyIndex: session?.uploadKeyIndex,
-              sessionId: session?.id
+              sessionId: session?.id,
+              clientId: session?.clientId
             })
           });
 
@@ -1074,60 +1077,43 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
     setIsClientModalOpen(false);
     setIsUploading(true);
     setProgress(0);
-    setProgressText(`Buscando detalhes de ${client.name}...`);
+    setProgressText(`Conectando base de dados RAG de ${client.name}...`);
 
     try {
-      // Fetch full details including documents
-      const fullClient = await supabaseService.getClientDetails(client.id);
-      
-      if (!fullClient || !fullClient.documents || fullClient.documents.length === 0) {
-          alert("Este cliente não possui documentos cadastrados.");
-          setIsUploading(false);
-          return;
-      }
-
-      setProgressText(`Preparando dossiê de ${fullClient.name}...`);
-      
-      let activeSessionId = currentSessionId;
-      
-      if (!activeSessionId) {
-        const newSession: ChatSession = {
-          id: generateId(),
-          title: `Dossiê: ${fullClient.name}`,
-          messages: [],
-          date: new Date().toLocaleDateString('pt-BR'),
-          documents: []
-        };
-        setSessions([newSession, ...sessions]);
-        setCurrentSessionId(newSession.id);
-        activeSessionId = newSession.id;
-      }
-
-      const readingMsg: Message = {
+      // Create a new session or update current session with client RAG details
+      const newSessionId = generateId();
+      const welcomeMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED a partir do nosso banco de dados, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
+        content: `🧠 **Conexão Inteligente RAG Estabelecida com Sucesso!**\n\nConectei este chat de forma direta e exclusiva à base de dados semântica (RAG) do GED do(a) cliente **${client.name}**.\n\nA partir de agora, eu tenho acesso instantâneo a todos os documentos dele(a) indexados no Supabase (petições, sentenças, laudos, cálculos e prontuários).\n\n**Você pode me perguntar agora:**\n- *"De acordo com os laudos do GED, qual é a patologia da incapacidade?"*\n- *"Faça um resumo dos períodos de trabalho descritos nos documentos dele"* \n- *"Gere o relatório da petição juntada"* \n- *"O que diz a última sentença juntada de ${client.name}?"*\n\nNão é necessário fazer download ou upload de nenhum arquivo manualmente! Fique à vontade para me questionar livremente sobre o caso.`,
         timestamp: new Date().toISOString()
       };
-      
-      setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
-      ));
 
-      const fileArray: File[] = [];
-      for (let i = 0; i < fullClient.documents.length; i++) {
-        const doc = fullClient.documents[i];
-        try {
-          const res = await fetch(doc.url);
-          const blob = await res.blob();
-          const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
-          fileArray.push(file);
-        } catch (e) {
-          console.error(`Erro ao baixar documento ${doc.name}:`, e);
-        }
+      const updatedSession: ChatSession = {
+        id: newSessionId,
+        title: `RAG: ${client.name}`,
+        messages: [welcomeMsg],
+        date: new Date().toLocaleDateString('pt-BR'),
+        documents: [],
+        clientId: String(client.id),
+        clientName: client.name
+      };
+
+      const fullSessions = [updatedSession, ...sessions];
+      setSessions(fullSessions);
+      setCurrentSessionId(newSessionId);
+
+      // Save to Supabase immediately using service
+      try {
+        await supabaseService.saveAIConversation({
+          ...updatedSession,
+          ai_name: 'michel'
+        });
+      } catch (saveErr) {
+        console.warn("Could not save session to Supabase, stored locally:", saveErr);
       }
 
-      await processFilesPhased(fileArray, activeSessionId);
+      setIsUploading(false);
     } catch (error) {
       console.error("Error importing client:", error);
       alert("Erro ao importar cliente.");
@@ -1285,6 +1271,31 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
 
       {/* MAIN CHAT AREA */}
       <div className="flex-1 flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0">
+        {currentSession?.clientId && (
+          <div className="flex items-center justify-between px-6 py-2.5 bg-indigo-50/50 dark:bg-gold-500/5 border-b border-indigo-100/30 dark:border-gold-500/10 font-sans z-10 shrink-0">
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-slate-600 dark:text-slate-300 font-medium">Buscador Semântico (RAG) ativo para o cliente:</span>
+              <span className="font-bold text-indigo-700 dark:text-gold-400 bg-indigo-100/40 dark:bg-gold-500/10 px-2 py-0.5 rounded-md">{currentSession.clientName}</span>
+            </div>
+            <button 
+              onClick={() => {
+                const confirmed = window.confirm(`Deseja desconectar a base de dados do cliente ${currentSession.clientName} deste chat?`);
+                if (confirmed) {
+                  setSessions(prev => prev.map(s => s.id === currentSession.id ? { ...s, clientId: undefined, clientName: undefined } : s));
+                }
+              }}
+              title="Desconectar RAG"
+              className="text-slate-400 hover:text-red-500 text-xs px-2 py-1 hover:bg-slate-100 dark:hover:bg-bordeaux-900/40 rounded transition font-medium shrink-0"
+            >
+              Desconectar
+            </button>
+          </div>
+        )}
+
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
