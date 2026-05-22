@@ -2311,6 +2311,25 @@ function getApiKeys() {
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
+
+/**
+ * FIX#5: Remove todos os fileData de contents quando arquivos da Files API expiraram.
+ * Arquivos da Gemini Files API expiram em 48h. Após expirar, qualquer requisição
+ * que os referencie retorna PERMISSION_DENIED. Removemos e retentamos sem os arquivos.
+ */
+function stripExpiredFileData(params: any): any {
+  if (!params.contents || !Array.isArray(params.contents)) return params;
+  const cleaned = {
+    ...params,
+    contents: params.contents.map((turn: any) => ({
+      ...turn,
+      parts: (turn.parts || []).filter((p: any) => !p.fileData)
+    }))
+  };
+  console.warn("[FIX#5] ⚠️  Arquivo Gemini expirado (>48h). FileData removido dos contents. Retentando sem arquivos.");
+  return cleaned;
+}
+
 async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
@@ -2375,9 +2394,16 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+    const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
+    }
+
+    // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
+    if (isExpiredFile) {
+      const paramsWithoutFiles = stripExpiredFileData(params);
+      return callGemini(paramsWithoutFiles, 1, modelIndex, 0, forcedKeyIndex);
     }
     
     if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
@@ -2468,9 +2494,16 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+    const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
+    }
+
+    // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
+    if (isExpiredFile) {
+      const paramsWithoutFiles = stripExpiredFileData(params);
+      return callGeminiStream(paramsWithoutFiles, 1, modelIndex, 0, forcedKeyIndex);
     }
 
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
