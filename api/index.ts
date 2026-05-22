@@ -2248,13 +2248,14 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3-flash-preview",
-  "gemini-3.5-flash"
+  "gemini-3.5-flash",
+  "gemini-3-flash-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-2.0-flash-exp": "gemini-3-flash-preview",
-  "gemini-1.5-flash-latest": "gemini-3-flash-preview"
+  "gemini-2.0-flash-exp": "gemini-3.5-flash",
+  "gemini-1.5-flash-latest": "gemini-3.5-flash",
+  "gemini-3-flash-preview": "gemini-3.5-flash"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2591,8 +2592,8 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         temperature: params.temperature ?? 0.2,
         max_tokens: params.max_tokens || 16383,
         stream: true,
-        include_reasoning: true, // Habilita tokens de raciocínio (Chain of Thought)
-        reasoning_effort: "xhigh" // Define esforço de raciocínio máximo conforme solicitado pelo usuário
+        include_reasoning: true, 
+        reasoning_effort: params.thinkingConfig?.thinkingBudget > 10000 ? "high" : "medium"
       })
     });
 
@@ -4547,7 +4548,7 @@ await callOpenRouterStream({
   model: model || "deepseek/deepseek-v4-flash",
   messages: orMessages,
   temperature: isGenerationRequest ? 0.15 : temperature,
-  max_tokens: 18000,
+  max_tokens: 2000,
   provider: {
     data_collection: false,
     require_reasoning: true
