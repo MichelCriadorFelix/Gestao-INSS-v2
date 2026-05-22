@@ -796,31 +796,7 @@ function isPetitionComplete(text: string): boolean {
   return hasPedeDeferimento && (hasOABorAssinatura || hasDataLocal);
 }
 
-/**
- * Extrai sumário estrutural de uma peça (lista de tópicos H2/H3 + primeira linha de cada).
- * Usado em FULL_REGENERATION para guiar nova versão sem injetar a peça inteira.
- */
-function extractStructuralSummary(petitionText: string): string {
-  if (!petitionText) return "(nenhum sumário disponível)";
-  const lines = petitionText.split('\n');
-  const summary: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    // Captura títulos markdown e títulos numerados romanos
-    if (/^#{1,3}\s+/.test(line) || /^[IVX]+\.\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(line)) {
-      summary.push(line);
-      // Pega o primeiro parágrafo de conteúdo abaixo do título
-      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
-        const next = lines[j].trim();
-        if (next && !next.startsWith('#') && !/^[IVX]+\./.test(next) && next.length > 30) {
-          summary.push('  → ' + next.substring(0, 180) + (next.length > 180 ? '...' : ''));
-          break;
-        }
-      }
-    }
-  }
-  return summary.length > 0 ? summary.join('\n') : petitionText.substring(0, 2000) + '...';
-}
+// FIX RESIDUAL #2: extractStructuralSummary removida (dead code desde Fix#3)
 
 // AI Service Logic Integrated
 
