@@ -4426,19 +4426,17 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
-    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message);
+    // FIX RESIDUAL #3: Fabrícia nunca gera petições → isGenerationRequest sempre false.
+    // Evita que "GERAR PEÇA" desative Google Search (ela precisa para atendimento)
+    // e mantém tokens em 600 (breve) em vez de 4096.
+    // Se o usuário pedir para gerar peça, o system prompt redireciona para Dr. Michel/Luana.
+    const isGenerationRequest = false; // Fabrícia não gera petições
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
     let maxOutputTokens = 600; 
     let thinkingConfig: any = { thinkingBudget: 512 }; 
 
-    if (isGenerationRequest) {
-      maxOutputTokens = 4096;
-      thinkingConfig = { thinkingBudget: 1024 };
-    } else if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    if (isStorageRequest || message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 2048;
       thinkingConfig = { thinkingBudget: 1024 };
     }
