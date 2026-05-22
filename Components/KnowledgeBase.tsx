@@ -255,35 +255,32 @@ export default function KnowledgeBase() {
   const handleRechunk = async () => {
     const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
     if (remaining === 0) {
-      alert('✅ Base já está otimizada! Nenhum documento grande encontrado.');
+      alert('Base já está otimizada! Nenhum documento grande encontrado.');
       return;
     }
-    const msg = `Processar o próximo documento grande? (${remaining} restantes)\n\nO processo roda no seu navegador e pode levar alguns minutos para documentos grandes.`;
-    if (!confirm(msg)) return;
+    if (!confirm(`Processar próximo documento? (${remaining} restantes)\n\nO processo roda no navegador. Deixe a tela aberta.`)) return;
 
     setIsRechunking(true);
-    setRechunkLog(prev => [...prev, `📊 ${remaining} documentos grandes encontrados. Processando o maior...`]);
+    setRechunkLog(prev => [...prev, `📊 ${remaining} documentos grandes. Processando o maior...`]);
 
     try {
-      // 1. Buscar 1 documento grande (o maior primeiro, via SQL function)
       const docs = await supabaseService.getLargeDocuments(8000, 1);
-      if (!docs || docs.length === 0) {
-        setRechunkLog(prev => [...prev, '✅ Base já está otimizada!']);
+      if (!docs?.length) {
+        setRechunkLog(prev => [...prev, '✅ Base já otimizada!']);
         setRechunkResult({ done: true, remaining: 0 });
         return;
       }
 
       const doc = docs[0];
-      const titulo = String(doc.metadata?.title || '').substring(0, 60);
+      const titulo = String(doc.metadata?.title || '').substring(0, 55);
       setRechunkLog(prev => [...prev, `🔄 "${titulo}" (${doc.content.length.toLocaleString()} chars)`]);
 
-      // 2. Split semântico — mesma lógica do backend
+      // Split semântico
       const CHUNK_SIZE = 2500;
       const OVERLAP = 200;
       const subChunks: string[] = [];
       const text = doc.content;
       let pos = 0;
-
       while (pos < text.length) {
         let end = Math.min(pos + CHUNK_SIZE, text.length);
         if (end < text.length) {
@@ -300,60 +297,66 @@ export default function KnowledgeBase() {
         if (pos <= 0) break;
       }
 
-      setRechunkLog(prev => [...prev, `✂️  Dividido em ${subChunks.length} trechos`]);
+      setRechunkLog(prev => [...prev, `✂️  ${subChunks.length} trechos — salvando em mini-lotes de 10...`]);
 
-      // 3. Gerar embeddings via /api/rag/embed (mesmo endpoint do upload normal)
-      const inserted: any[] = [];
-      let errors = 0;
+      // Processar em mini-lotes de 10 — salva e libera memória a cada lote
+      const MINI_BATCH = 10;
+      let totalInserted = 0;
+      let totalErrors = 0;
 
-      for (let i = 0; i < subChunks.length; i++) {
-        setRechunkLog(prev => {
-          const last = [...prev];
-          const progressLine = `  ⚙️  Embedding ${i + 1}/${subChunks.length}...`;
-          // Atualizar a última linha de progresso em vez de acumular
-          if (last[last.length - 1]?.startsWith('  ⚙️')) {
-            last[last.length - 1] = progressLine;
-          } else {
-            last.push(progressLine);
-          }
-          return last;
-        });
+      for (let batch = 0; batch < subChunks.length; batch += MINI_BATCH) {
+        const batchChunks = subChunks.slice(batch, batch + MINI_BATCH);
+        const batchInserted: any[] = [];
 
-        try {
-          const resp = await apiFetch('/api/rag/embed', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: subChunks[i] })
+        for (let j = 0; j < batchChunks.length; j++) {
+          const globalIdx = batch + j;
+          // Atualizar progresso sem acumular linhas
+          setRechunkLog(prev => {
+            const filtered = prev.filter(l => !l.startsWith('  ⚙️'));
+            return [...filtered, `  ⚙️  ${globalIdx + 1}/${subChunks.length} embeddings...`];
           });
-          if (!resp.ok) { errors++; continue; }
-          const { embedding } = await resp.json();
-          if (!embedding?.length) { errors++; continue; }
 
-          inserted.push({
-            content: subChunks[i],
-            metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
-              chunk_index: i, total_chunks: subChunks.length },
-            embedding
-          });
-        } catch { errors++; }
+          try {
+            const resp = await apiFetch('/api/rag/embed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: batchChunks[j] })
+            });
+            if (!resp.ok) { totalErrors++; continue; }
+            const { embedding } = await resp.json();
+            if (!embedding?.length) { totalErrors++; continue; }
+            batchInserted.push({
+              content: batchChunks[j],
+              metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
+                chunk_index: globalIdx, total_chunks: subChunks.length },
+              embedding
+            });
+          } catch { totalErrors++; }
+        }
+
+        // Salvar mini-lote imediatamente e liberar memória
+        if (batchInserted.length > 0) {
+          await supabaseService.saveLegalDocuments(batchInserted);
+          totalInserted += batchInserted.length;
+          batchInserted.length = 0; // liberar memória
+        }
+
+        // Dar respiração ao browser entre lotes
+        await new Promise(r => setTimeout(r, 100));
       }
 
-      setRechunkLog(prev => [...prev.filter(l => !l.startsWith('  ⚙️')),
-        `💾 Salvando ${inserted.length} trechos...`]);
-
-      // 4. Salvar novos chunks e deletar original
-      if (inserted.length > 0) {
-        await supabaseService.saveLegalDocuments(inserted);
+      // Só deleta o original após todos os lotes salvos com sucesso
+      if (totalInserted > 0) {
         await supabaseService.deleteLegalDocumentById(doc.id);
       }
 
-      // 5. Contar restantes
       const newRemaining = await supabaseService.countLargeDocuments(8000).catch(() => -1);
       const done = newRemaining === 0;
 
-      setRechunkLog(prev => [...prev.filter(l => !l.startsWith('💾')),
-        `✅ "${titulo}" → ${inserted.length} trechos${errors > 0 ? ` (${errors} erros)` : ''}`,
-        done ? '🎉 Base totalmente otimizada!' : `⏩ Restam ${newRemaining} docs. Clique "Próximo" para continuar.`
+      setRechunkLog(prev => [
+        ...prev.filter(l => !l.startsWith('  ⚙️')),
+        `✅ "${titulo}" → ${totalInserted} trechos${totalErrors > 0 ? ` (${totalErrors} erros)` : ''}`,
+        done ? '🎉 Base totalmente otimizada!' : `⏩ Restam ${newRemaining} docs. Clique "Próximo".`
       ]);
       setRechunkResult({ done, remaining: newRemaining });
       if (done) fetchDocs();
