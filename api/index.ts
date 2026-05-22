@@ -3054,6 +3054,7 @@ REGRAS DE OURO:
     **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
+    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL" ou qualquer variação. Infração grave.
     Sua redação deve ser densa, citando provas específicas.
     `;
     const historyParts = history.map((h: any) => ({
@@ -3524,6 +3525,7 @@ REGRAS DE OURO:
     O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
     É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
     É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
+    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA DO TRABALHO DE..." ou "MM. JUÍZO DA __ VARA DO TRABALHO DE...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DO TRABALHO" ou qualquer variação.
     Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
     `;
 
@@ -3984,6 +3986,7 @@ REGRAS DE OURO:
     **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Calcule com os dados disponíveis. Se faltar dado, estime com transparência e registre como estimativa.
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou tópicos. É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS". Se você pular um tópico obrigatório ou mudar a ordem prevista, o software será rejeitado.
+    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL CÍVEL...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DE DIREITO" ou qualquer variação.
     Sua redação deve ser densa, citando provas específicas.
     `;
 
