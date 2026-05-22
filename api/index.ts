@@ -2239,6 +2239,12 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
+const EMBEDDING_MODELS = [
+  'gemini-embedding-2-preview',
+  'text-embedding-004'
+];
+let currentEmbeddingModelIndex = 0;
+
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
   "gemini-1.5-flash",
@@ -2521,10 +2527,11 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   const originalKeyIndex = keys.indexOf(currentKey);
 
   const ai = new GoogleGenAI({ apiKey: currentKey });
+  const modelToUse = EMBEDDING_MODELS[currentEmbeddingModelIndex % EMBEDDING_MODELS.length];
 
   try {
     const result = await ai.models.embedContent({
-      model: 'gemini-embedding-2-preview',
+      model: modelToUse,
       contents: [text],
       config: {
         outputDimensionality: 768
@@ -2532,30 +2539,38 @@ async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
     });
     return result.embeddings?.[0]?.values || [];
   } catch (error: any) {
-    const errorMessage = error.message || String(error);
-    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
+    const errorMessage = error.message || errorStr || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found') || (errorMessage.includes('400') && errorMessage.includes('API key'));
     
     if (isInvalidKey) {
       invalidKeys.add(currentKey);
     }
 
-    console.error(`Erro ao gerar embedding com a chave ${originalKeyIndex}:`, errorMessage);
+    console.error(`Erro ao gerar embedding com a chave ${originalKeyIndex} usando ${modelToUse}:`, errorMessage);
     
-    // Rotate key
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    const isQuotaError = errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED");
+    
+    if (isQuotaError) {
+      currentEmbeddingModelIndex++;
+      if (currentEmbeddingModelIndex % EMBEDDING_MODELS.length === 0) {
+        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+      }
+    } else {
+      currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    }
     
     if (retries > 0) {
-      // If we hit a 429, we should wait longer. Let's extract retryDelay if present, or default to 5 seconds.
       let delay = 2000;
-      if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-         delay = 10000; // Wait 10 seconds on quota errors before trying the next key
+      if (isQuotaError) {
+         delay = 3000;
          const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
          if (match && match[1]) {
-             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000); // Max 65s wait
+             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000);
          }
       }
 
-      console.log(`Aguardando ${delay}ms antes de tentar novamente com a próxima chave... (${retries} tentativas restantes)`);
+      console.log(`Aguardando ${delay}ms antes de tentar novamente com o próximo modelo/chave... (${retries} tentativas restantes)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return callGeminiEmbed(text, retries - 1);
     }
@@ -2569,7 +2584,6 @@ async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<numb
 
   const validKeys = keys.filter(k => !invalidKeys.has(k));
   if (validKeys.length === 0) {
-    // If all keys are marked invalid, clear the set and try again as a last resort
     invalidKeys.clear();
   }
   
@@ -2578,10 +2592,11 @@ async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<numb
   const originalKeyIndex = keys.indexOf(currentKey);
 
   const ai = new GoogleGenAI({ apiKey: currentKey });
+  const modelToUse = EMBEDDING_MODELS[currentEmbeddingModelIndex % EMBEDDING_MODELS.length];
 
   try {
     const result = await ai.models.embedContent({
-      model: 'gemini-embedding-2-preview',
+      model: modelToUse,
       contents: texts,
       config: {
         outputDimensionality: 768
@@ -2589,30 +2604,38 @@ async function callGeminiEmbedBatch(texts: string[], retries = 10): Promise<numb
     });
     return result.embeddings?.map(e => e.values || []) || texts.map(() => []);
   } catch (error: any) {
-    const errorMessage = error.message || String(error);
-    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
+    const errorMessage = error.message || errorStr || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found') || (errorMessage.includes('400') && errorMessage.includes('API key'));
     
     if (isInvalidKey) {
       invalidKeys.add(currentKey);
     }
 
-    console.error(`Erro ao gerar embedding BATCH com a chave ${originalKeyIndex}:`, errorMessage);
+    console.error(`Erro ao gerar embedding BATCH com a chave ${originalKeyIndex} usando ${modelToUse}:`, errorMessage);
     
-    // Rotate to next key overall
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    const isQuotaError = errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED");
+    
+    if (isQuotaError) {
+      currentEmbeddingModelIndex++;
+      if (currentEmbeddingModelIndex % EMBEDDING_MODELS.length === 0) {
+        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+      }
+    } else {
+      currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    }
     
     if (retries > 0) {
-      // If we hit a 429, we should wait longer. Let's extract retryDelay if present, or default to 5 seconds.
       let delay = 2000;
-      if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-         delay = 10000; // Wait 10 seconds on quota errors before trying the next key
+      if (isQuotaError) {
+         delay = 3000;
          const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
          if (match && match[1]) {
-             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000); // Max 65s wait
+             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000);
          }
       }
 
-      console.log(`[BatchEmbed] Aguardando ${delay}ms antes de tentar novamente com a próxima chave... (${retries} tentativas restantes)`);
+      console.log(`[BatchEmbed] Aguardando ${delay}ms antes de tentar novamente com o próximo modelo/chave... (${retries} tentativas restantes)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return callGeminiEmbedBatch(texts, retries - 1);
     }
