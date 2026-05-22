@@ -580,7 +580,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               minWage: localStorage.getItem('app_min_wage') || '1621.00',
-              ragContext: resumeCount === 0 ? ragContext : undefined,
+              ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
