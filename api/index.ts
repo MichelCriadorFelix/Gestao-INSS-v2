@@ -3224,11 +3224,10 @@ ${message}`;
       thinkingConfig = { thinkingBudget: 16000 };
     }
 
-    // Temperature calibrada por intenção:
-    // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
-    // - Dúvida: 0.1 (máxima precisão, resposta determinística)
-    // - Peça/outros: temperature já definida (0.2)
-    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
+    // FIX#11: Temperature calibrada por intenção (revisão = mesma que geração para consistência de estilo)
+    // - Relatório: 0.25 | Dúvida: 0.1 | Geração/Revisão/Correção: 0.15 | Outros: 0.2
+    const isRevisionMode = !isGenerationRequest && !isReportRequest && intent !== "[DÚVIDA]";
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : (isGenerationRequest || isRevisionMode) ? 0.15 : temperature;
 
     try {
       let isFinished = false;
@@ -3730,7 +3729,9 @@ ${message}`;
     }
 
     // Temperature calibrada por intenção
-    const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
+    // FIX#11: Temperature calibrada — revisão usa 0.15 para manter estilo consistente com geração
+    const isRevisionModeLuana = !isGenerationRequest && !isReportRequestLuana && intent !== "[DÚVIDA]";
+    const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : (isGenerationRequest || isRevisionModeLuana) ? 0.15 : temperature;
 
     try {
       let isFinished = false;
@@ -4144,7 +4145,9 @@ ${message}`;
       thinkingConfig = { thinkingBudget: 16000 };
     }
 
-    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
+    // FIX#11: Temperature calibrada — revisão usa 0.15 para manter estilo consistente
+    const isRevisionModeFelix = !isGenerationRequest && !isReportRequest && intent !== "[DÚVIDA]";
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : (isGenerationRequest || isRevisionModeFelix) ? 0.15 : temperature;
 
     try {
       let isFinished = false;
