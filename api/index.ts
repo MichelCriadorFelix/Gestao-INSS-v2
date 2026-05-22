@@ -3095,16 +3095,27 @@ REGRAS DE OURO:
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
     const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
+    // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
-    if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
-      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve seguir o **Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras)** que você sugeriu anteriormente no Relatório de Análise Jurídica presente no histórico da conversa.
-Verifique sua própria recomendação no relatório anterior e cumpra-a com rigor. Se não houver relatório no histórico, use o padrão de **5000 palavras** de alta densidade jurídica.`;
-    } else if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
-      const target = parsePetitionTarget(petitionLength);
-      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
-O usuário selecionou explicitamente este alvo, portanto, você DEVE atingi-lo expandindo os argumentos e citações conforme necessário.`;
+    if (isGenerationRequest) {
+      if (petitionLength && petitionLength !== 'Padrão (Livre)') {
+        const target = parsePetitionTarget(petitionLength);
+        lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${target || 5000} palavras** de alta densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
+O usuário selecionou explicitamente este alvo — DEVE ser atingido expandindo argumentos e citações.`;
+      } else {
+        // Padrão (Livre): tentar extrair recomendação do histórico; se não houver, 5000 fixo
+        const historyText = history.map((h: any) => h.content || "").join("\n");
+        const extMatch = historyText.match(/RECOMENDAÇÃO DE EXTENSÃO[^
+]*
+[^
+]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+          || historyText.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
+        const detectedTarget = extMatch ? parseInt(extMatch[2]) : 5000;
+        lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${detectedTarget} palavras** de alta densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
+${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídica." : "Alvo padrão (5000 palavras) — nenhum relatório prévio encontrado no histórico."}`;
+      }
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -3570,16 +3581,23 @@ REGRAS DE OURO:
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
     const correctionInstruction = ""; // mantido para compatibilidade com finalMessage abaixo
 
+    // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
-    if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
-      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve seguir o **Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras)** que você sugeriu anteriormente no Relatório de Análise Jurídica presente no histórico da conversa.
-Verifique sua própria recomendação no relatório anterior e cumpra-a com rigor. Se não houver relatório no histórico, use o padrão de **5000 palavras** de alta densidade jurídica.`;
-    } else if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
-      const target = parsePetitionTarget(petitionLength);
-      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
-Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
-O usuário selecionou explicitamente este alvo, portanto, você DEVE atingi-lo expandindo os argumentos e citações conforme necessário.`;
+    if (isGenerationRequest) {
+      if (petitionLength && petitionLength !== 'Padrão (Livre)') {
+        const target = parsePetitionTarget(petitionLength);
+        lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${target || 5000} palavras** de alta densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
+O usuário selecionou explicitamente este alvo — DEVE ser atingido.`;
+      } else {
+        const historyTextL = history.map((h: any) => h.content || "").join("\n");
+        const extMatchL = historyTextL.match(/RECOMENDAÇÃO DE EXTENSÃO[^\n]*\n[^\n]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+          || historyTextL.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
+        const detectedTargetL = extMatchL ? parseInt(extMatchL[2]) : 5000;
+        lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve ter aproximadamente **${detectedTargetL} palavras** de alta densidade jurídica.
+${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padrão (5000 palavras) — nenhum relatório prévio detectado."}`;
+      }
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -4136,10 +4154,17 @@ ${message}`;
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       let targetInstruction = "";
-      if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
-        targetInstruction = `Siga o Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras) sugerido anteriormente no Relatório de Análise Jurídica. Se não houver, use o padrão de 5000 palavras.`;
-      } else if (isGenerationRequest && wordTarget) {
-        targetInstruction = `A petição deve ter aproximadamente **${wordTarget} palavras** de extrema densidade jurídica.`;
+      // FIX#10: detectar recomendação no histórico; fallback 5000 fixo
+      if (isGenerationRequest) {
+        if (wordTarget) {
+          targetInstruction = `A petição deve ter aproximadamente **${wordTarget} palavras** de extrema densidade jurídica.`;
+        } else {
+          const historyTextF = history.map((h: any) => h.content || "").join("\n");
+          const extMatchF = historyTextF.match(/RECOMENDAÇÃO DE EXTENSÃO[^\n]*\n[^\n]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+            || historyTextF.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
+          const detectedTargetF = extMatchF ? parseInt(extMatchF[2]) : 5000;
+          targetInstruction = `Esta peça deve ter aproximadamente **${detectedTargetF} palavras** de extrema densidade jurídica. ${extMatchF ? "Alvo extraído do Relatório." : "Alvo padrão — nenhum relatório detectado."}`;
+        }
       }
 
       const MAX_ATTEMPTS = 3;
