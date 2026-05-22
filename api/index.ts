@@ -3332,8 +3332,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // Salva a peça gerada como draft se for longa o suficiente
-      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+      // FIX#7: salvar draft sempre que output > 5000 chars (não apenas em isGenerationRequest)
+      // FULL_REGENERATION e ADDITION também produzem peças longas que precisam ser salvas
+      if (sessionId && fullResponseText.length > 5000) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_michel_${sessionId}`,
@@ -3842,8 +3843,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // Salva a peça gerada como draft se for longa o suficiente
-      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+      // FIX#7: salvar draft sempre que output > 5000 chars
+      if (sessionId && fullResponseText.length > 5000) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dra_luana_${sessionId}`,
@@ -4239,7 +4240,8 @@ REGRAS ABSOLUTAS:
       }
       
       // Salva draft
-      if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
+      // FIX#7: salvar draft sempre que output > 5000 chars
+      if (sessionId && fullResponseText.length > 5000) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_felix_castro_${sessionId}`,
