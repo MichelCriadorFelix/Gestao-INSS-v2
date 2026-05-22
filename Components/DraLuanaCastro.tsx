@@ -1581,16 +1581,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini · Gratuito (Padrão)">
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ⭐</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash · Padrão Ouro ⭐</option>
                     </optgroup>
                     <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Recomendado ⭐</option>
-                      <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
-                      <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
-                      <option value="qwen/qwen-max">Qwen Max</option>
-                      <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
-                      <option value="qwen/qwen-plus">Qwen Plus</option>
-                      <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Raciocínio ⭐</option>
                     </optgroup>
                   </select>
                 </div>

@@ -1047,16 +1047,16 @@ RECEBIMENTO DE DOCUMENTOS:
 → NÃO gere relatórios nem petições nesta etapa.
 
 COMANDO "GERAR RELATÓRIO":
-→ Gere o Relatório de Análise Jurídica completo (mínimo 2.000 palavras).
+→ Gere o Relatório de Análise Jurídica completo (até 2.000 palavras, podendo ser menos conforme a complexidade).
 → Estrutura obrigatória do relatório:
-   1. STATUS DA LEITURA DOCUMENTAL (mín. 200 palavras): liste cada arquivo com dados relevantes extraídos. Alerte se algum estiver ilegível.
-   2. RESUMO DOS FATOS (mín. 300 palavras): DER, DII, idade, tempo de contribuição, carência, indeferimento, motivo.
-   3. PROVAS E ANÁLISE DOCUMENTAL (mín. 400 palavras): correlacione cada documento com os fatos. Aponte documentos faltantes.
-   4. ANÁLISE DE DIVERGÊNCIAS (mín. 200 palavras): CTPS vs. CNIS vs. decisão do INSS. Liste todas as discrepâncias.
-   5. ADVOGADO DO DIABO (mín. 400 palavras): atue como Procurador implacável. 3 pontos fracos + estratégia de blindagem detalhada para cada um.
-   6. ANÁLISE DE REQUISITOS (mín. 300 palavras): verifique se os requisitos legais foram preenchidos com cálculo completo (datas, subtotais, total).
-   7. PRINCÍPIOS PREVIDENCIÁRIOS (mín. 150 palavras): princípios aplicáveis ao caso.
-   8. ESTRATÉGIA JURÍDICA (mín. 200 palavras): caminhos processuais com prós e contras.
+   1. STATUS DA LEITURA DOCUMENTAL (resumo conciso): liste cada arquivo com dados relevantes extraídos. Alerte se algum estiver ilegível.
+   2. RESUMO DOS FATOS (objetivo): DER, DII, idade, tempo de contribuição, carência, indeferimento, motivo.
+   3. PROVAS E ANÁLISE DOCUMENTAL: correlacione cada documento com os fatos. Aponte documentos faltantes.
+   4. ANÁLISE DE DIVERGÊNCIAS: CTPS vs. CNIS vs. decisão do INSS. Liste todas as discrepâncias.
+   5. ADVOGADO DO DIABO: atue como Procurador implacável. 3 pontos fracos + estratégia de blindagem detalhada para cada um.
+   6. ANÁLISE DE REQUISITOS: verifique se os requisitos legais foram preenchidos com cálculo completo (datas, subtotais, total).
+   7. PRINCÍPIOS PREVIDENCIÁRIOS: princípios aplicáveis ao caso.
+   8. ESTRATÉGIA JURÍDICA: caminhos processuais com prós e contras.
    9. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Com base na complexidade dos fatos, volume de provas (OCR) e densidade da Base de Conhecimento (RAG), sugira qual a extensão de palavras aconselhável para este caso específico: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique sua escolha com base na necessidade de citação direta de dispositivos e profundidade argumentativa.
    10. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
       Liste TODOS os fundamentos a serem usados. Para cada um, informe:
@@ -1739,7 +1739,7 @@ RECEBIMENTO DE DOCUMENTOS:
 → NÃO gere relatórios nem petições nesta etapa.
 
 COMANDO "GERAR RELATÓRIO":
-→ Gere o Relatório de Análise Jurídica completo.
+→ Gere o Relatório de Análise Jurídica completo (até 2.000 palavras, podendo ser menos conforme a complexidade).
 → Estrutura obrigatória do relatório:
    1. STATUS DA LEITURA DOCUMENTAL: liste cada arquivo com dados relevantes. Alerte se ilegível.
    2. RESUMO DOS FATOS: admissão, demissão, função, salário, violações.
@@ -2046,7 +2046,7 @@ RECEBIMENTO DE DOCUMENTOS:
 → NÃO gere relatórios nem petições nesta etapa.
 
 COMANDO "GERAR RELATÓRIO":
-→ Gere o Relatório de Análise Jurídica completo (mínimo 2.000 palavras).
+→ Gere o Relatório de Análise Jurídica completo (até 2.000 palavras, podendo ser menos conforme a complexidade).
 → Estrutura obrigatória do relatório:
    1. STATUS DA LEITURA DOCUMENTAL (mín. 200 palavras): liste cada arquivo com dados relevantes extraídos. Alerte se algum estiver ilegível.
    2. RESUMO DOS FATOS (mín. 300 palavras): partes envolvidas, relação jurídica (consumo ou civil), cronologia, problema central, providências já tomadas pelo cliente.
@@ -2248,19 +2248,20 @@ let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3.5-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-3.1-pro-preview"
+  "gemini-3-flash-preview",
+  "gemini-3.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-1.5-flash-latest": "gemini-3.5-flash",
-  "gemini-1.5-pro-latest": "gemini-3.1-pro-preview"
+  "gemini-2.0-flash-exp": "gemini-3-flash-preview",
+  "gemini-1.5-flash-latest": "gemini-3-flash-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return MODEL_HIERARCHY[0];
+  if (modelName === "gemini-3.5-flash") return "gemini-3.5-flash";
+  if (modelName === "gemini-3-flash-preview") return "gemini-3-flash-preview";
+  if (modelName.includes('deepseek')) return modelName;
   return MODEL_MAPPING[modelName] || modelName;
 }
 
@@ -2585,13 +2586,13 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         "X-Title": "Felix & Castro Advocacia"
       },
       body: JSON.stringify({
-        model: params.model || "deepseek/deepseek-chat",
+        model: params.model || "deepseek/deepseek-v4-flash",
         messages: params.messages,
         temperature: params.temperature ?? 0.2,
         max_tokens: params.max_tokens || 16383,
         stream: true,
         include_reasoning: true, // Habilita tokens de raciocínio (Chain of Thought)
-        reasoning_effort: "high" // Define esforço de raciocínio alto conforme suportado pelo modelo
+        reasoning_effort: "xhigh" // Define esforço de raciocínio máximo conforme solicitado pelo usuário
       })
     });
 
@@ -2913,11 +2914,11 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
 
-    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
       modelProvider = 'openrouter';
-      model = 'deepseek/deepseek-v3.2';
-      console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+      model = 'deepseek/deepseek-v4-flash';
+      console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V4 Flash via OpenRouter');
     }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
@@ -3055,21 +3056,15 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     }
 
     let lengthConstraint = "";
-    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
+    if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
+      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve seguir o **Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras)** que você sugeriu anteriormente no Relatório de Análise Jurídica presente no histórico da conversa.
+Verifique sua própria recomendação no relatório anterior e cumpra-a com rigor. Se não houver relatório no histórico, use o padrão de **5000 palavras** de alta densidade jurídica.`;
+    } else if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
-
-REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
-1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
-2. DISTRIBUIÇÃO E DENSIDADE:
-   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
-   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
-   • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-   • DO ROL DE DOCUMENTOS: VOCÊ DEVE criar uma lista exaustiva, numerada (1., 2., 3...). NUNCA agrupe documentos em uma mesma linha. SE O USUÁRIO FORNECEU um OCR com "Doc. 1", "Doc. 2", você DEVE listar EXATAMENTE um documento por linha com o NOME EXATO do arquivo indicado no OCR (ex: "1. Doc. 1 - Laudo Médico"). É estritamente OBRIGATÓRIO ter 1 (um) documento individual por linha separadamente.
-3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
-4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
-5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
+O usuário selecionou explicitamente este alvo, portanto, você DEVE atingi-lo expandindo os argumentos e citações conforme necessário.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -3162,15 +3157,15 @@ ${message}`;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16384; // Limite máximo da API para saída
-      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
+      maxOutputTokens = 18000; // Limite solicitado pelo usuário
+      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16384;
+      maxOutputTokens = 18000;
       thinkingConfig = undefined;
     }
 
@@ -3191,7 +3186,7 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
@@ -3233,10 +3228,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
 
           const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v3.2",
+            model: model || "deepseek/deepseek-v4-flash",
             messages: orMessages,
             temperature: isGenerationRequest ? 0.15 : temperature,
-            max_tokens: maxOutputTokens || 16384
+            max_tokens: maxOutputTokens || 18000,
+            provider: {
+              data_collection: false,
+              require_reasoning: true
+            }
           }, res, false);
 
           attemptText = orResult.fullText;
@@ -3244,7 +3243,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           maxTokensHit = orResult.maxTokensHit;
         } else {
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
+            model: model || "gemini-3-flash-preview",
             contents: currentContents,
             config: {
               systemInstruction: selectedSystemPrompt,
@@ -3356,11 +3355,11 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
 
-    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
       modelProvider = 'openrouter';
-      model = 'deepseek/deepseek-v3.2';
-      console.log('[Dra.Luana] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+      model = 'deepseek/deepseek-v4-flash';
+      console.log('[Dra.Luana] Tier Premium ativado → forçando DeepSeek V4 Flash via OpenRouter');
     }
 
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
@@ -3546,21 +3545,15 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
     }
 
     let lengthConstraint = "";
-    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
+    if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
+      lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
+Esta peça deve seguir o **Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras)** que você sugeriu anteriormente no Relatório de Análise Jurídica presente no histórico da conversa.
+Verifique sua própria recomendação no relatório anterior e cumpra-a com rigor. Se não houver relatório no histórico, use o padrão de **5000 palavras** de alta densidade jurídica.`;
+    } else if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
-
-REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
-1. Gere a petição INTEIRA, do endereçamento ao "Nestes termos, pede e espera deferimento" + assinatura, em UMA passada.
-2. DISTRIBUIÇÃO E DENSIDADE:
-   • DOS FATOS: Desenvolva o *storytelling* de forma aprofundada, dedicando no mínimo 5 a 6 longos parágrafos para narrar o ocorrido. Especifique e detalhe CADA prova fornecida no OCR (laudos, receitas, relatórios). Não cite genéricamente "laudos anexos" sem destrinchar o conteúdo de cada um.
-   • DO DIREITO: Para CADA tópico, é OBRIGATÓRIO CITAR EXPRESSAMENTE e ipsis litteris os artigos de lei, doutrina e a jurisprudência fornecidos. É PROIBIDO apenas parafrasear. Você DEVE abrir aspas ("...") ou usar formato de citação blockquote para inserir jurisprudências, súmulas e leis inteiras pertinentes. Crie a subsunção completa (fato-norma) para cada argumento. Desdobre conceitos doutrinários extensivamente aplicados ao caso.
-   • DOS PEDIDOS: Cada pedido deve ser exaustivamente detalhado, contendo de 3-5 linhas e fundamentado com a norma correlata.
-   • DO ROL DE DOCUMENTOS: VOCÊ DEVE criar uma lista exaustiva, numerada (1., 2., 3...). NUNCA agrupe documentos em uma mesma linha. SE O USUÁRIO FORNECEU um OCR com "Doc. 1", "Doc. 2", você DEVE listar EXATAMENTE um documento por linha com o NOME EXATO do arquivo indicado no OCR (ex: "1. Doc. 1 - Laudo Médico"). É estritamente OBRIGATÓRIO ter 1 (um) documento individual por linha separadamente.
-3. NUNCA escreva "Nestes termos, pede e espera deferimento" antes de ter esgotado todos os argumentos fáticos e fundados na base de conhecimento. A petição DEVE SER LONGA, ROBUSTA e EXAUSTIVA.
-4. NUNCA recomece a petição depois do "Nestes termos, pede e espera deferimento". PROIBIDO gerar uma segunda peça empilhada.
-5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
+O usuário selecionou explicitamente este alvo, portanto, você DEVE atingi-lo expandindo os argumentos e citações conforme necessário.`;
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
@@ -3676,15 +3669,15 @@ ${message}`;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16384; // Limite máximo da API para saída
-      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
+      maxOutputTokens = 18000; // Limite solicitado pelo usuário
+      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
     } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16384;
+      maxOutputTokens = 18000;
       thinkingConfig = undefined;
     }
 
@@ -3702,7 +3695,7 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
       if (totalInputTokensLuana > 90_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
@@ -3751,10 +3744,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
           const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v3.2",
+            model: model || "deepseek/deepseek-v4-flash",
             messages: orMessagesFinal,
             temperature: isGenerationRequest ? 0.15 : temperature,
-            max_tokens: maxOutputTokens || 16384
+            max_tokens: maxOutputTokens || 18000,
+            provider: {
+              data_collection: false,
+              require_reasoning: true
+            }
           }, res, false);
 
           attemptText = orResult.fullText;
@@ -3762,7 +3759,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           maxTokensHit = orResult.maxTokensHit;
         } else {
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
+            model: model || "gemini-3-flash-preview",
             contents: currentContents,
             config: {
               systemInstruction: selectedSystemPrompt,
@@ -3890,11 +3887,11 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
 
-    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
       modelProvider = 'openrouter';
-      model = 'deepseek/deepseek-v3.2';
-      console.log('[Dr.FelixCastro] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+      model = 'deepseek/deepseek-v4-flash';
+      console.log('[Dr.FelixCastro] Tier Premium ativado → forçando DeepSeek V4 Flash via OpenRouter');
     }
 
     const intent = await detectUserIntent(message);
@@ -4097,15 +4094,15 @@ ${message}`;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 16384; // Limite máximo da API para saída
-      thinkingConfig = { thinkingBudget: 16384 }; // Limite máximo de pensamento (Thinking) para a API
+      maxOutputTokens = 18000; // Limite solicitado pelo usuário
+      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 4096 };
     }
 
     if (modelProvider === 'openrouter') {
-      maxOutputTokens = 16384;
+      maxOutputTokens = 18000;
       thinkingConfig = undefined;
     }
 
@@ -4118,10 +4115,17 @@ ${message}`;
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
+      let targetInstruction = "";
+      if (isGenerationRequest && petitionLength === 'Padrão (Livre)') {
+        targetInstruction = `Siga o Alvo de Extensão (Mínimo 3000, Médio 5000 ou Máximo 7000 palavras) sugerido anteriormente no Relatório de Análise Jurídica. Se não houver, use o padrão de 5000 palavras.`;
+      } else if (isGenerationRequest && wordTarget) {
+        targetInstruction = `A petição deve ter aproximadamente **${wordTarget} palavras** de extrema densidade jurídica.`;
+      }
+
       const MAX_ATTEMPTS = 3;
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
+      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 90k tokens — output pode degradar.`);
       }
@@ -4140,7 +4144,7 @@ REGRAS ABSOLUTAS:
 1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 2. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 3. SÚMULAS NOS PEDIDOS: TERMINANTEMENTE PROIBIDO transcrever súmulas na seção de Pedidos.
-4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
+4. DENSIDADE EXTREMA: ${targetInstruction || "A petição deve ter entre 5000 e 7000 palavras."} Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
 5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
 6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
 
@@ -4162,10 +4166,14 @@ REGRAS ABSOLUTAS:
           }
 
           const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v3.2",
+            model: model || "deepseek/deepseek-v4-flash",
             messages: orMessages,
             temperature: isGenerationRequest ? 0.15 : temperature,
-            max_tokens: maxOutputTokens || 16384
+            max_tokens: maxOutputTokens || 18000,
+            provider: {
+              data_collection: false,
+              require_reasoning: true
+            }
           }, res, false);
 
           attemptText = orResult.fullText;
@@ -4173,7 +4181,7 @@ REGRAS ABSOLUTAS:
           maxTokensHit = orResult.maxTokensHit;
         } else {
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
+            model: model || "gemini-3-flash-preview",
             contents: currentContents,
             config: {
               systemInstruction: selectedSystemPrompt,
@@ -4371,11 +4379,11 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
 
-    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
+    // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
-modelProvider = 'openrouter';
-model = 'deepseek/deepseek-v3.2';
-console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v4-flash';
+      console.log('[Sec.Fabricia] Tier Premium ativado → forçando DeepSeek V4 Flash via OpenRouter');
     }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
@@ -4535,7 +4543,16 @@ for (const h of history) {
   orMessages.push({ role, content: h.content });
 }
 orMessages.push({ role: "user", content: finalMessage });
-await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
+await callOpenRouterStream({
+  model: model || "deepseek/deepseek-v4-flash",
+  messages: orMessages,
+  temperature: isGenerationRequest ? 0.15 : temperature,
+  max_tokens: 18000,
+  provider: {
+    data_collection: false,
+    require_reasoning: true
+  }
+}, res);
 return;
     }
 
@@ -4558,7 +4575,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
       if (totalInputTokens > 90_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`);
       }
@@ -4566,7 +4583,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 while (!isFinished && attempt < MAX_ATTEMPTS) {
   attempt++;
   const responseStream = await callGeminiStream({
-    model: model || "gemini-3.5-flash",
+    model: model || "gemini-3-flash-preview",
     contents: currentContents,
     config: {
       systemInstruction: selectedSystemPrompt,
