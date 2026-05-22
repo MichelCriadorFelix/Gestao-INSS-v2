@@ -16,8 +16,15 @@ CREATE TABLE IF NOT EXISTS client_document_chunks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
--- Garantir que a coluna chunk_index exista caso a tabela já tenha sido criada antes
+-- Garantir que as colunas novas existam caso a tabela já tenha sido criada em alguma iteração anterior sem elas
+ALTER TABLE client_document_chunks ADD COLUMN IF NOT EXISTS subfolder TEXT;
+ALTER TABLE client_document_chunks ADD COLUMN IF NOT EXISTS file_url TEXT;
 ALTER TABLE client_document_chunks ADD COLUMN IF NOT EXISTS chunk_index INTEGER;
+ALTER TABLE client_document_chunks ADD COLUMN IF NOT EXISTS metadata JSONB;
+ALTER TABLE client_document_chunks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW());
+
+-- Forçar o reload do cache de schemas do PostgREST para o Supabase reconhecer as novas colunas imediatamente
+NOTIFY pgrst, 'reload schema';
 
 -- 3. Configurar Políticas de Privacidade e Segurança (RLS - Row Level Security)
 -- Habilita o RLS na tabela
