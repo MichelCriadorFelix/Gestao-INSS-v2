@@ -8,7 +8,6 @@ import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
 import { supabaseService } from '../services/supabaseService';
-import { supabase } from '../supabaseClient';
 
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
@@ -96,131 +95,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
-  
-  const [selectedCompartment, setSelectedCompartment] = useState<'proof_documents' | 'new_proof_documents' | 'judicial_process' | 'petitions'>('proof_documents');
-  const [selectedSubfolder, setSelectedSubfolder] = useState<string>('');
-  const [indexStatus, setIndexStatus] = useState<Record<string, 'indexing' | 'indexed' | 'error' | 'none'>>({});
-  const [activeFilterCompartment, setActiveFilterCompartment] = useState<'all' | 'proofs' | 'process' | 'petitions'>('all');
-
-  const indexDocumentWithRAG = async (doc: ScannedDocument) => {
-      if (!formData.id) return;
-      setIndexStatus(prev => ({ ...prev, [doc.id]: 'indexing' }));
-      try {
-          console.log(`[RAG Indexing] Starting indexing for file: ${doc.name} (${doc.id})`);
-          
-          let token = "";
-          try {
-              if (supabase) {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (session) {
-                      token = session.access_token;
-                  }
-              }
-          } catch (sessionErr) {
-              console.warn("Could not get Supabase session token:", sessionErr);
-          }
-
-          let extractedText = "";
-          
-          if (doc.type === 'text/plain') {
-              const res = await fetch(doc.url);
-              extractedText = await res.text();
-          } else if (doc.type === 'application/pdf' || doc.type.startsWith('image/')) {
-              const ocrRes = await fetch('/api/ocr-unified', {
-                   method: 'POST',
-                   headers: { 
-                       'Content-Type': 'application/json',
-                       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                   },
-                   body: JSON.stringify({ 
-                       documents: [{
-                           url: doc.url,
-                           mimeType: doc.type,
-                           name: doc.name
-                       }] 
-                   })
-              });
-              if (!ocrRes.ok) throw new Error("Falha ao extrair texto (OCR) do arquivo.");
-              const ocrData = await ocrRes.json();
-              extractedText = ocrData.text || "";
-          }
-
-          if (!extractedText.trim()) {
-              console.warn("[RAG Indexing] No text extracted for doc:", doc.name);
-              setIndexStatus(prev => ({ ...prev, [doc.id]: 'none' }));
-              return;
-          }
-
-          const indexRes = await fetch('/api/client-rag/index', {
-               method: 'POST',
-               headers: { 
-                   'Content-Type': 'application/json',
-                   ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-               },
-               body: JSON.stringify({
-                   clientId: formData.id,
-                   compartment: doc.compartment || 'proof_documents',
-                   subfolder: doc.subfolder || null,
-                   fileName: doc.name,
-                   fileUrl: doc.url,
-                   text: extractedText
-               })
-          });
-
-          if (!indexRes.ok) throw new Error("Falha ao indexar vetores no Supabase.");
-
-          setIndexStatus(prev => ({ ...prev, [doc.id]: 'indexed' }));
-          console.log(`[RAG Indexing] Document ${doc.name} indexed successfully!`);
-      } catch (err) {
-          console.error(`[RAG Indexing] Error indexing document ${doc.name}:`, err);
-          setIndexStatus(prev => ({ ...prev, [doc.id]: 'error' }));
-      }
-  };
-
-  const clearAllClientRAG = async () => {
-      if (!formData.id) return;
-      
-      const confirmClear = window.confirm("Tem certeza que deseja excluir permanentemente toda a base de conhecimento (RAG) deste cliente? Isso irá apagar todos os vetores indexados no Supabase e liberar espaço no banco.");
-      if (!confirmClear) return;
-
-      try {
-          let token = "";
-          try {
-              if (supabase) {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (session) {
-                      token = session.access_token;
-                  }
-              }
-          } catch (sessionErr) {
-              console.warn("Could not get Supabase session token:", sessionErr);
-          }
-
-          const res = await fetch('/api/client-rag/clear-all', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-              },
-              body: JSON.stringify({ clientId: formData.id })
-          });
-
-          if (!res.ok) throw new Error("Falha ao limpar RAG no Supabase.");
-
-          // Update index status to none for all documents
-          const updatedStatus: Record<string, 'indexing' | 'indexed' | 'error' | 'none'> = {};
-          (formData.documents || []).forEach(doc => {
-              updatedStatus[doc.id] = 'none';
-          });
-          setIndexStatus(updatedStatus);
-
-          alert("Base de conhecimento (RAG) excluída com sucesso para este cliente!");
-      } catch (err: any) {
-          console.error("Erro ao limpar RAG do cliente:", err);
-          alert(`Erro ao excluir RAG: ${err.message || err}`);
-      }
-  };
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certidaoFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -318,36 +192,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     setActiveTab('info');
   }, [initialData, isOpen]);
 
-  // Load existing RAG indexed files for this client
-  useEffect(() => {
-    const fetchIndexedFiles = async () => {
-      if (!isOpen || !formData.id || !supabase) return;
-      try {
-        const { data, error } = await supabase
-          .from('client_document_chunks')
-          .select('file_name')
-          .eq('client_id', formData.id);
-        
-        if (!error && data) {
-          const indexedNames = new Set(data.map((item: any) => item.file_name));
-          const newStatus: Record<string, 'indexing' | 'indexed' | 'error' | 'none'> = {};
-          
-          (formData.documents || []).forEach(doc => {
-            if (indexedNames.has(doc.name)) {
-              newStatus[doc.id] = 'indexed';
-            }
-          });
-          
-          setIndexStatus(prev => ({ ...prev, ...newStatus }));
-        }
-      } catch (err) {
-        console.error("Error loading indexed documents:", err);
-      }
-    };
-    
-    fetchIndexedFiles();
-  }, [isOpen, formData.id, formData.documents?.length]);
-
   useEffect(() => {
     if (formData.der && formData.der.length === 10) {
        const derDate = parseDate(formData.der);
@@ -435,47 +279,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     onSave(formData as ClientRecord);
   };
 
-  const handleRemoveDocument = async (docId: string) => {
-      const docToRemove = (formData.documents || []).find(d => d.id === docId);
+  const handleRemoveDocument = (docId: string) => {
       const updatedDocs = (formData.documents || []).filter(d => d.id !== docId);
-      const updatedFormData = { ...formData, documents: updatedDocs };
-      setFormData(updatedFormData);
-      
-      try {
-          await onSave(updatedFormData as ClientRecord);
-      } catch (e) {
-          console.error("Error auto-saving after doc deletion:", e);
-      }
-
-      if (docToRemove && formData.id) {
-          try {
-              let token = "";
-              try {
-                  if (supabase) {
-                      const { data: { session } } = await supabase.auth.getSession();
-                      if (session) {
-                          token = session.access_token;
-                      }
-                  }
-              } catch (sessionErr) {}
-
-              await fetch('/api/client-rag/delete-file', {
-                  method: 'POST',
-                  headers: { 
-                      'Content-Type': 'application/json',
-                      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                  },
-                  body: JSON.stringify({
-                      clientId: formData.id,
-                      fileName: docToRemove.name,
-                      compartment: docToRemove.compartment || 'proof_documents'
-                  })
-              });
-              console.log(`[RAG Clean] Chunks cleaned up on deletion: ${docToRemove.name}`);
-          } catch (err) {
-              console.error("Could not clean indexing vectors:", err);
-          }
-      }
+      setFormData({ ...formData, documents: updatedDocs });
   }
 
   const handleRemoveCertidao = (docId: string) => {
@@ -507,22 +313,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               name: doc.name
           }));
 
-          let token = "";
-          try {
-              if (supabase) {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (session) {
-                      token = session.access_token;
-                  }
-              }
-          } catch (sessionErr) {}
-
           const ocrRes = await fetch('/api/ocr-unified', {
                method: 'POST',
-               headers: { 
-                   'Content-Type': 'application/json',
-                   ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-               },
+               headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({ documents: documentsToProcess })
           });
           
@@ -578,21 +371,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               console.warn("Storage upload failed, falling back to base64:", storageErr);
           }
 
-          const updatedDoc: ScannedDocument = { 
-              ...doc, 
-              url: finalUrl,
-              compartment: selectedCompartment,
-              subfolder: selectedSubfolder.trim() || undefined
-          };
+          const updatedDoc = { ...doc, url: finalUrl };
           const updatedDocs = [...(formData.documents || []), updatedDoc];
           const updatedFormData = { ...formData, documents: updatedDocs };
           setFormData(updatedFormData);
           
           await onSave(updatedFormData as ClientRecord);
           setSyncStatus(prev => ({ ...prev, [doc.id]: 'success' }));
-          
-          // Trigger semantic index
-          indexDocumentWithRAG(updatedDoc);
       } catch (e) {
           console.error("Error saving document:", e);
           setSyncStatus(prev => ({ ...prev, [doc.id]: 'error' }));
@@ -640,9 +425,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                   name: file.name,
                   type: file.type || 'application/pdf',
                   url: finalUrl,
-                  date: new Date().toISOString(),
-                  compartment: selectedCompartment,
-                  subfolder: selectedSubfolder.trim() || undefined
+                  date: new Date().toISOString()
               };
               
               newDocs.push(newDoc);
@@ -660,10 +443,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
           try {
               await onSave(updatedFormData as ClientRecord);
-              newDocs.forEach(doc => {
-                  newSyncStatus[doc.id] = 'success';
-                  indexDocumentWithRAG(doc);
-              });
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'success');
               setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
           } catch (e) {
               console.error("Error saving uploaded documents:", e);
@@ -1315,50 +1095,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 </form>
             ) : activeTab === 'docs' ? (
                 <div className="space-y-6">
-                    {/* CONFIGURAÇÃO DE ALVO PARA UPLOADS E DIGITALIZAÇÃO (RAG INTELIGENTE - PADRÃO OURO) */}
-                    <div className="bg-gradient-to-r from-emerald-500/5 to-primary-500/5 dark:from-gold-500/5 dark:to-primary-500/5 border border-primary-500/10 dark:border-gold-500/10 rounded-2xl p-4 space-y-4">
-                        <div className="flex flex-col sm:flex-row gap-4 items-end">
-                            <div className="flex-1 space-y-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400 flex items-center gap-1">
-                                    <span>📂</span> Pasta / Compartimento de Destino
-                                </label>
-                                <select 
-                                    value={selectedCompartment}
-                                    onChange={(e) => setSelectedCompartment(e.target.value as any)}
-                                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/70 rounded-xl font-medium text-slate-800 dark:text-white focus:ring-primary-500 outline-none"
-                                >
-                                    <option value="proof_documents">💼 Provas Fundamentais (Iniciais)</option>
-                                    <option value="new_proof_documents">✨ Novas Provas (Supervenientes)</option>
-                                    <option value="judicial_process">🏛️ Histórico do Processo Judicial (PDFs/Andamentos)</option>
-                                    <option value="petitions">📝 Petições Prontas do Histórico</option>
-                                </select>
-                            </div>
-                            <div className="flex-1 space-y-1.5">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400 flex items-center gap-1">
-                                    <span>🏷️</span> Subpasta / Marcador de Contexto (Opcional)
-                                </label>
-                                <input 
-                                    type="text"
-                                    placeholder="Ex: Laudo Médico, Contracheques, Juizado Comum..."
-                                    value={selectedSubfolder}
-                                    onChange={(e) => setSelectedSubfolder(e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-gold-500/15 bg-white dark:bg-bordeaux-950/70 rounded-xl font-medium text-slate-800 dark:text-white focus:ring-primary-500 outline-none"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-400 flex items-center gap-1">
-                            <span>💡</span> <strong>Indexador RAG Embutido:</strong> Ao fazer upload ou digitalizar um arquivo, ele será automaticamente convertido (OCR) e seus trechos indexados de forma semântica na base Supabase deste cliente.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50 dark:bg-bordeaux-950/30 p-4 border border-slate-200 dark:border-gold-500/10 rounded-2xl">
-                        <div className="flex flex-col">
-                            <h4 className="font-bold text-slate-700 dark:text-white flex items-center gap-1.5 text-sm sm:text-base">
-                                Explorador de Arquivos do Cliente
-                            </h4>
-                            <p className="text-xs text-slate-500">Mapeamento estruturado de evidências jurídicas</p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
+                    <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-slate-700 dark:text-white">Documentos Digitalizados</h4>
+                        <div className="flex items-center gap-2">
                             {formData.documents?.some(d => d.type === 'application/pdf') && (
                                 <button 
                                     onClick={async () => {
@@ -1367,7 +1106,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             await downloadFileRobust(doc.url, doc.name);
                                         }
                                     }}
-                                    className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-3 py-2 rounded-lg border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                                    className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
                                 >
                                     <ArrowDownTrayIcon className="h-4 w-4" />
                                     Baixar PDFs
@@ -1383,30 +1122,30 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             />
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg shadow-md transition"
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
-                                Carregar Arquivos
+                                Upload
                             </button>
                             <button 
                                 onClick={handleUnifiedOCR}
                                 disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
-                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
+                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
                             >
                                 {isGeneratingOCR ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <BoltIcon className="h-4 w-4" />}
                                 {isGeneratingOCR ? 'Lendo...' : 'Gerar OCR Unificado'}
                             </button>
                             <button 
                                 onClick={() => setIsScannerOpen(true)}
-                                className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-3 py-2 rounded-lg border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                                className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-primary-700 transition"
                             >
                                 <CameraIcon className="h-4 w-4" />
-                                Escanear
+                                Nova Digitalização
                             </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
                         <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
                             <DocumentTextIcon className="h-5 w-5 text-blue-500" />
                             Gerar Procuração
@@ -1421,76 +1160,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </button>
                     </div>
 
-                    {/* ABAS EXCLUSIVAS DE FILTRO POR COMPARTIMENTO DE RAG */}
-                    <div className="flex bg-slate-100 dark:bg-bordeaux-950/50 p-1.5 rounded-xl items-center gap-1 w-full flex-wrap border border-slate-200 dark:border-gold-500/10">
-                        <button 
-                            type="button"
-                            onClick={() => setActiveFilterCompartment('all')} 
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${activeFilterCompartment === 'all' ? 'bg-white dark:bg-bordeaux-900 text-primary-600 dark:text-gold-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            🌍 Todos ({formData.documents?.length || 0})
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setActiveFilterCompartment('proofs')} 
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${activeFilterCompartment === 'proofs' ? 'bg-white dark:bg-bordeaux-900 text-primary-600 dark:text-gold-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            💼 Provas Jurídicas ({formData.documents?.filter(d => d.compartment === 'proof_documents' || d.compartment === 'new_proof_documents' || !d.compartment).length || 0})
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setActiveFilterCompartment('process')} 
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${activeFilterCompartment === 'process' ? 'bg-white dark:bg-bordeaux-900 text-primary-600 dark:text-gold-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            🏛️ Processo e Andamentos ({formData.documents?.filter(d => d.compartment === 'judicial_process').length || 0})
-                        </button>
-                        <button 
-                            type="button"
-                            onClick={() => setActiveFilterCompartment('petitions')} 
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${activeFilterCompartment === 'petitions' ? 'bg-white dark:bg-bordeaux-900 text-primary-600 dark:text-gold-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            📝 Petições Salvas ({formData.documents?.filter(d => d.compartment === 'petitions').length || 0})
-                        </button>
-                    </div>
-
-                    {/* GERENCIAMENTO SEMÂNTICO DE RAG */}
-                    {formData.id && (
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-indigo-50/40 dark:bg-bordeaux-950/20 border border-indigo-100/60 dark:border-gold-500/10 rounded-2xl gap-3 font-sans text-xs">
-                            <div className="text-slate-600 dark:text-slate-300">
-                                🧠 <span className="font-bold text-slate-800 dark:text-white">Base de Inteligência (RAG):</span> {Object.values(indexStatus).filter(s => s === 'indexed').length} documento(s) com busca semântica ativa para as IAs do escritório.
-                            </div>
-                            <button 
-                                type="button"
-                                onClick={clearAllClientRAG}
-                                className="px-3 py-1.5 bg-red-50 hover:bg-red-600 dark:bg-red-950/20 dark:hover:bg-red-900/60 text-red-700 hover:text-white dark:text-red-400 dark:hover:text-white rounded-xl transition font-bold border border-red-200/50 dark:border-red-500/20 flex items-center justify-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
-                            >
-                                <TrashIcon className="h-4 w-4" /> Excluir RAG Completo
-                            </button>
-                        </div>
-                    )}
-
                     <div className="space-y-3">
                         {formData.documents && formData.documents.length > 0 ? (
-                            (formData.documents || []).filter(doc => {
-                                if (activeFilterCompartment === 'all') return true;
-                                if (activeFilterCompartment === 'proofs') {
-                                    return doc.compartment === 'proof_documents' || doc.compartment === 'new_proof_documents' || !doc.compartment;
-                                }
-                                if (activeFilterCompartment === 'process') {
-                                    return doc.compartment === 'judicial_process';
-                                }
-                                if (activeFilterCompartment === 'petitions') {
-                                    return doc.compartment === 'petitions';
-                                }
-                                return true;
-                            }).map((doc, idx) => (
-                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-50 dark:bg-bordeaux-900/30 border border-slate-200 dark:border-gold-500/10 rounded-2xl gap-3">
+                            formData.documents.map((doc, idx) => (
+                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl gap-3">
                                     <div className="flex items-center gap-3 flex-1">
                                         <div className="flex flex-col gap-1">
                                             <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
                                             <button onClick={() => moveDocument(idx, 'down')} disabled={idx === formData.documents!.length - 1} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDownIcon className="h-4 w-4" /></button>
                                         </div>
-                                        <div className="h-10 w-10 bg-red-100 text-red-600 dark:bg-bordeaux-900/40 dark:text-gold-400 rounded-xl flex items-center justify-center shrink-0 border border-red-200 dark:border-gold-500/20">
+                                        <div className="h-10 w-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center shrink-0">
                                             <DocumentTextIcon className="h-6 w-6" />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -1500,7 +1179,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                         type="text" 
                                                         value={editDocName} 
                                                         onChange={(e) => setEditDocName(e.target.value)}
-                                                        className="flex-1 px-2 py-1 text-sm border rounded dark:bg-bordeaux-900/60 dark:border-slate-600 dark:text-white outline-none"
+                                                        className="flex-1 px-2 py-1 text-sm border rounded dark:bg-bordeaux-900/60 dark:border-slate-600 dark:text-white"
                                                         autoFocus
                                                         onKeyDown={(e) => e.key === 'Enter' && saveDocName(doc.id)}
                                                     />
@@ -1508,67 +1187,25 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                     <button onClick={() => setEditingDocId(null)} className="text-slate-400 hover:text-slate-600"><XMarkIcon className="h-5 w-5" /></button>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center gap-2 flex-wrap">
+                                                <div className="flex items-center gap-2">
                                                     <p className="font-bold text-sm text-slate-800 dark:text-white truncate" title={doc.name}>{doc.name}</p>
-                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3.5 w-3.5 text-blue-500" title="Armazenado na Nuvem" />}
+                                                    {doc.url.startsWith('http') && <CloudIcon className="h-3 w-3 text-blue-500" title="Armazenado na Nuvem" />}
                                                     <button onClick={() => startEditingDoc(doc)} className="text-slate-400 hover:text-primary-600"><PencilSquareIcon className="h-4 w-4" /></button>
                                                 </div>
                                             )}
-                                            <div className="flex items-center gap-2 mt-1 flex-wrap font-sans text-[11px]">
-                                                <p className="text-slate-500 dark:text-slate-400">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMAGEM'}</p>
-                                                
-                                                {/* BADGES DO COMPARTIMENTO DO DOCUMENTO */}
-                                                <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 dark:bg-bordeaux-900/60 dark:text-gold-400 font-semibold border border-stone-200 dark:border-gold-500/20 flex items-center gap-1">
-                                                    📂 {{
-                                                        proof_documents: 'Provas Iniciais',
-                                                        new_proof_documents: 'Novas Provas',
-                                                        judicial_process: 'Processo Judicial',
-                                                        petitions: 'Petição do Histórico'
-                                                    }[doc.compartment || 'proof_documents']}
-                                                    {doc.subfolder ? ` [Subpasta: ${doc.subfolder}]` : ''}
-                                                </span>
-
-                                                {/* ETIQUETAS DO CLIENTE */}
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                <p className="text-xs text-slate-500">{doc.date} • {doc.type === 'application/pdf' ? 'PDF' : 'IMG'}</p>
                                                 {doc.tags?.map(tagId => {
                                                     const t = AVAILABLE_TAGS.find(t => t.id === tagId);
-                                                    return t ? <span key={tagId} className={`px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span> : null;
+                                                    return t ? <span key={tagId} className={`text-[10px] px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span> : null;
                                                 })}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
-                                        {/* STATUS E CONTROLE DE INDEXAÇÃO VETORIAL (RAG) */}
-                                        {indexStatus[doc.id] === 'indexing' && (
-                                            <span className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-1 rounded-lg flex items-center gap-1 animate-pulse font-bold">
-                                                <ArrowPathIcon className="h-3 w-3 animate-spin" /> RAG Indexando...
-                                            </span>
-                                        )}
-                                        {indexStatus[doc.id] === 'indexed' && (
-                                            <span className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-300 px-2 py-1 rounded-lg flex items-center gap-1 font-bold">
-                                                <CheckIcon className="h-3.5 w-3.5 text-emerald-600" /> RAG Ativo
-                                            </span>
-                                        )}
-                                        {indexStatus[doc.id] === 'error' && (
-                                            <button 
-                                                onClick={() => indexDocumentWithRAG(doc)} 
-                                                className="text-[11px] bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-200 transition font-bold"
-                                            >
-                                                <BoltIcon className="h-3 w-3 text-red-600" /> Falha RAG (Re-tentar)
-                                            </button>
-                                        )}
-                                        {!indexStatus[doc.id] || indexStatus[doc.id] === 'none' ? (
-                                            <button 
-                                                onClick={() => indexDocumentWithRAG(doc)} 
-                                                className="text-[11px] bg-slate-100 text-slate-700 dark:bg-bordeaux-950/60 dark:text-slate-300 px-2 py-1 rounded-lg border border-slate-200 dark:border-gold-500/10 flex items-center gap-1 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition font-bold"
-                                                title="Extrair texto e indexar semântica no Supabase RAG."
-                                            >
-                                                <BoltIcon className="h-3 w-3 text-indigo-500" /> Ativar RAG
-                                            </button>
-                                        ) : null}
-
+                                    <div className="flex items-center gap-2 sm:ml-auto">
                                         {syncStatus[doc.id] === 'syncing' && <span className="text-xs text-blue-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Salvando...</span>}
                                         {syncStatus[doc.id] === 'compressing' && <span className="text-xs text-amber-500 flex items-center gap-1"><ArrowPathIcon className="h-3 w-3 animate-spin" /> Comprimindo...</span>}
-                                        {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Re-tentar Upload</button>}
+                                        {syncStatus[doc.id] === 'error' && <button onClick={() => retryUpload(doc.id)} className="text-xs text-red-500 flex items-center gap-1 hover:underline"><ArrowPathIcon className="h-3 w-3" /> Tentar Novamente</button>}
                                         
                                         <button 
                                             onClick={() => handleCompressDocument(doc)} 
@@ -1584,7 +1221,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                 <TagIcon className="h-5 w-5" />
                                             </button>
                                             {activeTagMenu === doc.id && (
-                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-gold-500/15 rounded-xl shadow-lg z-10 p-2">
+                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl shadow-lg z-10 p-2">
                                                     <p className="text-xs font-bold text-slate-500 mb-2 px-2">Etiquetas</p>
                                                     {AVAILABLE_TAGS.map(t => (
                                                         <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded cursor-pointer">
@@ -1621,7 +1258,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                          <button
                             type="button"
                             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
-                            className="px-5 py-2.5 text-white font-medium bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-500/30 transition flex items-center gap-2 ml-auto text-sm"
+                            className="px-5 py-2.5 text-white font-medium bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-500/30 transition flex items-center gap-2 ml-auto"
                         >
                             <CheckIcon className="h-5 w-5" />
                             Salvar Alterações

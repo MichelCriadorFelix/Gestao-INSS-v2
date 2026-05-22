@@ -6,8 +6,6 @@ export interface ScannedDocument {
   url: string; // Base64
   date: string;
   tags?: string[];
-  compartment?: 'proof_documents' | 'new_proof_documents' | 'judicial_process' | 'petitions';
-  subfolder?: string;
 }
 
 export interface AgendaEvent {

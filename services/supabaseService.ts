@@ -18,9 +18,6 @@ export interface ChatSession {
   messages: Message[];
   ai_name: 'michel' | 'luana' | 'felix_castro' | 'fabricia';
   documents?: any[];
-  clientId?: string;
-  clientName?: string;
-  tokens?: { input: number; output: number; total: number };
 }
 
 export interface SavedCalculation {
@@ -36,35 +33,12 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return null;
     
-    let messagesToSave = session.messages.filter(m => 
-      !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]') && 
-      !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]') &&
-      !m.content?.startsWith('[SYSTEM_TOKENS_METADATA]')
-    );
-
+    let messagesToSave = session.messages.filter(m => !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
     if (session.documents && session.documents.length > 0) {
       messagesToSave = [...messagesToSave, {
         id: 'system-documents-metadata',
         role: 'user',
         content: `[SYSTEM_DOCUMENTS_METADATA]\n${JSON.stringify(session.documents)}`,
-        timestamp: new Date().toISOString()
-      }];
-    }
-
-    if (session.clientId) {
-      messagesToSave = [...messagesToSave, {
-        id: 'system-client-metadata',
-        role: 'user',
-        content: `[SYSTEM_CLIENT_METADATA]\n${JSON.stringify({ clientId: session.clientId, clientName: session.clientName })}`,
-        timestamp: new Date().toISOString()
-      }];
-    }
-
-    if (session.tokens) {
-      messagesToSave = [...messagesToSave, {
-        id: 'system-tokens-metadata',
-        role: 'user',
-        content: `[SYSTEM_TOKENS_METADATA]\n${JSON.stringify(session.tokens)}`,
         timestamp: new Date().toISOString()
       }];
     }
@@ -107,57 +81,21 @@ export const supabaseService = {
     
     return (data || []).map(session => {
       let documents = [];
-      let clientId = undefined;
-      let clientName = undefined;
-      let tokens = undefined;
       let messages = session.messages || [];
-
       const docsMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
       if (docsMsgIndex !== -1) {
         try {
           const docsJson = messages[docsMsgIndex].content.replace('[SYSTEM_DOCUMENTS_METADATA]\n', '');
           documents = JSON.parse(docsJson);
+          messages = messages.filter((_: any, i: number) => i !== docsMsgIndex);
         } catch (e) {
           console.error('Error parsing documents metadata', e);
         }
       }
-
-      const clientMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_CLIENT_METADATA]'));
-      if (clientMsgIndex !== -1) {
-        try {
-          const clientJson = messages[clientMsgIndex].content.replace('[SYSTEM_CLIENT_METADATA]\n', '');
-          const clientData = JSON.parse(clientJson);
-          clientId = clientData.clientId;
-          clientName = clientData.clientName;
-        } catch (e) {
-          console.error('Error parsing client metadata', e);
-        }
-      }
-
-      const tokensMsgIndex = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_TOKENS_METADATA]'));
-      if (tokensMsgIndex !== -1) {
-        try {
-          const tokensJson = messages[tokensMsgIndex].content.replace('[SYSTEM_TOKENS_METADATA]\n', '');
-          tokens = JSON.parse(tokensJson);
-        } catch (e) {
-          console.error('Error parsing tokens metadata', e);
-        }
-      }
-
-      // Filter out the system messages from the messages visible to the UI
-      messages = messages.filter((m: any) => 
-        !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]') && 
-        !m.content?.startsWith('[SYSTEM_CLIENT_METADATA]') &&
-        !m.content?.startsWith('[SYSTEM_TOKENS_METADATA]')
-      );
-
       return {
         ...session,
         messages,
-        documents,
-        clientId,
-        clientName,
-        tokens
+        documents
       };
     });
   },

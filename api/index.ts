@@ -3,50 +3,42 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import dotenv from "dotenv";
-import { createClient } from "@supabase/supabase-js";
-import multer from "multer";
-import fs from "fs";
-import path from "path";
+import { createClient } from '@supabase/supabase-js';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: '50mb' }));
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
 // Supabase Admin Client for Auth Verification
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
 );
 
 // Authentication Middleware
 const authenticate = async (req: any, res: any, next: any) => {
   // Skip auth for health check
   if (req.path === "/api/health") return next();
-
+  
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    return res
-      .status(401)
-      .json({ error: "Acesso não autorizado. Token ausente." });
+    return res.status(401).json({ error: "Acesso não autorizado. Token ausente." });
   }
 
   try {
-    const token = authHeader.split(" ")[1];
-    const {
-      data: { user },
-      error,
-    } = await supabaseAdmin.auth.getUser(token);
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
       return res.status(401).json({ error: "Sessão inválida ou expirada." });
@@ -62,43 +54,25 @@ const authenticate = async (req: any, res: any, next: any) => {
 // Helper para injetar a data atual nos prompts
 const getCurrentDateContext = () => {
   const date = new Date();
-  const formatter = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" });
+  const formatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
   return `\n\n[CONTEXTO TEMPORAL CRÍTICO]: Hoje é ${formatter.format(date)}. O ano atual é ${date.getFullYear()}. Você DEVE usar esta data como o "hoje" para todos os cálculos de idade, tempo de contribuição, prescrição, decadência e aplicação de leis no tempo (ex: regras de transição da EC 103/2019). Nunca assuma que estamos em 2023 ou 2024.`;
 };
 
 // Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
-  if (
-    req.path === "/health" ||
-    req.path === "/config" ||
-    req.path === "/bcdata/inpc" ||
-    req.originalUrl.includes("/bcdata/inpc")
-  )
-    return next();
+  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
   authenticate(req, res, next);
 });
 
 // File Upload Endpoint for Gemini File API
-const upload = multer({ dest: "/tmp/uploads/" });
+const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToGeminiWithRetry(
-  filePath: string,
-  mimetype: string,
-  originalname: string,
-  retries = 30,
-  forcedKeyIndex?: number,
-): Promise<any> {
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
-  if (keys.length === 0)
-    throw new Error(
-      "Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.",
-    );
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex =
-    forcedKeyIndex !== undefined && 30 - retries === 0
-      ? forcedKeyIndex
-      : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
@@ -108,58 +82,39 @@ async function uploadFileToGeminiWithRetry(
       config: {
         mimeType: mimetype,
         displayName: originalname,
-      },
+      }
     });
     // Adiciona o index da chave usada ao resultado
     return { ...uploadResult, keyIndex: keyToUseIndex % keys.length };
   } catch (error: any) {
     const errorMessage = error.message || String(error);
-    const isInvalidKey =
-      errorMessage.includes("API key not valid") ||
-      errorMessage.includes("INVALID_ARGUMENT") ||
-      errorMessage.includes("400") ||
-      errorMessage.includes("API_KEY_INVALID");
-    const isOverloaded =
-      errorMessage.includes("429") ||
-      errorMessage.includes("503") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED") ||
-      errorMessage.includes("Quota exceeded");
-
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
     }
-
-    console.error(
-      `Erro no upload com chave ${keyToUseIndex % keys.length}:`,
-      errorMessage,
-    );
-
+    
+    console.error(`Erro no upload com chave ${keyToUseIndex % keys.length}:`, errorMessage);
+    
     if ((isInvalidKey || isOverloaded) && retries > 0) {
       currentKeyIndex++;
       let delay = isInvalidKey ? 500 : 3000;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return uploadFileToGeminiWithRetry(
-        filePath,
-        mimetype,
-        originalname,
-        retries - 1,
-        forcedKeyIndex,
-      );
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1, forcedKeyIndex);
     }
-
+    
     throw error;
   }
 }
 
-app.post("/api/upload-file", upload.single("file"), async (req, res) => {
+app.post("/api/upload-file", upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo enviado" });
     }
 
-    const forcedKeyIndex = req.body.keyIndex
-      ? parseInt(req.body.keyIndex)
-      : undefined;
+    const forcedKeyIndex = req.body.keyIndex ? parseInt(req.body.keyIndex) : undefined;
 
     // Upload to Gemini
     const uploadResult = await uploadFileToGeminiWithRetry(
@@ -167,7 +122,7 @@ app.post("/api/upload-file", upload.single("file"), async (req, res) => {
       req.file.mimetype,
       req.file.originalname,
       30,
-      forcedKeyIndex,
+      forcedKeyIndex
     );
 
     // Clean up temp file
@@ -179,16 +134,14 @@ app.post("/api/upload-file", upload.single("file"), async (req, res) => {
       fileUri: uploadResult.uri,
       name: uploadResult.name,
       mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex,
+      keyIndex: uploadResult.keyIndex
     });
   } catch (error: any) {
     console.error("Error uploading file to Gemini:", error);
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res
-      .status(500)
-      .json({ error: error.message || "Falha no upload do arquivo" });
+    res.status(500).json({ error: error.message || "Falha no upload do arquivo" });
   }
 });
 
@@ -203,55 +156,48 @@ app.post("/api/upload-from-url", async (req: any, res) => {
     try {
       const parsedUrl = new URL(url);
       const hostname = parsedUrl.hostname.toLowerCase();
+      
+      const isInternal = 
+        hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname === '0.0.0.0' ||
+        hostname.startsWith('192.168.') || 
+        hostname.startsWith('10.') || 
+        hostname.startsWith('172.') || // Abordagem simplificada para ranges privados
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal');
 
-      const isInternal =
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "0.0.0.0" ||
-        hostname.startsWith("192.168.") ||
-        hostname.startsWith("10.") ||
-        hostname.startsWith("172.") || // Abordagem simplificada para ranges privados
-        hostname.endsWith(".local") ||
-        hostname.endsWith(".internal");
-
-      if (isInternal || !["http:", "https:"].includes(parsedUrl.protocol)) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "URL não permitida por motivos de segurança (SSRF Protection).",
-          });
+      if (isInternal || !['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return res.status(403).json({ error: "URL não permitida por motivos de segurança (SSRF Protection)." });
       }
     } catch (e) {
       return res.status(400).json({ error: "URL inválida." });
     }
 
-    const forcedKeyIndex =
-      keyIndex !== undefined ? parseInt(keyIndex) : undefined;
+    const forcedKeyIndex = keyIndex !== undefined ? parseInt(keyIndex) : undefined;
 
     // Download file to /tmp
     const response = await fetch(url);
-    if (!response.ok)
-      throw new Error(`Falha ao baixar arquivo da URL: ${response.statusText}`);
-
+    if (!response.ok) throw new Error(`Falha ao baixar arquivo da URL: ${response.statusText}`);
+    
     const buffer = await response.arrayBuffer();
-    tmpPath = path.join("/tmp", `proxy_${Date.now()}_${fileName || "file"}`);
+    tmpPath = path.join('/tmp', `proxy_${Date.now()}_${fileName || 'file'}`);
     fs.writeFileSync(tmpPath, Buffer.from(buffer));
 
     // Upload to Gemini
     const uploadResult = await uploadFileToGeminiWithRetry(
       tmpPath,
-      mimeType || "application/pdf",
-      fileName || "imported_file.pdf",
+      mimeType || 'application/pdf',
+      fileName || 'imported_file.pdf',
       30,
-      forcedKeyIndex,
+      forcedKeyIndex
     );
 
     res.json({
       fileUri: uploadResult.uri,
       name: uploadResult.name,
       mimeType: uploadResult.mimeType,
-      keyIndex: uploadResult.keyIndex,
+      keyIndex: uploadResult.keyIndex
     });
   } catch (error: any) {
     console.error("Erro no upload via URL:", error);
@@ -272,17 +218,15 @@ app.post("/api/ocr", async (req, res) => {
     }
 
     const parts = [
-      {
-        text: "Você é um especialista em AUDITORIA VISUAL de alta precisão para documentos jurídicos brasileiros. Sua missão é ler as IMAGENS anexadas com fidelidade absoluta.\n\nREGRAS DE OURO:\n1. FOCO NO CAMPO: No TRCT, localize os campos pelos números (Ex: Campo 24 para Admissão, Campo 26 para Afastamento).\n2. ZOOM MENTAL: Olhe para cada dígito individualmente. Se o ano terminar em '4', não leia como '9' ou '1'.\n3. FIDELIDADE VISUAL: Ignore o que o texto automático diz se ele divergir da imagem. A imagem é a verdade.\n4. DÚVIDA: Se um número estiver borrado, diga 'ILEGÍVEL' em vez de chutar.\n\nRetorne o texto organizado por campos e páginas.",
-      },
+      { text: "Você é um especialista em AUDITORIA VISUAL de alta precisão para documentos jurídicos brasileiros. Sua missão é ler as IMAGENS anexadas com fidelidade absoluta.\n\nREGRAS DE OURO:\n1. FOCO NO CAMPO: No TRCT, localize os campos pelos números (Ex: Campo 24 para Admissão, Campo 26 para Afastamento).\n2. ZOOM MENTAL: Olhe para cada dígito individualmente. Se o ano terminar em '4', não leia como '9' ou '1'.\n3. FIDELIDADE VISUAL: Ignore o que o texto automático diz se ele divergir da imagem. A imagem é a verdade.\n4. DÚVIDA: Se um número estiver borrado, diga 'ILEGÍVEL' em vez de chutar.\n\nRetorne o texto organizado por campos e páginas." }
     ];
 
     images.forEach((base64Image: string) => {
       parts.push({
         inlineData: {
           mimeType: "image/jpeg",
-          data: base64Image,
-        },
+          data: base64Image
+        }
       } as any);
     });
 
@@ -291,8 +235,8 @@ app.post("/api/ocr", async (req, res) => {
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
-        maxOutputTokens: 16383,
-      },
+        maxOutputTokens: 16383
+      }
     });
 
     res.json({ text: response.text || "" });
@@ -306,15 +250,14 @@ app.post("/api/ocr", async (req, res) => {
 app.post("/api/ocr-document", async (req, res) => {
   try {
     const { fileData, mimeType, documentName, documentType } = req.body;
-    if (!fileData)
-      return res.status(400).json({ error: "fileData is required" });
+    if (!fileData) return res.status(400).json({ error: "fileData is required" });
 
     // Detecta o tipo de documento para prompt especializado
-    const docTypeLower = (documentType || documentName || "").toLowerCase();
+    const docTypeLower = (documentType || documentName || '').toLowerCase();
 
-    let specialInstructions = "";
+    let specialInstructions = '';
 
-    if (docTypeLower.includes("cnis") || docTypeLower.includes("extrato")) {
+    if (docTypeLower.includes('cnis') || docTypeLower.includes('extrato')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: CNIS (Cadastro Nacional de Informações Sociais)
 FOCO ESPECIAL:
@@ -335,14 +278,10 @@ FOCO ESPECIAL:
   * B91 = Auxílio-Doença Acidentário
   * B92 = Aposentadoria por Invalidez Acidentária
 - Ao final, indique o total de vínculos encontrados`;
-    } else if (
-      docTypeLower.includes("laudo") ||
-      docTypeLower.includes("médic") ||
-      docTypeLower.includes("medic") ||
-      docTypeLower.includes("exame") ||
-      docTypeLower.includes("atestado") ||
-      docTypeLower.includes("prontuário")
-    ) {
+
+    } else if (docTypeLower.includes('laudo') || docTypeLower.includes('médic') || 
+               docTypeLower.includes('medic') || docTypeLower.includes('exame') ||
+               docTypeLower.includes('atestado') || docTypeLower.includes('prontuário')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: DOCUMENTO MÉDICO (Laudo, Atestado, Exame ou Prontuário)
 FOCO ESPECIAL:
@@ -362,10 +301,8 @@ FOCO ESPECIAL:
   * Conclusão/Impressão diagnóstica (transcreva integralmente)
 - Para laudos periciais: opinião conclusiva sobre capacidade laboral
 - Assinatura e carimbo (confirme nome e CRM do signatário)`;
-    } else if (
-      docTypeLower.includes("ppp") ||
-      docTypeLower.includes("profissiográfico")
-    ) {
+
+    } else if (docTypeLower.includes('ppp') || docTypeLower.includes('profissiográfico')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: PPP (Perfil Profissiográfico Previdenciário)
 FOCO ESPECIAL:
@@ -386,10 +323,8 @@ FOCO ESPECIAL:
 - Responsável pelos registros de saúde (PCMSO): nome, CRM, CPF e assinatura
 - Data de emissão do PPP
 - Se a empresa afirma que o EPI reduz a exposição abaixo do limite, destaque isso`;
-    } else if (
-      docTypeLower.includes("ctps") ||
-      docTypeLower.includes("carteira de trabalho")
-    ) {
+
+    } else if (docTypeLower.includes('ctps') || docTypeLower.includes('carteira de trabalho')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: CTPS (Carteira de Trabalho e Previdência Social)
 FOCO ESPECIAL:
@@ -407,12 +342,9 @@ FOCO ESPECIAL:
 - Anotações gerais: acidentes de trabalho, licenças, outros
 - Qualificação civil e profissional
 - Foto existente (descreva se presente)`;
-    } else if (
-      docTypeLower.includes("trct") ||
-      docTypeLower.includes("rescisão") ||
-      docTypeLower.includes("rescisao") ||
-      docTypeLower.includes("termo de rescisão")
-    ) {
+
+    } else if (docTypeLower.includes('trct') || docTypeLower.includes('rescisão') || 
+               docTypeLower.includes('rescisao') || docTypeLower.includes('termo de rescisão')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: TRCT (Termo de Rescisão do Contrato de Trabalho)
 
@@ -450,12 +382,9 @@ FGTS:
 - Valor a ser sacado
 
 Data do Termo e assinaturas presentes`;
-    } else if (
-      docTypeLower.includes("contra-cheque") ||
-      docTypeLower.includes("holerite") ||
-      docTypeLower.includes("contracheque") ||
-      docTypeLower.includes("folha de pagamento")
-    ) {
+
+    } else if (docTypeLower.includes('contra-cheque') || docTypeLower.includes('holerite') || 
+               docTypeLower.includes('contracheque') || docTypeLower.includes('folha de pagamento')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: CONTRA-CHEQUE / HOLERITE
 FOCO ESPECIAL:
@@ -480,13 +409,9 @@ Bases de cálculo:
 - Base INSS e alíquota
 - Base IRRF e alíquota
 - Base FGTS e valor depositado`;
-    } else if (
-      docTypeLower.includes("certidão") ||
-      docTypeLower.includes("nascimento") ||
-      docTypeLower.includes("casamento") ||
-      docTypeLower.includes("óbito") ||
-      docTypeLower.includes("obito")
-    ) {
+
+    } else if (docTypeLower.includes('certidão') || docTypeLower.includes('nascimento') || 
+               docTypeLower.includes('casamento') || docTypeLower.includes('óbito') || docTypeLower.includes('obito')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: CERTIDÃO (Nascimento, Casamento ou Óbito)
 FOCO ESPECIAL:
@@ -500,10 +425,8 @@ Para Casamento: nomes completos dos cônjuges, data/local do casamento, regime d
 Para Óbito: nome do falecido, data/hora/local do óbito, causa da morte (se informado), nome dos pais, se era casado/solteiro/viúvo
 - Observações e averbações (separações, reconhecimentos, etc.)
 - Data de expedição da certidão`;
-    } else if (
-      docTypeLower.includes("identidade") ||
-      docTypeLower.includes("rg")
-    ) {
+
+    } else if (docTypeLower.includes('identidade') || docTypeLower.includes('rg')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: DOCUMENTO DE IDENTIDADE (RG)
 FOCO ESPECIAL:
@@ -516,10 +439,8 @@ FOCO ESPECIAL:
 - Data de expedição
 - Validade (se houver)
 - Observações`;
-    } else if (
-      docTypeLower.includes("comprovante de residência") ||
-      docTypeLower.includes("residencia")
-    ) {
+
+    } else if (docTypeLower.includes('comprovante de residência') || docTypeLower.includes('residencia')) {
       specialInstructions = `
 DOCUMENTO IDENTIFICADO: COMPROVANTE DE RESIDÊNCIA
 FOCO ESPECIAL:
@@ -528,6 +449,7 @@ FOCO ESPECIAL:
 - Endereço completo (logradouro, número, complemento, bairro, cidade, estado, CEP)
 - Mês e ano de referência
 - Empresa emissora`;
+
     } else {
       specialInstructions = `
 Realize a extração completa de todo o texto do documento.
@@ -564,28 +486,26 @@ ${specialInstructions}`;
         parts: [
           {
             inlineData: {
-              mimeType: mimeType || "application/pdf",
-              data: fileData,
-            },
+              mimeType: mimeType || 'application/pdf',
+              data: fileData
+            }
           },
           {
-            text: `Realize a extração OCR completa e inteligente deste documento: "${documentName}". Siga rigorosamente as instruções. Não omita nenhuma informação presente no documento.`,
-          },
-        ],
+            text: `Realize a extração OCR completa e inteligente deste documento: "${documentName}". Siga rigorosamente as instruções. Não omita nenhuma informação presente no documento.`
+          }
+        ]
       },
       config: {
         systemInstruction: systemPrompt,
         temperature: 0.05,
-        maxOutputTokens: 16383,
-      },
+        maxOutputTokens: 16383
+      }
     });
 
     res.json({ text: response.text || "" });
   } catch (error: any) {
     console.error("Error in OCR document:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Falha no OCR do documento" });
+    res.status(500).json({ error: error.message || "Falha no OCR do documento" });
   }
 });
 
@@ -610,30 +530,21 @@ app.post("/api/ocr-unified", async (req, res) => {
           const downloadResponse = await fetch(doc.url);
           if (downloadResponse.ok) {
             const buffer = await downloadResponse.arrayBuffer();
-            const fileNameSanitized = (doc.name || "file").replace(
-              /[^a-zA-Z0-9.-]/g,
-              "_",
-            );
-            tmpPath = path.join(
-              "/tmp",
-              `unified_ocr_${Date.now()}_${i}_${fileNameSanitized}`,
-            );
+            const fileNameSanitized = (doc.name || 'file').replace(/[^a-zA-Z0-9.-]/g, '_');
+            tmpPath = path.join('/tmp', `unified_ocr_${Date.now()}_${i}_${fileNameSanitized}`);
             fs.writeFileSync(tmpPath, Buffer.from(buffer));
 
             const uploadResult = await uploadFileToGeminiWithRetry(
               tmpPath,
-              doc.mimeType || "application/pdf",
-              doc.name || "document",
+              doc.mimeType || 'application/pdf',
+              doc.name || 'document'
             );
             currentFileUri = uploadResult.uri;
           } else {
             console.warn(`Falha ao baixar doc ${doc.name} da URL.`);
           }
         } catch (downloadErr: any) {
-          console.error(
-            `Erro no download/preparo para o Gemini (Doc: ${doc.name}):`,
-            downloadErr,
-          );
+          console.error(`Erro no download/preparo para o Gemini (Doc: ${doc.name}):`, downloadErr);
         } finally {
           if (tmpPath && fs.existsSync(tmpPath)) {
             fs.unlinkSync(tmpPath);
@@ -642,39 +553,31 @@ app.post("/api/ocr-unified", async (req, res) => {
       }
 
       const docHeader = `--- INÍCIO DO DOCUMENTO ${i + 1}: ${doc.name} ---`;
-
+      
       if (!currentFileUri) {
         unifiedText += `${docHeader}\n[ERRO: Não foi possível processar este documento - falha no carregamento para a IA]\n\n`;
         continue;
       }
 
       const parts: any[] = [
-        {
-          text: `Você é um perito em extração de texto (OCR) de documentos jurídicos, médicos e previdenciários.
+        { text: `Você é um perito em extração de texto (OCR) de documentos jurídicos, médicos e previdenciários.
 Mande o conteúdo do arquivo abaixo em formato puro de texto (TXT inteligente).
 REGRAS:
 1. IDENTIFICAÇÃO: Inicie o texto sempre destacando o tipo do documento e seus detalhes vitais.
 2. TRANSCRIÇÃO LIMPA: Oculte lixo de caracteres, marcas de scanners ruins e gere uma leitura coesa.
 3. INSCRIÇÕES ESCANEADAS: Decifre caligrafia médica, atestados e PDFs antigos com foco em CRMs, CIDs, e Datas.
-4. ESTRUTURA: Não gere tabelas Markdown, apenas "Chave: Valor" em texto corrido.`,
-        },
-        {
-          fileData: {
-            mimeType: doc.mimeType || "application/pdf",
-            fileUri: currentFileUri,
-          },
-        },
+4. ESTRUTURA: Não gere tabelas Markdown, apenas "Chave: Valor" em texto corrido.` },
+        { fileData: { mimeType: doc.mimeType || 'application/pdf', fileUri: currentFileUri } }
       ];
 
       try {
         const response = await callGemini({
           model: "gemini-3.5-flash",
           contents: { role: "user", parts },
-          config: { temperature: 0.1, maxOutputTokens: 16383 },
+          config: { temperature: 0.1, maxOutputTokens: 16383 }
         });
-
-        const extracted =
-          response.text || "[Falha na extração de texto ou conteúdo vazio]";
+        
+        const extracted = response.text || "[Falha na extração de texto ou conteúdo vazio]";
         unifiedText += `${docHeader}\n${extracted}\n\n`;
       } catch (docErr: any) {
         console.error(`Erro ao processar doc ${doc.name}:`, docErr);
@@ -768,8 +671,8 @@ async function detectUserIntent(message: string): Promise<string> {
       contents: { role: "user", parts: [{ text: safeMessage }] },
       config: {
         systemInstruction: INTENT_DETECTOR_PROMPT,
-        temperature: 0,
-      },
+        temperature: 0
+      }
     });
     const intent = (response.text || "[DÚVIDA]").trim().toUpperCase();
     return intent;
@@ -788,7 +691,7 @@ async function detectUserIntent(message: string): Promise<string> {
  * Retorna null se for "Padrão (Livre)" ou inválido.
  */
 function parsePetitionTarget(petitionLength?: string): number | null {
-  if (!petitionLength || petitionLength === "Padrão (Livre)") return null;
+  if (!petitionLength || petitionLength === 'Padrão (Livre)') return null;
   const match = petitionLength.match(/(\d{4,5})/);
   if (!match) return null;
   return parseInt(match[1], 10);
@@ -800,9 +703,9 @@ function parsePetitionTarget(petitionLength?: string): number | null {
 function countWords(text: string): number {
   if (!text) return 0;
   const clean = text
-    .replace(/^>.*$/gm, "") // remove blockquotes (citações)
-    .replace(/[#*_`\[\](){}|>-]/g, " ") // remove caracteres de markdown
-    .replace(/\s+/g, " ")
+    .replace(/^>.*$/gm, '')                  // remove blockquotes (citações)
+    .replace(/[#*_`\[\](){}|>-]/g, ' ')       // remove caracteres de markdown
+    .replace(/\s+/g, ' ')
     .trim();
   return clean ? clean.split(/\s+/).length : 0;
 }
@@ -811,34 +714,18 @@ function countWords(text: string): number {
  * Decide se o pedido do usuário é correção pontual, adição ou regeneração total.
  * Crítico para evitar a degradação da 2ª petição.
  */
-type RevisionIntent =
-  | "POINT_CORRECTION"
-  | "ADDITION"
-  | "FULL_REGENERATION"
-  | "NEW_GENERATION";
+type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'NEW_GENERATION';
 
-function detectRevisionIntent(
-  message: string,
-  hasDraft: boolean,
-): RevisionIntent {
-  if (!hasDraft) return "NEW_GENERATION";
+function detectRevisionIntent(message: string, hasDraft: boolean): RevisionIntent {
+  if (!hasDraft) return 'NEW_GENERATION';
   const msg = message.toLowerCase();
-  const isFullRegen =
-    /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(
-      msg,
-    );
-  const isAddition =
-    /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(
-      msg,
-    );
-  const isPointCorrection =
-    /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na ))/i.test(
-      msg,
-    );
-  if (isFullRegen) return "FULL_REGENERATION";
-  if (isPointCorrection) return "POINT_CORRECTION";
-  if (isAddition) return "ADDITION";
-  return "POINT_CORRECTION";
+  const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
+  const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
+  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na ))/i.test(msg);
+  if (isFullRegen) return 'FULL_REGENERATION';
+  if (isPointCorrection) return 'POINT_CORRECTION';
+  if (isAddition) return 'ADDITION';
+  return 'POINT_CORRECTION';
 }
 
 /**
@@ -866,12 +753,10 @@ function estimateTokens(text: string): number {
 function smartTruncate(text: string, maxChars: number): string {
   if (!text || text.length <= maxChars) return text;
   const headSize = Math.floor(maxChars * 0.55);
-  const tailSize = Math.floor(maxChars * 0.4);
-  return (
-    text.substring(0, headSize) +
-    `\n\n[... ${text.length - headSize - tailSize} caracteres omitidos automaticamente para caber no orçamento de tokens ...]\n\n` +
-    text.substring(text.length - tailSize)
-  );
+  const tailSize = Math.floor(maxChars * 0.40);
+  return text.substring(0, headSize)
+    + `\n\n[... ${text.length - headSize - tailSize} caracteres omitidos automaticamente para caber no orçamento de tokens ...]\n\n`
+    + text.substring(text.length - tailSize);
 }
 
 /**
@@ -880,7 +765,7 @@ function smartTruncate(text: string, maxChars: number): string {
  * DeepSeek/Qwen via OpenRouter: 163k tokens total — usar 120k como limite seguro.
  */
 function getInputBudget(modelProvider?: string, model?: string): number {
-  if (modelProvider === "openrouter") {
+  if (modelProvider === 'openrouter') {
     // DeepSeek V3.2 e similares têm contexto de 163k. Deixar 30k para output + system + history.
     return 120_000; // tokens
   }
@@ -897,12 +782,8 @@ function isPetitionComplete(text: string): boolean {
   if (!text || text.length < 1500) return false;
   const tail = text.slice(-2500).toLowerCase();
   const hasPedeDeferimento = /pede\s+(e\s+espera\s+)?deferimento/i.test(tail);
-  const hasOABorAssinatura =
-    /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(tail) || /assinatura/i.test(tail);
-  const hasDataLocal =
-    /(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+\d{4}/i.test(
-      tail,
-    );
+  const hasOABorAssinatura = /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(tail) || /assinatura/i.test(tail);
+  const hasDataLocal = /(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+\d{4}/i.test(tail);
   // Se tem "pede e espera deferimento" + (OAB OU data), a peça encerrou
   return hasPedeDeferimento && (hasOABorAssinatura || hasDataLocal);
 }
@@ -913,7 +794,7 @@ function isPetitionComplete(text: string): boolean {
  */
 function extractStructuralSummary(petitionText: string): string {
   if (!petitionText) return "(nenhum sumário disponível)";
-  const lines = petitionText.split("\n");
+  const lines = petitionText.split('\n');
   const summary: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -923,23 +804,14 @@ function extractStructuralSummary(petitionText: string): string {
       // Pega o primeiro parágrafo de conteúdo abaixo do título
       for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
         const next = lines[j].trim();
-        if (
-          next &&
-          !next.startsWith("#") &&
-          !/^[IVX]+\./.test(next) &&
-          next.length > 30
-        ) {
-          summary.push(
-            "  → " + next.substring(0, 180) + (next.length > 180 ? "..." : ""),
-          );
+        if (next && !next.startsWith('#') && !/^[IVX]+\./.test(next) && next.length > 30) {
+          summary.push('  → ' + next.substring(0, 180) + (next.length > 180 ? '...' : ''));
           break;
         }
       }
     }
   }
-  return summary.length > 0
-    ? summary.join("\n")
-    : petitionText.substring(0, 2000) + "...";
+  return summary.length > 0 ? summary.join('\n') : petitionText.substring(0, 2000) + '...';
 }
 
 // AI Service Logic Integrated
@@ -2367,19 +2239,16 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 let currentKeyIndex = Math.floor(Math.random() * 10);
 const invalidKeys = new Set<string>();
 
-const EMBEDDING_MODELS = ["gemini-embedding-2-preview", "text-embedding-004"];
-let currentEmbeddingModelIndex = 0;
-
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
-  "gemini-3.1-pro-preview",
+  "gemini-3.1-pro-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
   "gemini-1.5-flash-latest": "gemini-3.5-flash",
-  "gemini-1.5-pro-latest": "gemini-3.1-pro-preview",
+  "gemini-1.5-pro-latest": "gemini-3.1-pro-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2392,97 +2261,65 @@ function getApiKeys() {
 
   // 1. Prioritize API_KEY_1 (supports comma-separated list of keys)
   if (process.env.API_KEY_1) {
-    keys.push(
-      ...process.env.API_KEY_1.split(",")
-        .map((k) => k.trim())
-        .filter(Boolean),
-    );
+    keys.push(...process.env.API_KEY_1.split(',').map(k => k.trim()).filter(Boolean));
   }
 
   // 2. Get all OTHER API keys
   const envKeys = Object.keys(process.env);
-  const keyVars = envKeys.filter(
-    (k) =>
-      (k.startsWith("API_KEY_") && k !== "API_KEY_1") ||
-      k.startsWith("GEMINI_API_KEY_"),
+  const keyVars = envKeys.filter(k => 
+    (k.startsWith('API_KEY_') && k !== 'API_KEY_1') || 
+    k.startsWith('GEMINI_API_KEY_')
   );
-
-  keys.push(
-    ...(keyVars.map((k) => process.env[k]).filter(Boolean) as string[]),
-  );
-
+  
+  keys.push(...keyVars.map(k => process.env[k]).filter(Boolean) as string[]);
+  
   // 3. Adiciona a chave padrão se existir
   if (process.env.GEMINI_API_KEY) keys.push(process.env.GEMINI_API_KEY);
-
+  
   // 4. Adiciona chaves da lista GEMINI_KEYS se existir
   if (process.env.GEMINI_KEYS) {
-    keys.push(
-      ...process.env.GEMINI_KEYS.split(",")
-        .map((k) => k.trim())
-        .filter(Boolean),
-    );
+    keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(Boolean));
   }
-
+  
   const uniqueKeys = [...new Set(keys)]; // Remove duplicatas
-  const filteredValidKeys = uniqueKeys.filter((k) => !invalidKeys.has(k));
-
+  const filteredValidKeys = uniqueKeys.filter(k => !invalidKeys.has(k));
+  
   // Log detalhado para diagnóstico no console da Vercel
-  if (process.env.NODE_ENV === "production") {
-    console.log(
-      `[AUTH] Detecção de Chaves: Encontradas ${keys.length} chaves potenciais.`,
-    );
-    console.log(
-      `[AUTH] Total de chaves únicas carregadas: ${uniqueKeys.length}. Chaves operacionais: ${filteredValidKeys.length}.`,
-    );
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keys.length} chaves potenciais.`);
+    console.log(`[AUTH] Total de chaves únicas carregadas: ${uniqueKeys.length}. Chaves operacionais: ${filteredValidKeys.length}.`);
   }
-
+  
   if (filteredValidKeys.length === 0 && uniqueKeys.length > 0) {
-    // Se todas as chaves foram marcadas como inválidas, limpa o cache de erro e tenta novamente
+    // Se todas as chaves foram marcadas como inválidas, limpa o cache de erro e tenta novamente 
     // Isso evita bloqueio total caso o erro de permissão seja temporário
-    console.warn(
-      "[AUTH] Todas as chaves marcadas como inválidas. Resetando cache para nova tentativa.",
-    );
+    console.warn("[AUTH] Todas as chaves marcadas como inválidas. Resetando cache para nova tentativa.");
     invalidKeys.clear();
     return uniqueKeys;
   }
-
+  
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
-async function callGemini(
-  params: any,
-  retries = 30,
-  modelIndex = 0,
-  failuresOnCurrentModel = 0,
-  forcedKeyIndex?: number,
-) {
+async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
-  if (keys.length === 0)
-    throw new Error(
-      "Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.",
-    );
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex =
-    forcedKeyIndex !== undefined && 30 - retries === 0
-      ? forcedKeyIndex
-      : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
-
+  
   // Select model from hierarchy or use the requested model on first try
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota,
+  // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota, 
   // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
-  const requestedModel =
-    modelIndex === 0 || params.model
-      ? params.model || MODEL_HIERARCHY[0]
-      : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
-
+  
   // Override model in params
   const finalParams = { ...params, model: currentModel };
-
+  
   // Fallback: Remove tools if not on the primary model or if retrying heavily
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -2492,145 +2329,90 @@ async function callGemini(
 
   try {
     const response = await ai.models.generateContent(finalParams);
-
+    
     let responseText = "";
     try {
       responseText = response.text || "";
     } catch (e) {
       // Ignore
     }
-
+    
     if (!responseText) {
       let isSafetyBlock = false;
       if (response.candidates && response.candidates.length > 0) {
         const candidate = response.candidates[0];
-        if (
-          candidate.finishReason === "SAFETY" ||
-          candidate.finishReason === "BLOCKLIST" ||
-          candidate.finishReason === "PROHIBITED_CONTENT"
-        ) {
-          isSafetyBlock = true;
+        if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKLIST' || candidate.finishReason === 'PROHIBITED_CONTENT') {
+           isSafetyBlock = true;
         }
-      } else if (
-        response.promptFeedback &&
-        response.promptFeedback.blockReason
-      ) {
+      } else if (response.promptFeedback && response.promptFeedback.blockReason) {
         isSafetyBlock = true;
       }
-
+      
       if (!isSafetyBlock) {
         throw new Error("EMPTY_RESPONSE");
       }
     }
-
+    
     return response;
   } catch (error: any) {
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
     const errorMessage = error.message || errorStr;
-
+    
     // Detect Error Types
-    const isOverloaded =
-      errorMessage.includes("429") ||
-      errorMessage.includes("503") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED") ||
-      errorMessage.includes("Quota exceeded");
-    const isNotFound =
-      errorMessage.includes("404") ||
-      errorMessage.includes("not found") ||
-      errorMessage.includes("NOT_FOUND");
-    const isEmpty = errorMessage.includes("EMPTY_RESPONSE");
-    const isInvalidKey =
-      errorMessage.includes("API key not valid") ||
-      errorMessage.includes("API_KEY_INVALID") ||
-      errorMessage.includes("Key not found");
-    const isBadRequest =
-      errorMessage.includes("400") || errorMessage.includes("INVALID_ARGUMENT");
-    const isPermissionDenied =
-      errorMessage.includes("403") ||
-      errorMessage.includes("PERMISSION_DENIED");
-
+    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
+    const isEmpty = errorMessage.includes('EMPTY_RESPONSE');
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+    const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
+    const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+    
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
     }
-
-    if (
-      (isOverloaded ||
-        isNotFound ||
-        isEmpty ||
-        isInvalidKey ||
-        isPermissionDenied ||
-        isBadRequest) &&
-      retries > 0
-    ) {
+    
+    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
       if (!isBadRequest) currentKeyIndex++; // Rotate key for auth/quota errors, but for 400 we might want to stay on key but switch model or config
-
+      
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
-      let delay = isInvalidKey || isPermissionDenied ? 500 : 2000;
+      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
       if (isBadRequest || isNotFound) {
-        // Bad Request or Not Found: Switch model immediately as the config/model is likely the problem
-        if (!params.model) {
-          nextModelIndex++;
-          nextFailures = 0;
-          delay = 500;
-          console.log(
-            `[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`,
-          );
-        } else {
-          delay = 500;
-          console.log(
-            `[Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`,
-          );
-        }
+         // Bad Request or Not Found: Switch model immediately as the config/model is likely the problem
+         if (!params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             delay = 500;
+             console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         } else {
+             delay = 500;
+             console.log(`[Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
+         }
       } else if (isEmpty) {
-        delay = 1000;
-        console.log(
-          `[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`,
-        );
+         delay = 1000;
+         console.log(`[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
       } else {
-        // 429/503: Retry logic
-        delay = errorMessage.includes("503") ? 3000 : 2000;
-
-        // Switch model faster on quota errors if all keys are exhausted.
-        if (
-          errorMessage.includes("Quota exceeded") &&
-          failuresOnCurrentModel >= keys.length &&
-          nextModelIndex < MODEL_HIERARCHY.length - 1 &&
-          !params.model
-        ) {
-          nextModelIndex++;
-          nextFailures = 0;
-          console.log(
-            `[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`,
-          );
-        } else if (
-          nextFailures > keys.length &&
-          nextModelIndex < MODEL_HIERARCHY.length - 1 &&
-          !params.model
-        ) {
-          nextModelIndex++;
-          nextFailures = 0;
-          console.log(
-            `[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`,
-          );
-        } else {
-          console.log(
-            `[Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`,
-          );
-        }
+         // 429/503: Retry logic
+         delay = errorMessage.includes('503') ? 3000 : 2000;
+         
+         // Switch model faster on quota errors if all keys are exhausted.
+         if (errorMessage.includes('Quota exceeded') && failuresOnCurrentModel >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             console.log(`[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
+         } else {
+             console.log(`[Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+         }
       }
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return callGemini(
-        params,
-        retries - 1,
-        nextModelIndex,
-        nextFailures,
-        forcedKeyIndex,
-      );
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
-
+    
     // Critical Failure
     if (retries === 0) {
       throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS.
@@ -2643,37 +2425,22 @@ async function callGemini(
   }
 }
 
-async function callGeminiStream(
-  params: any,
-  retries = 30,
-  modelIndex = 0,
-  failuresOnCurrentModel = 0,
-  forcedKeyIndex?: number,
-): Promise<any> {
+async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
-  if (keys.length === 0)
-    throw new Error(
-      "Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.",
-    );
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const keyToUseIndex =
-    forcedKeyIndex !== undefined && 30 - retries === 0
-      ? forcedKeyIndex
-      : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
-
+  
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota,
   // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
-  const requestedModel =
-    modelIndex === 0 || params.model
-      ? params.model || MODEL_HIERARCHY[0]
-      : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
-
+  
   const finalParams = { ...params, model: currentModel };
-
+  
   if (modelIndex > 0 || failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
       delete finalParams.config.tools;
@@ -2685,103 +2452,56 @@ async function callGeminiStream(
   } catch (error: any) {
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
     const errorMessage = error.message || errorStr;
-
-    const isOverloaded =
-      errorMessage.includes("429") ||
-      errorMessage.includes("503") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED") ||
-      errorMessage.includes("Quota exceeded");
-    const isNotFound =
-      errorMessage.includes("404") ||
-      errorMessage.includes("not found") ||
-      errorMessage.includes("NOT_FOUND");
-    const isInvalidKey =
-      errorMessage.includes("API key not valid") ||
-      errorMessage.includes("API_KEY_INVALID") ||
-      errorMessage.includes("Key not found");
-    const isBadRequest =
-      errorMessage.includes("400") || errorMessage.includes("INVALID_ARGUMENT");
-    const isPermissionDenied =
-      errorMessage.includes("403") ||
-      errorMessage.includes("PERMISSION_DENIED");
-
+    
+    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+    const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
+    const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+    
     if (isInvalidKey) {
       invalidKeys.add(apiKey);
     }
 
-    if (
-      (isOverloaded ||
-        isNotFound ||
-        isInvalidKey ||
-        isPermissionDenied ||
-        isBadRequest) &&
-      retries > 0
-    ) {
+    if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
       if (!isBadRequest) currentKeyIndex++;
-
+      
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
-      let delay = isInvalidKey || isPermissionDenied ? 500 : 2000;
+      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
       if (isBadRequest || isNotFound) {
-        if (!params.model) {
-          nextModelIndex++;
-          nextFailures = 0;
-          delay = 500;
-          console.log(
-            `[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`,
-          );
-        } else {
-          delay = 500;
-          console.log(
-            `[Stream Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`,
-          );
-        }
+         if (!params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             delay = 500;
+             console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+         } else {
+             delay = 500;
+             console.log(`[Stream Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
+         }
       } else {
-        delay = errorMessage.includes("503") ? 3000 : 2000;
-
-        if (
-          errorMessage.includes("Quota exceeded") &&
-          nextFailures >= keys.length &&
-          nextModelIndex < MODEL_HIERARCHY.length - 1 &&
-          !params.model
-        ) {
-          nextModelIndex++;
-          nextFailures = 0;
-          console.log(
-            `[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`,
-          );
-        } else if (
-          nextFailures > keys.length &&
-          nextModelIndex < MODEL_HIERARCHY.length - 1 &&
-          !params.model
-        ) {
-          nextModelIndex++;
-          nextFailures = 0;
-          console.log(
-            `[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`,
-          );
-        } else {
-          console.log(
-            `[Stream Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`,
-          );
-        }
+         delay = errorMessage.includes('503') ? 3000 : 2000;
+         
+         if (errorMessage.includes('Quota exceeded') && nextFailures >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+             nextModelIndex++;
+             nextFailures = 0;
+             console.log(`[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
+         } else {
+             console.log(`[Stream Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+         }
       }
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return callGeminiStream(
-        params,
-        retries - 1,
-        nextModelIndex,
-        nextFailures,
-        forcedKeyIndex,
-      );
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
-
+    
     if (retries === 0) {
-      throw new Error(
-        `FALHA CRÍTICA APÓS 30 TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`,
-      );
+      throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
     throw error;
   }
@@ -2789,289 +2509,88 @@ async function callGeminiStream(
 
 async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   const keys = getApiKeys();
-  if (keys.length === 0)
-    throw new Error(
-      "Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.",
-    );
+  if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const validKeys = keys.filter((k) => !invalidKeys.has(k));
-  if (validKeys.length === 0) {
-    invalidKeys.clear();
-  }
-
-  const usableKeys = validKeys.length > 0 ? validKeys : keys;
-  const currentKey = usableKeys[currentKeyIndex % usableKeys.length];
-  const originalKeyIndex = keys.indexOf(currentKey);
-
-  const ai = new GoogleGenAI({ apiKey: currentKey });
-  const modelToUse =
-    EMBEDDING_MODELS[currentEmbeddingModelIndex % EMBEDDING_MODELS.length];
+  const apiKey = keys[currentKeyIndex % keys.length];
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const result = await ai.models.embedContent({
-      model: modelToUse,
+      model: 'gemini-embedding-2-preview',
       contents: [text],
       config: {
-        outputDimensionality: 768,
-      },
+        outputDimensionality: 768
+      }
     });
     return result.embeddings?.[0]?.values || [];
   } catch (error: any) {
-    const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
-    const errorMessage = error.message || errorStr || String(error);
-    const isInvalidKey =
-      errorMessage.includes("API key not valid") ||
-      errorMessage.includes("API_KEY_INVALID") ||
-      errorMessage.includes("Key not found") ||
-      (errorMessage.includes("400") && errorMessage.includes("API key"));
-
+    const errorMessage = error.message || String(error);
+    const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('400') || errorMessage.includes('API_KEY_INVALID');
+    
     if (isInvalidKey) {
-      invalidKeys.add(currentKey);
+      invalidKeys.add(apiKey);
     }
 
-    console.error(
-      `Erro ao gerar embedding com a chave ${originalKeyIndex} usando ${modelToUse}:`,
-      errorMessage,
-    );
-
-    const isQuotaError =
-      errorMessage.includes("429") ||
-      errorMessage.includes("Quota exceeded") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED");
-
-    if (isQuotaError) {
-      currentEmbeddingModelIndex++;
-      if (currentEmbeddingModelIndex % EMBEDDING_MODELS.length === 0) {
-        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-      }
-    } else {
-      currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-    }
-
+    console.error(`Erro ao gerar embedding com a chave ${currentKeyIndex}:`, errorMessage);
+    
+    // Rotate key
+    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    
     if (retries > 0) {
+      // If we hit a 429, we should wait longer. Let's extract retryDelay if present, or default to 5 seconds.
       let delay = 2000;
-      if (isQuotaError) {
-        delay = 3000;
-        const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
-        if (match && match[1]) {
-          delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000);
-        }
+      if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+         delay = 10000; // Wait 10 seconds on quota errors before trying the next key
+         const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
+         if (match && match[1]) {
+             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000); // Max 65s wait
+         }
       }
 
-      console.log(
-        `Aguardando ${delay}ms antes de tentar novamente com o próximo modelo/chave... (${retries} tentativas restantes)`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      console.log(`Aguardando ${delay}ms antes de tentar novamente com a próxima chave... (${retries} tentativas restantes)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
       return callGeminiEmbed(text, retries - 1);
     }
     throw error;
   }
 }
 
-async function callGeminiEmbedBatch(
-  texts: string[],
-  retries = 10,
-): Promise<number[][]> {
-  const keys = getApiKeys();
-  if (keys.length === 0)
-    throw new Error(
-      "Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.",
-    );
-
-  const validKeys = keys.filter((k) => !invalidKeys.has(k));
-  if (validKeys.length === 0) {
-    invalidKeys.clear();
-  }
-
-  const usableKeys = validKeys.length > 0 ? validKeys : keys;
-  const currentKey = usableKeys[currentKeyIndex % usableKeys.length];
-  const originalKeyIndex = keys.indexOf(currentKey);
-
-  const ai = new GoogleGenAI({ apiKey: currentKey });
-  const modelToUse =
-    EMBEDDING_MODELS[currentEmbeddingModelIndex % EMBEDDING_MODELS.length];
-
-  try {
-    const result = await ai.models.embedContent({
-      model: modelToUse,
-      contents: texts,
-      config: {
-        outputDimensionality: 768,
-      },
-    });
-    return result.embeddings?.map((e) => e.values || []) || texts.map(() => []);
-  } catch (error: any) {
-    const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
-    const errorMessage = error.message || errorStr || String(error);
-    const isInvalidKey =
-      errorMessage.includes("API key not valid") ||
-      errorMessage.includes("API_KEY_INVALID") ||
-      errorMessage.includes("Key not found") ||
-      (errorMessage.includes("400") && errorMessage.includes("API key"));
-
-    if (isInvalidKey) {
-      invalidKeys.add(currentKey);
-    }
-
-    console.error(
-      `Erro ao gerar embedding BATCH com a chave ${originalKeyIndex} usando ${modelToUse}:`,
-      errorMessage,
-    );
-
-    const isQuotaError =
-      errorMessage.includes("429") ||
-      errorMessage.includes("Quota exceeded") ||
-      errorMessage.includes("RESOURCE_EXHAUSTED");
-
-    if (isQuotaError) {
-      currentEmbeddingModelIndex++;
-      if (currentEmbeddingModelIndex % EMBEDDING_MODELS.length === 0) {
-        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-      }
-    } else {
-      currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-    }
-
-    if (retries > 0) {
-      let delay = 2000;
-      if (isQuotaError) {
-        delay = 3000;
-        const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
-        if (match && match[1]) {
-          delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000);
-        }
-      }
-
-      console.log(
-        `[BatchEmbed] Aguardando ${delay}ms antes de tentar novamente com o próximo modelo/chave... (${retries} tentativas restantes)`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return callGeminiEmbedBatch(texts, retries - 1);
-    }
-    throw error;
-  }
-}
-
-async function retrieveClientRagContext(
-  clientId: string,
-  message: string,
-): Promise<string> {
-  try {
-    console.log(
-      `[RAG Inteligente] Iniciando busca RAG para cliente ID: ${clientId}, Query: "${message.substring(0, 60)}..."`,
-    );
-    const queryEmbedding = await callGeminiEmbed(message);
-
-    const rpcParams = {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.25,
-      match_count: 20,
-      filter_client_id: clientId,
-    };
-
-    const { data: chunks, error: matchError } = await supabaseAdmin.rpc(
-      "match_client_documents",
-      rpcParams,
-    );
-
-    if (matchError) {
-      console.error(
-        "[RAG Inteligente] Erro no match_client_documents:",
-        matchError,
-      );
-      return "";
-    }
-
-    if (chunks && chunks.length > 0) {
-      console.log(
-        `[RAG Inteligente] Sucesso! Encontrados ${chunks.length} trechos relevantes.`,
-      );
-
-      const formattedChunksSummaries = chunks
-        .map((chunk: any) => {
-          const tag =
-            chunk.compartment === "proof_documents"
-              ? "PROVA DO PROCESSO (Inicial)"
-              : chunk.compartment === "new_proof_documents"
-                ? "NOVA PROVA (Superveniente)"
-                : chunk.compartment === "judicial_process"
-                  ? "HISTÓRICO DO PROCESSO JUDICIAL"
-                  : chunk.compartment === "petitions"
-                    ? "PETIÇÃO DO HISTÓRICO"
-                    : chunk.compartment;
-
-          const sub = chunk.subfolder ? ` [Pasta: ${chunk.subfolder}]` : "";
-          return `---
-[FONTE / COMPARTIMENTO]: ${tag}${sub}
-[ARQUIVO]: ${chunk.file_name}
-[TRECHO / CONTEÚDO]:
-${chunk.content}`;
-        })
-        .join("\n\n");
-
-      return `\n\n[DADOS RAG DO CLIENTE - BUSCA SEMÂNTICA EM TEMPO REAL]\nForam localizados os seguintes trechos altamente relevantes nos documentos do cliente (provas, andamentos do processo, petições anteriores). Baseie suas decisões, citações, fatos e peticionamentos exclusivamente nestas informações quando aplicável:\n\n${formattedChunksSummaries}\n`;
-    }
-    console.log(
-      "[RAG Inteligente] Nenhum trecho correspondente no banco. Cliente sem documentos indexados ou score baixo.",
-    );
-    return "";
-  } catch (ragErr) {
-    console.error(
-      "[RAG Inteligente] Falha de processamento geral no RAG:",
-      ragErr,
-    );
-    return "";
-  }
-}
-
 async function callOpenRouterStream(params: any, res: any): Promise<void> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    res.write(
-      `data: ${JSON.stringify({ error: "OPENROUTER_API_KEY não configurada no servidor." })}\n\n`,
-    );
+    res.write(`data: ${JSON.stringify({ error: "OPENROUTER_API_KEY não configurada no servidor." })}\n\n`);
     res.write(`data: [DONE]\n\n`);
     res.end();
     return;
   }
 
   try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://gestao-inss-juridico.app",
-          "X-Title": "Felix & Castro Advocacia",
-        },
-        body: JSON.stringify({
-          model: params.model || "deepseek/deepseek-chat",
-          messages: params.messages,
-          temperature: params.temperature ?? 0.2,
-          max_tokens: params.max_tokens || 16383,
-          stream: true,
-          include_reasoning: true, // Habilita tokens de raciocínio (Chain of Thought)
-          reasoning_effort: "high", // Define esforço de raciocínio alto conforme suportado pelo modelo
-        }),
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://gestao-inss-juridico.app", 
+        "X-Title": "Felix & Castro Advocacia"
       },
-    );
+      body: JSON.stringify({
+        model: params.model || "deepseek/deepseek-chat",
+        messages: params.messages,
+        temperature: params.temperature ?? 0.2,
+        max_tokens: params.max_tokens || 16383,
+        stream: true,
+        include_reasoning: true, // Habilita tokens de raciocínio (Chain of Thought)
+        reasoning_effort: "high" // Define esforço de raciocínio alto conforme suportado pelo modelo
+      })
+    });
 
     if (!response.ok) {
       const errText = await response.text();
       // Erro de contexto excedido — mensagem amigável
-      if (
-        response.status === 400 &&
-        /maximum context length|context_length_exceeded/i.test(errText)
-      ) {
+      if (response.status === 400 && /maximum context length|context_length_exceeded/i.test(errText)) {
         const match = errText.match(/requested about (\d+) tokens/);
-        const requested = match
-          ? Math.round(parseInt(match[1], 10) / 1000)
-          : "?";
-        throw new Error(
-          `O input ficou maior que o limite do modelo OpenRouter (~${requested}k tokens, limite ~163k). Soluções: (1) reduza o número de documentos anexados; (2) gere com Gemini 3 Flash (contexto 1M); (3) selecione um tamanho menor de peça (3.000 ou 4.000 palavras). Detalhe técnico: ${errText.slice(0, 200)}`,
-        );
+        const requested = match ? Math.round(parseInt(match[1], 10) / 1000) : '?';
+        throw new Error(`O input ficou maior que o limite do modelo OpenRouter (~${requested}k tokens, limite ~163k). Soluções: (1) reduza o número de documentos anexados; (2) gere com Gemini 3 Flash (contexto 1M); (3) selecione um tamanho menor de peça (3.000 ou 4.000 palavras). Detalhe técnico: ${errText.slice(0, 200)}`);
       }
       throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
     }
@@ -3088,27 +2607,23 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
       done = readerDone;
       if (value) {
         const chunkStr = decoder.decode(value, { stream: true });
-        const lines = chunkStr.split("\n");
+        const lines = chunkStr.split('\n');
         for (const line of lines) {
-          if (line.startsWith("data: ") && line.trim() !== "data: [DONE]") {
+          if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
             try {
               const data = JSON.parse(line.slice(6));
               const delta = data.choices[0]?.delta;
-
+              
               // Captura tanto o conteúdo final quanto o raciocínio
-              const reasoning =
-                delta?.reasoning || delta?.reasoning_content || "";
+              const reasoning = delta?.reasoning || delta?.reasoning_content || "";
               const content = delta?.content || "";
-
+              
               if (reasoning) {
                 // Enviamos o raciocínio com um marcador para o frontend identificar se quiser
-                res.write(
-                  `data: ${JSON.stringify({ text: "", reasoning })}\n\n`,
-                );
+                res.write(`data: ${JSON.stringify({ text: "", reasoning })}\n\n`);
               }
-
+              
               if (content) {
-                combinedText += content;
                 res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
               }
             } catch (e) {
@@ -3119,20 +2634,11 @@ async function callOpenRouterStream(params: any, res: any): Promise<void> {
       }
     }
 
-    const promptText = JSON.stringify(params.messages);
-    const inputEst = estimateTokens(promptText);
-    const outputEst = estimateTokens(combinedText);
-    res.write(
-      `data: ${JSON.stringify({ tokens: { input: inputEst, output: outputEst, total: inputEst + outputEst } })}\n\n`,
-    );
-
     res.write(`data: [DONE]\n\n`);
     res.end();
   } catch (error: any) {
     console.error("OpenRouter stream error:", error);
-    res.write(
-      `data: ${JSON.stringify({ error: error.message || "Erro na geração do OpenRouter" })}\n\n`,
-    );
+    res.write(`data: ${JSON.stringify({ error: error.message || "Erro na geração do OpenRouter" })}\n\n`);
     res.write(`data: [DONE]\n\n`);
     res.end();
   }
@@ -3164,27 +2670,25 @@ app.post("/api/rag/process", async (req, res) => {
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       if (!chunk.trim()) continue;
-
+      
       // Delay to avoid hitting rate limits too fast (100 requests per minute = ~1.6 requests per second)
       // Let's add a 1-second delay between chunks, or 500ms if we have multiple keys.
       if (i > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 600)); // 600ms delay
+        await new Promise(resolve => setTimeout(resolve, 600)); // 600ms delay
       }
 
       const embedding = await callGeminiEmbed(chunk);
       processedChunks.push({
         content: chunk,
         metadata: metadata || {},
-        embedding,
+        embedding
       });
     }
 
     res.json({ chunks: processedChunks });
   } catch (error: any) {
     console.error("Error processing RAG:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Failed to process text for RAG" });
+    res.status(500).json({ error: error.message || "Failed to process text for RAG" });
   }
 });
 
@@ -3197,191 +2701,14 @@ app.post("/api/rag/embed", async (req, res) => {
     res.json({ embedding });
   } catch (error: any) {
     console.error("Error generating embedding:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Failed to generate embedding" });
-  }
-});
-
-app.post("/api/client-rag/index", async (req, res) => {
-  try {
-    const { clientId, compartment, subfolder, fileName, fileUrl, text } =
-      req.body;
-    if (!clientId || !compartment || !fileName || !text) {
-      return res
-        .status(400)
-        .json({
-          error: "clientId, compartment, fileName, and text are required",
-        });
-    }
-
-    // Split text into chunks (e.g. 800 characters with 150 overlapping, for semantic RAG)
-    const chunkSize = 800;
-    const overlap = 150;
-    const chunks: string[] = [];
-
-    let i = 0;
-    while (i < text.length) {
-      const chunk = text.substring(i, i + chunkSize);
-      chunks.push(chunk);
-      i += chunkSize - overlap;
-    }
-
-    console.log(
-      `[ClientRAG] Indexing file "${fileName}" with ${chunks.length} chunks for client ${clientId} (${compartment})`,
-    );
-
-    const processedChunks = [];
-
-    // First, delete any existing chunks for this specific file in this client to prevent duplicates
-    await supabaseAdmin
-      .from("client_document_chunks")
-      .delete()
-      .eq("client_id", clientId)
-      .eq("compartment", compartment)
-      .eq("file_name", fileName);
-
-    // Process embeddings in batches of 50 to avoid timeouts
-    const BATCH_SIZE = 50;
-
-    // Pre-filter empty chunks
-    const validChunks = chunks.filter((c) => c.trim().length > 0);
-
-    for (let i = 0; i < validChunks.length; i += BATCH_SIZE) {
-      const batchChunks = validChunks.slice(i, i + BATCH_SIZE);
-      console.log(
-        `[ClientRAG] Embedding batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(validChunks.length / BATCH_SIZE)} (size: ${batchChunks.length})`,
-      );
-
-      try {
-        const batchEmbeddings = await callGeminiEmbedBatch(batchChunks);
-
-        const chunkObjects = batchChunks.map((chunkText, batchIdx) => {
-          const globalIndex = i + batchIdx;
-          return {
-            client_id: clientId,
-            compartment,
-            subfolder: subfolder || null,
-            file_name: fileName,
-            file_url: fileUrl || null,
-            content: chunkText,
-            embedding: batchEmbeddings[batchIdx],
-            chunk_index: globalIndex,
-            metadata: {
-              chunk_index: globalIndex,
-              charLength: chunkText.length,
-              indexedAt: new Date().toISOString(),
-            },
-          };
-        });
-
-        console.log(
-          `[ClientRAG] Inserindo lote com 'chunk_index' na raiz e dentro de metadata...`,
-        );
-        // Insert this batch immediately to the database
-        const { error } = await supabaseAdmin
-          .from("client_document_chunks")
-          .insert(chunkObjects);
-
-        if (error) {
-          console.error(
-            `[ClientRAG] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`,
-            error,
-          );
-          throw error;
-        }
-
-        processedChunks.push(...chunkObjects);
-
-        // Slight delay between batches to respect rate limits
-        if (i + BATCH_SIZE < validChunks.length) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      } catch (batchError) {
-        console.error(
-          `[ClientRAG] Failed to process batch ${Math.floor(i / BATCH_SIZE) + 1}:`,
-          batchError,
-        );
-        throw batchError;
-      }
-    }
-
-    res.json({ success: true, chunksCount: processedChunks.length });
-  } catch (error: any) {
-    console.error("Error in /api/client-rag/index:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Failed to index client document" });
-  }
-});
-
-app.post("/api/client-rag/delete-file", async (req, res) => {
-  try {
-    const { clientId, fileName, compartment } = req.body;
-    if (!clientId || !fileName || !compartment) {
-      return res
-        .status(400)
-        .json({ error: "clientId, fileName, and compartment are required" });
-    }
-
-    console.log(
-      `[ClientRAG] Deleting chunks for file "${fileName}" under client ${clientId} (${compartment})`,
-    );
-
-    const { error } = await supabaseAdmin
-      .from("client_document_chunks")
-      .delete()
-      .eq("client_id", clientId)
-      .eq("compartment", compartment)
-      .eq("file_name", fileName);
-
-    if (error) {
-      console.error("Error deleting client document chunks:", error);
-      throw error;
-    }
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("Error in /api/client-rag/delete-file:", error);
-    res.status(500).json({ error: error.message || "Failed to delete chunks" });
-  }
-});
-
-app.post("/api/client-rag/clear-all", async (req, res) => {
-  try {
-    const { clientId } = req.body;
-    if (!clientId) {
-      return res.status(400).json({ error: "clientId is required" });
-    }
-
-    console.log(
-      `[ClientRAG] Full database wipe requested for client ${clientId}`,
-    );
-
-    const { error } = await supabaseAdmin
-      .from("client_document_chunks")
-      .delete()
-      .eq("client_id", clientId);
-
-    if (error) {
-      console.error("Error full clearing RAG chunks:", error);
-      throw error;
-    }
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("Error in /api/client-rag/clear-all:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Failed to clear all RAG chunks" });
+    res.status(500).json({ error: error.message || "Failed to generate embedding" });
   }
 });
 
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
     const { cnisContent, model = "gemini-3.5-flash" } = req.body;
-    if (!cnisContent)
-      return res.status(400).json({ error: "CNIS content is required" });
+    if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
       model: "gemini-3.5-flash", // Garante o uso do Flash para CNIS como solicitado
@@ -3390,50 +2717,37 @@ app.post("/api/analyze-cnis", async (req, res) => {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
         responseMimeType: "application/json",
         temperature: 0.05,
-        maxOutputTokens: 16383, // Mantido em 16383 para análise completa
-      },
+        maxOutputTokens: 16383 // Mantido em 16383 para análise completa
+      }
     });
 
     let jsonData = {};
     try {
       jsonData = JSON.parse(response.text || "{}");
     } catch (e) {
-      console.warn(
-        "Malformed JSON in analyze-cnis, returning raw text or partial data.",
-        e,
-      );
+      console.warn("Malformed JSON in analyze-cnis, returning raw text or partial data.", e);
       let rawText = (response.text || "").trim();
-      if (rawText.startsWith("```json")) rawText = rawText.substring(7);
-      if (rawText.endsWith("```"))
-        rawText = rawText.substring(0, rawText.length - 3);
+      if (rawText.startsWith('```json')) rawText = rawText.substring(7);
+      if (rawText.endsWith('```')) rawText = rawText.substring(0, rawText.length - 3);
       rawText = rawText.trim();
-
+      
       try {
-        const lastBraceIndex = Math.max(
-          rawText.lastIndexOf("}"),
-          rawText.lastIndexOf("]"),
-        );
+        const lastBraceIndex = Math.max(rawText.lastIndexOf('}'), rawText.lastIndexOf(']'));
         if (lastBraceIndex > -1) {
-          jsonData = JSON.parse(rawText.substring(0, lastBraceIndex + 1));
+           jsonData = JSON.parse(rawText.substring(0, lastBraceIndex + 1));
         } else {
-          throw new Error("Cannot find braces");
+           throw new Error("Cannot find braces");
         }
       } catch (e2) {
-        // Fallback formatting for CNIS data that was heavily truncated
-        jsonData = {
-          error:
-            "Análise incompleta devido ao limite de tokens da IA. Tente enviar menos páginas do CNIS de cada vez.",
-          raw: rawText,
-        };
+         // Fallback formatting for CNIS data that was heavily truncated
+         jsonData = { error: "Análise incompleta devido ao limite de tokens da IA. Tente enviar menos páginas do CNIS de cada vez.", raw: rawText };
       }
     }
-
+    
     res.json(jsonData);
   } catch (error: any) {
     console.error("Error analyzing CNIS:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Falha na análise do CNIS" });
+    res.status(500).json({ error: error.message || "Falha na análise do CNIS" });
   }
 });
 
@@ -3466,9 +2780,9 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
     const response = await callGemini({
-      model: "gemini-2.5-flash-image",
+      model: 'gemini-2.5-flash-image',
       contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } },
+      config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
     });
 
     let base64Image = "";
@@ -3490,38 +2804,28 @@ app.post("/api/marketing/generate-image", async (req, res) => {
 
 app.post("/api/marketing/generate", async (req, res) => {
   try {
-    const {
-      topic,
-      persona,
-      mode = "full",
-      currentData,
-      strategy = "educacional",
-      assetDescription,
-    } = req.body;
+    const { topic, persona, mode = 'full', currentData, strategy = 'educacional', assetDescription } = req.body;
     if (!topic) return res.status(400).json({ error: "Topic is required" });
 
-    const personaDesc =
-      persona === "michel"
-        ? "Dr. Michel Felix: Estilo direto, estratégico."
-        : "Dra. Luana Castro: Estilo acolhedor, empático.";
+    const personaDesc = persona === 'michel' 
+      ? 'Dr. Michel Felix: Estilo direto, estratégico.'
+      : 'Dra. Luana Castro: Estilo acolhedor, empático.';
 
     let strategyDesc = "";
-    if (mode !== "strategies") {
-      if (strategy === "educacional") strategyDesc = "Abordagem Educacional.";
-      else if (strategy === "alerta") strategyDesc = "Abordagem de Alerta.";
+    if (mode !== 'strategies') {
+      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional.";
+      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta.";
       else strategyDesc = strategy;
     }
 
-    let assetContext = assetDescription
-      ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.`
-      : "";
+    let assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
     let jsonFormat = "";
     let taskDesc = "";
 
-    if (mode === "strategies") {
+    if (mode === 'strategies') {
       taskDesc = `Ideias de abordagens para post sobre: "${topic}".`;
       jsonFormat = `{ "strategies": [{ "title": "string", "description": "string" }] }`;
-    } else if (mode === "template") {
+    } else if (mode === 'template') {
       taskDesc = `Texto para a arte do post sobre: "${topic}".`;
       jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
@@ -3529,9 +2833,7 @@ app.post("/api/marketing/generate", async (req, res) => {
       jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
 
-    const captionInstructions =
-      mode === "full"
-        ? `
+    const captionInstructions = mode === 'full' ? `
 REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
 - Escreva em parágrafos CURTOS (máximo 3 linhas cada)
 - Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto
@@ -3543,8 +2845,7 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
 - O campo "highlight" deve ter NO MÁXIMO 6 palavras
 - O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras
 - O campo "ctaCaption" deve ser uma frase imperativa curta (máximo 6 palavras) com caráter EDUCATIVO e INSTITUCIONAL. Exemplos: "Salve esse post!", "Comente sua dúvida!", "Compartilhe com quem precisa!", "Siga para mais conteúdo!". NUNCA use frases que incentivem contato direto ou captação de clientes como "Me chame no WhatsApp", "Entre em contato", "Agende sua consulta" — isso viola o Código de Ética da OAB.
-- PRECISÃO JURÍDICA: nunca simplifique a ponto de distorcer o direito. Se afirmar que algo é garantido por lei, isso deve ser juridicamente correto`
-        : "";
+- PRECISÃO JURÍDICA: nunca simplifique a ponto de distorcer o direito. Se afirmar que algo é garantido por lei, isso deve ser juridicamente correto` : '';
 
     const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
     Público: Pessoas simples. Linguagem CLARA.
@@ -3553,9 +2854,9 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
     Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
-      model: "gemini-3.5-flash",
+      model: 'gemini-3.5-flash',
       contents: prompt,
-      config: { responseMimeType: "application/json" },
+      config: { responseMimeType: 'application/json' }
     });
     res.json({ text: response.text });
   } catch (error: any) {
@@ -3566,101 +2867,45 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
 
 app.get("/api/bcdata/inpc", async (req, res) => {
   try {
-    const fetch = await import("node-fetch").then((m) => m.default);
-    const response = await fetch(
-      "https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json",
-    );
+    const fetch = await import('node-fetch').then(m => m.default);
+    const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json');
     if (!response.ok) {
-      return res
-        .status(response.status)
-        .json({ error: "Failed to fetch from BCB" });
+      return res.status(response.status).json({ error: "Failed to fetch from BCB" });
     }
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
     console.error("BCB Proxy Error:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Failed to fetch BCB data" });
+    res.status(500).json({ error: error.message || "Failed to fetch BCB data" });
   }
 });
 
 app.post("/api/dr-michel/chat", async (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-  }, 5000);
-
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
+  
   try {
-    let {
-      message,
-      history,
-      images,
-      files,
-      ragContext,
-      documentContext,
-      modelProvider,
-      model,
-      keyIndex,
-      customLaws,
-      sessionId,
-      petitionLength,
-      clientId,
-    } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
-
-    if (clientId) {
-      const clientRagContext = await retrieveClientRagContext(
-        clientId,
-        message,
-      );
-      if (clientRagContext) {
-        if (!documentContext) {
-          documentContext = clientRagContext;
-        } else {
-          documentContext += "\n\n" + clientRagContext;
-        }
-      }
-    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
-      modelProvider = "openrouter";
-      model = "deepseek/deepseek-v3.2";
-      console.log(
-        "[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter",
-      );
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v3.2';
+      console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
     }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
-
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
-    const isGeneratingCommand =
-      /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(
-        message,
-      );
-    if (isGenerationIntent && !isGeneratingCommand) {
-      clearInterval(heartbeat);
-      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
-      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
-      res.write(`data: [DONE]\n\n`);
-      res.end();
-      return;
-    }
-
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent =
-      intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    const isStorageRequest =
-      isStorageIntent || message.includes("Apenas armazene");
+    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
 
-    let selectedSystemPrompt =
-      DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
+    let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
@@ -3677,7 +2922,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
-    if (model && (model.includes("deepseek") || model.includes("qwen"))) {
+    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
@@ -3688,35 +2933,24 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
-    const maxDocCtxChars = Math.floor(availableForContext * 0.6 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.3 * 3.5);
+    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
-        console.log(
-          `[Dr.Michel] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed) / 1000)}k tokens)`,
-        );
+        console.log(`[Dr.Michel] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}
-
-ATENÇÃO — REGRAS DE ROL DE DOCUMENTOS, VALORES E QUALIFICAÇÃO:
-1. ROL DE DOCUMENTOS: O tópico "Rol de Documentos" ao final da peça deve listar EXATAMENTE e APENAS os documentos presentes e nomeados no contexto acima. É TERMINANTEMENTE PROIBIDO listar ou inventar a existência de documentos genéricos (ex: "Procuração", "Comprovante de Residência") se eles não estiverem explícitos nos OCRs anexados ou no relato do advogado.
-2. VALORES E CÁLCULOS: NUNCA altere, recalcule ou invente valores de Danos Materiais ou Danos Morais se o advogado já tiver estipulado valores específicos no histórico. USE ESTRITAMENTE os valores do relato.
-3. QUALIFICAÇÃO DAS PARTES: Você DEVE usar todos os dados de qualificação do Autor e do Réu fornecidos no relato do caso e nos OCRs (endereço, CPF, CNPJ, profissão, etc). NUNCA omita a qualificação substituindo por genéricos "[QUALIFICAÇÃO DO AUTOR]" se os dados foram fornecidos.`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
     }
 
-    if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
-      let lawsContext = (customLaws || [])
-        .map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`)
-        .join("\n\n---\n\n");
+    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
+      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
       const originalLawsSize = lawsContext.length;
       lawsContext = smartTruncate(lawsContext, maxLawsChars);
       if (lawsContext.length < originalLawsSize) {
-        console.log(
-          `[Dr.Michel] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`,
-        );
+        console.log(`[Dr.Michel] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
       }
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
 REGRAS DE USO:
@@ -3738,32 +2972,51 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
-    const isReportRequest =
-      (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO") ||
-      (message || "").includes("gerar relatório") ||
-      (message || "").includes("gerar relatorio");
+    // Janela de histórico calibrada por intenção:
+    // - GERAÇÃO: até 6 turnos (já comprimidos pelo frontend) — contexto suficiente
+    // - DÚVIDA: até 10 turnos
+    // - CASUAL/outros: até 6 turnos
+    if (isGenerationRequest) {
+      if (history.length > 6) history = history.slice(-6);
+    } else if (intent === "[DÚVIDA]") {
+      if (history.length > 10) history = history.slice(-10);
+    } else {
+      if (history.length > 6) history = history.slice(-6);
+    }
+
+    // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
+    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
+    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
+    ` : `
+    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
+    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
+    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
+    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
+    **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
+    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
+    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
+    Sua redação deve ser densa, citando provas específicas.
+    `;
+    const historyParts = history.map((h: any) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
+
+    // ============================================================
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
+    // ============================================================
     let isCorrectionRequest = false;
     let correctionInstruction = "";
-    const lastAssistantMsg = [...history]
-      .reverse()
-      .find((h: any) => h.role === "assistant");
-    const lastAssistantWasLongGeneration =
-      lastAssistantMsg &&
-      (lastAssistantMsg.content.length > 3000 ||
-        lastAssistantMsg.content.includes(
-          "[... Peça/Relatório completo gerado anteriormente",
-        ));
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(
-      message,
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
     );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
-    if (
-      lastAssistantWasLongGeneration &&
-      hasCorrectionKeywords &&
-      !isGenerationRequest
-    ) {
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
       isCorrectionRequest = true;
       correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
 Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
@@ -3779,42 +3032,8 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
       console.log("Dr. Michel: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
-    // MODO API LIMPA (Padrão Ouro Felix & Castro):
-    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
-    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
-    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
-    // Frontend controls history length
-
-    // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest
-      ? ""
-      : intent === "[DÚVIDA]"
-        ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
-    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
-    `
-        : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
-    **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
-    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
-    Sua redação deve ser densa, citando provas específicas.
-    `;
-    const historyParts = history.map((h: any) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
-    }));
-
     let lengthConstraint = "";
-    if (
-      isGenerationRequest &&
-      petitionLength &&
-      petitionLength !== "Padrão (Livre)"
-    ) {
+    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
@@ -3831,12 +3050,7 @@ REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
-    let finalMessage =
-      message +
-      "\n\n" +
-      REINFORCEMENT_PROMPT +
-      correctionInstruction +
-      lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
     if (ragContext) {
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
@@ -3851,10 +3065,10 @@ ${ragContext}`;
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
-          .from("ai_conversations")
-          .select("messages")
-          .eq("lawyer_type", "petition_draft")
-          .eq("id", `draft_dr_michel_${sessionId}`)
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dr_michel_${sessionId}`)
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
@@ -3865,12 +3079,10 @@ ${ragContext}`;
       }
 
       const revisionIntent = detectRevisionIntent(message, !!draftContent);
-      console.log(
-        `[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`,
-      );
+      console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === "POINT_CORRECTION" || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
           // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
@@ -3879,9 +3091,9 @@ Mantenha densidade, citações em blockquote e formatação idênticas ao padrã
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua — peça completa disponível no Editor de Petições ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
 [FIM DA REFERÊNCIA]`;
-        } else if (revisionIntent === "ADDITION") {
+        } else if (revisionIntent === 'ADDITION') {
           // Adição — devolve só o trecho novo.
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
@@ -3890,7 +3102,7 @@ Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e dens
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
@@ -3911,31 +3123,18 @@ ${message}`;
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
     if (images && Array.isArray(images)) {
-      images.forEach((img: string) =>
-        currentMessageParts.push({
-          inlineData: { mimeType: "image/jpeg", data: img },
-        }),
-      );
+      images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
     }
     if (files && Array.isArray(files)) {
-      files.forEach((file: any) =>
-        currentMessageParts.push({
-          fileData: { mimeType: file.mimeType, fileUri: file.fileUri },
-        }),
-      );
+      files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
     }
 
-    const contents = [
-      ...historyParts,
-      { role: "user", parts: currentMessageParts },
-    ];
+    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
-      const orSystemPrompt =
-        selectedSystemPrompt +
-        `
+      const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
@@ -3948,23 +3147,18 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-      const orMessages: any[] = [{ role: "system", content: orSystemPrompt }];
+      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
       for (const h of history) {
-        const role = h.role === "model" ? "assistant" : h.role;
+        const role = h.role === 'model' ? 'assistant' : h.role;
         orMessages.push({ role, content: h.content });
       }
       orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream(
-        {
-          model: model || "deepseek/deepseek-v3.2",
-          messages: orMessages,
-          temperature: isGenerationRequest ? 0.15 : temperature,
-          max_tokens: 16383,
-        },
-        res,
-      );
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
       return;
     }
+
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -3972,15 +3166,12 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
-    } else if (
-      isReportRequest ||
-      (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")
-    ) {
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
       thinkingConfig = undefined;
     }
@@ -3989,11 +3180,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
     // - Dúvida: 0.1 (máxima precisão, resposta determinística)
     // - Peça/outros: temperature já definida (0.2)
-    const finalTemperature = isReportRequest
-      ? 0.25
-      : intent === "[DÚVIDA]"
-        ? 0.1
-        : temperature;
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
       let isFinished = false;
@@ -4001,55 +3188,39 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let fullResponseText = "";
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
-      const wordTarget = isGenerationRequest
-        ? parsePetitionTarget(petitionLength)
-        : null;
+      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input — diagnóstico de orçamento de tokens
-      const totalInputTokens =
-        estimateTokens(selectedSystemPrompt) +
-        estimateTokens(JSON.stringify(contents));
-      console.log(
-        `[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens / 1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || "livre"} palavras | Modelo: ${model || "gemini-3.5-flash"}`,
-      );
+      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
-        console.warn(
-          `[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`,
-        );
+        console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream(
-          {
-            model: model || "gemini-3.5-flash",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools,
-            } as any,
-          },
-          30,
-          0,
-          0,
-          keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-        );
+        const responseStream = await callGeminiStream({
+          model: model || "gemini-3.5-flash",
+          contents: currentContents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: finalTemperature,
+            maxOutputTokens,
+            ...(thinkingConfig && { thinkingConfig }),
+            tools
+          } as any
+        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
         let maxTokensHit = false;
         let attemptText = "";
         for await (const chunk of responseStream) {
           let text = "";
-          try {
-            text = chunk.text || "";
-          } catch (e) {}
+          try { text = chunk.text || ""; } catch(e) {}
 
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
-            if (candidate.finishReason === "MAX_TOKENS") {
+            if (candidate.finishReason === 'MAX_TOKENS') {
               maxTokensHit = true;
             }
           }
@@ -4062,19 +3233,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
 
         // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
-        if (
-          attempt > 1 &&
-          hasEchoRepetition(
-            attemptText,
-            fullResponseText.substring(
-              0,
-              fullResponseText.length - attemptText.length,
-            ),
-          )
-        ) {
-          console.log(
-            `[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`,
-          );
+        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+          console.log(`[Dr.Michel] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
           isFinished = true;
           break;
         }
@@ -4082,39 +3242,20 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
         if (isPetitionComplete(fullResponseText)) {
           const wc = countWords(fullResponseText);
-          console.log(
-            `[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`,
-          );
+          console.log(`[Dr.Michel] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached =
-          !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
         // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (
-          maxTokensHit &&
-          (wordTarget === null || !targetReached) &&
-          attempt < MAX_ATTEMPTS
-        ) {
-          console.log(
-            `[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || "∞"} palavras). Continuando...`,
-          );
+        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({
-            role: "model",
-            parts: [{ text: attemptText }],
-          });
-          currentContents.push({
-            role: "user",
-            parts: [
-              {
-                text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`,
-              },
-            ],
-          });
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -4124,35 +3265,27 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       }
 
       const finalWordCount = countWords(fullResponseText);
-      console.log(
-        `[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ""} em ${attempt} ciclo(s).`,
-      );
+      console.log(`[Dr.Michel] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
 
       clearInterval(heartbeat);
       if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
-
+      
       // Salva a peça gerada como draft se for longa o suficiente
       if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
         try {
-          await supabaseAdmin.from("ai_conversations").upsert({
+          await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_michel_${sessionId}`,
-            lawyer_type: "petition_draft",
-            title: "DrMichel",
+            lawyer_type: 'petition_draft',
+            title: 'DrMichel',
             date: new Date().toISOString(),
-            messages: [{ role: "assistant", content: fullResponseText }],
+            messages: [{ role: 'assistant', content: fullResponseText }]
           });
         } catch (e) {
           console.error("Erro salvando petition_draft (DrMichel):", e);
         }
       }
-
-      const inputTokens = totalInputTokens;
-      const outputTokens = estimateTokens(fullResponseText);
-      res.write(
-        `data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`,
-      );
 
       res.write(`data: [DONE]\n\n`);
       res.end();
@@ -4169,92 +3302,40 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 });
 
 app.post("/api/dra-luana/chat", async (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-  }, 5000);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let {
-      message,
-      history,
-      images,
-      minWage = "1621.00",
-      files,
-      ragContext,
-      documentContext,
-      modelProvider,
-      model,
-      keyIndex,
-      customLaws,
-      sessionId,
-      petitionLength,
-      clientId,
-    } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
-
-    if (clientId) {
-      const clientRagContext = await retrieveClientRagContext(
-        clientId,
-        message,
-      );
-      if (clientRagContext) {
-        if (!documentContext) {
-          documentContext = clientRagContext;
-        } else {
-          documentContext += "\n\n" + clientRagContext;
-        }
-      }
-    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
-      modelProvider = "openrouter";
-      model = "deepseek/deepseek-v3.2";
-      console.log(
-        "[Dra.Luana] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter",
-      );
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v3.2';
+      console.log('[Dra.Luana] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
     }
 
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
-
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
-    const isGeneratingCommand =
-      /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(
-        message,
-      );
-    if (isGenerationIntent && !isGeneratingCommand) {
-      clearInterval(heartbeat);
-      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
-      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
-      res.write(`data: [DONE]\n\n`);
-      res.end();
-      return;
-    }
-
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent =
-      intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    const isStorageRequest =
-      isStorageIntent ||
-      message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") ||
-      message.includes("Enviei os seguintes documentos");
-
-    const isGenerationRequest =
-      isGenerationIntent ||
-      message.includes("GERAR RELATÓRIO") ||
-      message.includes("GERAR PEÇA");
+    const isStorageRequest = isStorageIntent || 
+                             message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
+                             message.includes("Enviei os seguintes documentos");
+    
+    const isGenerationRequest = isGenerationIntent || 
+                                 message.includes("GERAR RELATÓRIO") || 
+                                 message.includes("GERAR PEÇA");
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
-    let selectedSystemPrompt =
-      DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
-
+    let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
+    
     // Injeta regras de Rito Processual
     const RITE_RULES = `
     RITOS PROCESSUAIS TRABALHISTAS (ATENÇÃO AO VALOR DA CAUSA):
@@ -4266,7 +3347,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     
     Sempre que analisar cálculos ou sugerir estratégias, mencione o rito aplicável e lembre o usuário das regras específicas desse rito (ex: limite de testemunhas, necessidade de pedido líquido no sumaríssimo, etc). Se o valor estiver muito próximo do limite do sumaríssimo (ex: 41 salários mínimos), sugira estrategicamente a renúncia do excedente para enquadramento no rito sumaríssimo, que é mais célere.
     `;
-
+    
     selectedSystemPrompt += "\n" + RITE_RULES;
 
     const PHASED_SCIENCE_PROMPT = `
@@ -4302,7 +3383,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
-    if (model && (model.includes("deepseek") || model.includes("qwen"))) {
+    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
@@ -4313,35 +3394,24 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
-    const maxDocCtxChars = Math.floor(availableForContext * 0.6 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.3 * 3.5);
+    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
-        console.log(
-          `[Dra.Luana] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed) / 1000)}k tokens)`,
-        );
+        console.log(`[Dra.Luana] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}
-
-ATENÇÃO — REGRAS DE ROL DE DOCUMENTOS, VALORES E QUALIFICAÇÃO:
-1. ROL DE DOCUMENTOS: O tópico "Rol de Documentos" ao final da peça deve listar EXATAMENTE e APENAS os documentos presentes e nomeados no contexto acima. É TERMINANTEMENTE PROIBIDO listar ou inventar a existência de documentos genéricos (ex: "Procuração", "Comprovante de Residência") se eles não estiverem explícitos nos OCRs anexados ou no relato do advogado.
-2. VALORES E CÁLCULOS: NUNCA altere, recalcule ou invente valores de Danos Materiais ou Danos Morais se o advogado já tiver estipulado valores específicos no histórico. USE ESTRITAMENTE os valores do relato.
-3. QUALIFICAÇÃO DAS PARTES: Você DEVE usar todos os dados de qualificação do Autor e do Réu fornecidos no relato do caso e nos OCRs (endereço, CPF, CNPJ, profissão, etc). NUNCA omita a qualificação substituindo por genéricos "[QUALIFICAÇÃO DO AUTOR]" se os dados foram fornecidos.`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
     }
 
-    if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
-      let lawsContext = (customLaws || [])
-        .map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`)
-        .join("\n\n---\n\n");
+    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
+      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
       const originalLawsSize = lawsContext.length;
       lawsContext = smartTruncate(lawsContext, maxLawsChars);
       if (lawsContext.length < originalLawsSize) {
-        console.log(
-          `[Dra.Luana] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`,
-        );
+        console.log(`[Dra.Luana] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
       }
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
 REGRAS DE USO:
@@ -4363,33 +3433,59 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
-    const isReportRequest =
-      (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO") ||
-      (message || "").includes("gerar relatório") ||
-      (message || "").includes("gerar relatorio");
+    // 3. GESTÃO DE JANELA DESLIZANTE CALIBRADA POR INTENÇÃO - Pilar 4
+    // GERAÇÃO: 6 turnos (já comprimidos pelo frontend) | DÚVIDA: 10 | CASUAL: 6
+    if (isGenerationRequest) {
+      if (history.length > 6) {
+        console.log(`Pilar 4: GERAÇÃO — limitando histórico de ${history.length} para 6 turnos.`);
+        history = history.slice(-6);
+      }
+    } else if (intent === "[DÚVIDA]") {
+      if (history.length > 10) history = history.slice(-10);
+      console.log(`Pilar 4: Modo DÚVIDA — limitando histórico a 10 turnos.`);
+    } else {
+      if (history.length > 6) {
+        console.log(`Pilar 4: Limitando histórico de ${history.length} para 6 turnos para redução de custos.`);
+        history = history.slice(-6);
+      }
+    }
+
+    // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
+    Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
+    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários.
+    Use Google Search para verificar a redação atualizada de artigos da CLT e súmulas do TST.
+    Informe sempre o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
+    ` : `
+    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
+    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
+    **PROIBIÇÃO DE REPETIÇÃO E TERMOS DE IA:** Jamais repita os mesmos pedidos ou tópicos no final da peça. É TERMINANTEMENTE PROIBIDO incluir as strings "RAG", "Base de Conhecimento", "Local OCR" ou referências ao sistema de IA no corpo da petição.
+    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista para cada tipo de ação trabalhista, o software será rejeitado. O tópico "Resumo da Demanda" deve ser um texto narrativo e não uma tabela.
+    O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
+    É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
+    É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
+    Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
+    `;
+
+    const historyParts = history.map((h: any) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
+
+    // ============================================================
+    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente)
+    // ============================================================
     let isCorrectionRequest = false;
     let correctionInstruction = "";
-    const lastAssistantMsg = [...history]
-      .reverse()
-      .find((h: any) => h.role === "assistant");
-    const lastAssistantWasLongGeneration =
-      lastAssistantMsg &&
-      (lastAssistantMsg.content.length > 3000 ||
-        lastAssistantMsg.content.includes(
-          "[... Peça/Relatório completo gerado anteriormente",
-        ));
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(
-      message,
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
     );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
-    if (
-      lastAssistantWasLongGeneration &&
-      hasCorrectionKeywords &&
-      !isGenerationRequest &&
-      !message.includes("[FASE DE TOMADA DE CIÊNCIA]")
-    ) {
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest && !message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       isCorrectionRequest = true;
       correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
 Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
@@ -4405,45 +3501,8 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS (PUNIÇÃO SE DESCUMPRIR):
       console.log("Dra. Luana: MODO CORREÇÃO PONTUAL detectado e ativado.");
     }
 
-    // MODO API LIMPA (Padrão Ouro Felix & Castro):
-    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
-    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
-    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
-    // Frontend controls history length
-
-    // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest
-      ? ""
-      : intent === "[DÚVIDA]"
-        ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
-    Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários.
-    Use Google Search para verificar a redação atualizada de artigos da CLT e súmulas do TST.
-    Informe sempre o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
-    `
-        : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
-    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
-    **PROIBIÇÃO DE REPETIÇÃO E TERMOS DE IA:** Jamais repita os mesmos pedidos ou tópicos no final da peça. É TERMINANTEMENTE PROIBIDO incluir as strings "RAG", "Base de Conhecimento", "Local OCR" ou referências ao sistema de IA no corpo da petição.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista para cada tipo de ação trabalhista, o software será rejeitado. O tópico "Resumo da Demanda" deve ser um texto narrativo e não uma tabela.
-    O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
-    É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
-    É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
-    Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
-    `;
-
-    const historyParts = history.map((h: any) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
-    }));
-
     let lengthConstraint = "";
-    if (
-      isGenerationRequest &&
-      petitionLength &&
-      petitionLength !== "Padrão (Livre)"
-    ) {
+    if (isGenerationRequest && petitionLength && petitionLength !== 'Padrão (Livre)') {
       const target = parsePetitionTarget(petitionLength);
       lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
 Esta peça deve ter aproximadamente **${target || 5000} palavras** formadas por extrema densidade jurídica em UMA ÚNICA REDAÇÃO COMPLETA.
@@ -4460,12 +3519,7 @@ REGRAS OBRIGATÓRIAS PARA ATINGIR A METRAGEM ESPERADA:
 5. CÓPIA FIEL DA JURISPRUDÊNCIA: O usuário confia na sua capacidade de transcrever na íntegra a base legal requerida para dar sustância à tese, logo não evite inserir ementas completas.`;
     }
 
-    let finalMessage =
-      message +
-      "\n\n" +
-      REINFORCEMENT_PROMPT +
-      correctionInstruction +
-      lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
     if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
@@ -4483,10 +3537,10 @@ ${ragContext}`;
       let draftContent = "";
       try {
         const { data: draftData } = await supabaseAdmin
-          .from("ai_conversations")
-          .select("messages")
-          .eq("lawyer_type", "petition_draft")
-          .eq("id", `draft_dra_luana_${sessionId}`)
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dra_luana_${sessionId}`)
           .maybeSingle();
 
         if (draftData && draftData.messages && draftData.messages.length > 0) {
@@ -4497,12 +3551,10 @@ ${ragContext}`;
       }
 
       const revisionIntent = detectRevisionIntent(message, !!draftContent);
-      console.log(
-        `[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`,
-      );
+      console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === "POINT_CORRECTION" || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
@@ -4510,9 +3562,9 @@ Mantenha densidade, valores da planilha e formatação idênticas ao padrão da 
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua — peça completa disponível no Editor de Petições ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
 [FIM DA REFERÊNCIA]`;
-        } else if (revisionIntent === "ADDITION") {
+        } else if (revisionIntent === 'ADDITION') {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
@@ -4520,7 +3572,7 @@ Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e dens
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           const sumarioEstrutural = extractStructuralSummary(draftContent);
@@ -4546,8 +3598,8 @@ ${message}`;
         currentMessageParts.push({
           inlineData: {
             mimeType: "image/jpeg",
-            data: base64Image,
-          },
+            data: base64Image
+          }
         });
       });
     }
@@ -4558,25 +3610,23 @@ ${message}`;
         currentMessageParts.push({
           fileData: {
             mimeType: file.mimeType,
-            fileUri: file.fileUri,
-          },
+            fileUri: file.fileUri
+          }
         });
       });
     }
 
     const contents = [
       ...historyParts,
-      { role: "user", parts: currentMessageParts },
+      { role: 'user', parts: currentMessageParts }
     ];
 
     // Configuração de Tools (Google Search Grounding + URL Context)
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
-      const orSystemPromptLuana =
-        selectedSystemPrompt +
-        `
+      const orSystemPromptLuana = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
 Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
@@ -4587,51 +3637,37 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 4. DENSITY: Entre 4000 e 6000 palavras. Não resuma.
 5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
 
-      const orMessages: any[] = [
-        { role: "system", content: selectedSystemPrompt },
-      ];
+      const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
       for (const h of history) {
         // Normalizar papéis: Gemini usa 'model', OpenRouter/OpenAI usa 'assistant'
-        const role = h.role === "model" ? "assistant" : h.role;
+        const role = h.role === 'model' ? 'assistant' : h.role;
         orMessages.push({ role, content: h.content });
       }
-
+      
       const userContent: any[] = [];
       // Algumas IAs no OpenRouter preferem conteúdo como string simples em vez de array de objetos para texto puro
       // Mas se houver imagens, TEM que ser array. Se não houver, string simples é mais seguro.
       if (images && images.length > 0) {
         userContent.push({ type: "text", text: finalMessage });
         images.forEach((img: string) => {
-          userContent.push({
-            type: "image_url",
-            image_url: { url: `data:image/jpeg;base64,${img}` },
-          });
+          userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
         });
       }
 
-      orMessages.push({
-        role: "user",
-        content: userContent.length > 0 ? userContent : finalMessage,
-      });
+      orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
 
-      const orMessagesFinal = orMessages.map((m: any) =>
-        m.role === "system" ? { ...m, content: orSystemPromptLuana } : m,
-      );
+      const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
-      await callOpenRouterStream(
-        {
-          model: model || "deepseek/deepseek-v3.2",
-          messages: orMessagesFinal,
-          temperature: isGenerationRequest ? 0.15 : temperature,
-          max_tokens: 16383,
-        },
-        res,
-      );
+      await callOpenRouterStream({
+        model: model || "deepseek/deepseek-v3.2",
+        messages: orMessagesFinal,
+        temperature: isGenerationRequest ? 0.15 : temperature,
+        max_tokens: 16383
+      }, res);
       return;
     }
 
-    const isReportRequestLuana =
-      (message || "").includes("GERAR RELATÓRIO") ||
+    const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
@@ -4640,25 +3676,18 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
-    } else if (
-      isReportRequestLuana ||
-      (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")
-    ) {
+    } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
       thinkingConfig = undefined;
     }
 
     // Temperature calibrada por intenção
-    const finalTemperature = isReportRequestLuana
-      ? 0.25
-      : intent === "[DÚVIDA]"
-        ? 0.1
-        : temperature;
+    const finalTemperature = isReportRequestLuana ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
       let isFinished = false;
@@ -4666,61 +3695,35 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       let fullResponseText = "";
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
-      const wordTarget = isGenerationRequest
-        ? parsePetitionTarget(petitionLength)
-        : null;
+      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input — diagnóstico de orçamento de tokens
-      const totalInputTokensLuana =
-        estimateTokens(selectedSystemPrompt) +
-        estimateTokens(JSON.stringify(contents));
-      console.log(
-        `[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana / 1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || "livre"} palavras | Modelo: ${model || "gemini-3.5-flash"}`,
-      );
+      const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokensLuana > 90_000) {
-        console.warn(
-          `[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`,
-        );
+        console.warn(`[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream(
-          {
-            model: model || "gemini-3.5-flash",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens: maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools: tools,
-              safetySettings: [
-                {
-                  category: "HARM_CATEGORY_HARASSMENT",
-                  threshold: "BLOCK_NONE",
-                },
-                {
-                  category: "HARM_CATEGORY_HATE_SPEECH",
-                  threshold: "BLOCK_NONE",
-                },
-                {
-                  category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                  threshold: "BLOCK_NONE",
-                },
-                {
-                  category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                  threshold: "BLOCK_NONE",
-                },
-              ],
-            } as any,
-          },
-          30,
-          0,
-          0,
-          keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-        );
+        const responseStream = await callGeminiStream({
+          model: model || "gemini-3.5-flash",
+          contents: currentContents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: finalTemperature,
+            maxOutputTokens: maxOutputTokens,
+            ...(thinkingConfig && { thinkingConfig }),
+            tools: tools,
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          } as any
+        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
         let maxTokensHit = false;
         let attemptText = "";
@@ -4734,13 +3737,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
-            if (candidate.finishReason === "MAX_TOKENS") {
+            if (candidate.finishReason === 'MAX_TOKENS') {
               maxTokensHit = true;
-            } else if (
-              candidate.finishReason &&
-              candidate.finishReason !== "STOP" &&
-              !text
-            ) {
+            } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
               text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
             }
           }
@@ -4752,19 +3751,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
         }
 
-        if (
-          attempt > 1 &&
-          hasEchoRepetition(
-            attemptText,
-            fullResponseText.substring(
-              0,
-              fullResponseText.length - attemptText.length,
-            ),
-          )
-        ) {
-          console.log(
-            `[Dra.Luana] ECO detectado no ciclo ${attempt} — interrompendo continuação.`,
-          );
+        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+          console.log(`[Dra.Luana] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
           isFinished = true;
           break;
         }
@@ -4772,39 +3760,20 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         // DETECTOR DE FIM DE PEÇA: se já tem "Nestes termos, pede e espera deferimento" + OAB/data, ENCERRA mesmo abaixo do alvo
         if (isPetitionComplete(fullResponseText)) {
           const wc = countWords(fullResponseText);
-          console.log(
-            `[Dra.Luana] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`,
-          );
+          console.log(`[Dra.Luana] Peça encerrada naturalmente (Nestes termos, pede e espera deferimento detectado) com ${wc} palavras. ENCERRANDO sem continuação.`);
           isFinished = true;
           break;
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached =
-          !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
         // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (
-          maxTokensHit &&
-          (wordTarget === null || !targetReached) &&
-          attempt < MAX_ATTEMPTS
-        ) {
-          console.log(
-            `[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || "∞"} palavras). Continuando...`,
-          );
+        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({
-            role: "model",
-            parts: [{ text: attemptText }],
-          });
-          currentContents.push({
-            role: "user",
-            parts: [
-              {
-                text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`,
-              },
-            ],
-          });
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -4814,154 +3783,91 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       }
 
       const finalWordCount = countWords(fullResponseText);
-      console.log(
-        `[Dra.Luana] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ""} em ${attempt} ciclo(s).`,
-      );
+      console.log(`[Dra.Luana] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
 
       clearInterval(heartbeat);
       if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
-
+      
       // Salva a peça gerada como draft se for longa o suficiente
       if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
         try {
-          await supabaseAdmin.from("ai_conversations").upsert({
+          await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dra_luana_${sessionId}`,
-            lawyer_type: "petition_draft",
-            title: "DraLuana",
+            lawyer_type: 'petition_draft',
+            title: 'DraLuana',
             date: new Date().toISOString(),
-            messages: [{ role: "assistant", content: fullResponseText }],
+            messages: [{ role: 'assistant', content: fullResponseText }]
           });
         } catch (e) {
           console.error("Erro salvando petition_draft (DraLuana):", e);
         }
       }
 
-      const inputTokens = totalInputTokensLuana;
-      const outputTokens = estimateTokens(fullResponseText);
-      res.write(
-        `data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`,
-      );
-
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (streamError: any) {
       clearInterval(heartbeat);
       console.error("Stream error (Dra. Luana):", streamError);
-
-      let errorMessage =
-        streamError.message || "Erro durante a geração do texto.";
-
+      
+      let errorMessage = streamError.message || "Erro durante a geração do texto.";
+      
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   } catch (error: any) {
     clearInterval(heartbeat);
     console.error("Error in chat (Dra. Luana):", error);
-    res.write(
-      `data: ${JSON.stringify({ error: error.message || "Falha no chat" })}\n\n`,
-    );
+    res.write(`data: ${JSON.stringify({ error: error.message || "Falha no chat" })}\n\n`);
     res.end();
   }
 });
 
 app.post("/api/dr-felix-castro/chat", async (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-  }, 5000);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let {
-      message,
-      history,
-      images,
-      files,
-      ragContext,
-      documentContext,
-      modelProvider,
-      model,
-      keyIndex,
-      customLaws,
-      sessionId,
-      petitionLength,
-      clientId,
-    } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
-
-    if (clientId) {
-      const clientRagContext = await retrieveClientRagContext(
-        clientId,
-        message,
-      );
-      if (clientRagContext) {
-        if (!documentContext) {
-          documentContext = clientRagContext;
-        } else {
-          documentContext += "\n\n" + clientRagContext;
-        }
-      }
-    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
-      modelProvider = "openrouter";
-      model = "deepseek/deepseek-v3.2";
-      console.log(
-        "[Dr.FelixCastro] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter",
-      );
+      modelProvider = 'openrouter';
+      model = 'deepseek/deepseek-v3.2';
+      console.log('[Dr.FelixCastro] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
     }
 
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
-
-    // REGRA DE SEGURANÇA CONTRA DESPERDÍCIO DE TOKENS (SÓ GERA COM COMANDOS DE CRIAÇÃO/EXPOSIÇÃO/REDIGIR NO PRÓPRIO COMANDO)
-    const isGeneratingCommand =
-      /gerar|gera|resum|apresent|escrev|elabor|redig|peça|petição|faz|fazer/i.test(
-        message,
-      );
-    if (isGenerationIntent && !isGeneratingCommand) {
-      clearInterval(heartbeat);
-      const warningText = `⚠️ **Aviso de Segurança de Créditos**:\n\nPercebi que sua solicitação envolve a redação ou rascunho de uma peça jurídica ou relatório, porém você não enviou o comando expresso para iniciar a confecção da peça.\n\nPara evitar o início automático de textos extensos e o desperdício desnecessário de tokens, eu respondo apenas dúvidas neste modo de interação. Se você realmente deseja que eu elabore e redija este documento agora, por favor reenvie a sua mensagem incluindo expressamente palavras como **"Gerar Peça"**, **"Gerar Petição"** ou **"Gerar Relatório"**.`;
-      res.write(`data: ${JSON.stringify({ text: warningText })}\n\n`);
-      res.write(`data: [DONE]\n\n`);
-      res.end();
-      return;
-    }
-
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent =
-      intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    const isStorageRequest =
-      isStorageIntent || message.includes("Apenas armazene");
+    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
 
-    let selectedSystemPrompt =
-      DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
+    let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
       selectedSystemPrompt = ARCHIVIST_SYSTEM_PROMPT + getCurrentDateContext();
       temperature = 0.1;
     } else if (isCasualIntent) {
-      selectedSystemPrompt =
-        DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
+      selectedSystemPrompt = DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag) ragContext = "";
     } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
-      selectedSystemPrompt =
-        DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
+      selectedSystemPrompt = DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
     }
 
     if (isGenerationRequest) {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
-    if (model && (model.includes("deepseek") || model.includes("qwen"))) {
+    if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite de Direito do Consumidor ou Direito Civil. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez. Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
     }
 
@@ -4969,35 +3875,24 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const inputBudget = getInputBudget(modelProvider, model);
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens;
-    const maxDocCtxChars = Math.floor(availableForContext * 0.6 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.3 * 3.5);
+    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
-        console.log(
-          `[Dr.FelixCastro] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars`,
-        );
+        console.log(`[Dr.FelixCastro] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}
-
-ATENÇÃO — REGRAS DE ROL DE DOCUMENTOS, VALORES E QUALIFICAÇÃO:
-1. ROL DE DOCUMENTOS: O tópico "Rol de Documentos" ao final da peça deve listar EXATAMENTE e APENAS os documentos presentes e nomeados no contexto acima. É TERMINANTEMENTE PROIBIDO listar ou inventar a existência de documentos genéricos (ex: "Procuração", "Comprovante de Residência") se eles não estiverem explícitos nos OCRs anexados ou no relato do advogado.
-2. VALORES E CÁLCULOS: NUNCA altere, recalcule ou invente valores de Danos Materiais ou Danos Morais se o advogado já tiver estipulado valores específicos no histórico. USE ESTRITAMENTE os valores do relato.
-3. QUALIFICAÇÃO DAS PARTES: Você DEVE usar todos os dados de qualificação do Autor e do Réu fornecidos no relato do caso e nos OCRs (endereço, CPF, CNPJ, profissão, etc). NUNCA omita a qualificação substituindo por genéricos "[QUALIFICAÇÃO DO AUTOR]" se os dados foram fornecidos.`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
     }
 
-    if (customLaws && Array.isArray(customLaws) && customLaws.length > 0) {
-      let lawsContext = (customLaws || [])
-        .map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`)
-        .join("\n\n---\n\n");
+    if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
+      let lawsContext = (customLaws || []).map((law: any) => `TÍTULO: ${law.title}\nCONTEÚDO: ${law.content}`).join('\n\n---\n\n');
       const originalLawsSize = lawsContext.length;
       lawsContext = smartTruncate(lawsContext, maxLawsChars);
       if (lawsContext.length < originalLawsSize) {
-        console.log(
-          `[Dr.FelixCastro] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`,
-        );
+        console.log(`[Dr.FelixCastro] customLaws comprimido: ${originalLawsSize} → ${lawsContext.length} chars`);
       }
       selectedSystemPrompt += `\n\n[BASE DE CONHECIMENTO JURÍDICO PERSONALIZADA (LEGISLAÇÃO ADICIONAL DO USUÁRIO)]\n
 REGRAS DE USO:
@@ -5019,32 +3914,45 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // DETECÇÃO DE CORREÇÃO (Camada 3 — correção inteligente - antecipada para o histórico "API Limpa")
-    const isReportRequest =
-      (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO") ||
-      (message || "").includes("gerar relatório") ||
-      (message || "").includes("gerar relatorio");
+    // Janela de histórico calibrada por intenção
+    if (isGenerationRequest) {
+      if (history.length > 6) history = history.slice(-6);
+    } else if (intent === "[DÚVIDA]") {
+      if (history.length > 10) history = history.slice(-10);
+    } else {
+      if (history.length > 6) history = history.slice(-6);
+    }
+
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
+    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
+    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
+    ` : `
+    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
+    Dr. Felix e Castro, você é um advogado combativo. Você DEVE extrair dados REAIS.
+    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito do CONSUMIDOR e/ou Direito CIVIL. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019) ou Direito do Trabalho (Horas Extras, FGTS, Verbas Rescisórias, Reintegração). Isso é inaceitável.
+    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Calcule com os dados disponíveis. Se faltar dado, estime com transparência e registre como estimativa.
+    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou tópicos. É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição.
+    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS". Se você pular um tópico obrigatório ou mudar a ordem prevista, o software será rejeitado.
+    Sua redação deve ser densa, citando provas específicas.
+    `;
+
+    const historyParts = history.map((h: any) => ({
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
+    }));
+
+    // DETECÇÃO DE CORREÇÃO
     let isCorrectionRequest = false;
     let correctionInstruction = "";
-    const lastAssistantMsg = [...history]
-      .reverse()
-      .find((h: any) => h.role === "assistant");
-    const lastAssistantWasLongGeneration =
-      lastAssistantMsg &&
-      (lastAssistantMsg.content.length > 3000 ||
-        lastAssistantMsg.content.includes(
-          "[... Peça/Relatório completo gerado anteriormente",
-        ));
-    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(
-      message,
+    const lastAssistantMsg = [...history].reverse().find((h: any) => h.role === 'assistant');
+    const lastAssistantWasLongGeneration = lastAssistantMsg && (
+      lastAssistantMsg.content.length > 3000 ||
+      lastAssistantMsg.content.includes('[... Peça/Relatório completo gerado anteriormente')
     );
+    const hasCorrectionKeywords = /corri[gj]|atualiz|ajust|mud[ae]/i.test(message);
 
-    if (
-      lastAssistantWasLongGeneration &&
-      hasCorrectionKeywords &&
-      !isGenerationRequest
-    ) {
+    if (lastAssistantWasLongGeneration && hasCorrectionKeywords && !isGenerationRequest) {
       isCorrectionRequest = true;
       correctionInstruction = `\n\n[MODO CORREÇÃO PONTUAL DE TÓPICO ATIVADO]
 Detectei que você gerou uma peça/relatório longo anteriormente e o usuário está pedindo a CORREÇÃO DE UM TÓPICO ESPECÍFICO.
@@ -5056,54 +3964,19 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
 4. Se o usuário não especificou qual tópico, peça esclarecimento em UMA frase.`;
     }
 
-    // MODO API LIMPA (Padrão Ouro Felix & Castro):
-    // Quando o comando for de gerar peça ou gerar relatório fresco (e não uma correção),
-    // limpamos o histórico de conversação anterior do payload para garantir uma "API limpa",
-    // poupando tokens e evitando desvios ou resumos causados pela bagagem de chats prévios.
-    // Frontend controls history length
-
-    const REINFORCEMENT_PROMPT = isStorageRequest
-      ? ""
-      : intent === "[DÚVIDA]"
-        ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
-    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
-    `
-        : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    Dr. Felix e Castro, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito do CONSUMIDOR e/ou Direito CIVIL. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019) ou Direito do Trabalho (Horas Extras, FGTS, Verbas Rescisórias, Reintegração). Isso é inaceitável.
-    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Calcule com os dados disponíveis. Se faltar dado, estime com transparência e registre como estimativa.
-    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou tópicos. É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS". Se você pular um tópico obrigatório ou mudar a ordem prevista, o software será rejeitado.
-    Sua redação deve ser densa, citando provas específicas.
-    `;
-
-    const historyParts = history.map((h: any) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
-    }));
-
     let finalMessage = message;
-    if (ragContext) {
-      finalMessage += `\n\n${ragContext}`;
-    }
-    if (REINFORCEMENT_PROMPT) {
-      finalMessage += `\n\n${REINFORCEMENT_PROMPT}`;
-    }
-    if (correctionInstruction) {
-      finalMessage += correctionInstruction;
-    }
+    if (ragContext) { finalMessage += `\n\n${ragContext}`; }
+    if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
+    if (correctionInstruction) { finalMessage += correctionInstruction; }
 
     // Draft injection para revisão
     if (sessionId && (isCorrectionRequest || isGenerationRequest)) {
       let draftContent = "";
       try {
         const { data: draftRow } = await supabaseAdmin
-          .from("ai_conversations")
-          .select("messages")
-          .eq("id", `draft_dr_felix_castro_${sessionId}`)
+          .from('ai_conversations')
+          .select('messages')
+          .eq('id', `draft_dr_felix_castro_${sessionId}`)
           .single();
         if (draftRow?.messages?.[0]?.content) {
           draftContent = draftRow.messages[0].content;
@@ -5113,21 +3986,19 @@ INSTRUÇÕES PRIORITÁRIAS E OBRIGATÓRIAS:
       }
 
       const revisionIntent = detectRevisionIntent(message, !!draftContent);
-      console.log(
-        `[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`,
-      );
+      console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (draftContent) {
-        if (revisionIntent === "POINT_CORRECTION" || isCorrectionRequest) {
+        if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO.
 Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua — peça completa disponível no Editor de Petições ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
 [FIM DA REFERÊNCIA]`;
-        } else if (revisionIntent === "ADDITION") {
+        } else if (revisionIntent === 'ADDITION') {
           const draftEnxuto = draftContent.substring(0, 15000);
           finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
@@ -5135,7 +4006,7 @@ Devolva APENAS o novo trecho no estilo e densidade da peça original.
 Indique onde o trecho deve ser inserido.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
           const sumarioEstrutural = extractStructuralSummary(draftContent);
@@ -5154,31 +4025,18 @@ ${message}`;
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
     if (images && Array.isArray(images)) {
-      images.forEach((img: string) =>
-        currentMessageParts.push({
-          inlineData: { mimeType: "image/jpeg", data: img },
-        }),
-      );
+      images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
     }
     if (files && Array.isArray(files)) {
-      files.forEach((file: any) =>
-        currentMessageParts.push({
-          fileData: { mimeType: file.mimeType, fileUri: file.fileUri },
-        }),
-      );
+      files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
     }
 
-    const contents = [
-      ...historyParts,
-      { role: "user", parts: currentMessageParts },
-    ];
+    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       clearInterval(heartbeat);
-      const orSystemPrompt =
-        selectedSystemPrompt +
-        `
+      const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica de Direito do Consumidor ou Direito Civil para o escritório Felix & Castro Advocacia.
@@ -5190,23 +4048,18 @@ REGRAS ABSOLUTAS:
 5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
 6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
 
-      const orMessages: any[] = [{ role: "system", content: orSystemPrompt }];
+      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
       for (const h of history) {
-        const role = h.role === "model" ? "assistant" : h.role;
+        const role = h.role === 'model' ? 'assistant' : h.role;
         orMessages.push({ role, content: h.content });
       }
       orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream(
-        {
-          model: model || "deepseek/deepseek-v3.2",
-          messages: orMessages,
-          temperature: isGenerationRequest ? 0.15 : temperature,
-          max_tokens: 16383,
-        },
-        res,
-      );
+      await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
       return;
     }
+
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
+      (message || "").includes("GERAR RELATORIO");
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -5214,24 +4067,17 @@ REGRAS ABSOLUTAS:
     if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = { thinkingBudget: 4096 };
-    } else if (
-      isReportRequest ||
-      (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")
-    ) {
+    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingBudget: 2048 };
     }
 
-    if (modelProvider === "openrouter") {
+    if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
       thinkingConfig = undefined;
     }
 
-    const finalTemperature = isReportRequest
-      ? 0.25
-      : intent === "[DÚVIDA]"
-        ? 0.1
-        : temperature;
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
       let isFinished = false;
@@ -5239,54 +4085,38 @@ REGRAS ABSOLUTAS:
       let fullResponseText = "";
       let currentContents = [...contents];
       let finalMaxTokensHit = false;
-      const wordTarget = isGenerationRequest
-        ? parsePetitionTarget(petitionLength)
-        : null;
+      const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3;
 
-      const totalInputTokens =
-        estimateTokens(selectedSystemPrompt) +
-        estimateTokens(JSON.stringify(contents));
-      console.log(
-        `[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens / 1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || "livre"} palavras | Modelo: ${model || "gemini-3.5-flash"}`,
-      );
+      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
-        console.warn(
-          `[Dr.FelixCastro] ⚠️  Input acima de 90k tokens — output pode degradar.`,
-        );
+        console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 90k tokens — output pode degradar.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
-        const responseStream = await callGeminiStream(
-          {
-            model: model || "gemini-3.5-flash",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools,
-            } as any,
-          },
-          30,
-          0,
-          0,
-          keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-        );
+        const responseStream = await callGeminiStream({
+          model: model || "gemini-3.5-flash",
+          contents: currentContents,
+          config: {
+            systemInstruction: selectedSystemPrompt,
+            temperature: finalTemperature,
+            maxOutputTokens,
+            ...(thinkingConfig && { thinkingConfig }),
+            tools
+          } as any
+        }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
         let maxTokensHit = false;
         let attemptText = "";
         for await (const chunk of responseStream) {
           let text = "";
-          try {
-            text = chunk.text || "";
-          } catch (e) {}
+          try { text = chunk.text || ""; } catch(e) {}
 
           if (chunk.candidates && chunk.candidates.length > 0) {
             const candidate = chunk.candidates[0];
-            if (candidate.finishReason === "MAX_TOKENS") {
+            if (candidate.finishReason === 'MAX_TOKENS') {
               maxTokensHit = true;
             }
           }
@@ -5299,19 +4129,8 @@ REGRAS ABSOLUTAS:
         }
 
         // ANTI-ECO
-        if (
-          attempt > 1 &&
-          hasEchoRepetition(
-            attemptText,
-            fullResponseText.substring(
-              0,
-              fullResponseText.length - attemptText.length,
-            ),
-          )
-        ) {
-          console.log(
-            `[Dr.FelixCastro] ECO detectado no ciclo ${attempt} — interrompendo.`,
-          );
+        if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+          console.log(`[Dr.FelixCastro] ECO detectado no ciclo ${attempt} — interrompendo.`);
           isFinished = true;
           break;
         }
@@ -5319,38 +4138,19 @@ REGRAS ABSOLUTAS:
         // DETECTOR DE FIM DE PEÇA
         if (isPetitionComplete(fullResponseText)) {
           const wc = countWords(fullResponseText);
-          console.log(
-            `[Dr.FelixCastro] Peça encerrada naturalmente com ${wc} palavras.`,
-          );
+          console.log(`[Dr.FelixCastro] Peça encerrada naturalmente com ${wc} palavras.`);
           isFinished = true;
           break;
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached =
-          !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-        if (
-          maxTokensHit &&
-          (wordTarget === null || !targetReached) &&
-          attempt < MAX_ATTEMPTS
-        ) {
-          console.log(
-            `[Dr.FelixCastro] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || "∞"} palavras). Continuando...`,
-          );
+        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+          console.log(`[Dr.FelixCastro] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
-          currentContents.push({
-            role: "model",
-            parts: [{ text: attemptText }],
-          });
-          currentContents.push({
-            role: "user",
-            parts: [
-              {
-                text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`,
-              },
-            ],
-          });
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -5360,35 +4160,27 @@ REGRAS ABSOLUTAS:
       }
 
       const finalWordCount = countWords(fullResponseText);
-      console.log(
-        `[Dr.FelixCastro] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ""} em ${attempt} ciclo(s).`,
-      );
+      console.log(`[Dr.FelixCastro] ✓ Geração concluída: ${finalWordCount} palavras${wordTarget ? ` / alvo: ${wordTarget}` : ''} em ${attempt} ciclo(s).`);
 
       clearInterval(heartbeat);
       if (finalMaxTokensHit) {
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
-
+      
       // Salva draft
       if (sessionId && fullResponseText.length > 5000 && isGenerationRequest) {
         try {
-          await supabaseAdmin.from("ai_conversations").upsert({
+          await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_felix_castro_${sessionId}`,
-            lawyer_type: "petition_draft",
-            title: "DrFelixCastro",
+            lawyer_type: 'petition_draft',
+            title: 'DrFelixCastro',
             date: new Date().toISOString(),
-            messages: [{ role: "assistant", content: fullResponseText }],
+            messages: [{ role: 'assistant', content: fullResponseText }]
           });
         } catch (e) {
           console.error("Erro salvando petition_draft (DrFelixCastro):", e);
         }
       }
-
-      const inputTokens = totalInputTokens;
-      const outputTokens = estimateTokens(fullResponseText);
-      res.write(
-        `data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`,
-      );
 
       res.write(`data: [DONE]\n\n`);
       res.end();
@@ -5407,12 +4199,12 @@ REGRAS ABSOLUTAS:
 app.post("/api/dr-michel/generate-docx", async (req, res) => {
   try {
     const { content } = req.body;
-
-    const lines = content.split("\n");
+    
+    const lines = content.split('\n');
     const paragraphs = lines.map((line: string) => {
-      const isBold = line.startsWith("**") && line.endsWith("**");
-      const text = line.replace(/\*\*/g, "");
-
+      const isBold = line.startsWith('**') && line.endsWith('**');
+      const text = line.replace(/\*\*/g, '');
+      
       return new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
         spacing: { line: 360 },
@@ -5421,36 +4213,31 @@ app.post("/api/dr-michel/generate-docx", async (req, res) => {
             text: text,
             size: 24,
             font: "Times New Roman",
-            bold: isBold,
+            bold: isBold
           }),
         ],
       });
     });
 
     const doc = new Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              margin: {
-                top: 1701,
-                left: 1701,
-                bottom: 1134,
-                right: 1134,
-              },
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1701,
+              left: 1701,
+              bottom: 1134,
+              right: 1134,
             },
           },
-          children: paragraphs,
         },
-      ],
+        children: paragraphs,
+      }],
     });
 
     const buffer = await Packer.toBuffer(doc);
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    );
-    res.setHeader("Content-Disposition", "attachment; filename=peticao.docx");
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename=peticao.docx');
     res.send(buffer);
   } catch (error: any) {
     console.error("Error generating DOCX:", error);
@@ -5468,24 +4255,22 @@ app.get("/api/config", (req, res) => {
   const configToken = process.env.CONFIG_TOKEN;
 
   if (configToken) {
-    const sentToken = req.headers["x-config-token"] || req.query.token;
+    const sentToken = req.headers['x-config-token'] || req.query.token;
     if (!sentToken || sentToken !== configToken) {
       return res.status(403).json({ error: "Acesso não autorizado." });
     }
   }
 
-  const url =
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    process.env.URL_SUPABASE ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.ANON_KEY_SUPABASE ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
+  const url = process.env.SUPABASE_URL || 
+              process.env.VITE_SUPABASE_URL || 
+              process.env.URL_SUPABASE ||
+              process.env.NEXT_PUBLIC_SUPABASE_URL;
+              
+  const key = process.env.SUPABASE_ANON_KEY || 
+              process.env.VITE_SUPABASE_ANON_KEY || 
+              process.env.ANON_KEY_SUPABASE ||
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
   res.json({ url, key });
 });
 
@@ -5494,72 +4279,38 @@ app.use((err: any, req: any, res: any, next: any) => {
   console.error("Global error handler:", err);
   res.status(err.status || 500).json({
     error: err.message || "Erro interno do servidor",
-    stack: process.env.NODE_ENV === "production" ? undefined : err.stack,
+    stack: process.env.NODE_ENV === "production" ? undefined : err.stack
   });
 });
 
 app.post("/api/sec-fabricia/chat", async (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`);
-  }, 5000);
-
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
+  
   try {
-    let {
-      message,
-      history,
-      images,
-      files,
-      ragContext,
-      documentContext,
-      modelProvider,
-      model,
-      keyIndex,
-      customLaws,
-      sessionId,
-      petitionLength,
-      clientId,
-    } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
     message = message || "";
-
-    if (clientId) {
-      const clientRagContext = await retrieveClientRagContext(
-        clientId,
-        message,
-      );
-      if (clientRagContext) {
-        if (!documentContext) {
-          documentContext = clientRagContext;
-        } else {
-          documentContext += "\n\n" + clientRagContext;
-        }
-      }
-    }
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V3.2 via OpenRouter
     if (petitionLength && /premium|7000/i.test(petitionLength)) {
-      modelProvider = "openrouter";
-      model = "deepseek/deepseek-v3.2";
-      console.log(
-        "[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter",
-      );
+modelProvider = 'openrouter';
+model = 'deepseek/deepseek-v3.2';
+console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V3.2 via OpenRouter');
     }
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent =
-      intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
-    const isStorageRequest =
-      isStorageIntent || message.includes("Apenas armazene");
+    const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     const isGenerationRequest = isGenerationIntent || message.includes("GERAR");
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
-    let maxOutputTokens = 600;
-    let thinkingConfig: any = { thinkingBudget: 512 };
+    let maxOutputTokens = 600; 
+    let thinkingConfig: any = { thinkingBudget: 512 }; 
 
     if (isGenerationRequest) {
       maxOutputTokens = 4096;
@@ -5576,20 +4327,16 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const inputBudget = getInputBudget(modelProvider, model);
     const reservedTokens = 15_000;
     const availableForContext = inputBudget - reservedTokens;
-    const maxDocCtxChars = Math.floor(availableForContext * 0.8 * 3.5);
+    const maxDocCtxChars = Math.floor(availableForContext * 0.80 * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO/DOCUMENTOS ANEXADOS]\n${compressed}
-
-ATENÇÃO — REGRAS DE ROL DE DOCUMENTOS E VALORES:
-1. ROL DE DOCUMENTOS: O tópico "Rol de Documentos" ao final da peça deve listar EXATAMENTE e APENAS os documentos presentes e nomeados no contexto acima (Use o campo "DOCUMENTO:" ou "NOME DO ARQUIVO" exatamente como listado aqui, se for útil para a peça). É TERMINANTEMENTE PROIBIDO inventar ou presumir documentos se eles não estiverem explicitamente listados neste contexto de OCR.
-2. VALORES E CÁLCULOS: NUNCA altere, recalcule ou invente valores se o advogado já tiver estipulado valores específicos no histórico.`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO/DOCUMENTOS ANEXADOS]\n${compressed}`;
     }
 
     // Janela de histórico
-    // Frontend controls history length
+    if (history.length > 8) history = history.slice(-8);
 
     const REINFORCEMENT_PROMPT = `
     [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
@@ -5600,22 +4347,17 @@ ATENÇÃO — REGRAS DE ROL DE DOCUMENTOS E VALORES:
     PROIBIDO: Nunca adicione seções direcionadas a advogados, meta-comentários ou feedbacks internos (ex: "Doutores...", "Como posso ajudar a equipe?") na sua resposta.`;
 
     const historyParts = history.map((h: any) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
+      role: h.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: h.content }]
     }));
 
     let isCorrectionRequest = false;
     let correctionInstruction = "";
     let lengthConstraint = "";
 
-    let finalMessage =
-      message +
-      "\n\n" +
-      REINFORCEMENT_PROMPT +
-      correctionInstruction +
-      lengthConstraint;
+    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + correctionInstruction + lengthConstraint;
     if (ragContext) {
-      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
+finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
 NUNCA afirme algo que contradiga o texto abaixo.
@@ -5625,54 +4367,52 @@ ${ragContext}`;
     }
 
     if (sessionId && (isGenerationRequest || isCorrectionRequest)) {
-      let draftContent = "";
-      try {
-        const { data: draftData } = await supabaseAdmin
-          .from("ai_conversations")
-          .select("messages")
-          .eq("lawyer_type", "petition_draft")
-          .eq("id", `draft_sec_fabricia_${sessionId}`)
-          .maybeSingle();
+let draftContent = "";
+try {
+  const { data: draftData } = await supabaseAdmin
+    .from('ai_conversations')
+    .select('messages')
+    .eq('lawyer_type', 'petition_draft')
+    .eq('id', `draft_sec_fabricia_${sessionId}`)
+    .maybeSingle();
 
-        if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content || "";
-        }
-      } catch (e) {
-        console.error("Supabase petition_draft fetch error:", e);
-      }
+  if (draftData && draftData.messages && draftData.messages.length > 0) {
+    draftContent = draftData.messages[0].content || "";
+  }
+} catch (e) {
+  console.error("Supabase petition_draft fetch error:", e);
+}
 
-      const revisionIntent = detectRevisionIntent(message, !!draftContent);
-      console.log(
-        `[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`,
-      );
+const revisionIntent = detectRevisionIntent(message, !!draftContent);
+console.log(`[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (draftContent) {
-        if (revisionIntent === "POINT_CORRECTION" || isCorrectionRequest) {
-          // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-          const draftEnxuto = draftContent.substring(0, 15000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
+if (draftContent) {
+  if (revisionIntent === 'POINT_CORRECTION' || isCorrectionRequest) {
+    // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
+    const draftEnxuto = draftContent.substring(0, 15000);
+    finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
 A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
 Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
 Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua — peça completa disponível no Editor de Petições ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua — peça completa disponível no Editor de Petições ...]' : ''}
 [FIM DA REFERÊNCIA]`;
-        } else if (revisionIntent === "ADDITION") {
-          // Adição — devolve só o trecho novo.
-          const draftEnxuto = draftContent.substring(0, 15000);
-          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
+  } else if (revisionIntent === 'ADDITION') {
+    // Adição — devolve só o trecho novo.
+    const draftEnxuto = draftContent.substring(0, 15000);
+    finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
 A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
 Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
 Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
 
 [PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 15000 ? "\n[... continua ...]" : ""}
+${draftEnxuto}${draftContent.length > 15000 ? '\n[... continua ...]' : ''}
 [FIM DA REFERÊNCIA]`;
-        } else {
-          // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          const sumarioEstrutural = extractStructuralSummary(draftContent);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
+  } else {
+    // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
+    const sumarioEstrutural = extractStructuralSummary(draftContent);
+    finalMessage += `\n\n[MODO NOVA VERSÃO — GERAR PEÇA DO ZERO COM DIRETRIZES]
 O usuário pediu uma NOVA versão da peça. NÃO copie a peça anterior — gere do zero com a estrutura abaixo + as mudanças solicitadas.
 Mantenha a mesma estrutura de tópicos, mas redija parágrafos novos, com densidade IGUAL OU SUPERIOR à anterior.
 
@@ -5682,37 +4422,24 @@ ${sumarioEstrutural}
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        }
-      }
+  }
+}
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
     if (images && Array.isArray(images)) {
-      images.forEach((img: string) =>
-        currentMessageParts.push({
-          inlineData: { mimeType: "image/jpeg", data: img },
-        }),
-      );
+images.forEach((img: string) => currentMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: img } }));
     }
     if (files && Array.isArray(files)) {
-      files.forEach((file: any) =>
-        currentMessageParts.push({
-          fileData: { mimeType: file.mimeType, fileUri: file.fileUri },
-        }),
-      );
+files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: file.mimeType, fileUri: file.fileUri } }));
     }
 
-    const contents = [
-      ...historyParts,
-      { role: "user", parts: currentMessageParts },
-    ];
+    const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
     const tools = isStorageRequest ? undefined : [{ googleSearch: {} }];
 
-    if (modelProvider === "openrouter") {
-      clearInterval(heartbeat);
-      const orSystemPrompt =
-        selectedSystemPrompt +
-        `
+    if (modelProvider === 'openrouter') {
+clearInterval(heartbeat);
+const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
@@ -5725,203 +4452,135 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-      const orMessages: any[] = [{ role: "system", content: orSystemPrompt }];
-      for (const h of history) {
-        const role = h.role === "model" ? "assistant" : h.role;
-        orMessages.push({ role, content: h.content });
-      }
-      orMessages.push({ role: "user", content: finalMessage });
-      await callOpenRouterStream(
-        {
-          model: model || "deepseek/deepseek-v3.2",
-          messages: orMessages,
-          temperature: isGenerationRequest ? 0.15 : temperature,
-          max_tokens: 16383,
-        },
-        res,
-      );
-      return;
+const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+for (const h of history) {
+  const role = h.role === 'model' ? 'assistant' : h.role;
+  orMessages.push({ role, content: h.content });
+}
+orMessages.push({ role: "user", content: finalMessage });
+await callOpenRouterStream({ model: model || "deepseek/deepseek-v3.2", messages: orMessages, temperature: isGenerationRequest ? 0.15 : temperature, max_tokens: 16383 }, res);
+return;
     }
 
-    const isReportRequest =
-      (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
+    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
     // - Dúvida: 0.1 (máxima precisão, resposta determinística)
     // - Peça/outros: temperature já definida (0.2)
-    const finalTemperature = isReportRequest
-      ? 0.25
-      : intent === "[DÚVIDA]"
-        ? 0.1
-        : temperature;
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
-      let isFinished = false;
-      let attempt = 0;
-      let fullResponseText = "";
-      let currentContents = [...contents];
-      let finalMaxTokensHit = false;
-      const wordTarget = isGenerationRequest
-        ? parsePetitionTarget(petitionLength)
-        : null;
-      const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
+let isFinished = false;
+let attempt = 0;
+let fullResponseText = "";
+let currentContents = [...contents];
+let finalMaxTokensHit = false;
+const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
+const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input
-      const totalInputTokens =
-        estimateTokens(selectedSystemPrompt) +
-        estimateTokens(JSON.stringify(contents));
-      console.log(
-        `[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens / 1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || "livre"} palavras | Modelo: ${model || "gemini-3.5-flash"}`,
-      );
+      const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       if (totalInputTokens > 90_000) {
-        console.warn(
-          `[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`,
-        );
+        console.warn(`[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`);
       }
 
-      while (!isFinished && attempt < MAX_ATTEMPTS) {
-        attempt++;
-        const responseStream = await callGeminiStream(
-          {
-            model: model || "gemini-3.5-flash",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools,
-            } as any,
-          },
-          30,
-          0,
-          0,
-          keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-        );
+while (!isFinished && attempt < MAX_ATTEMPTS) {
+  attempt++;
+  const responseStream = await callGeminiStream({
+    model: model || "gemini-3.5-flash",
+    contents: currentContents,
+    config: {
+      systemInstruction: selectedSystemPrompt,
+      temperature: finalTemperature,
+      maxOutputTokens,
+      ...(thinkingConfig && { thinkingConfig }),
+      tools
+    } as any
+  }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
-        let maxTokensHit = false;
-        let attemptText = "";
-        for await (const chunk of responseStream) {
-          let text = "";
-          try {
-            text = chunk.text || "";
-          } catch (e) {}
+  let maxTokensHit = false;
+  let attemptText = "";
+  for await (const chunk of responseStream) {
+    let text = "";
+    try { text = chunk.text || ""; } catch(e) {}
 
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            if (candidate.finishReason === "MAX_TOKENS") {
-              maxTokensHit = true;
-            }
-          }
-
-          if (text) {
-            attemptText += text;
-            fullResponseText += text;
-            res.write(`data: ${JSON.stringify({ text })}\n\n`);
-          }
-        }
-
-        // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
-        if (
-          attempt > 1 &&
-          hasEchoRepetition(
-            attemptText,
-            fullResponseText.substring(
-              0,
-              fullResponseText.length - attemptText.length,
-            ),
-          )
-        ) {
-          console.log(
-            `[Sec.Fabricia] ECO detectado no ciclo ${attempt} — interrompendo continuação.`,
-          );
-          isFinished = true;
-          break;
-        }
-
-        // DETECTOR DE FIM DE PEÇA
-        if (isPetitionComplete(fullResponseText)) {
-          const wc = countWords(fullResponseText);
-          console.log(
-            `[Sec.Fabricia] Resposta encerrada naturalmente com ${wc} palavras.`,
-          );
-          isFinished = true;
-          break;
-        }
-
-        const currentWordCount = countWords(fullResponseText);
-        const targetReached =
-          !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
-
-        // CONTINUAÇÃO APENAS em MAX_TOKENS
-        if (
-          maxTokensHit &&
-          (wordTarget === null || !targetReached) &&
-          attempt < MAX_ATTEMPTS
-        ) {
-          console.log(
-            `[Sec.Fabricia] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || "∞"} palavras). Continuando...`,
-          );
-          const anchor = fullResponseText.slice(-600);
-          currentContents.push({
-            role: "model",
-            parts: [{ text: attemptText }],
-          });
-          currentContents.push({
-            role: "user",
-            parts: [
-              {
-                text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`,
-              },
-            ],
-          });
-        } else {
-          if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
-            finalMaxTokensHit = true;
-          }
-          isFinished = true;
-        }
+    if (chunk.candidates && chunk.candidates.length > 0) {
+      const candidate = chunk.candidates[0];
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        maxTokensHit = true;
       }
+    }
 
-      const finalWordCount = countWords(fullResponseText);
-      console.log(
-        `[Sec.Fabricia] ✓ Interação concluída: ${finalWordCount} palavras em ${attempt} ciclo(s).`,
-      );
+    if (text) {
+      attemptText += text;
+      fullResponseText += text;
+      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
+  }
 
-      clearInterval(heartbeat);
-      if (finalMaxTokensHit) {
-        res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
-      }
+  // ANTI-ECO: se a continuação repetiu mais de 200 chars do texto antigo, aborta
+  if (attempt > 1 && hasEchoRepetition(attemptText, fullResponseText.substring(0, fullResponseText.length - attemptText.length))) {
+    console.log(`[Sec.Fabricia] ECO detectado no ciclo ${attempt} — interrompendo continuação.`);
+    isFinished = true;
+    break;
+  }
 
-      // Salva a resposta gerada como draft se for longa o suficiente
-      if (sessionId && fullResponseText.length > 500 && isGenerationRequest) {
-        try {
-          await supabaseAdmin.from("ai_conversations").upsert({
-            id: `draft_sec_fabricia_${sessionId}`,
-            lawyer_type: "petition_draft",
-            title: "Fabricia",
-            date: new Date().toISOString(),
-            messages: [{ role: "assistant", content: fullResponseText }],
-          });
-        } catch (e) {
-          console.error("Erro salvando rascunho de Fabrícia:", e);
-        }
-      }
+  // DETECTOR DE FIM DE PEÇA
+  if (isPetitionComplete(fullResponseText)) {
+    const wc = countWords(fullResponseText);
+    console.log(`[Sec.Fabricia] Resposta encerrada naturalmente com ${wc} palavras.`);
+    isFinished = true;
+    break;
+  }
 
-      const inputTokens = totalInputTokens;
-      const outputTokens = estimateTokens(fullResponseText);
-      res.write(
-        `data: ${JSON.stringify({ tokens: { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens } })}\n\n`,
-      );
+  const currentWordCount = countWords(fullResponseText);
+  const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-      res.write(`data: [DONE]\n\n`);
-      res.end();
+  // CONTINUAÇÃO APENAS em MAX_TOKENS
+  if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+    console.log(`[Sec.Fabricia] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
+    const anchor = fullResponseText.slice(-600);
+    currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+    currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
+  } else {
+    if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
+      finalMaxTokensHit = true;
+    }
+    isFinished = true;
+  }
+}
+
+const finalWordCount = countWords(fullResponseText);
+console.log(`[Sec.Fabricia] ✓ Interação concluída: ${finalWordCount} palavras em ${attempt} ciclo(s).`);
+
+clearInterval(heartbeat);
+if (finalMaxTokensHit) {
+  res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
+}
+
+// Salva a resposta gerada como draft se for longa o suficiente
+if (sessionId && fullResponseText.length > 500 && isGenerationRequest) {
+  try {
+    await supabaseAdmin.from('ai_conversations').upsert({
+      id: `draft_sec_fabricia_${sessionId}`,
+      lawyer_type: 'petition_draft',
+      title: 'Fabricia',
+      date: new Date().toISOString(),
+      messages: [{ role: 'assistant', content: fullResponseText }]
+    });
+  } catch (e) {
+    console.error("Erro salvando rascunho de Fabrícia:", e);
+  }
+}
+
+res.write(`data: [DONE]\n\n`);
+res.end();
     } catch (err: any) {
-      clearInterval(heartbeat);
-      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-      res.end();
+clearInterval(heartbeat);
+res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+res.end();
     }
   } catch (err: any) {
     clearInterval(heartbeat);
@@ -5930,53 +4589,49 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
   }
 });
 
+
 app.post("/api/sec-fabricia/generate-docx", async (req, res) => {
   try {
     const { content } = req.body;
-
-    const lines = content.split("\n");
+    
+    const lines = content.split('\n');
     const paragraphs = lines.map((line: string) => {
-      const isBold = line.startsWith("**") && line.endsWith("**");
-      const text = line.replace(/\*\*/g, "");
+const isBold = line.startsWith('**') && line.endsWith('**');
+const text = line.replace(/\*\*/g, '');
 
-      return new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { line: 360 },
-        children: [
-          new TextRun({
-            text: text,
-            size: 24,
-            font: "Times New Roman",
-            bold: isBold,
-          }),
-        ],
-      });
+return new Paragraph({
+  alignment: AlignmentType.JUSTIFIED,
+  spacing: { line: 360 },
+  children: [
+    new TextRun({
+      text: text,
+      size: 24,
+      font: "Times New Roman",
+      bold: isBold
+    }),
+  ],
+});
     });
 
     const doc = new Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              margin: {
-                top: 1701,
-                left: 1701,
-                bottom: 1134,
-                right: 1134,
-              },
-            },
-          },
-          children: paragraphs,
-        },
-      ],
+sections: [{
+  properties: {
+    page: {
+      margin: {
+        top: 1701,
+        left: 1701,
+        bottom: 1134,
+        right: 1134,
+      },
+    },
+  },
+  children: paragraphs,
+}],
     });
 
     const buffer = await Packer.toBuffer(doc);
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    );
-    res.setHeader("Content-Disposition", "attachment; filename=peticao.docx");
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename=peticao.docx');
     res.send(buffer);
   } catch (error: any) {
     console.error("Error generating DOCX:", error);
@@ -5986,11 +4641,7 @@ app.post("/api/sec-fabricia/generate-docx", async (req, res) => {
 
 // Manipulador 404 para rotas /api que não foram encontradas
 app.all("/api/*", (req, res) => {
-  res
-    .status(404)
-    .json({
-      error: `Rota API não encontrada: ${req.method} ${req.originalUrl}`,
-    });
+  res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
 });
 
 // Development server setup
@@ -5998,39 +4649,37 @@ const PORT = 3000;
 
 if (process.env.NODE_ENV !== "production") {
   // Use dynamic import to avoid loading Vite in production/Vercel
-  import("vite")
-    .then(({ createServer: createViteServer }) => {
-      createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      }).then((vite) => {
-        app.use(vite.middlewares);
+  import("vite").then(({ createServer: createViteServer }) => {
+    createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    }).then((vite) => {
+      app.use(vite.middlewares);
 
-        app.listen(PORT, "0.0.0.0", () => {
-          console.log(`Development server running on http://localhost:${PORT}`);
-        });
+app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Development server running on http://localhost:${PORT}`);
       });
-    })
-    .catch((err) => {
-      console.error("Failed to start development server:", err);
     });
+  }).catch(err => {
+    console.error("Failed to start development server:", err);
+  });
 } else {
   // Production setup
   const path = await import("path");
   const url = await import("url");
   const __filename = url.fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
-
+  
   const root = path.join(__dirname, "..");
-  const distPath = path.join(root, "dist");
-
+  const distPath = path.join(root, 'dist');
+  
   // Serve static files from the React app
   app.use(express.static(distPath));
-
+  
   // The "catchall" handler: for any request that doesn't
   // match one above, send back React's index.html file.
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 
   app.listen(PORT, "0.0.0.0", () => {

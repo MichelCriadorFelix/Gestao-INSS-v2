@@ -58,9 +58,6 @@ interface ChatSession {
   messages: Message[];
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
-  tokens?: { input: number; output: number; total: number };
-  clientId?: string;
-  clientName?: string;
 }
 
 interface SecFabriciaFelixProps {
@@ -572,7 +569,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             };
           }
           // Resposta de IA com peça/relatório longo
-          if (m.role === 'assistant' && m.content.length > 20000) {
+          if (m.role === 'assistant' && m.content.length > 3000) {
             return {
               ...m,
               content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
@@ -612,8 +609,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
               model: eliteModelOverride || selectedModel,
               petitionLength,
               keyIndex: session?.uploadKeyIndex,
-              sessionId: session?.id,
-              clientId: session?.clientId
+              sessionId: session?.id
             })
           });
 
@@ -680,12 +676,6 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
                   if (data.text) {
                     fullText += data.text;
                     setStreamingMessage(fullText);
-                  }
-
-                  if (data.tokens) {
-                    setSessions(prev => prev.map(s => 
-                      s.id === sessionId ? { ...s, tokens: data.tokens } : s
-                    ));
                   }
                 }
               }
@@ -1077,43 +1067,98 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
     setIsClientModalOpen(false);
     setIsUploading(true);
     setProgress(0);
-    setProgressText(`Conectando base de dados RAG de ${client.name}...`);
+    setProgressText(`Buscando detalhes de ${client.name}...`);
 
     try {
-      // Create a new session or update current session with client RAG details
-      const newSessionId = generateId();
-      const welcomeMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: `🧠 **Conexão Inteligente RAG Estabelecida com Sucesso!**\n\nConectei este chat de forma direta e exclusiva à base de dados semântica (RAG) do GED do(a) cliente **${client.name}**.\n\nA partir de agora, eu tenho acesso instantâneo a todos os documentos dele(a) indexados no Supabase (petições, sentenças, laudos, cálculos e prontuários).\n\n**Como sua Secretária (Fabrícia), eu posso ajudar você a:**\n- *Elaborar mensagens de acolhimento e atualizações para enviar pelo WhatsApp de ${client.name}.*\n- *Consultar do que se trata o processo e andamentos narrados nos documentos dele(a).*\n- *Estruturar lembretes ou resumos rápidos das demandas deste cliente.*\n\nNão é necessário fazer download ou upload de nenhum arquivo manualmente! Fique à vontade para me perguntar de forma natural.`,
-        timestamp: new Date().toISOString()
-      };
-
-      const updatedSession: ChatSession = {
-        id: newSessionId,
-        title: `RAG: ${client.name}`,
-        messages: [welcomeMsg],
-        date: new Date().toLocaleDateString('pt-BR'),
-        documents: [],
-        clientId: String(client.id),
-        clientName: client.name
-      };
-
-      const fullSessions = [updatedSession, ...sessions];
-      setSessions(fullSessions);
-      setCurrentSessionId(newSessionId);
-
-      // Save to Supabase immediately using service
-      try {
-        await supabaseService.saveAIConversation({
-          ...updatedSession,
-          ai_name: 'fabricia'
-        });
-      } catch (saveErr) {
-        console.warn("Could not save session to Supabase, stored locally:", saveErr);
+      // Fetch full details including documents
+      const fullClient = await supabaseService.getClientDetails(client.id);
+      
+      if (!fullClient) {
+          alert("Cliente não encontrado.");
+          setIsUploading(false);
+          return;
+      }
+      
+      setProgressText(`Preparando resumo de ${fullClient.name}...`);
+      
+      let activeSessionId = currentSessionId;
+      
+      if (!activeSessionId) {
+        const newSession: ChatSession = {
+          id: generateId(),
+          title: `Dossiê: ${fullClient.name}`,
+          messages: [],
+          date: new Date().toLocaleDateString('pt-BR'),
+          documents: []
+        };
+        setSessions([newSession, ...sessions]);
+        setCurrentSessionId(newSession.id);
+        activeSessionId = newSession.id;
       }
 
-      setIsUploading(false);
+      const hasCertidao = fullClient.narrativeCertificates && fullClient.narrativeCertificates.length > 0;
+      let informativeText = `[SISTEMA: FORMULÁRIO INFORMATIVO DO CLIENTE]
+Nome: ${fullClient.name}
+CPF: ${fullClient.cpf}
+Nacionalidade: ${fullClient.nationality || 'Não informada'}
+Estado Civil: ${fullClient.maritalStatus || 'Não informado'}
+Profissão: ${fullClient.profession || 'Não informada'}
+E-mail/Endereço: ${fullClient.address || 'Não informado'}
+Telefone/WhatsApp: ${fullClient.whatsapp || 'Não informado'}
+DER: ${fullClient.der || 'Não informada'}
+Data da Perícia: ${fullClient.medExpertiseDate || 'Não informada'}
+Certidões Narratórias Anexadas: ${hasCertidao ? 'SIM' : 'NÃO'}`;
+
+      if (fullClient.legalRepresentative) {
+        informativeText += `\n\n[SISTEMA: DADOS DO REPRESENTANTE LEGAL]
+Nome do Representante: ${fullClient.legalRepresentative}
+Gênero do Representante: ${fullClient.legalRepresentativeGender || 'Não informado'}
+Nacionalidade do Representante: ${fullClient.legalRepresentativeNationality || 'Não informada'}
+Estado Civil do Representante: ${fullClient.legalRepresentativeMaritalStatus || 'Não informado'}
+Profissão do Representante: ${fullClient.legalRepresentativeProfession || 'Não informada'}
+CPF do Representante: ${fullClient.legalRepresentativeCpf || 'Não informado'}
+Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não informado'}`;
+      }
+
+      informativeText += `\n\nPor favor, como você é a secretária, recepcione essas informações do novo cliente e faça um acolhimento inicial. Seu objetivo é estar pronta para gerar mensagens de atualização via WhatsApp para o cliente de forma clara e humana. ${!hasCertidao ? 'Caso a Certidão Narratória não esteja anexada, informe que isso será necessário para detalhar os andamentos futuramente.' : ''}`;
+
+      const readingMsg: Message = {
+        id: generateId(),
+        role: 'user', // We send the form as if it's user context to prompt an automated response
+        content: informativeText,
+        timestamp: new Date().toISOString()
+      };
+      
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
+      ));
+
+      const fileArray: File[] = [];
+      if (hasCertidao) {
+        for (let i = 0; i < fullClient.narrativeCertificates.length; i++) {
+          const doc = fullClient.narrativeCertificates[i];
+          try {
+            const res = await fetch(doc.url);
+            const blob = await res.blob();
+            const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
+            fileArray.push(file);
+          } catch (e) {
+            console.error(`Erro ao baixar certidão ${doc.name}:`, e);
+          }
+        }
+      }
+
+      if (fileArray.length > 0) {
+        await processFilesPhased(fileArray, activeSessionId);
+      } else {
+        // Trigger automated response directly if no files to process
+        setIsUploading(false);
+        // We need to trigger the hook or a fetch, so we just set the input, but we've already added a message...
+        // Let's just wait for the user to type something, but we sent a 'user' message, so we should trigger the AI response automatically.
+        // I will just let the user see the system prompt as a normal message, and they will reply? No, let's make it a system message!
+        // No, `readingMsg` is a system message?
+      }
+      setIsUploading(false); // Cleanup any leftover state
     } catch (error) {
       console.error("Error importing client:", error);
       alert("Erro ao importar cliente.");
@@ -1271,31 +1316,6 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
 
       {/* MAIN CHAT AREA */}
       <div className="flex-1 flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0">
-        {currentSession?.clientId && (
-          <div className="flex items-center justify-between px-6 py-2.5 bg-indigo-50/50 dark:bg-gold-500/5 border-b border-indigo-100/30 dark:border-gold-500/10 font-sans z-10 shrink-0">
-            <div className="flex items-center gap-2 text-xs flex-wrap">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-slate-600 dark:text-slate-300 font-medium">Buscador Semântico (RAG) ativo para o cliente:</span>
-              <span className="font-bold text-indigo-700 dark:text-gold-400 bg-indigo-100/40 dark:bg-gold-500/10 px-2 py-0.5 rounded-md">{currentSession.clientName}</span>
-            </div>
-            <button 
-              onClick={() => {
-                const confirmed = window.confirm(`Deseja desconectar a base de dados do cliente ${currentSession.clientName} deste chat?`);
-                if (confirmed) {
-                  setSessions(prev => prev.map(s => s.id === currentSession.id ? { ...s, clientId: undefined, clientName: undefined } : s));
-                }
-              }}
-              title="Desconectar RAG"
-              className="text-slate-400 hover:text-red-500 text-xs px-2 py-1 hover:bg-slate-100 dark:hover:bg-bordeaux-900/40 rounded transition font-medium shrink-0"
-            >
-              Desconectar
-            </button>
-          </div>
-        )}
-
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1624,19 +1644,6 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
                       <option value="qwen/qwen3.5-flash-02-23">Qwen 3.5 Flash</option>
                     </optgroup>
                   </select>
-                  {currentSession?.tokens && (
-                    <>
-                      <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
-                      <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50/50 dark:bg-emerald-950/25 border border-emerald-100/40 dark:border-emerald-900/45 rounded-md text-[9px] sm:text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-300" title="Consumo estimado de tokens neste chat">
-                        <Bot className="w-3 h-3 text-emerald-500 shrink-0" />
-                        <span className="hidden md:inline">In: {currentSession.tokens.input.toLocaleString()}</span>
-                        <span className="hidden md:inline opacity-40">|</span>
-                        <span className="hidden md:inline">Out: {currentSession.tokens.output.toLocaleString()}</span>
-                        <span className="hidden md:inline opacity-40">|</span>
-                        <span className="font-bold">T: {currentSession.tokens.total.toLocaleString()}</span>
-                      </div>
-                    </>
-                  )}
                 </div>
                 <button 
                   onClick={() => handleSendMessage()}
