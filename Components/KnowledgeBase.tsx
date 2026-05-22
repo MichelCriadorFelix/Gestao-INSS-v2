@@ -253,60 +253,117 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
-    const msg = rechunkResult && !rechunkResult.done && rechunkResult.remaining > 0
-      ? `Processar o próximo documento? (${rechunkResult.remaining} restantes)`
-      : 'Iniciar otimização da base? Processa 1 documento por vez com streaming em tempo real.';
+    const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
+    if (remaining === 0) {
+      alert('✅ Base já está otimizada! Nenhum documento grande encontrado.');
+      return;
+    }
+    const msg = `Processar o próximo documento grande? (${remaining} restantes)\n\nO processo roda no seu navegador e pode levar alguns minutos para documentos grandes.`;
     if (!confirm(msg)) return;
 
     setIsRechunking(true);
-    setRechunkLog(prev => [...prev, '⏳ Conectando...']);
+    setRechunkLog(prev => [...prev, `📊 ${remaining} documentos grandes encontrados. Processando o maior...`]);
 
     try {
-      const response = await apiFetch('/api/admin/rechunk-large-docs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
-      });
-
-      if (!response.ok || !response.body) {
-        const txt = await response.text().catch(() => `HTTP ${response.status}`);
-        throw new Error(txt.substring(0, 200));
+      // 1. Buscar 1 documento grande (o maior primeiro, via SQL function)
+      const docs = await supabaseService.getLargeDocuments(8000, 1);
+      if (!docs || docs.length === 0) {
+        setRechunkLog(prev => [...prev, '✅ Base já está otimizada!']);
+        setRechunkResult({ done: true, remaining: 0 });
+        return;
       }
 
-      // Ler SSE stream linha a linha
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      const doc = docs[0];
+      const titulo = String(doc.metadata?.title || '').substring(0, 60);
+      setRechunkLog(prev => [...prev, `🔄 "${titulo}" (${doc.content.length.toLocaleString()} chars)`]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() || '';
-        for (const part of parts) {
-          const line = part.replace(/^data: /, '').trim();
-          if (!line) continue;
-          try {
-            const evt = JSON.parse(line);
-            if (evt.error) {
-              setRechunkLog(prev => [...prev, `❌ ${evt.error}`]);
-            } else {
-              if (evt.log) setRechunkLog(prev => [...prev, evt.log]);
-              if (evt.done !== undefined || evt.remaining !== undefined) {
-                setRechunkResult(evt);
-                if (evt.done) fetchDocs();
-              }
-            }
-          } catch { /* linha incompleta */ }
+      // 2. Split semântico — mesma lógica do backend
+      const CHUNK_SIZE = 2500;
+      const OVERLAP = 200;
+      const subChunks: string[] = [];
+      const text = doc.content;
+      let pos = 0;
+
+      while (pos < text.length) {
+        let end = Math.min(pos + CHUNK_SIZE, text.length);
+        if (end < text.length) {
+          const artBreak = text.lastIndexOf('\nArt. ', end);
+          const parBreak  = text.lastIndexOf('\n\n', end);
+          const sentBreak = text.lastIndexOf('. ', end);
+          if (artBreak > pos + CHUNK_SIZE * 0.5)      end = artBreak;
+          else if (parBreak > pos + CHUNK_SIZE * 0.5)  end = parBreak + 2;
+          else if (sentBreak > pos + CHUNK_SIZE * 0.5) end = sentBreak + 2;
         }
+        const chunk = text.slice(pos, end).trim();
+        if (chunk.length > 80) subChunks.push(chunk);
+        pos = end - OVERLAP;
+        if (pos <= 0) break;
       }
+
+      setRechunkLog(prev => [...prev, `✂️  Dividido em ${subChunks.length} trechos`]);
+
+      // 3. Gerar embeddings via /api/rag/embed (mesmo endpoint do upload normal)
+      const inserted: any[] = [];
+      let errors = 0;
+
+      for (let i = 0; i < subChunks.length; i++) {
+        setRechunkLog(prev => {
+          const last = [...prev];
+          const progressLine = `  ⚙️  Embedding ${i + 1}/${subChunks.length}...`;
+          // Atualizar a última linha de progresso em vez de acumular
+          if (last[last.length - 1]?.startsWith('  ⚙️')) {
+            last[last.length - 1] = progressLine;
+          } else {
+            last.push(progressLine);
+          }
+          return last;
+        });
+
+        try {
+          const resp = await apiFetch('/api/rag/embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: subChunks[i] })
+          });
+          if (!resp.ok) { errors++; continue; }
+          const { embedding } = await resp.json();
+          if (!embedding?.length) { errors++; continue; }
+
+          inserted.push({
+            content: subChunks[i],
+            metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
+              chunk_index: i, total_chunks: subChunks.length },
+            embedding
+          });
+        } catch { errors++; }
+      }
+
+      setRechunkLog(prev => [...prev.filter(l => !l.startsWith('  ⚙️')),
+        `💾 Salvando ${inserted.length} trechos...`]);
+
+      // 4. Salvar novos chunks e deletar original
+      if (inserted.length > 0) {
+        await supabaseService.saveLegalDocuments(inserted);
+        await supabaseService.deleteLegalDocumentById(doc.id);
+      }
+
+      // 5. Contar restantes
+      const newRemaining = await supabaseService.countLargeDocuments(8000).catch(() => -1);
+      const done = newRemaining === 0;
+
+      setRechunkLog(prev => [...prev.filter(l => !l.startsWith('💾')),
+        `✅ "${titulo}" → ${inserted.length} trechos${errors > 0 ? ` (${errors} erros)` : ''}`,
+        done ? '🎉 Base totalmente otimizada!' : `⏩ Restam ${newRemaining} docs. Clique "Próximo" para continuar.`
+      ]);
+      setRechunkResult({ done, remaining: newRemaining });
+      if (done) fetchDocs();
+
     } catch (err: any) {
       setRechunkLog(prev => [...prev, `❌ Erro: ${err.message}`]);
     } finally {
       setIsRechunking(false);
     }
-  };
+  }
 
   // Validação em tempo real do título
   const titleWarnings = useMemo(() => validateTitle(title), [title]);

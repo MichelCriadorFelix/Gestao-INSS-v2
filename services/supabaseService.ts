@@ -841,6 +841,32 @@ export const supabaseService = {
     return data || [];
   },
 
+  // Busca documentos maiores que minChars — usado para rechunking no browser
+  async getLargeDocuments(minChars: number = 8000, batchLimit: number = 1): Promise<Array<{id: number, content: string, metadata: any}>> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .rpc('get_large_legal_documents', { min_chars: minChars, batch_limit: batchLimit, batch_offset: 0 });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async countLargeDocuments(minChars: number = 8000): Promise<number> {
+    const supabase = getSupabase();
+    if (!supabase) return 0;
+    const { data, error } = await supabase
+      .rpc('count_large_legal_documents', { min_chars: minChars });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
+  async deleteLegalDocumentById(id: number) {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const { error } = await supabase.from('legal_documents').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async deleteLegalDocumentByTitle(title: string) {
     const supabase = getSupabase();
     if (!supabase) return null;
