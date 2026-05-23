@@ -253,86 +253,43 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
-    // FASE 1 ou FASE 2 dependendo do estado atual
-    const pendingEmbeddings = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
-    const largeDocs = await supabaseService.countLargeDocuments(8000).catch(() => 0);
-
-    if (pendingEmbeddings === 0 && largeDocs === 0) {
+    const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
+    if (remaining === 0) {
       alert('Base ja esta otimizada!');
+      setRechunkResult({ done: true, remaining: 0 });
       return;
     }
+    if (!confirm(`Processar proximo documento? (${remaining} restantes)\n\nRoda no servidor — sem travar o navegador.`)) return;
 
     setIsRechunking(true);
+    setRechunkLog(prev => [...prev, `Iniciando... (${remaining} docs grandes)`]);
 
     try {
-      // FASE 2: há chunks sem embedding — gerar embeddings primeiro
-      if (pendingEmbeddings > 0) {
-        setRechunkLog(prev => [...prev, `Gerando embeddings: ${pendingEmbeddings} trechos pendentes...`]);
-        let remaining = pendingEmbeddings;
-        let done_count = 0;
+      // Chamar a Supabase Edge Function — roda no servidor, sem timeout de browser
+      const supabaseUrl = 'https://nnhatyvrtlbkyfadumqo.supabase.co';
+      const resp = await fetch(`${supabaseUrl}/functions/v1/rechunk-large-docs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
+      });
 
-        while (remaining > 0) {
-          const chunk = await supabaseService.getOneChunkNeedingEmbedding();
-          if (!chunk) break;
+      const data = await resp.json();
 
-          setRechunkLog(prev => {
-            const clean = prev.filter(l => !l.startsWith('  '));
-            return [...clean, `  Embedding ${done_count + 1}/${pendingEmbeddings}: ID ${chunk.id}`];
-          });
-
-          try {
-            const resp = await apiFetch('/api/rag/embed', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: chunk.content })
-            });
-            if (resp.ok) {
-              const { embedding } = await resp.json();
-              if (embedding?.length) {
-                await supabaseService.updateEmbedding(chunk.id, embedding);
-                done_count++;
-              }
-            }
-          } catch { /* continua no proximo */ }
-
-          remaining = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
-          await new Promise(r => setTimeout(r, 50));
-        }
-
-        setRechunkLog(prev => [
-          ...prev.filter(l => !l.startsWith('  ')),
-          `Embeddings gerados: ${done_count}`,
-          largeDocs > 0 ? `${largeDocs} documentos grandes ainda para dividir. Clique novamente.` : 'Base totalmente otimizada!'
-        ]);
-        setRechunkResult({ done: largeDocs === 0 && remaining === 0, remaining: largeDocs });
-        if (largeDocs === 0) fetchDocs();
-        return;
-      }
-
-      // FASE 1: dividir documento via SQL (sem embedding — rapido)
-      if (!confirm(`Dividir proximo documento grande? (${largeDocs} restantes)\nRapido: so divide o texto, sem gerar embeddings agora.`)) {
-        setIsRechunking(false);
-        return;
-      }
-
-      setRechunkLog(prev => [...prev, `Dividindo documento via SQL...`]);
-      const result = await supabaseService.splitOneLargeDocument();
-
-      if (result.done) {
-        setRechunkLog(prev => [...prev, 'Nenhum documento grande. Clique novamente para gerar embeddings pendentes.']);
+      if (data.error) {
+        setRechunkLog(prev => [...prev, `Erro: ${data.error}`]);
+      } else if (data.done) {
+        setRechunkLog(prev => [...prev, 'Base totalmente otimizada!']);
+        setRechunkResult({ done: true, remaining: 0 });
+        fetchDocs();
       } else {
         setRechunkLog(prev => [...prev,
-          `Dividido: "${result.titulo}" -> ${result.chunks_gerados} trechos (sem embedding ainda)`,
-          `Clique novamente para gerar os embeddings dos ${result.chunks_gerados} trechos.`
+          `OK: "${data.titulo}" -> ${data.new_chunks} trechos${data.errors > 0 ? ` (${data.errors} erros)` : ''}`,
+          `Restam ${data.remaining} documentos. Clique Proximo.`
         ]);
+        setRechunkResult({ done: false, remaining: data.remaining });
       }
-
-      const newLarge = await supabaseService.countLargeDocuments(8000).catch(() => largeDocs);
-      const newPending = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
-      setRechunkResult({ done: false, remaining: newLarge, pendingEmbeddings: newPending });
-
     } catch (err: any) {
-      setRechunkLog(prev => [...prev, `Erro: ${err.message}`]);
+      setRechunkLog(prev => [...prev, `Erro de conexao: ${err.message}`]);
     } finally {
       setIsRechunking(false);
     }
