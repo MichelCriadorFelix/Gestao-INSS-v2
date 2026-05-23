@@ -3039,17 +3039,10 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // Janela de histórico calibrada por intenção:
-    // - GERAÇÃO: até 6 turnos (já comprimidos pelo frontend) — contexto suficiente
-    // - DÚVIDA: até 10 turnos
-    // - CASUAL/outros: até 6 turnos
-    if (isGenerationRequest) {
-      if (history.length > 6) history = history.slice(-6);
-    } else if (intent === "[DÚVIDA]") {
-      if (history.length > 10) history = history.slice(-10);
-    } else {
-      if (history.length > 6) history = history.slice(-6);
-    }
+    // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
+    // Limite de segurança: 30 turnos (~60 mensagens) = ~500k chars típicos de um caso jurídico
+    // Previne edge cases extremos sem sacrificar contexto normal
+    if (history.length > 30) history = history.slice(-30);
 
     // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
@@ -3156,15 +3149,15 @@ ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]
 [FIM DA REFERÊNCIA]`;
         } else {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
-          const draftParaRegen = draftContent.substring(0, 20000);
+          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
+          const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
 [VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
-${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -3222,8 +3215,9 @@ ${message}`;
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-      if (totalInputTokens > 90_000) {
-        console.warn(`[Dr.Michel] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
+      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      if (totalInputTokens > 200_000) {
+        console.warn(`[Dr.Michel] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -3512,22 +3506,10 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // 3. GESTÃO DE JANELA DESLIZANTE CALIBRADA POR INTENÇÃO - Pilar 4
-    // GERAÇÃO: 6 turnos (já comprimidos pelo frontend) | DÚVIDA: 10 | CASUAL: 6
-    if (isGenerationRequest) {
-      if (history.length > 6) {
-        console.log(`Pilar 4: GERAÇÃO — limitando histórico de ${history.length} para 6 turnos.`);
-        history = history.slice(-6);
-      }
-    } else if (intent === "[DÚVIDA]") {
-      if (history.length > 10) history = history.slice(-10);
-      console.log(`Pilar 4: Modo DÚVIDA — limitando histórico a 10 turnos.`);
-    } else {
-      if (history.length > 6) {
-        console.log(`Pilar 4: Limitando histórico de ${history.length} para 6 turnos para redução de custos.`);
-        history = history.slice(-6);
-      }
-    }
+    // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
+    // Limite de segurança: 30 turnos (~60 mensagens) = ~500k chars típicos de um caso jurídico
+    // Previne edge cases extremos sem sacrificar contexto normal
+    if (history.length > 30) history = history.slice(-30);
 
     // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
@@ -3636,15 +3618,15 @@ Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS 
 ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
-          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
-          const draftParaRegen = draftContent.substring(0, 20000);
+          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
+          const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
 [VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
-${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -3725,8 +3707,9 @@ ${message}`;
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-      if (totalInputTokensLuana > 90_000) {
-        console.warn(`[Dra.Luana] ⚠️  Input acima de 90k tokens — output pode degradar. Considere reduzir documentos.`);
+      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      if (totalInputTokensLuana > 200_000) {
+        console.warn(`[Dra.Luana] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -3998,14 +3981,10 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
     }
 
-    // Janela de histórico calibrada por intenção
-    if (isGenerationRequest) {
-      if (history.length > 6) history = history.slice(-6);
-    } else if (intent === "[DÚVIDA]") {
-      if (history.length > 10) history = history.slice(-10);
-    } else {
-      if (history.length > 6) history = history.slice(-6);
-    }
+    // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
+    // Limite de segurança: 30 turnos (~60 mensagens) = ~500k chars típicos de um caso jurídico
+    // Previne edge cases extremos sem sacrificar contexto normal
+    if (history.length > 30) history = history.slice(-30);
 
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
@@ -4075,15 +4054,15 @@ Indique onde o trecho deve ser inserido.
 ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
 [FIM DA REFERÊNCIA]`;
         } else {
-          // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
-          const draftParaRegen = draftContent.substring(0, 20000);
+          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
+          const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
 [VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
-${draftParaRegen}${draftContent.length > 20000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -4153,8 +4132,9 @@ ${message}`;
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-      if (totalInputTokens > 90_000) {
-        console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 90k tokens — output pode degradar.`);
+      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      if (totalInputTokens > 200_000) {
+        console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -4449,8 +4429,8 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO/DOCUMENTOS ANEXADOS]\n${compressed}`;
     }
 
-    // Janela de histórico
-    if (history.length > 8) history = history.slice(-8);
+    // Janela de histórico ampliada para a secretária Fabrícia
+    if (history.length > 15) history = history.slice(-15);
 
     const REINFORCEMENT_PROMPT = `
     [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
@@ -4526,14 +4506,14 @@ ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]
 [FIM DA REFERÊNCIA]`;
   } else {
     // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-    // FIX#3: injeta corpo real (20k chars) em vez de sumário de 2k chars
-    const draftParaRegen = draftContent.substring(0, 20000);
+    // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
+    const draftParaRegen = draftContent.substring(0, 60000);
     finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
 [VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
-${draftParaRegen}${draftContent.length > 20000 ? '\n[... mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -4608,8 +4588,9 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
-      if (totalInputTokens > 90_000) {
-        console.warn(`[Sec.Fabricia] ⚠️  Input em 90k tokens — output pode degradar.`);
+      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      if (totalInputTokens > 200_000) {
+        console.warn(`[Sec.Fabricia] ⚠️  Input acima de 200k tokens — uso muito intenso.`);
       }
 
 while (!isFinished && attempt < MAX_ATTEMPTS) {
