@@ -301,6 +301,52 @@ export default function KnowledgeBase() {
   const [progress, setProgress] = useState({ done: 0, total: 0, titulo: '' });
   const [log, setLog] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [fixingEmbeddings, setFixingEmbeddings] = useState(false);
+  const [fixLog, setFixLog] = useState<string[]>([]);
+  const [fixProgress, setFixProgress] = useState({ done: 0, total: 0 });
+
+  const handleFixEmbeddings = async () => {
+    if (!confirm('Gerar embeddings para os 299 chunks sem vetor?\nProcessamento server-side — leva ~5 minutos.')) return;
+    setFixingEmbeddings(true);
+    setFixLog(['Iniciando geração de embeddings server-side...']);
+    setFixProgress({ done: 0, total: 299 });
+    try {
+      const response = await apiFetch('/api/admin/fix-embeddings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
+      });
+      if (!response.body) throw new Error('Sem resposta do servidor');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        for (const part of parts) {
+          const line = part.replace(/^data: /, '').trim();
+          if (!line) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.log) setFixLog(prev => [...prev.slice(-40), evt.log]);
+            if (evt.progress) setFixProgress({ done: evt.progress, total: evt.total || 299 });
+            if (evt.done) {
+              setFixLog(prev => [...prev, evt.log || '✅ Concluído!']);
+              setFixProgress(p => ({ ...p, done: evt.processed || p.done }));
+              fetchStatus();
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setFixLog(prev => [...prev, `❌ Erro: ${e.message}`]);
+    } finally {
+      setFixingEmbeddings(false);
+    }
+  };
 
   const edgeCall = async (body: any, timeoutMs = 20000): Promise<any> => {
     try {
@@ -844,6 +890,44 @@ export default function KnowledgeBase() {
           </div>
         </div>
       )}
+
+      {/* Painel Fix Embeddings — para chunks sem vetor */}
+      {(fixLog.length > 0 || fixingEmbeddings) && (
+        <div className="bg-slate-50 dark:bg-bordeaux-950/40 border border-amber-200 dark:border-amber-700/20 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">Gerando Embeddings</span>
+            {fixProgress.total > 0 && (
+              <span className="text-xs font-mono text-amber-700 dark:text-amber-400">
+                {fixProgress.done}/{fixProgress.total} ({Math.round(fixProgress.done/fixProgress.total*100)}%)
+              </span>
+            )}
+          </div>
+          {fixProgress.total > 0 && (
+            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full bg-amber-500 transition-all duration-300 rounded-full"
+                style={{ width: `${Math.round(fixProgress.done/fixProgress.total*100)}%` }} />
+            </div>
+          )}
+          <div className="bg-slate-900 rounded-lg p-3 max-h-36 overflow-y-auto">
+            {fixLog.map((l, i) => (
+              <p key={i} className={`text-xs font-mono leading-5 ${l.startsWith('❌') ? 'text-red-400' : l.startsWith('🎉') || l.startsWith('✅') ? 'text-emerald-400' : 'text-slate-300'}`}>{l}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Botão fix embeddings server-side */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleFixEmbeddings}
+          disabled={fixingEmbeddings}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            fixingEmbeddings ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'
+          }`}
+        >
+          {fixingEmbeddings ? <><Loader2 size={14} className="animate-spin" /> Gerando...</> : '⚡ Gerar 299 Embeddings Pendentes'}
+        </button>
+      </div>
 
       {/* Guia de Nomenclatura */}
       <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4">

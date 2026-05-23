@@ -4919,6 +4919,113 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
 
 
 
+// ============================================================
+// ENDPOINT: GERAR EMBEDDINGS PARA CHUNKS PENDENTES
+// Processa chunks com embedding IS NULL em lotes de 15
+// Usa callGeminiEmbed + supabaseAdmin — 100% server-side
+// ============================================================
+app.post("/api/admin/fix-embeddings", async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const send = (obj: object) => {
+    try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {}
+  };
+
+  try {
+    const { adminKey } = req.body || {};
+    if (adminKey !== (process.env.ADMIN_KEY || "felix-castro-rechunk-2026")) {
+      send({ error: "Não autorizado" });
+      return res.end();
+    }
+
+    const BATCH = 15;
+
+    // Contar pendentes
+    const { count: totalPendentes } = await supabaseAdmin
+      .from('legal_documents')
+      .select('id', { count: 'exact', head: true })
+      .is('embedding', null);
+
+    send({ log: `📋 ${totalPendentes || 0} chunks sem embedding encontrados` });
+
+    if (!totalPendentes || totalPendentes === 0) {
+      send({ log: '✅ Nenhum chunk pendente — base já está completa!', done: true });
+      return res.end();
+    }
+
+    // Buscar em lotes de 15
+    let processed = 0;
+    let errors = 0;
+    let offset = 0;
+
+    while (true) {
+      const { data: chunks, error: fetchErr } = await supabaseAdmin
+        .from('legal_documents')
+        .select('id, content, metadata')
+        .is('embedding', null)
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH - 1);
+
+      if (fetchErr) { send({ log: `❌ Erro ao buscar: ${fetchErr.message}` }); break; }
+      if (!chunks || chunks.length === 0) break;
+
+      send({ log: `⚙️  Lote ${Math.floor(offset/BATCH)+1}: ${chunks.length} chunks (${processed}/${totalPendentes} feitos)` });
+
+      for (const chunk of chunks) {
+        try {
+          const embedding = await callGeminiEmbed(chunk.content);
+          if (!embedding || embedding.length === 0) {
+            errors++;
+            continue;
+          }
+          const { error: updateErr } = await supabaseAdmin
+            .from('legal_documents')
+            .update({ embedding })
+            .eq('id', chunk.id);
+
+          if (updateErr) { errors++; continue; }
+          processed++;
+
+          // Atualizar progresso a cada 5
+          if (processed % 5 === 0) {
+            send({ progress: processed, total: totalPendentes, log: `  ✓ ${processed}/${totalPendentes} embeddings gerados...` });
+          }
+        } catch (e: any) {
+          errors++;
+          send({ log: `  ⚠️  Chunk ${chunk.id} falhou: ${String(e.message).substring(0, 60)}` });
+        }
+        // Pausa de 300ms entre embeddings para não sobrecarregar
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      offset += chunks.length;
+      if (chunks.length < BATCH) break; // último lote
+    }
+
+    // Contar restantes reais
+    const { count: restantes } = await supabaseAdmin
+      .from('legal_documents')
+      .select('id', { count: 'exact', head: true })
+      .is('embedding', null);
+
+    send({
+      done: true,
+      processed,
+      errors,
+      remaining: restantes || 0,
+      log: `🎉 Concluído! ${processed} embeddings gerados. ${errors} erros. ${restantes || 0} pendentes.`
+    });
+
+  } catch (err: any) {
+    send({ error: String(err?.message || 'Erro interno') });
+  }
+  res.end();
+});
+
+
 // Development server setup
 const PORT = 3000;
 
