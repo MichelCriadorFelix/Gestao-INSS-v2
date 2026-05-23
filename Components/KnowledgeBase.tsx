@@ -350,6 +350,8 @@ export default function KnowledgeBase() {
         // Salvar via Edge Function (usa service role key)
         await edgeCall({ action: 'save_embedding', chunkId: chunk.id, embedding });
         done++;
+        // Delay para não sobrecarregar o WAL do Supabase com inserts muito rápidos
+        await new Promise(r => setTimeout(r, 1500));
         setProgress(p => ({ ...p, done, total: total }));
         // Atualizar a última linha de progresso
         setLog(prev => {
