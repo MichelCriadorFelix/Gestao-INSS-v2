@@ -246,53 +246,135 @@ export default function KnowledgeBase() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showGuide, setShowGuide] = useState(false);
 
-  // Rechunking admin
+  // Manutenção — rechunking
   const [showAdmin, setShowAdmin] = useState(false);
-  const [isRechunking, setIsRechunking] = useState(false);
-  const [rechunkResult, setRechunkResult] = useState<any>(null);
-  const [rechunkLog, setRechunkLog] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'idle'|'splitting'|'embedding'|'done'>('idle');
+  const [status, setStatus] = useState<any>(null); // { large_docs, pending_embeddings, next_doc }
+  const [progress, setProgress] = useState({ done: 0, total: 0, titulo: '' });
+  const [log, setLog] = useState<string[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const EDGE_URL = 'https://nnhatyvrtlbkyfadumqo.supabase.co/functions/v1/rechunk-large-docs';
+  const ADMIN_KEY = 'felix-castro-rechunk-2026';
+
+  const edgeCall = async (body: object) => {
+    const r = await fetch(EDGE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminKey: ADMIN_KEY, ...body })
+    });
+    return r.json();
+  };
+
+  const addLog = (msg: string) => setLog(prev => [...prev.slice(-30), msg]);
+
+  const fetchStatus = async () => {
+    const data = await edgeCall({ action: 'status' }).catch(() => null);
+    if (data && !data.error) setStatus(data);
+    return data;
+  };
+
+  // FASE 1: Split do próximo documento grande no banco (sem Gemini, leve)
+  const handleSplit = async () => {
+    setIsRunning(true);
+    setPhase('splitting');
+    addLog('Dividindo documento no banco de dados...');
+    try {
+      const data = await edgeCall({ action: 'split' });
+      if (data.error) { addLog('Erro: ' + data.error); setPhase('idle'); return; }
+      if (data.done) { addLog('Nenhum documento grande encontrado.'); setPhase('done'); return; }
+      addLog(`Dividido: "${String(data.titulo || '').substring(0,45)}" (${(data.original_chars||0).toLocaleString()} chars) -> ${data.chunks_created} trechos`);
+      addLog(`Docs grandes restantes: ${data.large_docs_remaining} | Embeddings pendentes: ${data.pending_embeddings}`);
+      setProgress({ done: 0, total: data.pending_embeddings || 0, titulo: data.titulo || '' });
+      await fetchStatus();
+      // Iniciar fase de embeddings automaticamente
+      handleEmbedLoop(data.pending_embeddings || 0);
+    } catch (e: any) { addLog('Erro: ' + e.message); setPhase('idle'); setIsRunning(false); }
+  };
+
+  // FASE 2: Gerar embeddings para os chunks pendentes (1 por vez via /api/rag/embed)
+  const handleEmbedLoop = async (total: number) => {
+    setPhase('embedding');
+    let done = 0;
+    let consecutiveErrors = 0;
+
+    while (true) {
+      // Buscar 1 chunk sem embedding
+      const chunks = await edgeCall({ action: 'status' })
+        .then(s => s.pending_embeddings)
+        .catch(() => 0);
+
+      if (chunks === 0) {
+        addLog('Todos os embeddings gerados!');
+        break;
+      }
+
+      // Buscar o chunk pelo supabase direto (lightweight — content é 2500 chars max)
+      const { data: rows, error } = await (await import('../supabaseClient')).default
+        ?.from('legal_documents')
+        .select('id, content, metadata')
+        .eq('metadata->>needs_embedding', 'true')
+        .is('embedding', null)
+        .order('id', { ascending: true })
+        .limit(1) || { data: null, error: 'no client' };
+
+      if (error || !rows?.length) { consecutiveErrors++; if (consecutiveErrors > 3) break; continue; }
+      consecutiveErrors = 0;
+
+      const chunk = rows[0];
+      // Gerar embedding via API existente
+      try {
+        const resp = await apiFetch('/api/rag/embed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: chunk.content })
+        });
+        if (!resp.ok) { consecutiveErrors++; await new Promise(r => setTimeout(r, 1000)); continue; }
+        const { embedding } = await resp.json();
+        if (!embedding?.length) { consecutiveErrors++; continue; }
+
+        // Salvar via Edge Function (usa service role key)
+        await edgeCall({ action: 'save_embedding', chunkId: chunk.id, embedding });
+        done++;
+        setProgress(p => ({ ...p, done, total: total }));
+        // Atualizar a última linha de progresso
+        setLog(prev => {
+          const clean = prev.filter(l => !l.startsWith('  Embedding'));
+          return [...clean, `  Embedding ${done}/${total}...`];
+        });
+      } catch { consecutiveErrors++; await new Promise(r => setTimeout(r, 500)); }
+    }
+
+    await fetchStatus();
+    setPhase('idle');
+    setIsRunning(false);
+    addLog(`Concluido! ${done} embeddings gerados.`);
+  };
 
   const handleRechunk = async () => {
-    const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
-    if (remaining === 0) {
-      alert('Base ja esta otimizada!');
-      setRechunkResult({ done: true, remaining: 0 });
+    if (isRunning) return;
+    const s = await fetchStatus();
+    if (!s) { addLog('Erro ao verificar status.'); return; }
+
+    // Se há chunks pendentes de embedding, continuar de onde parou
+    if (s.pending_embeddings > 0) {
+      if (!confirm(`Continuar gerando embeddings? (${s.pending_embeddings} pendentes)`)) return;
+      setIsRunning(true);
+      handleEmbedLoop(s.pending_embeddings);
       return;
     }
-    if (!confirm(`Processar proximo documento? (${remaining} restantes)\n\nRoda no servidor — sem travar o navegador.`)) return;
 
-    setIsRechunking(true);
-    setRechunkLog(prev => [...prev, `Iniciando... (${remaining} docs grandes)`]);
-
-    try {
-      // Chamar a Supabase Edge Function — roda no servidor, sem timeout de browser
-      const supabaseUrl = 'https://nnhatyvrtlbkyfadumqo.supabase.co';
-      const resp = await fetch(`${supabaseUrl}/functions/v1/rechunk-large-docs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
-      });
-
-      const data = await resp.json();
-
-      if (data.error) {
-        setRechunkLog(prev => [...prev, `Erro: ${data.error}`]);
-      } else if (data.done) {
-        setRechunkLog(prev => [...prev, 'Base totalmente otimizada!']);
-        setRechunkResult({ done: true, remaining: 0 });
-        fetchDocs();
-      } else {
-        setRechunkLog(prev => [...prev,
-          `OK: "${data.titulo}" -> ${data.new_chunks} trechos${data.errors > 0 ? ` (${data.errors} erros)` : ''}`,
-          `Restam ${data.remaining} documentos. Clique Proximo.`
-        ]);
-        setRechunkResult({ done: false, remaining: data.remaining });
-      }
-    } catch (err: any) {
-      setRechunkLog(prev => [...prev, `Erro de conexao: ${err.message}`]);
-    } finally {
-      setIsRechunking(false);
+    // Se há docs grandes, iniciar split do próximo
+    if (s.large_docs > 0) {
+      const titulo = s.next_doc?.titulo || '';
+      const chars = (s.next_doc?.chars || 0).toLocaleString();
+      if (!confirm(`Processar proximo documento?\n"${titulo}"\n${chars} chars`)) return;
+      handleSplit();
+      return;
     }
+
+    alert('Base ja esta totalmente otimizada!');
+    setPhase('done');
   }
 
   // Validação em tempo real do título
@@ -670,63 +752,138 @@ export default function KnowledgeBase() {
         </div>
       </div>
 
-      {/* ── Painel Admin — Rechunking ─────────────────────────── */}
+      {/* ── Painel Manutenção ─────────────────────────────────── */}
       <div className="bg-slate-50 dark:bg-bordeaux-950/40 border border-slate-200 dark:border-gold-500/10 rounded-xl overflow-hidden">
         <button
-          onClick={() => setShowAdmin(!showAdmin)}
+          onClick={async () => { setShowAdmin(!showAdmin); if (!showAdmin) await fetchStatus(); }}
           className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 transition-colors"
         >
           <div className="flex items-center gap-2">
             <Wrench size={15} className="text-slate-400" />
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Manutenção da Base — Otimizar Chunks</span>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              Manutenção da Base — Otimizar Chunks
+            </span>
+            {status && (status.large_docs > 0 || status.pending_embeddings > 0) && (
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                {status.pending_embeddings > 0 ? `${status.pending_embeddings} embeddings pendentes` : `${status.large_docs} docs grandes`}
+              </span>
+            )}
+            {status && status.large_docs === 0 && status.pending_embeddings === 0 && (
+              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                Otimizada
+              </span>
+            )}
           </div>
           {showAdmin ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
         </button>
 
         {showAdmin && (
-          <div className="px-5 pb-5 pt-2 space-y-3 border-t border-slate-200 dark:border-gold-500/10">
-            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/20 rounded-lg p-3">
-              <p className="text-xs text-amber-800 dark:text-amber-300 font-medium mb-1">O que faz?</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Documentos maiores que 8.000 caracteres têm embeddings "diluídos" que reduzem a precisão da busca.
-                Este processo divide cada um em trechos de ~2.500 chars, gera embeddings precisos para cada trecho
-                e substitui o documento original. Roda uma única vez.
-              </p>
-            </div>
+          <div className="px-5 pb-5 pt-3 border-t border-slate-200 dark:border-gold-500/10 space-y-4">
 
-            <button
-              onClick={handleRechunk}
-              disabled={isRechunking}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${
-                isRechunking ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500'
-              }`}
-            >
-              {isRechunking ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
-              {isRechunking
-                  ? 'Processando...'
-                  : rechunkResult && !rechunkResult.done && rechunkResult.remaining > 0
-                  ? `▶ Próximo (${rechunkResult.remaining} restantes)`
-                  : 'Executar Rechunking'}
-            </button>
-
-            {rechunkResult && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-700/20 rounded-lg p-3">
-                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mb-1">✅ Concluído</p>
-                <div className="grid grid-cols-3 gap-2 text-xs text-emerald-700 dark:text-emerald-400">
-                  <div><span className="font-bold">{rechunkResult.processed}</span> documentos processados</div>
-                  <div><span className="font-bold">{rechunkResult.new_chunks}</span> novos chunks gerados</div>
-                  <div><span className="font-bold">{rechunkResult.errors}</span> erros</div>
+            {/* Status geral */}
+            {status ? (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white dark:bg-bordeaux-900/40 rounded-lg p-3 text-center border border-slate-100 dark:border-gold-500/10">
+                  <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{status.large_docs}</div>
+                  <div className="text-xs text-slate-500 mt-1">Docs grandes<br/>para dividir</div>
                 </div>
+                <div className="bg-white dark:bg-bordeaux-900/40 rounded-lg p-3 text-center border border-slate-100 dark:border-gold-500/10">
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{status.pending_embeddings}</div>
+                  <div className="text-xs text-slate-500 mt-1">Chunks sem<br/>embedding</div>
+                </div>
+                <div className="bg-white dark:bg-bordeaux-900/40 rounded-lg p-3 text-center border border-slate-100 dark:border-gold-500/10">
+                  <div className={`text-2xl font-bold ${status.large_docs === 0 && status.pending_embeddings === 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {status.large_docs === 0 && status.pending_embeddings === 0 ? '✓' : '...'}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">Status<br/>da base</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 text-center py-2">Carregando status...</div>
+            )}
+
+            {/* Próximo documento */}
+            {status?.next_doc && (
+              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/20 rounded-lg p-3">
+                <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1">Próximo a processar:</p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 truncate">{status.next_doc.titulo}</p>
+                <p className="text-xs text-blue-500 mt-0.5">{(status.next_doc.chars || 0).toLocaleString()} chars</p>
               </div>
             )}
 
-            {rechunkLog.length > 0 && (
-              <div className="bg-slate-900 rounded-lg p-3 max-h-48 overflow-y-auto">
-                {rechunkLog.map((line, i) => (
-                  <p key={i} className="text-xs font-mono text-slate-300 leading-5">{line}</p>
+            {/* Barra de progresso de embedding */}
+            {phase === 'embedding' && progress.total > 0 && (
+              <div>
+                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-1.5">
+                  <span className="truncate max-w-[60%]">{progress.titulo}</span>
+                  <span className="font-mono font-bold">
+                    {progress.done}/{progress.total} ({Math.round(progress.done/progress.total*100)}%)
+                  </span>
+                </div>
+                <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.round(progress.done/progress.total*100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-400 mt-1 text-center">
+                  {phase === 'splitting' ? 'Dividindo documento...' : 'Gerando embeddings — não feche o app'}
+                </p>
+              </div>
+            )}
+            {phase === 'splitting' && (
+              <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400">
+                <Loader2 size={14} className="animate-spin flex-shrink-0" />
+                Dividindo documento no banco de dados... (rápido)
+              </div>
+            )}
+
+            {/* Botão principal */}
+            {status && (status.large_docs > 0 || status.pending_embeddings > 0) ? (
+              <button
+                onClick={handleRechunk}
+                disabled={isRunning}
+                className={`w-full py-2.5 rounded-lg text-sm font-medium text-white transition-colors flex items-center justify-center gap-2 ${
+                  isRunning ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                {isRunning ? (
+                  <><Loader2 size={15} className="animate-spin" />
+                  {phase === 'splitting' ? 'Dividindo...' : `Gerando embedding ${progress.done}/${progress.total}...`}</>
+                ) : status.pending_embeddings > 0 ? (
+                  <><Wrench size={15} /> Continuar — {status.pending_embeddings} embeddings pendentes</>
+                ) : (
+                  <><Wrench size={15} /> Processar próximo documento ({status.large_docs} restantes)</>
+                )}
+              </button>
+            ) : status?.large_docs === 0 && status?.pending_embeddings === 0 ? (
+              <div className="text-center py-2">
+                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                  ✅ Base totalmente otimizada!
+                </span>
+              </div>
+            ) : null}
+
+            {/* Log */}
+            {log.length > 0 && (
+              <div className="bg-slate-900 rounded-lg p-3 max-h-40 overflow-y-auto">
+                {log.map((line, i) => (
+                  <p key={i} className={`text-xs font-mono leading-5 ${
+                    line.startsWith('Erro') ? 'text-red-400' :
+                    line.startsWith('  Embedding') ? 'text-slate-400' :
+                    'text-slate-200'
+                  }`}>{line}</p>
                 ))}
               </div>
             )}
+
+            <button
+              onClick={fetchStatus}
+              disabled={isRunning}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              ↻ Atualizar status
+            </button>
           </div>
         )}
       </div>
