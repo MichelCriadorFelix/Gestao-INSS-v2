@@ -274,20 +274,30 @@ export default function KnowledgeBase() {
     return data;
   };
 
-  // FASE 1: Split do próximo documento grande no banco (sem Gemini, leve)
+  // FASE 1: Split do próximo documento (SQL via Edge Function)
   const handleSplit = async () => {
     setIsRunning(true);
     setPhase('splitting');
-    addLog('Dividindo documento no banco de dados...');
+    addLog('Dividindo documento...');
     try {
-      const data = await edgeCall({ action: 'split' });
-      if (data.error) { addLog('Erro: ' + data.error); setPhase('idle'); return; }
-      if (data.done) { addLog('Nenhum documento grande encontrado.'); setPhase('done'); return; }
-      addLog(`Dividido: "${String(data.titulo || '').substring(0,45)}" (${(data.original_chars||0).toLocaleString()} chars) -> ${data.chunks_created} trechos`);
-      addLog(`Docs grandes restantes: ${data.large_docs_remaining} | Embeddings pendentes: ${data.pending_embeddings}`);
+      // Tentar split via SQL primeiro
+      let data = await edgeCall({ action: 'split' });
+
+      // Se SQL deu timeout, usar split_js (Edge Function faz o split em JS)
+      if (data.error === 'timeout_sql' || (data.error && data.error.includes('timeout'))) {
+        addLog('SQL lento — usando split alternativo...');
+        data = await edgeCall({ action: 'split_js', docId: data.target_id });
+      }
+
+      if (data.error) { addLog('Erro: ' + data.error); setPhase('idle'); setIsRunning(false); return; }
+      if (data.done) { addLog('Nenhum documento grande encontrado.'); setPhase('done'); setIsRunning(false); return; }
+
+      const titulo = String(data.titulo || '').substring(0, 45);
+      const chunks = data.chunks_created || data.pending_embeddings || 0;
+      addLog(`Dividido: "${titulo}" -> ${chunks} trechos`);
+      addLog(`Docs restantes: ${data.large_docs_remaining} | Pendentes: ${data.pending_embeddings}`);
       setProgress({ done: 0, total: data.pending_embeddings || 0, titulo: data.titulo || '' });
       await fetchStatus();
-      // Iniciar fase de embeddings automaticamente
       handleEmbedLoop(data.pending_embeddings || 0);
     } catch (e: any) { addLog('Erro: ' + e.message); setPhase('idle'); setIsRunning(false); }
   };
