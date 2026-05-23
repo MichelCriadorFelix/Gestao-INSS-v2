@@ -4972,26 +4972,36 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
       if (fetchErr) { send({ log: `❌ Erro ao buscar: ${fetchErr.message}` }); break; }
       if (!chunks || chunks.length === 0) break;
 
-      send({ log: `⚙️  Lote ${Math.floor(offset/BATCH)+1}: ${chunks.length} chunks (${processed}/${totalPendentes} feitos)` });
+      send({ log: `⚙️  Lote: ${chunks.length} chunks a processar (Progresso: ${processed}/${totalPendentes} feitos, offset: ${offset})` });
+
+      let batchSuccessCount = 0;
 
       for (const chunk of chunks) {
+        let success = false;
         try {
           const embedding = await callGeminiEmbed(chunk.content);
-          if (!embedding || embedding.length === 0) {
+          if (embedding && embedding.length > 0) {
+            const { error: updateErr } = await supabaseAdmin
+              .from('legal_documents')
+              .update({ embedding })
+              .eq('id', chunk.id);
+
+            if (!updateErr) {
+              processed++;
+              batchSuccessCount++;
+              success = true;
+
+              // Atualizar progresso a cada 5 ou no final do lote
+              if (processed % 5 === 0) {
+                send({ progress: processed, total: totalPendentes, log: `  ✓ ${processed}/${totalPendentes} embeddings gerados...` });
+              }
+            } else {
+              errors++;
+              send({ log: `  ⚠️  Erro DB para chunk ${chunk.id}: ${updateErr.message}` });
+            }
+          } else {
             errors++;
-            continue;
-          }
-          const { error: updateErr } = await supabaseAdmin
-            .from('legal_documents')
-            .update({ embedding })
-            .eq('id', chunk.id);
-
-          if (updateErr) { errors++; continue; }
-          processed++;
-
-          // Atualizar progresso a cada 5
-          if (processed % 5 === 0) {
-            send({ progress: processed, total: totalPendentes, log: `  ✓ ${processed}/${totalPendentes} embeddings gerados...` });
+            send({ log: `  ⚠️  Embedding retornado está vazio para o chunk ${chunk.id}` });
           }
         } catch (e: any) {
           errors++;
@@ -5001,7 +5011,10 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
         await new Promise(r => setTimeout(r, 300));
       }
 
-      offset += chunks.length;
+      // Se atualizamos com sucesso N chunks, eles foram removidos do conjunto "embedding IS NULL".
+      // Para o próximo lote, apenas precisamos pular aqueles que falharam e continuam com embedding IS NULL.
+      offset += (chunks.length - batchSuccessCount);
+
       if (chunks.length < BATCH) break; // último lote
     }
 

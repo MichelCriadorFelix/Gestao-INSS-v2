@@ -176,109 +176,145 @@ function validateTitle(titulo: string): string[] {
 // CHUNKING PADRÃO OURO com overlap e sub-split de artigos gigantes
 // ============================================================
 function chunkLegalText(text: string, maxChars = 2500, overlapChars = 200): string[] {
+  if (!text) return [];
   const chunks: string[] = [];
 
-  // Sub-divisor semântico para trechos densos sem artigos ou sem quebra de parágrafo duplo
-  const subSplit = (txt: string): string[] => {
-    const subs: string[] = [];
-    const parParts = txt.split(/\n\n+/);
-    const splitParts: string[] = [];
+  // Passo 1: Limpar e normalizar quebras de linha
+  const normalizedText = text.replace(/\r\n/g, '\n').trim();
 
-    // Se um parágrafo individual for muito longo (> maxChars), quebra por linha simples (\n)
-    for (const par of parParts) {
-      if (par.length > maxChars) {
-        const lines = par.split(/\n+/);
-        for (const line of lines) {
-          if (line.length > maxChars) {
-            // Se a linha ainda for muito longa, quebra por sentenças (. )
-            const sentences = line.split(/(?<=\.\s+)/);
+  // Passo 2: Dividir por artigo primeiro para manter integridade de artigos se existirem
+  const rawParts = normalizedText.split(/(?=\n\s*(?:Art\.|Artigo)\s+\d)/i);
+
+  const splitChunkHard = (txt: string, limit: number, overlap: number): string[] => {
+    // Se o texto é menor que o limite, retorna diretamente
+    if (txt.length <= limit) return [txt];
+
+    const result: string[] = [];
+    let start = 0;
+    while (start < txt.length) {
+      let end = start + limit;
+      if (end < txt.length) {
+        // Tenta achar um espaço em branco para não cortar palavra no meio
+        const lastSpace = txt.lastIndexOf(' ', end);
+        if (lastSpace > start + limit * 0.75) {
+          end = lastSpace;
+        }
+      } else {
+        end = txt.length;
+      }
+
+      const chunk = txt.substring(start, end).trim();
+      if (chunk.length >= 40) { // ignorar resíduos irrisórios
+        result.push(chunk);
+      }
+
+      // Próximo início com overlap
+      start = end - overlap;
+      if (start < 0) start = 0;
+      // Salvaguarda para evitar loops infinitos se overlap >= limit
+      if (start >= end) {
+        start = end;
+      }
+    }
+    return result;
+  };
+
+  const processChunk = (txt: string) => {
+    const trimmed = txt.trim();
+    if (trimmed.length < 40) return;
+
+    // Se o chunk for menor que o limite máximo, adiciona direto
+    if (trimmed.length <= maxChars) {
+      chunks.push(trimmed);
+      return;
+    }
+
+    // Caso contrário, subdivide de forma inteligente por parágrafos duplos (\n\n)
+    const paragraphs = trimmed.split(/\n\n+/);
+    let currentBlock = '';
+
+    for (const paragraph of paragraphs) {
+      const p = paragraph.trim();
+      if (!p) continue;
+
+      // Se um parágrafo sozinho já é maior que maxChars, quebramos ele
+      if (p.length > maxChars) {
+        // Envia o que temos acumulado antes do parágrafo grande
+        if (currentBlock.length > 0) {
+          chunks.push(currentBlock);
+          currentBlock = '';
+        }
+
+        // Subdivide o parágrafo gigante de forma rígida com overlap
+        const subParts = p.split(/\n+/);
+        for (const part of subParts) {
+          if (part.length > maxChars) {
+            // Dividir sentenças por ponto final seguido de espaço
+            const sentences = part.split(/(?<=\.\s+)/);
+            let currentSentBlock = '';
             for (const sent of sentences) {
               if (sent.length > maxChars) {
-                // Se ainda for muito longa (ex: PDF sem formatação), fatia de forma rígida pelo limite
-                let remaining = sent;
-                while (remaining.length > 0) {
-                  if (remaining.length <= maxChars) {
-                    splitParts.push(remaining);
-                    break;
-                  }
-                  let slicePoint = maxChars;
-                  const lastSpace = remaining.lastIndexOf(' ', maxChars);
-                  if (lastSpace > maxChars * 0.7) {
-                    slicePoint = lastSpace;
-                  }
-                  splitParts.push(remaining.substring(0, slicePoint).trim());
-                  remaining = remaining.substring(slicePoint).trim();
+                if (currentSentBlock.length > 0) {
+                  chunks.push(currentSentBlock);
+                  currentSentBlock = '';
                 }
+                // Fatia de forma rígida
+                const hardSlices = splitChunkHard(sent, maxChars, overlapChars);
+                chunks.push(...hardSlices);
               } else {
-                splitParts.push(sent);
+                if ((currentSentBlock + '\n' + sent).length > maxChars) {
+                  if (currentSentBlock.length > 0) chunks.push(currentSentBlock);
+                  currentSentBlock = sent;
+                } else {
+                  currentSentBlock = currentSentBlock ? currentSentBlock + '\n' + sent : sent;
+                }
               }
             }
+            if (currentSentBlock.length > 0) {
+              chunks.push(currentSentBlock);
+            }
           } else {
-            splitParts.push(line);
+            chunks.push(part);
           }
         }
       } else {
-        splitParts.push(par);
+        // Parágrafo cabe no bloco atual?
+        if ((currentBlock + '\n\n' + p).length <= maxChars) {
+          currentBlock = currentBlock ? currentBlock + '\n\n' + p : p;
+        } else {
+          // Se não cabe, descarrega o bloco atual
+          if (currentBlock.length > 0) {
+            chunks.push(currentBlock);
+          }
+          currentBlock = p;
+        }
       }
     }
 
-    // Agora agrupa os fragmentos de forma equilibrada respeitando o maxChars e inserindo overlap
-    let cur = '';
-    for (const part of splitParts) {
-      const trimmedPart = part.trim();
-      if (!trimmedPart) continue;
-
-      if ((cur + '\n\n' + trimmedPart).length > maxChars && cur.length > 0) {
-        subs.push(cur.trim());
-        // Overlap: utiliza as últimas 2 linhas do bloco anterior para contexto
-        const lines = cur.split('\n');
-        const overlap = lines.slice(-2).join('\n');
-        cur = (overlap.length > 5 ? overlap + '\n\n' : '') + trimmedPart;
-      } else {
-        cur = cur ? cur + '\n\n' + trimmedPart : trimmedPart;
-      }
-    }
-
-    if (cur.trim().length > 80) {
-      subs.push(cur.trim());
-    }
-    return subs;
-  };
-
-  // Passo 1: dividir primeiramente por artigo (Art. X / Artigo X)
-  const rawParts = text.split(/(?=\n\s*(?:Art\.|Artigo)\s+\d)/i);
-
-  let currentChunk = '';
-
-  const flushChunk = (chunk: string) => {
-    const trimmed = chunk.trim();
-    if (trimmed.length < 80) return; // ignora micro-resíduos
-    // Se o chunk é grande, sub-divide de forma inteligente usando subSplit
-    if (trimmed.length > maxChars) {
-      subSplit(trimmed).forEach(sub => chunks.push(sub));
-    } else {
-      chunks.push(trimmed);
+    if (currentBlock.length > 0) {
+      chunks.push(currentBlock);
     }
   };
 
   for (const part of rawParts) {
-    const p = part.trim();
-    if (!p) continue;
+    processChunk(part);
+  }
 
-    if (currentChunk.length + p.length > maxChars && currentChunk.length > 0) {
-      flushChunk(currentChunk);
-      // Overlap: repete os últimos overlapChars do chunk anterior
-      const overlap = currentChunk.length > overlapChars
-        ? currentChunk.slice(-overlapChars)
-        : currentChunk;
-      currentChunk = overlap + '\n\n' + p;
+  // Garantia absoluta: filtrar possíveis pedaços vazios ou extremamente pequenos,
+  // e se por algum motivo sobrar algum trecho maior que maxChars, subdividir ele de forma rígida!
+  const finalChunks: string[] = [];
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim();
+    if (trimmed.length < 40) continue;
+    if (trimmed.length > maxChars) {
+      const fallbackSlices = splitChunkHard(trimmed, maxChars, overlapChars);
+      finalChunks.push(...fallbackSlices);
     } else {
-      currentChunk = currentChunk ? currentChunk + '\n\n' + p : p;
+      finalChunks.push(trimmed);
     }
   }
 
-  if (currentChunk.trim().length > 80) flushChunk(currentChunk);
-  return chunks;
+  return finalChunks;
 }
 
 export default function KnowledgeBase() {
@@ -306,7 +342,7 @@ export default function KnowledgeBase() {
   const [fixProgress, setFixProgress] = useState({ done: 0, total: 0 });
 
   const handleFixEmbeddings = async () => {
-    if (!confirm('Gerar embeddings para os 299 chunks sem vetor?\nProcessamento server-side — leva ~5 minutos.')) return;
+    if (!confirm('Gerar embeddings para os chunks sem vetor?\nProcessamento server-side — leva ~5 minutos.')) return;
     setFixingEmbeddings(true);
     setFixLog(['Iniciando geração de embeddings server-side...']);
     setFixProgress({ done: 0, total: 299 });
@@ -317,6 +353,15 @@ export default function KnowledgeBase() {
         body: JSON.stringify({ adminKey: 'felix-castro-rechunk-2026' })
       });
       if (!response.body) throw new Error('Sem resposta do servidor');
+      if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = `Falha na requisição (HTTP ${response.status})`;
+        try {
+          const jsonVal = JSON.parse(errText);
+          if (jsonVal.error) errMsg = jsonVal.error;
+        } catch {}
+        throw new Error(errMsg);
+      }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -331,6 +376,10 @@ export default function KnowledgeBase() {
           if (!line) continue;
           try {
             const evt = JSON.parse(line);
+            if (evt.error) {
+              setFixLog(prev => [...prevDetail(prev), `❌ Erro do Servidor: ${evt.error}`]);
+              continue;
+            }
             if (evt.log) setFixLog(prev => [...prev.slice(-40), evt.log]);
             if (evt.progress) setFixProgress({ done: evt.progress, total: evt.total || 299 });
             if (evt.done) {
@@ -347,6 +396,11 @@ export default function KnowledgeBase() {
       setFixingEmbeddings(false);
     }
   };
+
+  // Helper local since prevDetail is not a function
+  function prevDetail(arr: string[]): string[] {
+    return arr.slice(-40);
+  }
 
   const edgeCall = async (body: any, timeoutMs = 20000): Promise<any> => {
     try {
