@@ -257,13 +257,23 @@ export default function KnowledgeBase() {
   const EDGE_URL = 'https://nnhatyvrtlbkyfadumqo.supabase.co/functions/v1/rechunk-large-docs';
   const ADMIN_KEY = 'felix-castro-rechunk-2026';
 
-  const edgeCall = async (body: object) => {
-    const r = await fetch(EDGE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminKey: ADMIN_KEY, ...body })
-    });
-    return r.json();
+  const edgeCall = async (body: object, timeoutMs = 20000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const r = await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminKey: ADMIN_KEY, ...body }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      return r.json();
+    } catch (e: any) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') return { error: 'timeout', message: 'Servidor demorou >20s' };
+      return { error: e.message };
+    }
   };
 
   const addLog = (msg: string) => setLog(prev => [...prev.slice(-30), msg]);
@@ -309,27 +319,29 @@ export default function KnowledgeBase() {
     let consecutiveErrors = 0;
 
     while (true) {
-      // Buscar 1 chunk sem embedding
-      const chunks = await edgeCall({ action: 'status' })
-        .then(s => s.pending_embeddings)
-        .catch(() => 0);
-
-      if (chunks === 0) {
-        addLog('Todos os embeddings gerados!');
-        break;
+      // Verificar pendentes (a cada 5 loops para não sobrecarregar)
+      if (done % 5 === 0) {
+        const st = await edgeCall({ action: 'status' }, 10000).catch(() => null);
+        if (st && st.pending_embeddings === 0) { addLog('Todos os embeddings concluídos!'); break; }
       }
 
-      // Buscar 1 chunk pendente de embedding via Edge Function (get_chunks_needing_embedding)
+      // Buscar 1 chunk pendente de embedding via Edge Function
       let chunk: any = null;
       try {
-        const chunkData = await edgeCall({ action: 'get_next_chunk' });
-        if (chunkData.error || !chunkData.id) {
+        const chunkData = await edgeCall({ action: 'get_next_chunk' }, 15000);
+        if (chunkData.error === 'sem_chunk' || (!chunkData.id && !chunkData.error)) {
+          addLog('Todos os embeddings concluídos!');
+          break;
+        }
+        if (chunkData.error) {
           consecutiveErrors++;
-          if (consecutiveErrors > 3) break;
-          await new Promise(r => setTimeout(r, 500));
+          addLog(`  Falha ${consecutiveErrors}/3: ${chunkData.message || chunkData.error}`);
+          if (consecutiveErrors >= 3) { addLog('❌ 3 falhas. Recarregue e tente novamente.'); break; }
+          await new Promise(r => setTimeout(r, 3000));
           continue;
         }
         chunk = chunkData;
+        consecutiveErrors = 0;
       } catch {
         consecutiveErrors++;
         if (consecutiveErrors > 3) break;
@@ -338,11 +350,24 @@ export default function KnowledgeBase() {
       consecutiveErrors = 0;
       // Gerar embedding via API existente
       try {
-        const resp = await apiFetch('/api/rag/embed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: chunk.content })
-        });
+        const embedCtrl = new AbortController();
+        const embedTimer = setTimeout(() => embedCtrl.abort(), 30000);
+        let resp: Response;
+        try {
+          resp = await apiFetch('/api/rag/embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: chunk.content }),
+            signal: embedCtrl.signal
+          });
+          clearTimeout(embedTimer);
+        } catch (fetchErr: any) {
+          clearTimeout(embedTimer);
+          consecutiveErrors++;
+          addLog(`  Embed timeout/erro: ${fetchErr.message}`);
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
         if (!resp.ok) { consecutiveErrors++; await new Promise(r => setTimeout(r, 1000)); continue; }
         const { embedding } = await resp.json();
         if (!embedding?.length) { consecutiveErrors++; continue; }
