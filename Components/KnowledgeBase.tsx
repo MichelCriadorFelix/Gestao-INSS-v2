@@ -253,29 +253,49 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
+    // Detectar se está em mobile (limite menor para evitar crash)
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    const MAX_CHARS = isMobile ? 40000 : 200000;
+
     const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
     if (remaining === 0) {
-      alert('Base já está otimizada! Nenhum documento grande encontrado.');
+      alert('Base ja esta otimizada!');
       return;
     }
-    if (!confirm(`Processar próximo documento? (${remaining} restantes)\n\nO processo roda no navegador. Deixe a tela aberta.`)) return;
+
+    if (!confirm(`Processar proximo documento? (${remaining} restantes)\n${isMobile ? 'Modo celular: pula docs > 40k chars. Use PC para os gigantes.' : 'Modo desktop: processa tudo.'}`)) return;
 
     setIsRechunking(true);
-    setRechunkLog(prev => [...prev, `📊 ${remaining} documentos grandes. Processando o maior...`]);
+    setRechunkLog(prev => [...prev, `Buscando proximo documento gerenciavel...`]);
 
     try {
+      // Buscar o menor doc grande (SQL ja ordena ASC agora)
       const docs = await supabaseService.getLargeDocuments(8000, 1);
       if (!docs?.length) {
-        setRechunkLog(prev => [...prev, '✅ Base já otimizada!']);
+        setRechunkLog(prev => [...prev, 'Base ja otimizada!']);
         setRechunkResult({ done: true, remaining: 0 });
+        setIsRechunking(false);
         return;
       }
 
       const doc = docs[0];
-      const titulo = String(doc.metadata?.title || '').substring(0, 55);
-      setRechunkLog(prev => [...prev, `🔄 "${titulo}" (${doc.content.length.toLocaleString()} chars)`]);
+      const titulo = String(doc.metadata?.title || '').substring(0, 50);
+      const chars = doc.content.length;
 
-      // Split semântico
+      // Pular docs muito grandes no celular
+      if (chars > MAX_CHARS) {
+        setRechunkLog(prev => [...prev,
+          `Pulando "${titulo}" (${chars.toLocaleString()} chars > limite ${MAX_CHARS.toLocaleString()})`,
+          isMobile ? 'Abra o app no PC/Desktop para processar os documentos gigantes.' : 'Documento muito grande. Tente novamente.'
+        ]);
+        setRechunkResult({ done: false, remaining, skipped: true });
+        setIsRechunking(false);
+        return;
+      }
+
+      setRechunkLog(prev => [...prev, `Processando: "${titulo}" (${chars.toLocaleString()} chars)`]);
+
+      // Split semantico
       const CHUNK_SIZE = 2500;
       const OVERLAP = 200;
       const subChunks: string[] = [];
@@ -284,12 +304,12 @@ export default function KnowledgeBase() {
       while (pos < text.length) {
         let end = Math.min(pos + CHUNK_SIZE, text.length);
         if (end < text.length) {
-          const artBreak = text.lastIndexOf('\nArt. ', end);
-          const parBreak  = text.lastIndexOf('\n\n', end);
-          const sentBreak = text.lastIndexOf('. ', end);
-          if (artBreak > pos + CHUNK_SIZE * 0.5)      end = artBreak;
-          else if (parBreak > pos + CHUNK_SIZE * 0.5)  end = parBreak + 2;
-          else if (sentBreak > pos + CHUNK_SIZE * 0.5) end = sentBreak + 2;
+          const a1 = text.lastIndexOf('\nArt. ', end);
+          const a2 = text.lastIndexOf('\n\n', end);
+          const a3 = text.lastIndexOf('. ', end);
+          if (a1 > pos + CHUNK_SIZE * 0.5) end = a1;
+          else if (a2 > pos + CHUNK_SIZE * 0.5) end = a2 + 2;
+          else if (a3 > pos + CHUNK_SIZE * 0.5) end = a3 + 2;
         }
         const chunk = text.slice(pos, end).trim();
         if (chunk.length > 80) subChunks.push(chunk);
@@ -297,72 +317,70 @@ export default function KnowledgeBase() {
         if (pos <= 0) break;
       }
 
-      setRechunkLog(prev => [...prev, `✂️  ${subChunks.length} trechos — salvando em mini-lotes de 10...`]);
+      setRechunkLog(prev => [...prev, `${subChunks.length} trechos para embeddings...`]);
 
-      // Processar em mini-lotes de 10 — salva e libera memória a cada lote
-      const MINI_BATCH = 10;
-      let totalInserted = 0;
-      let totalErrors = 0;
+      // Mini-lotes de 8 embeddings — salva e limpa memoria a cada lote
+      const MINI = 8;
+      let totalOk = 0;
+      let totalErr = 0;
 
-      for (let batch = 0; batch < subChunks.length; batch += MINI_BATCH) {
-        const batchChunks = subChunks.slice(batch, batch + MINI_BATCH);
-        const batchInserted: any[] = [];
+      for (let b = 0; b < subChunks.length; b += MINI) {
+        const batch = subChunks.slice(b, b + MINI);
+        const toSave: any[] = [];
 
-        for (let j = 0; j < batchChunks.length; j++) {
-          const globalIdx = batch + j;
-          // Atualizar progresso sem acumular linhas
+        for (let j = 0; j < batch.length; j++) {
+          const idx = b + j;
+          // Atualizar progresso (substitui linha anterior)
           setRechunkLog(prev => {
-            const filtered = prev.filter(l => !l.startsWith('  ⚙️'));
-            return [...filtered, `  ⚙️  ${globalIdx + 1}/${subChunks.length} embeddings...`];
+            const clean = prev.filter(l => !l.startsWith('  '));
+            return [...clean, `  ${idx + 1}/${subChunks.length} embeddings...`];
           });
-
           try {
-            const resp = await apiFetch('/api/rag/embed', {
+            const r = await apiFetch('/api/rag/embed', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: batchChunks[j] })
+              body: JSON.stringify({ text: batch[j] })
             });
-            if (!resp.ok) { totalErrors++; continue; }
-            const { embedding } = await resp.json();
-            if (!embedding?.length) { totalErrors++; continue; }
-            batchInserted.push({
-              content: batchChunks[j],
-              metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
-                chunk_index: globalIdx, total_chunks: subChunks.length },
-              embedding
-            });
-          } catch { totalErrors++; }
+            if (r.ok) {
+              const { embedding } = await r.json();
+              if (embedding?.length) {
+                toSave.push({
+                  content: batch[j],
+                  metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
+                    chunk_index: idx, total_chunks: subChunks.length },
+                  embedding
+                });
+                totalOk++;
+              } else totalErr++;
+            } else totalErr++;
+          } catch { totalErr++; }
         }
 
-        // Salvar mini-lote imediatamente e liberar memória
-        if (batchInserted.length > 0) {
-          await supabaseService.saveLegalDocuments(batchInserted);
-          totalInserted += batchInserted.length;
-          batchInserted.length = 0; // liberar memória
+        // Salvar lote e liberar memoria
+        if (toSave.length) {
+          await supabaseService.saveLegalDocuments(toSave);
+          toSave.length = 0;
         }
-
-        // Dar respiração ao browser entre lotes
-        await new Promise(r => setTimeout(r, 100));
+        // Respiracao para o browser
+        await new Promise(r => setTimeout(r, 80));
       }
 
-      // Só deleta o original após todos os lotes salvos com sucesso
-      if (totalInserted > 0) {
-        await supabaseService.deleteLegalDocumentById(doc.id);
-      }
+      // Deletar original so apos tudo salvo
+      if (totalOk > 0) await supabaseService.deleteLegalDocumentById(doc.id);
 
       const newRemaining = await supabaseService.countLargeDocuments(8000).catch(() => -1);
       const done = newRemaining === 0;
 
       setRechunkLog(prev => [
-        ...prev.filter(l => !l.startsWith('  ⚙️')),
-        `✅ "${titulo}" → ${totalInserted} trechos${totalErrors > 0 ? ` (${totalErrors} erros)` : ''}`,
-        done ? '🎉 Base totalmente otimizada!' : `⏩ Restam ${newRemaining} docs. Clique "Próximo".`
+        ...prev.filter(l => !l.startsWith('  ')),
+        `OK: "${titulo}" -> ${totalOk} trechos${totalErr > 0 ? ` (${totalErr} erros)` : ''}`,
+        done ? 'Base totalmente otimizada!' : `Restam ${newRemaining} docs. Clique Proximo.`
       ]);
       setRechunkResult({ done, remaining: newRemaining });
       if (done) fetchDocs();
 
     } catch (err: any) {
-      setRechunkLog(prev => [...prev, `❌ Erro: ${err.message}`]);
+      setRechunkLog(prev => [...prev, `Erro: ${err.message}`]);
     } finally {
       setIsRechunking(false);
     }
