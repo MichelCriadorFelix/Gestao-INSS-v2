@@ -860,6 +860,48 @@ export const supabaseService = {
     return Number(data) || 0;
   },
 
+  // Atualiza o embedding de um chunk específico (usado no reembedding pós-rechunking SQL)
+  async updateEmbedding(id: number, embedding: number[]) {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('legal_documents')
+      .update({ embedding })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  // Busca 1 chunk sem embedding para processar
+  async getOneChunkNeedingEmbedding(): Promise<{id: number, content: string, metadata: any} | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('get_one_chunk_needing_embedding');
+    if (error) throw error;
+    return data?.[0] || null;
+  },
+
+  // Conta chunks sem embedding
+  async countChunksNeedingEmbedding(): Promise<number> {
+    const supabase = getSupabase();
+    if (!supabase) return 0;
+    const { data, error } = await supabase.rpc('count_chunks_needing_embedding');
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
+  // Divide UM documento grande em sub-chunks via SQL (sem embedding — rápido)
+  async splitOneLargeDocument(): Promise<{done: boolean, titulo?: string, chars?: number, chunks_gerados?: number, message?: string}> {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase não disponível');
+    const { data, error } = await supabase.rpc('split_one_large_document', {
+      max_chunk_chars: 2500,
+      overlap_chars: 200,
+      min_large_chars: 8000
+    });
+    if (error) throw error;
+    return data as any;
+  },
+
   async deleteLegalDocumentById(id: number) {
     const supabase = getSupabase();
     if (!supabase) return;

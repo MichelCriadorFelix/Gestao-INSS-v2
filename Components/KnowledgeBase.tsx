@@ -253,131 +253,83 @@ export default function KnowledgeBase() {
   const [rechunkLog, setRechunkLog] = useState<string[]>([]);
 
   const handleRechunk = async () => {
-    // Detectar se está em mobile (limite menor para evitar crash)
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    const MAX_CHARS = isMobile ? 40000 : 200000;
+    // FASE 1 ou FASE 2 dependendo do estado atual
+    const pendingEmbeddings = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
+    const largeDocs = await supabaseService.countLargeDocuments(8000).catch(() => 0);
 
-    const remaining = await supabaseService.countLargeDocuments(8000).catch(() => 0);
-    if (remaining === 0) {
+    if (pendingEmbeddings === 0 && largeDocs === 0) {
       alert('Base ja esta otimizada!');
       return;
     }
 
-    if (!confirm(`Processar proximo documento? (${remaining} restantes)\n${isMobile ? 'Modo celular: pula docs > 40k chars. Use PC para os gigantes.' : 'Modo desktop: processa tudo.'}`)) return;
-
     setIsRechunking(true);
-    setRechunkLog(prev => [...prev, `Buscando proximo documento gerenciavel...`]);
 
     try {
-      // Buscar o menor doc grande (SQL ja ordena ASC agora)
-      const docs = await supabaseService.getLargeDocuments(8000, 1);
-      if (!docs?.length) {
-        setRechunkLog(prev => [...prev, 'Base ja otimizada!']);
-        setRechunkResult({ done: true, remaining: 0 });
-        setIsRechunking(false);
-        return;
-      }
+      // FASE 2: há chunks sem embedding — gerar embeddings primeiro
+      if (pendingEmbeddings > 0) {
+        setRechunkLog(prev => [...prev, `Gerando embeddings: ${pendingEmbeddings} trechos pendentes...`]);
+        let remaining = pendingEmbeddings;
+        let done_count = 0;
 
-      const doc = docs[0];
-      const titulo = String(doc.metadata?.title || '').substring(0, 50);
-      const chars = doc.content.length;
+        while (remaining > 0) {
+          const chunk = await supabaseService.getOneChunkNeedingEmbedding();
+          if (!chunk) break;
 
-      // Pular docs muito grandes no celular
-      if (chars > MAX_CHARS) {
-        setRechunkLog(prev => [...prev,
-          `Pulando "${titulo}" (${chars.toLocaleString()} chars > limite ${MAX_CHARS.toLocaleString()})`,
-          isMobile ? 'Abra o app no PC/Desktop para processar os documentos gigantes.' : 'Documento muito grande. Tente novamente.'
-        ]);
-        setRechunkResult({ done: false, remaining, skipped: true });
-        setIsRechunking(false);
-        return;
-      }
-
-      setRechunkLog(prev => [...prev, `Processando: "${titulo}" (${chars.toLocaleString()} chars)`]);
-
-      // Split semantico
-      const CHUNK_SIZE = 2500;
-      const OVERLAP = 200;
-      const subChunks: string[] = [];
-      const text = doc.content;
-      let pos = 0;
-      while (pos < text.length) {
-        let end = Math.min(pos + CHUNK_SIZE, text.length);
-        if (end < text.length) {
-          const a1 = text.lastIndexOf('\nArt. ', end);
-          const a2 = text.lastIndexOf('\n\n', end);
-          const a3 = text.lastIndexOf('. ', end);
-          if (a1 > pos + CHUNK_SIZE * 0.5) end = a1;
-          else if (a2 > pos + CHUNK_SIZE * 0.5) end = a2 + 2;
-          else if (a3 > pos + CHUNK_SIZE * 0.5) end = a3 + 2;
-        }
-        const chunk = text.slice(pos, end).trim();
-        if (chunk.length > 80) subChunks.push(chunk);
-        pos = end - OVERLAP;
-        if (pos <= 0) break;
-      }
-
-      setRechunkLog(prev => [...prev, `${subChunks.length} trechos para embeddings...`]);
-
-      // Mini-lotes de 8 embeddings — salva e limpa memoria a cada lote
-      const MINI = 8;
-      let totalOk = 0;
-      let totalErr = 0;
-
-      for (let b = 0; b < subChunks.length; b += MINI) {
-        const batch = subChunks.slice(b, b + MINI);
-        const toSave: any[] = [];
-
-        for (let j = 0; j < batch.length; j++) {
-          const idx = b + j;
-          // Atualizar progresso (substitui linha anterior)
           setRechunkLog(prev => {
             const clean = prev.filter(l => !l.startsWith('  '));
-            return [...clean, `  ${idx + 1}/${subChunks.length} embeddings...`];
+            return [...clean, `  Embedding ${done_count + 1}/${pendingEmbeddings}: ID ${chunk.id}`];
           });
+
           try {
-            const r = await apiFetch('/api/rag/embed', {
+            const resp = await apiFetch('/api/rag/embed', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: batch[j] })
+              body: JSON.stringify({ text: chunk.content })
             });
-            if (r.ok) {
-              const { embedding } = await r.json();
+            if (resp.ok) {
+              const { embedding } = await resp.json();
               if (embedding?.length) {
-                toSave.push({
-                  content: batch[j],
-                  metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
-                    chunk_index: idx, total_chunks: subChunks.length },
-                  embedding
-                });
-                totalOk++;
-              } else totalErr++;
-            } else totalErr++;
-          } catch { totalErr++; }
+                await supabaseService.updateEmbedding(chunk.id, embedding);
+                done_count++;
+              }
+            }
+          } catch { /* continua no proximo */ }
+
+          remaining = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
+          await new Promise(r => setTimeout(r, 50));
         }
 
-        // Salvar lote e liberar memoria
-        if (toSave.length) {
-          await supabaseService.saveLegalDocuments(toSave);
-          toSave.length = 0;
-        }
-        // Respiracao para o browser
-        await new Promise(r => setTimeout(r, 80));
+        setRechunkLog(prev => [
+          ...prev.filter(l => !l.startsWith('  ')),
+          `Embeddings gerados: ${done_count}`,
+          largeDocs > 0 ? `${largeDocs} documentos grandes ainda para dividir. Clique novamente.` : 'Base totalmente otimizada!'
+        ]);
+        setRechunkResult({ done: largeDocs === 0 && remaining === 0, remaining: largeDocs });
+        if (largeDocs === 0) fetchDocs();
+        return;
       }
 
-      // Deletar original so apos tudo salvo
-      if (totalOk > 0) await supabaseService.deleteLegalDocumentById(doc.id);
+      // FASE 1: dividir documento via SQL (sem embedding — rapido)
+      if (!confirm(`Dividir proximo documento grande? (${largeDocs} restantes)\nRapido: so divide o texto, sem gerar embeddings agora.`)) {
+        setIsRechunking(false);
+        return;
+      }
 
-      const newRemaining = await supabaseService.countLargeDocuments(8000).catch(() => -1);
-      const done = newRemaining === 0;
+      setRechunkLog(prev => [...prev, `Dividindo documento via SQL...`]);
+      const result = await supabaseService.splitOneLargeDocument();
 
-      setRechunkLog(prev => [
-        ...prev.filter(l => !l.startsWith('  ')),
-        `OK: "${titulo}" -> ${totalOk} trechos${totalErr > 0 ? ` (${totalErr} erros)` : ''}`,
-        done ? 'Base totalmente otimizada!' : `Restam ${newRemaining} docs. Clique Proximo.`
-      ]);
-      setRechunkResult({ done, remaining: newRemaining });
-      if (done) fetchDocs();
+      if (result.done) {
+        setRechunkLog(prev => [...prev, 'Nenhum documento grande. Clique novamente para gerar embeddings pendentes.']);
+      } else {
+        setRechunkLog(prev => [...prev,
+          `Dividido: "${result.titulo}" -> ${result.chunks_gerados} trechos (sem embedding ainda)`,
+          `Clique novamente para gerar os embeddings dos ${result.chunks_gerados} trechos.`
+        ]);
+      }
+
+      const newLarge = await supabaseService.countLargeDocuments(8000).catch(() => largeDocs);
+      const newPending = await supabaseService.countChunksNeedingEmbedding().catch(() => 0);
+      setRechunkResult({ done: false, remaining: newLarge, pendingEmbeddings: newPending });
 
     } catch (err: any) {
       setRechunkLog(prev => [...prev, `Erro: ${err.message}`]);
