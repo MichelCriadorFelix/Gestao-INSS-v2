@@ -238,7 +238,7 @@ export default function KnowledgeBase() {
   const [content, setContent] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isSuccess, setIsSuccess] = useState(false);
   const [existingDocs, setExistingDocs] = useState<string[]>([]);
@@ -426,7 +426,7 @@ export default function KnowledgeBase() {
 
     setIsProcessing(true);
     setMessage({ text: 'Verificando base...', type: 'info' });
-    setProgress({ current: 0, total: 0 });
+    setUploadProgress({ current: 0, total: 0 });
 
     try {
       await supabaseService.deleteLegalDocumentByTitle(title.trim());
@@ -435,14 +435,14 @@ export default function KnowledgeBase() {
       const chunks = chunkLegalText(content, 2500, 200);
       if (chunks.length === 0) throw new Error('Nenhum trecho de texto gerado. Verifique o conteúdo.');
 
-      setProgress({ current: 0, total: chunks.length });
+      setUploadProgress({ current: 0, total: chunks.length });
       setMessage({ text: `Gerando embeddings para ${chunks.length} trechos...`, type: 'info' });
 
       let processedChunks: any[] = [];
 
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        setProgress({ current: i + 1, total: chunks.length });
+        setUploadProgress({ current: i + 1, total: chunks.length });
 
         const response = await apiFetch('/api/rag/embed', {
           method: 'POST',
@@ -639,16 +639,16 @@ export default function KnowledgeBase() {
             </div>
 
             {/* Progresso */}
-            {isProcessing && progress.total > 0 && (
+            {isProcessing && uploadProgress.total > 0 && (
               <div>
                 <div className="flex justify-between text-xs text-slate-500 mb-1">
-                  <span>Processando trecho {progress.current} de {progress.total}</span>
-                  <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+                  <span>Processando trecho {uploadProgress.current} de {uploadProgress.total}</span>
+                  <span>{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
                 </div>
                 <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-indigo-500 transition-all duration-300"
-                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                    style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                   />
                 </div>
               </div>
