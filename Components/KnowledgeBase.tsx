@@ -178,6 +178,73 @@ function validateTitle(titulo: string): string[] {
 function chunkLegalText(text: string, maxChars = 2500, overlapChars = 200): string[] {
   const chunks: string[] = [];
 
+  // Sub-divisor semântico para trechos densos sem artigos ou sem quebra de parágrafo duplo
+  const subSplit = (txt: string): string[] => {
+    const subs: string[] = [];
+    const parParts = txt.split(/\n\n+/);
+    const splitParts: string[] = [];
+
+    // Se um parágrafo individual for muito longo (> maxChars), quebra por linha simples (\n)
+    for (const par of parParts) {
+      if (par.length > maxChars) {
+        const lines = par.split(/\n+/);
+        for (const line of lines) {
+          if (line.length > maxChars) {
+            // Se a linha ainda for muito longa, quebra por sentenças (. )
+            const sentences = line.split(/(?<=\.\s+)/);
+            for (const sent of sentences) {
+              if (sent.length > maxChars) {
+                // Se ainda for muito longa (ex: PDF sem formatação), fatia de forma rígida pelo limite
+                let remaining = sent;
+                while (remaining.length > 0) {
+                  if (remaining.length <= maxChars) {
+                    splitParts.push(remaining);
+                    break;
+                  }
+                  let slicePoint = maxChars;
+                  const lastSpace = remaining.lastIndexOf(' ', maxChars);
+                  if (lastSpace > maxChars * 0.7) {
+                    slicePoint = lastSpace;
+                  }
+                  splitParts.push(remaining.substring(0, slicePoint).trim());
+                  remaining = remaining.substring(slicePoint).trim();
+                }
+              } else {
+                splitParts.push(sent);
+              }
+            }
+          } else {
+            splitParts.push(line);
+          }
+        }
+      } else {
+        splitParts.push(par);
+      }
+    }
+
+    // Agora agrupa os fragmentos de forma equilibrada respeitando o maxChars e inserindo overlap
+    let cur = '';
+    for (const part of splitParts) {
+      const trimmedPart = part.trim();
+      if (!trimmedPart) continue;
+
+      if ((cur + '\n\n' + trimmedPart).length > maxChars && cur.length > 0) {
+        subs.push(cur.trim());
+        // Overlap: utiliza as últimas 2 linhas do bloco anterior para contexto
+        const lines = cur.split('\n');
+        const overlap = lines.slice(-2).join('\n');
+        cur = (overlap.length > 5 ? overlap + '\n\n' : '') + trimmedPart;
+      } else {
+        cur = cur ? cur + '\n\n' + trimmedPart : trimmedPart;
+      }
+    }
+
+    if (cur.trim().length > 80) {
+      subs.push(cur.trim());
+    }
+    return subs;
+  };
+
   // Passo 1: dividir primeiramente por artigo (Art. X / Artigo X)
   const rawParts = text.split(/(?=\n\s*(?:Art\.|Artigo)\s+\d)/i);
 
@@ -186,31 +253,12 @@ function chunkLegalText(text: string, maxChars = 2500, overlapChars = 200): stri
   const flushChunk = (chunk: string) => {
     const trimmed = chunk.trim();
     if (trimmed.length < 80) return; // ignora micro-resíduos
-    // Se o chunk é MUITO grande (artigo único enorme), sub-divide por parágrafo/sentença
-    if (trimmed.length > maxChars * 1.5) {
+    // Se o chunk é grande, sub-divide de forma inteligente usando subSplit
+    if (trimmed.length > maxChars) {
       subSplit(trimmed).forEach(sub => chunks.push(sub));
     } else {
       chunks.push(trimmed);
     }
-  };
-
-  // Sub-divisor semântico para artigos gigantes (Art. 5 da CF, etc.)
-  const subSplit = (text: string): string[] => {
-    const subs: string[] = [];
-    const parParts = text.split(/\n\n+/);
-    let cur = '';
-    for (const par of parParts) {
-      if ((cur + '\n\n' + par).length > maxChars && cur.length > 0) {
-        subs.push(cur.trim());
-        // Overlap: repetir últimas linhas do chunk anterior como contexto
-        const overlap = cur.split('\n').slice(-3).join('\n');
-        cur = overlap + '\n\n' + par;
-      } else {
-        cur = cur ? cur + '\n\n' + par : par;
-      }
-    }
-    if (cur.trim().length > 80) subs.push(cur.trim());
-    return subs;
   };
 
   for (const part of rawParts) {
@@ -458,10 +506,16 @@ export default function KnowledgeBase() {
       } catch { consecutiveErrors++; await new Promise(r => setTimeout(r, 500)); }
     }
 
-    await fetchStatus();
-    setPhase('idle');
-    setIsRunning(false);
-    addLog(`Concluido! ${done} embeddings gerados.`);
+    const nextStatus = await fetchStatus();
+    if (nextStatus && nextStatus.large_docs > 0) {
+      addLog(`✨ Bloco concluído! Há mais ${nextStatus.large_docs} documento(s) grande(s). Iniciando próximo automaticamente em 1s...`);
+      await new Promise(r => setTimeout(r, 1000));
+      handleSplit();
+    } else {
+      setPhase('idle');
+      setIsRunning(false);
+      addLog(`🎉 Sucesso! Base de conhecimento totalmente otimizada (0 documentos grandes, 0 embeddings pendentes).`);
+    }
   };
 
   const handleRechunk = async () => {
@@ -477,16 +531,16 @@ export default function KnowledgeBase() {
       return;
     }
 
-    // Se há docs grandes, iniciar split do próximo
+    // Se há docs grandes, iniciar split do próximo de forma contínua
     if (s.large_docs > 0) {
       const titulo = s.next_doc?.titulo || '';
       const chars = (s.next_doc?.chars || 0).toLocaleString();
-      if (!confirm(`Processar proximo documento?\n"${titulo}"\n${chars} chars`)) return;
+      if (!confirm(`Iniciar otimização contínua automática de todos os ${s.large_docs} documentos?\n\nPróximo documento: "${titulo}" (${chars} chars).`)) return;
       handleSplit();
       return;
     }
 
-    alert('Base ja esta totalmente otimizada!');
+    alert('Base jurídica já está totalmente otimizada!');
     setPhase('done');
   }
 
