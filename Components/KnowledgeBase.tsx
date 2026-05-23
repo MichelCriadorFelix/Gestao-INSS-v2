@@ -277,29 +277,54 @@ export default function KnowledgeBase() {
         };
       }
       
-      if (body.action === 'split') {
-        const splitResult = await supabaseService.splitOneLargeDocument();
+      if (body.action === 'split' || body.action === 'split_js') {
+        const largeDocs = await supabaseService.getLargeDocuments(8000, 1);
+        if (!largeDocs || largeDocs.length === 0) {
+          return { done: true, chunks_created: 0, pending_embeddings: 0, large_docs_remaining: 0, titulo: '' };
+        }
+        
+        const largeDoc = largeDocs[0];
+        const content = largeDoc.content || '';
+        const title = largeDoc.metadata?.title || 'Sem título';
+        
+        // Chunk direct in browser
+        const chunkList = chunkLegalText(content, 2500, 200);
+        if (chunkList.length === 0) {
+          return { error: 'invalid_split_content', message: 'Nenhum trecho de texto gerado ao subdividir.' };
+        }
+        
+        const chunkEntries = chunkList.map((chunkText, idx) => ({
+          content: chunkText,
+          metadata: {
+            ...largeDoc.metadata,
+            title: title,
+            tipo: largeDoc.metadata?.tipo || 'outro',
+            sourceUrl: largeDoc.metadata?.sourceUrl || null,
+            dateAdded: largeDoc.metadata?.dateAdded || new Date().toISOString(),
+            chunkIndex: idx,
+            totalChunks: chunkList.length,
+            chunk_index: idx,
+            total_chunks: chunkList.length,
+          },
+          embedding: null
+        }));
+        
+        // Delete original document
+        await supabaseService.deleteLegalDocumentById(largeDoc.id);
+        
+        // Save smaller chunks
+        await supabaseService.saveLegalDocuments(chunkEntries as any);
+        
         const pending = await supabaseService.countChunksNeedingEmbedding();
         const remaining = await supabaseService.countLargeDocuments(8000);
+        
         return {
-          ...splitResult,
-          chunks_created: splitResult.chunks_gerados || 0,
+          done: false,
+          titulo: title,
+          chars: content.length,
+          chunks_created: chunkList.length,
           large_docs_remaining: remaining,
-          pending_embeddings: pending,
-          titulo: splitResult.titulo || ''
-        };
-      }
-
-      if (body.action === 'split_js') {
-        const splitResult = await supabaseService.splitOneLargeDocument();
-        const pending = await supabaseService.countChunksNeedingEmbedding();
-        const remaining = await supabaseService.countLargeDocuments(8000);
-        return {
-          ...splitResult,
-          chunks_created: splitResult.chunks_gerados || 0,
-          large_docs_remaining: remaining,
-          pending_embeddings: pending,
-          titulo: splitResult.titulo || ''
+          pending_embeddings: pending
         };
       }
 
