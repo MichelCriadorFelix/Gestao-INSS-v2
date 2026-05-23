@@ -319,19 +319,23 @@ export default function KnowledgeBase() {
         break;
       }
 
-      // Buscar o chunk pelo supabase direto (lightweight — content é 2500 chars max)
-      const { data: rows, error } = await (await import('../supabaseClient')).default
-        ?.from('legal_documents')
-        .select('id, content, metadata')
-        .eq('metadata->>needs_embedding', 'true')
-        .is('embedding', null)
-        .order('id', { ascending: true })
-        .limit(1) || { data: null, error: 'no client' };
-
-      if (error || !rows?.length) { consecutiveErrors++; if (consecutiveErrors > 3) break; continue; }
+      // Buscar 1 chunk pendente de embedding via Edge Function (get_chunks_needing_embedding)
+      let chunk: any = null;
+      try {
+        const chunkData = await edgeCall({ action: 'get_next_chunk' });
+        if (chunkData.error || !chunkData.id) {
+          consecutiveErrors++;
+          if (consecutiveErrors > 3) break;
+          await new Promise(r => setTimeout(r, 500));
+          continue;
+        }
+        chunk = chunkData;
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors > 3) break;
+        continue;
+      }
       consecutiveErrors = 0;
-
-      const chunk = rows[0];
       // Gerar embedding via API existente
       try {
         const resp = await apiFetch('/api/rag/embed', {
