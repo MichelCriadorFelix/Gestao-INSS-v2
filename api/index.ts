@@ -4765,10 +4765,7 @@ sections: [{
   }
 });
 
-// Manipulador 404 para rotas /api que não foram encontradas
-app.all("/api/*", (req, res) => {
-  res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
-});
+
 
 // ============================================================
 // FIX D — ENDPOINT ADMIN: RECHUNKING DE DOCUMENTOS GIGANTES
@@ -5036,6 +5033,11 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
     send({ error: String(err?.message || 'Erro interno') });
   }
   res.end();
+});
+
+// Manipulador 404 para rotas /api que não foram encontradas (deve ficar após todas as rotas de API legítimas)
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
 });
 
 
