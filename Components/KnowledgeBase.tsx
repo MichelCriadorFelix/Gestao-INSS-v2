@@ -254,25 +254,72 @@ export default function KnowledgeBase() {
   const [log, setLog] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
-  const EDGE_URL = 'https://nnhatyvrtlbkyfadumqo.supabase.co/functions/v1/rechunk-large-docs';
-  const ADMIN_KEY = 'felix-castro-rechunk-2026';
-
-  const edgeCall = async (body: object, timeoutMs = 20000) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const edgeCall = async (body: any, timeoutMs = 20000): Promise<any> => {
     try {
-      const r = await fetch(EDGE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminKey: ADMIN_KEY, ...body }),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      return r.json();
+      if (body.action === 'status') {
+        const pending_embeddings = await supabaseService.countChunksNeedingEmbedding();
+        const large_docs = await supabaseService.countLargeDocuments(8000);
+        let next_doc = null;
+        if (large_docs > 0) {
+          const docs = await supabaseService.getLargeDocuments(8000, 1);
+          if (docs && docs.length > 0) {
+            next_doc = {
+              titulo: docs[0].metadata?.title || 'Sem título',
+              chars: docs[0].content?.length || 0,
+              id: docs[0].id
+            };
+          }
+        }
+        return {
+          pending_embeddings,
+          large_docs,
+          next_doc
+        };
+      }
+      
+      if (body.action === 'split') {
+        const splitResult = await supabaseService.splitOneLargeDocument();
+        const pending = await supabaseService.countChunksNeedingEmbedding();
+        const remaining = await supabaseService.countLargeDocuments(8000);
+        return {
+          ...splitResult,
+          chunks_created: splitResult.chunks_gerados || 0,
+          large_docs_remaining: remaining,
+          pending_embeddings: pending,
+          titulo: splitResult.titulo || ''
+        };
+      }
+
+      if (body.action === 'split_js') {
+        const splitResult = await supabaseService.splitOneLargeDocument();
+        const pending = await supabaseService.countChunksNeedingEmbedding();
+        const remaining = await supabaseService.countLargeDocuments(8000);
+        return {
+          ...splitResult,
+          chunks_created: splitResult.chunks_gerados || 0,
+          large_docs_remaining: remaining,
+          pending_embeddings: pending,
+          titulo: splitResult.titulo || ''
+        };
+      }
+
+      if (body.action === 'get_next_chunk') {
+        const nextChunk = await supabaseService.getOneChunkNeedingEmbedding();
+        if (!nextChunk) {
+          return { error: 'sem_chunk' };
+        }
+        return nextChunk;
+      }
+
+      if (body.action === 'save_embedding') {
+        await supabaseService.updateEmbedding(body.chunkId, body.embedding);
+        return { success: true };
+      }
+
+      return { error: 'invalid_action' };
     } catch (e: any) {
-      clearTimeout(timer);
-      if (e.name === 'AbortError') return { error: 'timeout', message: 'Servidor demorou >20s' };
-      return { error: e.message };
+      console.error('Local edgeCall error:', e);
+      return { error: e.message || 'Erro de rede ou banco' };
     }
   };
 
@@ -552,7 +599,172 @@ export default function KnowledgeBase() {
 
   // ── Interface principal ──────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
+      {/* Top Header Row with Maintenance Toggle */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-bordeaux-950/60 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-gold-500/20 gap-3">
+        <div>
+          <h1 className="text-lg font-serif font-semibold text-slate-800 dark:text-cream-55">
+            Gestão da Base de Conhecimento
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Gerenciamento, indexação de documentos jurídicos e otimização de trechos (Rechunking).
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            const nextVal = !showAdmin;
+            setShowAdmin(nextVal);
+            if (nextVal) {
+              fetchStatus();
+            }
+          }}
+          className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shrink-0 ${
+            showAdmin
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60 text-amber-700 dark:text-amber-400'
+              : 'bg-slate-50 hover:bg-slate-100 dark:bg-bordeaux-900/40 dark:hover:bg-bordeaux-900/60 border-slate-200 dark:border-gold-500/15 text-slate-700 dark:text-gold-400'
+          }`}
+        >
+          <Wrench size={14} />
+          {showAdmin ? 'Fechar Painel Otimizador' : 'Otimizar Chunks da Base (Admin)'}
+        </button>
+      </div>
+
+      {/* Painel de manutenção — Otimizar Chunks */}
+      {showAdmin && (
+        <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/20 rounded-xl p-6 shadow-sm space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 border-b border-slate-100 dark:border-gold-500/10 pb-3">
+            <Wrench className="text-indigo-500 animate-pulse" size={18} />
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100 font-serif">
+              Otimizador de Chunks (Padrão Ouro — 2.500 chars com overlap)
+            </h2>
+          </div>
+
+          {/* Grid de Métricas */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-50 dark:bg-bordeaux-900/30 border border-slate-100 dark:border-gold-500/10 rounded-lg p-3">
+              <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                Documentos Grandes (&gt;8k chars)
+              </span>
+              <span className="text-xl font-bold text-slate-800 dark:text-slate-100 font-mono">
+                {status?.large_docs !== undefined ? status.large_docs : '—'}
+              </span>
+            </div>
+            
+            <div className="bg-slate-50 dark:bg-bordeaux-900/30 border border-slate-100 dark:border-gold-500/10 rounded-lg p-3">
+              <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                Trechos sem Embedding
+              </span>
+              <span className="text-xl font-bold text-red-600 dark:text-red-400 font-mono">
+                {status?.pending_embeddings !== undefined ? status.pending_embeddings : '—'}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-bordeaux-900/30 border border-slate-100 dark:border-gold-500/10 rounded-lg p-3">
+              <span className="block text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                Estado do Otimizador
+              </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full inline-block mt-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200/40">
+                {isRunning ? 'Ativo...' : 'Inativo'}
+              </span>
+            </div>
+          </div>
+
+          {/* Próximo Documento */}
+          {status?.next_doc && (
+            <div className="bg-slate-50 dark:bg-bordeaux-900/20 border border-slate-100 dark:border-gold-500/10 rounded-lg p-4 space-y-1">
+              <span className="block text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                Próximo a processar (O maior documento)
+              </span>
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate" title={status.next_doc.titulo}>
+                  📋 {status.next_doc.titulo}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono shrink-0">
+                  {status.next_doc.chars.toLocaleString()} chars
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Progresso de Execução */}
+          {phase !== 'idle' && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>FASE: {
+                  phase === 'splitting' ? '✂️ Dividindo documento...' :
+                  phase === 'embedding' ? '⚙️ Gerando embeddings...' :
+                  'Pronto'
+                }</span>
+                {phase === 'embedding' && progress.total > 0 && (
+                  <span>{progress.done} de {progress.total} chunks ({Math.round((progress.done / progress.total) * 100)}%)</span>
+                )}
+              </div>
+              {phase === 'embedding' && progress.total > 0 && (
+                <div className="h-1.5 bg-slate-100 dark:bg-bordeaux-900 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-600 transition-all duration-300"
+                    style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Console de Logs */}
+          {log.length > 0 && (
+            <div className="space-y-1">
+              <span className="block text-xs font-medium text-slate-400 uppercase tracking-wide">
+                Logs de Processamento
+              </span>
+              <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 h-40 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1 leading-relaxed shadow-inner">
+                {log.map((line, idx) => (
+                  <div key={idx} className={
+                    line.includes('❌') || line.includes('Erro') ? 'text-red-400 font-semibold' :
+                    line.includes('⚠️') ? 'text-amber-400 font-semibold' :
+                    line.includes('✅') || line.includes('🎉') ? 'text-emerald-400 font-semibold' :
+                    'text-slate-300'
+                  }>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={async () => {
+                if (isRunning) return;
+                setIsRunning(true);
+                addLog('Iniciando atualização de status...');
+                await fetchStatus();
+                setIsRunning(false);
+              }}
+              disabled={isRunning}
+              className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${
+                isRunning
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                  : 'bg-white hover:bg-slate-50 dark:bg-bordeaux-900/20 dark:hover:bg-bordeaux-900/30 text-slate-700 dark:text-gold-400 border-slate-200 dark:border-gold-500/15'
+              }`}
+            >
+              🔄 Atualizar Status
+            </button>
+            <button
+              onClick={handleRechunk}
+              disabled={isRunning || (!status?.pending_embeddings && !status?.large_docs)}
+              className={`px-5 py-2 text-xs font-semibold rounded-lg text-white transition-all flex items-center gap-1.5 shadow-sm ${
+                isRunning || (!status?.pending_embeddings && !status?.large_docs)
+                  ? 'bg-indigo-300 dark:bg-indigo-950/50 cursor-not-allowed text-indigo-100'
+                  : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-500/10 font-bold'
+              }`}
+            >
+              <Wrench size={13} />
+              {status?.pending_embeddings > 0 ? `Gerar Embeddings (${status.pending_embeddings} pendentes)` : 'Iniciar Otimização'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Guia de Nomenclatura */}
       <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4">

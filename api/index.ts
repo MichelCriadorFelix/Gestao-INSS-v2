@@ -3090,10 +3090,7 @@ O usuário selecionou explicitamente este alvo — DEVE ser atingido expandindo 
       } else {
         // Padrão (Livre): tentar extrair recomendação do histórico; se não houver, 5000 fixo
         const historyText = history.map((h: any) => h.content || "").join("\n");
-        const extMatch = historyText.match(/RECOMENDAÇÃO DE EXTENSÃO[^
-]*
-[^
-]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+        const extMatch = historyText.match(/RECOMENDAÇÃO DE EXTENSÃO.*?(Mínimo|Médio|Máximo)\s+(\d{4,5})/is)
           || historyText.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
         const detectedTarget = extMatch ? parseInt(extMatch[2]) : 5000;
         lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
