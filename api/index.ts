@@ -2228,7 +2228,7 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 `;
 
 // Logic for API Key Rotation (Round-Robin)
-let currentKeyIndex = Math.floor(Math.random() * 10);
+let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
