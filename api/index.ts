@@ -3570,7 +3570,7 @@ Esta peça deve ter aproximadamente **${target || 5000} palavras** de alta densi
 O usuário selecionou explicitamente este alvo — DEVE ser atingido.`;
       } else {
         const historyTextL = history.map((h: any) => h.content || "").join("\n");
-        const extMatchL = historyTextL.match(/RECOMENDAÇÃO DE EXTENSÃO[^\n]*\n[^\n]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+        const extMatchL = historyTextL.match(/RECOMENDAÇÃO DE EXTENSÃO.*?(Mínimo|Médio|Máximo)\s+(\d{4,5})/is)
           || historyTextL.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
         const detectedTargetL = extMatchL ? parseInt(extMatchL[2]) : 5000;
         lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
@@ -4142,7 +4142,7 @@ ${message}`;
           targetInstruction = `A petição deve ter aproximadamente **${wordTarget} palavras** de extrema densidade jurídica.`;
         } else {
           const historyTextF = history.map((h: any) => h.content || "").join("\n");
-          const extMatchF = historyTextF.match(/RECOMENDAÇÃO DE EXTENSÃO[^\n]*\n[^\n]*(Mínimo|Médio|Máximo)\s+(\d{4,5})/i)
+          const extMatchF = historyTextF.match(/RECOMENDAÇÃO DE EXTENSÃO.*?(Mínimo|Médio|Máximo)\s+(\d{4,5})/is)
             || historyTextF.match(/(Mínimo|Médio|Máximo)\s+(\d{4,5})\s+palavras/i);
           const detectedTargetF = extMatchF ? parseInt(extMatchF[2]) : 5000;
           targetInstruction = `Esta peça deve ter aproximadamente **${detectedTargetF} palavras** de extrema densidade jurídica. ${extMatchF ? "Alvo extraído do Relatório." : "Alvo padrão — nenhum relatório detectado."}`;
