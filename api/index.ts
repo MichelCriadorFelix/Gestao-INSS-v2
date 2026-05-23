@@ -3344,9 +3344,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // FIX#7: salvar draft sempre que output > 5000 chars (não apenas em isGenerationRequest)
-      // FULL_REGENERATION e ADDITION também produzem peças longas que precisam ser salvas
-      if (sessionId && fullResponseText.length > 5000) {
+      // FIX#12: salvar draft sempre que output > 5000 chars (não apenas em isGenerationRequest)
+      // Mas NUNCA salvar relatórios de auditoria (isReportRequest) como petition_draft, para evitar conflitos de revisão
+      if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_michel_${sessionId}`,
@@ -3854,8 +3854,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // FIX#7: salvar draft sempre que output > 5000 chars
-      if (sessionId && fullResponseText.length > 5000) {
+      // FIX#12: salvar draft sempre que output > 5000 chars (evita salvar relatórios isReportRequestLuana como draft)
+      if (sessionId && fullResponseText.length > 5000 && !isReportRequestLuana) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dra_luana_${sessionId}`,
@@ -4260,8 +4260,8 @@ REGRAS ABSOLUTAS:
       }
       
       // Salva draft
-      // FIX#7: salvar draft sempre que output > 5000 chars
-      if (sessionId && fullResponseText.length > 5000) {
+      // FIX#12: salvar draft sempre que output > 5000 chars (evita salvar relatórios isReportRequest como draft)
+      if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_felix_castro_${sessionId}`,
