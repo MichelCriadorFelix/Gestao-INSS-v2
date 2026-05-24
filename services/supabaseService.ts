@@ -767,17 +767,44 @@ export const supabaseService = {
     is_single_chunk: boolean | null}>> {
     const supabase = getSupabase();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .rpc('match_legal_documents_by_area', {
-        query_embedding: embedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount,
-        filter_areas: areas
-      });
-    if (error) {
-      console.error('Erro na busca por área:', error);
-      return [];
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    // Tenta primeiro via RPC dedicada se ela existir no Postgres de forma nativa
+    try {
+      const response = await supabase
+        .rpc('match_legal_documents_by_area', {
+          query_embedding: embedding,
+          match_threshold: matchThreshold,
+          match_count: matchCount,
+          filter_areas: areas
+        });
+      data = response.data;
+      error = response.error;
+    } catch (err) {
+      error = err;
     }
+
+    // Se houve erro (por exemplo, a RPC match_legal_documents_by_area não existe ou não foi criada via migrations)
+    // ou se a busca por área retornou zero resultados (o que pode acontecer se todos os documentos forem legados
+    // e ainda não possuírem a propriedade de áreas gravadas no metadados), usamos o fallback inteligente com filtragem em JS.
+    if (error || !data || data.length === 0) {
+      const legacyResults = await this.searchLegalDocuments(embedding, matchThreshold, matchCount);
+      if (!legacyResults || legacyResults.length === 0) return [];
+
+      // Filtragem inteligente na camada de aplicação:
+      // 1. Inclui documentos sem metadados ou sem o array 'areas' cadastrado (para manter retrocompatibilidade com o acervo existente!)
+      // 2. Para documentos novos que possuem o array 'areas', garante que haja interseção com as áreas do respectivo agente.
+      return legacyResults.filter(doc => {
+        const docAreas = doc.metadata?.areas;
+        if (!docAreas || !Array.isArray(docAreas) || docAreas.length === 0) {
+          return true; // Documento legado ou sem restrição, exibe sempre
+        }
+        return docAreas.some((a: string) => areas.includes(a));
+      });
+    }
+
     return data || [];
   },
 

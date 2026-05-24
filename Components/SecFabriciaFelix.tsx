@@ -471,36 +471,34 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
         //            Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
         // • EC/CF:   'Nome (EC nº X/AAAA)' ou 'CONSTITUIÇÃO...'
         //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
-        // Busca e filtra os títulos da base para consulta exata por título (apenas se for comando de geração)
+        // Busca e filtra os títulos da base para consulta exata por título
         // Otimização: filtra apenas os títulos mencionados no prompt para evitar N+1 queries desnecessárias e diluição de contexto
         const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
-        const allTitles = isGenerationCommand
-          ? allLawTitles.filter((title: string) => {
-              const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-              const normQuery = messageText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const allTitles = allLawTitles.filter((title: string) => {
+          const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const normQuery = messageText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-              // 1. Inclusão direta do título
-              if (normQuery.includes(normTitle)) return true;
+          // 1. Inclusão direta do título
+          if (normQuery.includes(normTitle)) return true;
 
-              // 2. Correspondência por números de lei/súmula/tema (ex: "11442" ou "8213")
-              const numbers = title.match(/\d+[\d./-]*\d*/g) || [];
-              for (const num of numbers) {
-                if (num.length >= 2 && normQuery.includes(num.replace(/[./-]/g, ''))) {
-                  return true;
-                }
-              }
+          // 2. Correspondência por números de lei/súmula/tema (ex: "11442" ou "8213")
+          const numbers = title.match(/\d+[\d./-]*\d*/g) || [];
+          for (const num of numbers) {
+            if (num.length >= 2 && normQuery.includes(num.replace(/[./-]/g, ''))) {
+              return true;
+            }
+          }
 
-              // 3. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
-              const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
-              for (const kw of keywords) {
-                if (normQuery.includes(kw)) {
-                  return true;
-                }
-              }
+          // 3. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
+          const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
+          for (const kw of keywords) {
+            if (normQuery.includes(kw)) {
+              return true;
+            }
+          }
 
-              return false;
-            })
-          : [];
+          return false;
+        });
 
         // Query limpa para busca vetorial (evitando poluição do vetor com títulos de outras leis não pertinentes)
         const ragQuery = messageText.substring(0, 420);
@@ -522,7 +520,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
-            // Threshold 0.60 e máximo 12 resultados para reduzir ruído
+            // Threshold 0.50 e máximo 30 resultados para ampla cobertura de buscas por área e retrocompatibilidade de legados
             const vectorResults = await supabaseService
               .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.50, 30);
 
@@ -538,8 +536,10 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
 
             // Vetorial primeiro (mais relevante)
             vectorResults.forEach((r: any) => {
-              seen.add(r.id);
-              merged.push({ ...r, source: 'vector' });
+              if (!seen.has(r.id)) {
+                seen.add(r.id);
+                merged.push({ ...r, source: 'vector' });
+              }
             });
             // Keyword depois (complementar)
             keywordResults.forEach((r: any) => {
