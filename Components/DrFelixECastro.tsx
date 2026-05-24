@@ -470,15 +470,39 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
         //            Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
         // • EC/CF:   'Nome (EC nº X/AAAA)' ou 'CONSTITUIÇÃO...'
         //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
-        // Enriquece a query com títulos das leis já conhecidas
-        // na base para melhorar precisão do RAG em qualquer área
+        // Busca e filtra os títulos da base para consulta exata por título (apenas se for comando de geração)
+        // Otimização: filtra apenas os títulos mencionados no prompt para evitar N+1 queries desnecessárias e diluição de contexto
         const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
-        const allTitles = isGenerationCommand ? allLawTitles : [];
-        const titlesSnippet = allLawTitles
-          .slice(0, 20)
-          .map((t: string) => t.replace(/[()]/g, ''))
-          .join(' ');
-        const ragQuery = messageText.substring(0, 350) + ' ' + titlesSnippet.substring(0, 150);
+        const allTitles = isGenerationCommand
+          ? allLawTitles.filter((title: string) => {
+              const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+              const normQuery = messageText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+              // 1. Inclusão direta do título
+              if (normQuery.includes(normTitle)) return true;
+
+              // 2. Correspondência por números de lei/súmula/tema (ex: "11442" ou "8213")
+              const numbers = title.match(/\d+[\d./-]*\d*/g) || [];
+              for (const num of numbers) {
+                if (num.length >= 2 && normQuery.includes(num.replace(/[./-]/g, ''))) {
+                  return true;
+                }
+              }
+
+              // 3. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
+              const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
+              for (const kw of keywords) {
+                if (normQuery.includes(kw)) {
+                  return true;
+                }
+              }
+
+              return false;
+            })
+          : [];
+
+        // Query limpa para busca vetorial (evitando poluição do vetor com títulos de outras leis não pertinentes)
+        const ragQuery = messageText.substring(0, 420);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
