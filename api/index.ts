@@ -934,7 +934,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
    - Súmula 79 TNU = BPC/LOAS. Não desconsidera renda de membros do grupo familiar com benefícios assistenciais.
    - Súmula 80 TNU = BPC/LOAS. Necessidade de avaliação social (fatores ambientais, sociais, econômicos e pessoais).
 
-🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte o advogado no final da peça para adicionar à base.
+🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
@@ -1641,7 +1641,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 🔴 COERÊNCIA TEMÁTICA TRABALHISTA (REGRA CRÍTICA — ANTI-ALUCINAÇÃO):
    Use EXCLUSIVAMENTE fundamentação de Direito do Trabalho/Processual do Trabalho aplicável ao caso concreto. NUNCA citar institutos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019). Não use analogias entre Direito do Trabalho e Direito Previdenciário sem base expressa no RAG.
 
-🔴 PROIBIDO inventar ou citar Súmulas TST/STF, Temas, Leis ou OJs que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte a advogada no final da peça para adicionar à base.
+🔴 PROIBIDO inventar ou citar Súmulas TST/STF, Temas, Leis ou OJs que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
@@ -1651,8 +1651,7 @@ A. SE O TEXTO ESTIVER NA BASE DE CONHECIMENTO (RAG):
    → Cite TEXTUALMENTE em blockquote (>), com cada linha começando por >.
    → O texto deve ser IDÊNTICO ao fornecido — nem uma vírgula a mais.
    → Antes e depois da citação, contextualize: explique POR QUE aquele dispositivo se aplica ao caso.
-   → Itens com score ≥ 70%: citação direta em blockquote.
-   → Itens com score < 60%: use apenas como referência contextual, sem citar textualmente.
+   → REGRA DE PRIORIDADE: independentemente do score, se o item recuperado é a lei, súmula ou OJ EXATAMENTE necessária para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão.
 
 B. SE O TEXTO NÃO ESTIVER NA BASE (REGRA ABSOLUTA):
    → É ESTRITAMENTE PROIBIDO citar, mencionar, sugerir ou parafrasear qualquer lei, artigo, decreto ou jurisprudência que não esteja no RAG.
@@ -1940,7 +1939,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
    • Misto (CDC + CC): aplique CDC como norma especial e CC subsidiariamente.
    PROIBIDO usar argumento por analogia entre áreas distintas sem base expressa no RAG.
 
-🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, mencione apenas sua aplicabilidade SEM transcrever e alerte o advogado no final da peça para adicionar à base.
+🔴 PROIBIDO inventar ou citar Súmulas, Temas, Leis ou Decretos que NÃO constem na Base de Conhecimento (RAG). Se uma fonte essencial NÃO foi recuperada, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 1 — REGRAS DE CITAÇÃO JURÍDICA (NÚCLEO DO PADRÃO OURO)
@@ -3033,7 +3032,7 @@ REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
 3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ, Tema 905/STJ etc.) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
 
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
@@ -3172,11 +3171,11 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
-    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
-
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
+
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -3256,7 +3255,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           const orResult = await callOpenRouterStream({
             model: model || "deepseek/deepseek-v4-flash",
             messages: orMessages,
-            temperature: isGenerationRequest ? 0.15 : temperature,
+            temperature: finalTemperature,
             max_tokens: maxOutputTokens || 18000,
             provider: {
               data_collection: false,
@@ -3500,7 +3499,7 @@ REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
 3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
 
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
@@ -3664,11 +3663,11 @@ ${message}`;
     ];
 
     // Configuração de Tools (Google Search Grounding + URL Context)
-    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
-    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
-
     const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest || isReportRequestLuana || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
+
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -3755,7 +3754,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           const orResult = await callOpenRouterStream({
             model: model || "deepseek/deepseek-v4-flash",
             messages: orMessagesFinal,
-            temperature: isGenerationRequest ? 0.15 : temperature,
+            temperature: finalTemperature,
             max_tokens: maxOutputTokens || 18000,
             provider: {
               data_collection: false,
@@ -3975,7 +3974,7 @@ REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
 3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, mencione brevemente sem transcrever.`;
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
 
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
@@ -4077,11 +4076,11 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
-    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
-
     const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
       (message || "").includes("GERAR RELATORIO");
+    // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
+    const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
+
 
     let maxOutputTokens = 4096;
     let thinkingConfig: any = { thinkingBudget: 1024 };
@@ -4172,7 +4171,7 @@ REGRAS ABSOLUTAS:
           const orResult = await callOpenRouterStream({
             model: model || "deepseek/deepseek-v4-flash",
             messages: orMessages,
-            temperature: isGenerationRequest ? 0.15 : temperature,
+            temperature: finalTemperature,
             max_tokens: maxOutputTokens || 18000,
             provider: {
               data_collection: false,
@@ -4528,8 +4527,9 @@ files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: fi
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
+    let isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
     // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
-    const tools = (isStorageRequest || isGenerationRequest) ? undefined : [{ googleSearch: {} }];
+    const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
     if (modelProvider === 'openrouter') {
 clearInterval(heartbeat);
@@ -4565,7 +4565,7 @@ await callOpenRouterStream({
 return;
     }
 
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
+    isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
