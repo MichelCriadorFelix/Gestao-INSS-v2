@@ -38,7 +38,14 @@ const isValidUrl = (url: string | undefined): boolean => {
 };
 
 export const getDbConfig = () => {
-    const stored = localStorage.getItem(DB_CONFIG_KEY);
+    let stored = null;
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        try {
+            stored = localStorage.getItem(DB_CONFIG_KEY);
+        } catch (e) {
+            console.warn("Could not read from localStorage on getDbConfig:", e);
+        }
+    }
     if (stored) return JSON.parse(stored);
 
     const envUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');

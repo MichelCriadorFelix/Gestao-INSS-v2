@@ -768,44 +768,69 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return [];
 
-    let data: any[] | null = null;
-    let error: any = null;
+    let areaData: any[] = [];
+    let legacyData: any[] = [];
 
-    // Tenta primeiro via RPC dedicada se ela existir no Postgres de forma nativa
+    // Buscas paralelas para ampla cobertura e velocidade garantida (modo cabal!)
     try {
-      const response = await supabase
-        .rpc('match_legal_documents_by_area', {
+      const [areaRes, legacyRes] = await Promise.all([
+        supabase.rpc('match_legal_documents_by_area', {
           query_embedding: embedding,
           match_threshold: matchThreshold,
           match_count: matchCount,
           filter_areas: areas
-        });
-      data = response.data;
-      error = response.error;
+        }),
+        supabase.rpc('match_legal_documents_smart', {
+          query_embedding: embedding,
+          match_threshold: matchThreshold,
+          match_count: matchCount
+        })
+      ]);
+
+      if (areaRes.data) areaData = areaRes.data;
+      if (legacyRes.data) legacyData = legacyRes.data;
     } catch (err) {
-      error = err;
+      console.warn("Error doing parallel RAG searches, trying fallback:", err);
+      try {
+        const legacyRes = await supabase.rpc('match_legal_documents_smart', {
+          query_embedding: embedding,
+          match_threshold: matchThreshold,
+          match_count: matchCount
+        });
+        if (legacyRes.data) legacyData = legacyRes.data;
+      } catch (innerErr) {
+        console.error("Critical fallback search failed:", innerErr);
+      }
     }
 
-    // Se houve erro (por exemplo, a RPC match_legal_documents_by_area não existe ou não foi criada via migrations)
-    // ou se a busca por área retornou zero resultados (o que pode acontecer se todos os documentos forem legados
-    // e ainda não possuírem a propriedade de áreas gravadas no metadados), usamos o fallback inteligente com filtragem em JS.
-    if (error || !data || data.length === 0) {
-      const legacyResults = await this.searchLegalDocuments(embedding, matchThreshold, matchCount);
-      if (!legacyResults || legacyResults.length === 0) return [];
+    // Merge sem duplicatas
+    const seen = new Set<number>();
+    const merged: any[] = [];
 
-      // Filtragem inteligente na camada de aplicação:
-      // 1. Inclui documentos sem metadados ou sem o array 'areas' cadastrado (para manter retrocompatibilidade com o acervo existente!)
-      // 2. Para documentos novos que possuem o array 'areas', garante que haja interseção com as áreas do respectivo agente.
-      return legacyResults.filter(doc => {
+    // 1. Adicionar resultados por área primeiro
+    areaData.forEach((doc: any) => {
+      seen.add(doc.id);
+      merged.push(doc);
+    });
+
+    // 2. Adicionar da busca geral se passarem na validação inteligente
+    // (para recuperar Código Civil ou outros que faltem áreas classificadas)
+    legacyData.forEach((doc: any) => {
+      if (!seen.has(doc.id)) {
         const docAreas = doc.metadata?.areas;
-        if (!docAreas || !Array.isArray(docAreas) || docAreas.length === 0) {
-          return true; // Documento legado ou sem restrição, exibe sempre
+        if (!docAreas || !Array.isArray(docAreas) || docAreas.length === 0 || docAreas.some((a: string) => areas.includes(a))) {
+          seen.add(doc.id);
+          merged.push(doc);
         }
-        return docAreas.some((a: string) => areas.includes(a));
-      });
-    }
+      }
+    });
 
-    return data || [];
+    // Ordena decrescente pela similaridade
+    return merged.sort((a, b) => {
+      const simA = a.similarity ?? a.a_similarity ?? 0;
+      const simB = b.similarity ?? b.a_similarity ?? 0;
+      return simB - simA;
+    }).slice(0, matchCount);
   },
 
   async getAllLegalDocumentTitles(): Promise<string[]> {
@@ -814,13 +839,16 @@ export const supabaseService = {
 
     const { data, error } = await supabase
       .from('legal_documents')
-      .select("metadata->>title")
-      .not('metadata->>title', 'is', null);
+      .select("metadata");
 
     if (error || !data) return [];
 
     const titles = data
-      .map((row: any) => Object.values(row)[0])
+      .map((row: any) => {
+        if (!row) return null;
+        if (row.metadata?.title) return row.metadata.title;
+        return row.title || row['metadata->title'] || row['metadata->>title'] || (typeof row === 'string' ? row : Object.values(row)[0]);
+      })
       .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
 
     return [...new Set(titles)] as string[];
@@ -834,10 +862,11 @@ export const supabaseService = {
     const seen = new Set<number>();
 
     for (const title of titles) {
+      // Query tolerante a caminhos JSONB e versões de PostgREST
       const { data, error } = await supabase
         .from('legal_documents')
         .select('*')
-        .eq('metadata->>title', title)
+        .or(`metadata->title.eq."${title}",metadata->>title.eq."${title}"`)
         .limit(chunksPerTitle);
 
       if (!error && data) {
