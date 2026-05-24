@@ -470,11 +470,15 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
         //            Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
         // • EC/CF:   'Nome (EC nº X/AAAA)' ou 'CONSTITUIÇÃO...'
         //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
-        const allTitles = isGenerationCommand
-          ? await supabaseService.getAllLegalDocumentTitles()
-          : [];
-
-        const ragQuery = messageText.substring(0, 400);
+        // Enriquece a query com títulos das leis já conhecidas
+        // na base para melhorar precisão do RAG em qualquer área
+        const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
+        const allTitles = isGenerationCommand ? allLawTitles : [];
+        const titlesSnippet = allLawTitles
+          .slice(0, 20)
+          .map((t: string) => t.replace(/[()]/g, ''))
+          .join(' ');
+        const ragQuery = messageText.substring(0, 350) + ' ' + titlesSnippet.substring(0, 150);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
@@ -483,7 +487,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
           }),
-          supabaseService.keywordSearchLegalDocuments(messageText, 5)
+          supabaseService.keywordSearchLegalDocuments(messageText, 15)
         ]);
 
         const titleResults = allTitles.length > 0

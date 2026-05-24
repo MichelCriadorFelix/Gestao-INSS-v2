@@ -457,11 +457,15 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         // Busca TODOS os títulos da base dinamicamente.
         // Documentos futuros são captados automaticamente
         // desde que sigam os padrões de nomenclatura da base.
-        const allTitles = isGenerationCommand
-          ? await supabaseService.getAllLegalDocumentTitles()
-          : [];
-
-        const ragQuery = messageText.substring(0, 400);
+        // Enriquece a query com títulos das leis já conhecidas
+        // na base para melhorar precisão do RAG em qualquer área
+        const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
+        const allTitles = isGenerationCommand ? allLawTitles : [];
+        const titlesSnippet = allLawTitles
+          .slice(0, 20)
+          .map((t: string) => t.replace(/[()]/g, ''))
+          .join(' ');
+        const ragQuery = messageText.substring(0, 350) + ' ' + titlesSnippet.substring(0, 150);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
@@ -470,7 +474,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
           }),
-          supabaseService.keywordSearchLegalDocuments(messageText, 5)
+          supabaseService.keywordSearchLegalDocuments(messageText, 15)
         ]);
 
         const titleResults = allTitles.length > 0
