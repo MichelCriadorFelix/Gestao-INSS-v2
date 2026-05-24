@@ -330,6 +330,24 @@ export default function KnowledgeBase() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showGuide, setShowGuide] = useState(false);
 
+  const AREAS_DISPONIVEIS = [
+    { id: 'INSS',        label: 'Previdenciário — RGPS/INSS',     cor: 'blue'   },
+    { id: 'RPPS',        label: 'Previdenciário — RPPS/Servidor',  cor: 'purple' },
+    { id: 'TRABALHISTA', label: 'Trabalhista',                     cor: 'orange' },
+    { id: 'CONSUMIDOR',  label: 'Consumidor / CDC',                cor: 'green'  },
+    { id: 'CIVEL',       label: 'Cível',                           cor: 'red'    },
+  ];
+
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+
+  const toggleArea = (areaId: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(areaId)
+        ? prev.filter(a => a !== areaId)
+        : [...prev, areaId]
+    );
+  };
+
   // Manutenção — rechunking
   const [showAdmin, setShowAdmin] = useState(false);
   const [phase, setPhase] = useState<'idle'|'splitting'|'embedding'|'done'>('idle');
@@ -687,6 +705,13 @@ export default function KnowledgeBase() {
       setMessage({ text: 'Título e conteúdo são obrigatórios.', type: 'error' });
       return;
     }
+    if (selectedAreas.length === 0) {
+      setMessage({
+        text: 'Selecione ao menos uma área jurídica.',
+        type: 'error'
+      });
+      return;
+    }
     if (titleWarnings.length > 0) {
       if (!confirm('O título tem avisos de padronização. Deseja continuar mesmo assim?')) return;
     }
@@ -728,6 +753,7 @@ export default function KnowledgeBase() {
           content: chunk,
           metadata: {
             title: title.trim(),
+            areas: selectedAreas,
             tipo: tipoDetectado,
             sourceUrl: sourceUrl.trim() || null,
             dateAdded: new Date().toISOString(),
@@ -767,7 +793,7 @@ export default function KnowledgeBase() {
           A IA já pode usar este documento nas petições e respostas jurídicas.
         </p>
         <button
-          onClick={() => { setIsSuccess(false); setTitle(''); setContent(''); setSourceUrl(''); setMessage({ text: '', type: '' }); }}
+          onClick={() => { setIsSuccess(false); setTitle(''); setContent(''); setSourceUrl(''); setSelectedAreas([]); setMessage({ text: '', type: '' }); }}
           className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
         >
           <Plus size={20} /> Adicionar Mais
@@ -983,49 +1009,7 @@ export default function KnowledgeBase() {
         </button>
       </div>
 
-      {/* Guia de Nomenclatura */}
-      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/30 rounded-xl p-4">
-        <button
-          onClick={() => setShowGuide(!showGuide)}
-          className="w-full flex items-center justify-between text-left"
-        >
-          <div className="flex items-center gap-2">
-            <Info size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
-            <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Padrão Ouro de Nomenclatura — Base de Conhecimento Felix & Castro
-            </span>
-          </div>
-          <span className="text-amber-600 dark:text-amber-400 text-xs">{showGuide ? '▲ fechar' : '▼ ver guia'}</span>
-        </button>
 
-        {showGuide && (
-          <div className="mt-4 space-y-4">
-            {NAMING_GUIDE.map((item) => (
-              <div key={item.tipo} className="bg-white dark:bg-bordeaux-900/40 rounded-lg p-3 border border-amber-100 dark:border-amber-800/20">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-base">{item.icon}</span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{item.tipo}</span>
-                </div>
-                <code className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded block mb-2">
-                  {item.padrao}
-                </code>
-                <div className="space-y-1">
-                  {item.exemplos.map((ex) => (
-                    <button
-                      key={ex}
-                      onClick={() => handleSelectExample(ex)}
-                      className="w-full text-left text-xs text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors truncate"
-                      title={`Usar "${ex}" como título`}
-                    >
-                      → {ex}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulário de upload */}
@@ -1084,6 +1068,121 @@ export default function KnowledgeBase() {
                 placeholder="Ex: https://www.planalto.gov.br/ccivil_03/leis/l8213cons.htm"
                 className="w-full p-2 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 text-sm"
               />
+            </div>
+
+            {/* Áreas Jurídicas */}
+            <div className="bg-slate-50 dark:bg-bordeaux-900/20 p-4 rounded-xl border border-slate-200/60 dark:border-gold-500/10">
+              <label className="block text-sm font-semibold text-slate-800 dark:text-slate-100 mb-0.5">
+                Áreas Jurídicas *
+              </label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                Selecione todas as áreas aplicáveis (pode ser mais de uma)
+              </p>
+              
+              <div className="flex flex-wrap gap-2">
+                {AREAS_DISPONIVEIS.map(area => {
+                  const isChecked = selectedAreas.includes(area.id);
+                  let badgeColors = "";
+                  if (area.cor === 'blue') badgeColors = isChecked ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-semibold text-xs rounded-full border px-3 py-1.5" : "bg-slate-100/50 dark:bg-bordeaux-900/20 border-slate-200 dark:border-gold-500/5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 text-xs rounded-full border px-3 py-1.5";
+                  else if (area.cor === 'purple') badgeColors = isChecked ? "bg-purple-100 dark:bg-purple-900/40 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300 font-semibold text-xs rounded-full border px-3 py-1.5" : "bg-slate-100/50 dark:bg-bordeaux-900/20 border-slate-200 dark:border-gold-500/5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 text-xs rounded-full border px-3 py-1.5";
+                  else if (area.cor === 'orange') badgeColors = isChecked ? "bg-orange-100 dark:bg-orange-900/40 border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-300 font-semibold text-xs rounded-full border px-3 py-1.5" : "bg-slate-100/50 dark:bg-bordeaux-900/20 border-slate-200 dark:border-gold-500/5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 text-xs rounded-full border px-3 py-1.5";
+                  else if (area.cor === 'green') badgeColors = isChecked ? "bg-emerald-100 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300 font-semibold text-xs rounded-full border px-3 py-1.5" : "bg-slate-100/50 dark:bg-bordeaux-900/20 border-slate-200 dark:border-gold-500/5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 text-xs rounded-full border px-3 py-1.5";
+                  else if (area.cor === 'red') badgeColors = isChecked ? "bg-red-100 dark:bg-red-900/40 border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 font-semibold text-xs rounded-full border px-3 py-1.5" : "bg-slate-100/50 dark:bg-bordeaux-900/20 border-slate-200 dark:border-gold-500/5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/30 text-xs rounded-full border px-3 py-1.5";
+
+                  return (
+                    <button
+                      key={area.id}
+                      type="button"
+                      onClick={() => toggleArea(area.id)}
+                      className={`flex items-center gap-1.5 cursor-pointer select-none transition-colors ${badgeColors}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}} // No-op to avoid double trigger
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 pointer-events-none"
+                      />
+                      {area.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Novo Colapsável Padrão Ouro de Nomenclatura */}
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-gold-500/15 rounded-xl p-4">
+              <button
+                type="button"
+                onClick={() => setShowGuide(!showGuide)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Info size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    Padrão Ouro de Nomenclatura — Exemplos por Área
+                  </span>
+                </div>
+                <span className="text-amber-600 dark:text-amber-400 text-xs">{showGuide ? '▲ fechar' : '▼ ver guia'}</span>
+              </button>
+
+              {showGuide && (
+                <div className="mt-4 space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 border-b border-amber-200/55 dark:border-amber-700/30 pb-0.5">INSS / PREVIDENCIÁRIO:</h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-2 list-disc">
+                      <li><strong>Lei:</strong> "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)"</li>
+                      <li><strong>Decreto:</strong> "Regulamento da Previdência Social (Decreto nº 3.048/1999)"</li>
+                      <li><strong>Súmula:</strong> "SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais"</li>
+                      <li><strong>Tema:</strong> "TEMA 640 STJ — PREVIDENCIÁRIO — BPC e exclusão de benefício de idoso no cálculo da renda"</li>
+                      <li><strong>Jurisprudência:</strong> "JURISPRUDÊNCIA TRF — PREVIDENCIÁRIO — Aposentadoria especial copeiro hospitalar"</li>
+                      <li><strong>IN:</strong> "INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022"</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 border-b border-amber-200/55 dark:border-amber-700/30 pb-0.5">TRABALHISTA:</h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-2 list-disc">
+                      <li>"Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)"</li>
+                      <li>"ORIENTAÇÃO JURISPRUDENCIAL 42 SDI-1 TST — TRABALHISTA — Licença-prêmio convertida em pecúnia"</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 border-b border-amber-200/55 dark:border-amber-700/30 pb-0.5">CONSUMIDOR:</h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-2 list-disc">
+                      <li>"Código de Defesa do Consumidor - CDC (Lei nº 8.078/1990)"</li>
+                      <li>"SÚMULA 479 STJ — CONSUMERISTA — Responsabilidade objetiva por fraudes bancárias"</li>
+                      <li>"JURISPRUDÊNCIA — CONSUMERISTA — Dano moral por bloqueio cautelar indevido"</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 border-b border-amber-200/55 dark:border-amber-700/30 pb-0.5">CÍVEL:</h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-2 list-disc">
+                      <li>"Transporte Rodoviário de Cargas por Conta de Terceiros (Lei nº 11.442/2007)"</li>
+                      <li>"JURISPRUDÊNCIA TJ — CÍVEL — Roubo Fortuito Externo"</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1 border-b border-amber-200/55 dark:border-amber-700/30 pb-0.5">UNIVERSAIS (marcar todas as áreas):</h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-1 pl-2 list-disc">
+                      <li>"CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988"</li>
+                      <li>"Código de Processo Civil (Lei nº 13.105/2015)"</li>
+                      <li>"Juizados Especiais Cíveis e Criminais (Lei nº 9.099/1995)"</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-amber-100/50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-200/50 dark:border-amber-900/30">
+                    <h4 className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-1">REGRAS GERAIS DO TÍTULO:</h4>
+                    <ul className="text-[11px] text-amber-900 dark:text-amber-300 space-y-0.5 pl-2 list-disc">
+                      <li>Máximo 120 caracteres</li>
+                      <li>Separador em súmulas/jurisprudências: travessão (—), não hífen (-)</li>
+                      <li>Nunca use o formato de ementa oficial ("LEI Nº X, DE DD DE MES DE AAAA")</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Conteúdo */}

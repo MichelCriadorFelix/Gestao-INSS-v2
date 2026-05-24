@@ -437,6 +437,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       }).join('\n\n---\n\n') || '';
 
       // 1. Get embedding and perform Keyword Search in parallel
+      const AGENT_AREAS = ['TRABALHISTA','CIVEL','CONSUMIDOR','INSS','RPPS'];
       let ragContext = '';
 
       // Detectar mensagens casuais para evitar busca RAG desnecessária
@@ -507,7 +508,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           if (embedding && embedding.length > 0) {
             // Threshold 0.60 e máximo 12 resultados para reduzir ruído
             const vectorResults = await supabaseService
-              .searchLegalDocuments(embedding, 0.50, 30);
+              .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.50, 30);
 
             // Merge sem duplicatas, priorizando vetorial
             const seen = new Set<number>();

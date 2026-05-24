@@ -757,6 +757,30 @@ export const supabaseService = {
     return data || [];
   },
 
+  async searchLegalDocumentsByArea(
+    embedding: number[],
+    areas: string[],
+    matchThreshold = 0.50,
+    matchCount = 30
+  ): Promise<Array<{id: number, content: string,
+    metadata: any, similarity: number,
+    is_single_chunk: boolean | null}>> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .rpc('match_legal_documents_by_area', {
+        query_embedding: embedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        filter_areas: areas
+      });
+    if (error) {
+      console.error('Erro na busca por área:', error);
+      return [];
+    }
+    return data || [];
+  },
+
   async getAllLegalDocumentTitles(): Promise<string[]> {
     const supabase = getSupabase();
     if (!supabase) return [];
