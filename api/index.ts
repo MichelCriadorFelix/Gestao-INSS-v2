@@ -3177,8 +3177,8 @@ ${message}`;
     const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
 
-    let maxOutputTokens = 4096;
-    let thinkingConfig: any = { thinkingBudget: 1024 };
+    let maxOutputTokens = 8192;
+    let thinkingConfig: any = { thinkingBudget: 8192 };
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
@@ -3669,8 +3669,8 @@ ${message}`;
     const tools = (isStorageRequest || isGenerationRequest || isReportRequestLuana || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
 
-    let maxOutputTokens = 4096;
-    let thinkingConfig: any = { thinkingBudget: 1024 };
+    let maxOutputTokens = 8192;
+    let thinkingConfig: any = { thinkingBudget: 8192 };
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
@@ -4082,8 +4082,8 @@ ${message}`;
     const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
 
-    let maxOutputTokens = 4096;
-    let thinkingConfig: any = { thinkingBudget: 1024 };
+    let maxOutputTokens = 8192;
+    let thinkingConfig: any = { thinkingBudget: 8192 };
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {

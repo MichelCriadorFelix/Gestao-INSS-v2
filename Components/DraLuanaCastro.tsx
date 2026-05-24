@@ -507,7 +507,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           if (embedding && embedding.length > 0) {
             // Threshold 0.60 e máximo 12 resultados para reduzir ruído
             const vectorResults = await supabaseService
-              .searchLegalDocuments(embedding, 0.60, 25);
+              .searchLegalDocuments(embedding, 0.50, 30);
 
             // Merge sem duplicatas, priorizando vetorial
             const seen = new Set<number>();
