@@ -3030,7 +3030,7 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
-2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
+2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
 3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ, Tema 905/STJ etc.) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
@@ -3497,7 +3497,7 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
-2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
+2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
 3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
@@ -3972,7 +3972,7 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
-2. Priorize itens com Score acima de 70% para citação direta. Score abaixo de 60% use apenas como referência contextual.
+2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
 3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
@@ -4530,6 +4530,7 @@ files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: fi
     let isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
     // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
     const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
+    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     if (modelProvider === 'openrouter') {
 clearInterval(heartbeat);
@@ -4555,7 +4556,7 @@ orMessages.push({ role: "user", content: finalMessage });
 await callOpenRouterStream({
   model: model || "deepseek/deepseek-v4-flash",
   messages: orMessages,
-  temperature: isGenerationRequest ? 0.15 : temperature,
+  temperature: finalTemperature,
   max_tokens: 2000,
   provider: {
     data_collection: false,
@@ -4571,7 +4572,6 @@ return;
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
     // - Dúvida: 0.1 (máxima precisão, resposta determinística)
     // - Peça/outros: temperature já definida (0.2)
-    const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     try {
 let isFinished = false;
