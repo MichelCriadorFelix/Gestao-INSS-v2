@@ -854,31 +854,127 @@ export const supabaseService = {
     return [...new Set(titles)] as string[];
   },
 
-  async searchByTitles(titles: string[], chunksPerTitle = 5): Promise<any[]> {
+  async searchByTitles(titles: string[], chunksPerTitle = 5, query?: string): Promise<any[]> {
     const supabase = getSupabase();
     if (!supabase || titles.length === 0) return [];
 
     const results: any[] = [];
     const seen = new Set<number>();
 
+    // Extrair números de artigos ou parágrafos de forma inteligente
+    // Exemplo: "artigo 90", "art. 90", "Art 92", "Artigo 3", "§ 92"
+    const articleNumbers: string[] = [];
+    if (query) {
+      const artMatches = [...query.matchAll(/(?:art(?:igo|\.)?|§|parágrafo|paragraph)\s*(\d+)/gi)];
+      artMatches.forEach(m => {
+        if (m[1]) articleNumbers.push(m[1]);
+      });
+      
+      // Também capturamos números isolados menores que 3 dígitos
+      const isolatedNumbers = query.match(/\b\d{1,3}\b/g) || [];
+      isolatedNumbers.forEach(num => {
+        if (!articleNumbers.includes(num)) {
+          articleNumbers.push(num);
+        }
+      });
+    }
+
+    // Extrair palavras-chave relevantes da query para busca direcionada complementar dentro das leis correspondentes
+    const keywords: string[] = [];
+    if (query) {
+      const stopWords = new Set([
+        'artigo', 'artigos', 'sobre', 'como', 'quem', 'traz', 'qual', 'para', 'onde', 'quais', 'diz', 'esta', 'este', 'naquela', 'naquele', 'pelo', 'pela', 'pelos', 'pelas',
+        'do', 'da', 'dos', 'das', 'de', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas', 'em', 'para', 'com', 'contra', 'por', 'sem', 'sob', 'sobre', 'atras', 'entre',
+        'lei', 'organica', 'municipal', 'municipalidade', 'estatuto', 'servidor', 'servidores', 'publico', 'publicos', 'comarca'
+      ]);
+      const normalQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const words = normalQuery.split(/[^a-z0-9]/).filter(w => w.length >= 3);
+      words.forEach(w => {
+        if (!stopWords.has(w) && isNaN(Number(w)) && !keywords.includes(w)) {
+          keywords.push(w);
+        }
+      });
+    }
+
     for (const title of titles) {
-      // Query parametrizada segura via .eq para evitar erros 400 de PostgREST com parênteses/caracteres especiais no título
-      const { data, error } = await supabase
+      const docResults: any[] = [];
+
+      // 1. Se informou número de artigo, faz uma busca pontual e direcionada
+      if (articleNumbers.length > 0) {
+        for (const num of articleNumbers) {
+          const orFilter = `content.ilike.%Art% ${num}%,content.ilike.%§% ${num}%,content.ilike.%Artigo% ${num}%,content.ilike.%Art% ${num}º%,content.ilike.%Art% ${num}-%,content.ilike.%§% ${num}º%`;
+          
+          const { data, error } = await supabase
+            .from('legal_documents')
+            .select('*')
+            .eq('metadata->>title', title)
+            .or(orFilter)
+            .limit(10);
+            
+          if (!error && data && data.length > 0) {
+            data.forEach((doc: any) => {
+              docResults.push({ ...doc, is_target_article: true });
+            });
+          }
+        }
+      }
+
+      // 2. Se informou palavras-chave específicas, faz filtragem interna no documento
+      if (keywords.length > 0) {
+        let keywordFilter = '';
+        keywords.forEach(kw => {
+          if (keywordFilter) keywordFilter += ',';
+          keywordFilter += `content.ilike.%${kw}%`;
+        });
+        
+        if (keywordFilter) {
+          const { data, error } = await supabase
+            .from('legal_documents')
+            .select('*')
+            .eq('metadata->>title', title)
+            .or(keywordFilter)
+            .limit(10);
+            
+          if (!error && data && data.length > 0) {
+            data.forEach((doc: any) => {
+              docResults.push({ ...doc, is_target_keyword: true });
+            });
+          }
+        }
+      }
+
+      // 3. Fallback: carregar os primeiros trechos padrão do documento para contexto inicial
+      const { data: fallbackData, error: fallbackError } = await supabase
         .from('legal_documents')
         .select('*')
         .eq('metadata->>title', title)
         .limit(chunksPerTitle);
 
-      if (!error && data) {
-        data.forEach((doc: any) => {
-          if (!seen.has(doc.id)) {
-            seen.add(doc.id);
-            results.push({ ...doc, similarity: 1.0, source: 'title_exact' });
-          }
+      if (!fallbackError && fallbackData) {
+        fallbackData.forEach((doc: any) => {
+          docResults.push(doc);
         });
       }
+
+      // Merge sem duplicatas de chunks para este título específico, ponderando importância
+      docResults.forEach((doc: any) => {
+        if (!seen.has(doc.id)) {
+          seen.add(doc.id);
+          
+          let scoreBoost = 0.8;
+          if (doc.is_target_article) {
+            scoreBoost = 1.5;
+          } else if (doc.is_target_keyword) {
+            scoreBoost = 1.2;
+          }
+          
+          results.push({ ...doc, similarity: scoreBoost, source: 'title_exact' });
+        }
+      });
     }
-    return results;
+
+    // Ordena priorizando artigos e palavras-chave específicas encontradas no documento
+    return results.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
   },
 
   async keywordSearchLegalDocuments(query: string, matchCount = 15) {
@@ -892,10 +988,23 @@ export const supabaseService = {
     const terms = query.split(/\s+/).filter(t => t.length >= 2);
     if (terms.length === 0 && identifiers.length === 0) return [];
 
-    const searchTerms = Array.from(new Set([...identifiers, ...terms])).slice(0, 8);
+    const rawTerms = Array.from(new Set([...identifiers, ...terms])).slice(0, 10);
+    
+    // Filter out common Portuguese/English stop words to avoid flooding the PostgREST OR clause with useless terms (e.g., 'sao', 'joao', 'de', 'do')
+    const stopWords = new Set([
+      'de', 'do', 'da', 'dos', 'das', 'um', 'uma', 'uns', 'umas', 'no', 'na', 'nos', 'nas', 'em', 'para', 'com', 'contra', 'por', 'sem', 'sob', 'sobre', 'atras', 'entre',
+      'como', 'quem', 'qual', 'quais', 'onde', 'quando', 'esta', 'este', 'isto', 'aquilo', 'o', 'a', 'os', 'as', 'e', 'ou', 'se', 'mas', 'pelo', 'pela', 'pelos', 'pelas'
+    ]);
+    
+    const searchTerms = rawTerms.filter(term => {
+      const normalizedTerm = term.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return !stopWords.has(normalizedTerm);
+    });
+
+    if (searchTerms.length === 0) return [];
     
     let filter = '';
-    searchTerms.forEach((term, i) => {
+    searchTerms.forEach((term) => {
       // Escape special characters for ilike
       // Supabase PostgREST uses % as wildcard, not *
       // IMPORTANT: Remove commas as they break the OR logic tree in PostgREST
@@ -908,6 +1017,8 @@ export const supabaseService = {
       if (filter) filter += ',';
       filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
     });
+
+    if (!filter) return [];
 
     const { data, error } = await supabase
       .from('legal_documents')

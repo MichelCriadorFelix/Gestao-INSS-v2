@@ -518,7 +518,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         ]);
 
         const titleResults = allTitles.length > 0
-          ? await supabaseService.searchByTitles(allTitles, 5)
+          ? await supabaseService.searchByTitles(allTitles, 15, enrichedQueryText)
           : [];
 
         if (embedResponse.ok) {
