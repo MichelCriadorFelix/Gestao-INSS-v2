@@ -444,6 +444,22 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
       const AGENT_AREAS = ['INSS','RPPS','TRABALHISTA','CONSUMIDOR','CIVEL'];
       let ragContext = '';
       try {
+        // Context-aware query enrichment for RAG:
+        // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
+        // the search misses because the current message has no semantic legal terms.
+        // We aggregate the current message with the last 4 user statements in the active session
+        // to restore full legal context and retrieve appropriate documents (like Código Civil).
+        const userMessages = session?.messages?.filter((m: any) => m.role === 'user') || [];
+        const lastFewUserTexts = userMessages
+          .slice(-4)
+          .map((m: any) => m.content)
+          .filter((c: string) => c && c.length > 30 && !c.startsWith('[SYSTEM_DOCUMENTS_METADATA]'))
+          .join(' ');
+
+        const enrichedQueryText = lastFewUserTexts 
+          ? `${messageText} ${lastFewUserTexts}`.substring(0, 1500)
+          : messageText;
+
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
@@ -476,7 +492,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
         const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
         const allTitles = allLawTitles.filter((title: string) => {
           const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const normQuery = messageText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const normQuery = enrichedQueryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
           // 1. Inclusão direta do título
           if (normQuery.includes(normTitle)) return true;
@@ -501,7 +517,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
         });
 
         // Query limpa para busca vetorial (evitando poluição do vetor com títulos de outras leis não pertinentes)
-        const ragQuery = messageText.substring(0, 420);
+        const ragQuery = enrichedQueryText.substring(0, 600);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
@@ -510,7 +526,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
           }),
-          supabaseService.keywordSearchLegalDocuments(messageText, 15)
+          supabaseService.keywordSearchLegalDocuments(enrichedQueryText, 15)
         ]);
 
         const titleResults = allTitles.length > 0

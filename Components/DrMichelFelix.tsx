@@ -18,7 +18,11 @@ import {
   TrashIcon as Trash2,
   ClipboardIcon as Copy,
   PencilIcon as Edit2,
-  XMarkIcon as XMark
+  XMarkIcon as XMark,
+  CheckCircleIcon as CheckCircle,
+  SparklesIcon as Sparkles,
+  ScissorsIcon as Scissors,
+  ShieldExclamationIcon as ShieldExclamation
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { SocialSecurityData } from '../SocialSecurityCalc';
@@ -444,6 +448,22 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       const AGENT_AREAS = ['INSS','RPPS','CIVEL','TRABALHISTA','CONSUMIDOR'];
       let ragContext = '';
       try {
+        // Context-aware query enrichment for RAG:
+        // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
+        // the search misses because the current message has no semantic legal terms.
+        // We aggregate the current message with the last 4 user statements in the active session
+        // to restore full legal context and retrieve appropriate documents (like Código Civil).
+        const userMessages = session?.messages?.filter((m: any) => m.role === 'user') || [];
+        const lastFewUserTexts = userMessages
+          .slice(-4)
+          .map((m: any) => m.content)
+          .filter((c: string) => c && c.length > 30 && !c.startsWith('[SYSTEM_DOCUMENTS_METADATA]'))
+          .join(' ');
+
+        const enrichedQueryText = lastFewUserTexts 
+          ? `${messageText} ${lastFewUserTexts}`.substring(0, 1500)
+          : messageText;
+
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
@@ -476,7 +496,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
         const allTitles = allLawTitles.filter((title: string) => {
           const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const normQuery = messageText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const normQuery = enrichedQueryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
           // 1. Inclusão direta do título
           if (normQuery.includes(normTitle)) return true;
@@ -501,7 +521,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         });
 
         // Query limpa para busca vetorial (evitando poluição do vetor com títulos de outras leis não pertinentes)
-        const ragQuery = messageText.substring(0, 420);
+        const ragQuery = enrichedQueryText.substring(0, 600);
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
@@ -510,7 +530,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
           }),
-          supabaseService.keywordSearchLegalDocuments(messageText, 15)
+          supabaseService.keywordSearchLegalDocuments(enrichedQueryText, 15)
         ]);
 
         const titleResults = allTitles.length > 0
@@ -1548,6 +1568,71 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                 </div>
               </div>
             )}
+
+            {/* PAINEL DE AÇÕES INTELIGENTES (Harness Felix & Castro) */}
+            <div className="mb-3.5 flex flex-wrap gap-2 items-center">
+              <span className="text-[10px] font-black text-slate-400 dark:text-gold-500/40 uppercase tracking-widest select-none pr-1">Harness de Ações:</span>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("[CONFIRMAR O CORPO DA PETIÇÃO] Solicito a análise técnica de rito e aprovação do atual rascunho. Por favor, pergunte-me quais próximos passos de exportação ou ritos processuais de rascunhos adicionais deseja realizar.");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Confirmar rascunho"
+              >
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Confirmar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("[GERAÇÃO MODULAR] Desejo elaborar uma seção em tópicos isolados e independentes para a petição. Por favor, detalhe quais tópicos (como Qualificação, Fatos, Direito ou Pedidos) estão disponíveis e pergunte por qual deles deseja iniciar a redação.");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Geração Modular"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                Geração Modular
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("[CORREÇÃO CIRÚRGICA]\n\nTRECHO ATUAL:\n\"Insira aqui o parágrafo ou frase que está imperfeito\"\n\nCORREÇÃO SOLICITADA:\n\"Descreva aqui a alteração desejada\"");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Correção Cirúrgica de Fragmentos"
+              >
+                <Scissors className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                Correção Cirúrgica
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("[VALIDAÇÃO E AUDITORIA] Solicito auditoria jurídica profunda e pente-fino no atual rascunho de petição para reportar contradições fáticas, omissões de rito ou leis ausentes. Por favor, apresente o relatório de auditoria.");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Validar & Auditar"
+              >
+                <ShieldExclamation className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                Validar & Auditar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInput("[REFAZER DO ZERO] Desejo apagar as alterações anteriores e reescrever toda a peça do completo zero. Por favor, pergunte-me qual tese jurídica, rito processual ou direcionamento fático deseja incorporar nesta reescrita estrutural.");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Refazer petição"
+              >
+                <Loader2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                Refazer do Zero
+              </button>
+            </div>
 
             <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 

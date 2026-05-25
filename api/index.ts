@@ -665,6 +665,15 @@ ESTILO: Advogado sênior respondendo a colega de escritório. Tom técnico, dire
 
 async function detectUserIntent(message: string): Promise<string> {
   const safeMessage = message || "";
+  const msgLower = safeMessage.toLowerCase();
+  
+  if (msgLower.includes("[geração modular]") || msgLower.includes("[geracao modular]") || msgLower.includes("[correção cirúrgica]") || msgLower.includes("[correcao cirurgica]")) {
+    return "[GERAÇÃO]";
+  }
+  if (msgLower.includes("[validação e auditoria]") || msgLower.includes("[validacao e auditoria]")) {
+    return "[DÚVIDA]";
+  }
+
   try {
     const response = await callGemini({
       model: "gemini-3.5-flash",
@@ -726,6 +735,11 @@ type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'N
 function detectRevisionIntent(message: string, hasDraft: boolean): RevisionIntent {
   if (!hasDraft) return 'NEW_GENERATION';
   const msg = message.toLowerCase();
+  
+  if (msg.includes("[correção cirúrgica]") || msg.includes("[correcao cirurgica]") || msg.includes("[geração modular]") || msg.includes("[geracao modular]")) {
+    return 'POINT_CORRECTION';
+  }
+
   const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
   const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
   const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na ))/i.test(msg);
@@ -2958,6 +2972,14 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       console.log('[Dr.Michel] Tier Premium ativado → forçando DeepSeek V4 Flash via OpenRouter');
     }
     const intent = await detectUserIntent(message);
+    const msgUpper = (message || "").toUpperCase();
+    
+    // Identificar relatórios e auditorias de forma consolidada e precoce
+    const isReportRequest = msgUpper.includes("GERAR RELATÓRIO") || 
+                            msgUpper.includes("GERAR RELATORIO") || 
+                            msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
+                            msgUpper.includes("[VALIDACAO E AUDITORIA]");
+
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
@@ -2977,12 +2999,41 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
+    } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
       selectedSystemPrompt = DR_MICHEL_DUVIDA_PROMPT + getCurrentDateContext();
     }
 
     if (isGenerationRequest) {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
+    if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE GERAÇÃO MODULAR]
+O usuário está solicitando a elaboração de uma ETAPA ESPECÍFICA da petição (indicada na mensagem).
+Você DEVE focar 100% de sua atenção e resposta APENAS na etapa solicitada.
+NÃO redija as outras seções/tópicos da petição.
+Deixe tudo extremamente aprofundado, fundamentado e com densidade de elite, mas circunscrito EXCLUSIVAMENTE ao conteúdo desta etapa.
+Não introduza conversas ou explicações casuais ("Aqui está...", "Com certeza..."). Escreva de forma direta e formal.`;
+    }
+
+    if (msgUpper.includes("[CORREÇÃO CIRÚRGICA]") || msgUpper.includes("[CORRECOES]") || msgUpper.includes("[CORRECAO CIRURGICA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE CORREÇÃO CIRÚRGICA DE PRECISÃO]
+O usuário indicou um fragmento de texto sob a tag "TRECHO ATUAL" e pediu correções sob a tag "CORREÇÃO SOLICITADA".
+Você DEVE reescrever EXCLUSIVAMENTE o bloco, parágrafo ou segmento que foi enviado corrigido, pronto para substituição por completo.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO retornar qualquer outra seção do documento que não esteja contida no trecho para correção.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO incluir preâmbulos, saudações, avaliações ("Aqui está seu trecho corrigido:", "Conforme solicitado...").
+Sua resposta DEVE conter APENAS o trecho reescrito diretamente, sem rodeios.`;
+    }
+
+    if (msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || msgUpper.includes("[VALIDACAO E AUDITORIA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE AUDITORIA E VALIDAÇÃO JURÍDICA]
+Você atuará como um auditor sênior rigoroso de petições. Analise o rascunho anterior (que está no prompt como base) de forma cirúrgica.
+Apresente um Relatório de Auditoria estruturado em tópicos objetivos:
+1. INCONSISTÊNCIAS E CONTRADIÇÕES (divergência de datas, números ou pedidos sem fundamentação fática).
+2. OMISSÕES CRÍTICAS (requisitos processuais ausentes, artigos de lei obrigatórios ou temas/súmulas essenciais que deveriam constar).
+3. PLANO DE MELHORIAS (sugestões técnicas para tornar a argumentação à prova de falhas).
+NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de auditoria técnica.`;
     }
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
@@ -3171,8 +3222,6 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
     // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
     const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
@@ -3390,6 +3439,13 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
+    const msgUpper = (message || "").toUpperCase();
+    
+    const isReportRequestLuana = msgUpper.includes("GERAR RELATÓRIO") || 
+                                 msgUpper.includes("GERAR RELATORIO") || 
+                                 msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
+                                 msgUpper.includes("[VALIDACAO E AUDITORIA]");
+
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
@@ -3399,11 +3455,39 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                              message.includes("Enviei os seguintes documentos");
     
     const isGenerationRequest = isGenerationIntent || 
-                                 message.includes("GERAR RELATÓRIO") || 
                                  message.includes("GERAR PEÇA");
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
+
+    // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
+    if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE GERAÇÃO MODULAR]
+O usuário está solicitando a elaboração de uma ETAPA ESPECÍFICA da petição trabalhista (indicada na mensagem).
+Você DEVE focar 100% de sua atenção e resposta APENAS na etapa solicitada (ex: Qualificação, Fatos, Fundamentação ou Pedidos).
+NÃO redija as outras seções/tópicos da petição.
+Deixe tudo extremamente aprofundado, fundamentado e com densidade de elite, mas circunscrito EXCLUSIVAMENTE ao conteúdo desta etapa trabalhista.
+Não introduza conversas ou explicações casuais ("Aqui está...", "Com certeza..."). Escreva de forma direta e formal.`;
+    }
+
+    if (msgUpper.includes("[CORREÇÃO CIRÚRGICA]") || msgUpper.includes("[CORRECOES]") || msgUpper.includes("[CORRECAO CIRURGICA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE CORREÇÃO CIRÚRGICA DE PRECISÃO]
+O usuário indicou um fragmento de texto sob a tag "TRECHO ATUAL" e pediu correções sob a tag "CORREÇÃO SOLICITADA".
+Você DEVE reescrever EXCLUSIVAMENTE o bloco, parágrafo ou segmento trabalhista que foi enviado corrigido, pronto para substituição por completo.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO retornar qualquer outra seção do documento que não esteja contida no trecho para correção.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO incluir preâmbulos, saudações, avaliações ("Aqui está seu trecho corrigido:", "Conforme solicitado...").
+Sua resposta DEVE conter APENAS o trecho reescrito diretamente, sem rodeios.`;
+    }
+
+    if (msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || msgUpper.includes("[VALIDACAO E AUDITORIA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE AUDITORIA E VALIDAÇÃO JURÍDICA TRABALHISTA]
+Você atuará como uma auditora trabalhista sênior rigorosa de petições. Analise o rascunho anterior (que está no prompt como base) de forma cirúrgica.
+Apresente um Relatório de Auditoria estruturado em tópicos objetivos:
+1. INCONSISTÊNCIAS E CONTRADIÇÕES (divergência de datas, valores financeiros divergentes da planilha ou pedidos sem fundamentação fática).
+2. OMISSÕES CRÍTICAS (artigos obrigatórios da CLT ausentes, súmulas/OJ's do TST que deveriam constar, rito inadequado para o valor).
+3. PLANO DE MELHORIAS (sugestões técnicas para tornar seus pedidos e fundamentações à prova de falhas).
+NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de auditoria técnica.`;
+    }
     
     // Injeta regras de Rito Processual
     const RITE_RULES = `
@@ -3662,9 +3746,6 @@ ${message}`;
       { role: 'user', parts: currentMessageParts }
     ];
 
-    // Configuração de Tools (Google Search Grounding + URL Context)
-    const isReportRequestLuana = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
     // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
     const tools = (isStorageRequest || isGenerationRequest || isReportRequestLuana || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
@@ -3903,6 +3984,14 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     }
 
     const intent = await detectUserIntent(message);
+    const msgUpper = (message || "").toUpperCase();
+    
+    // Identificar relatórios e auditorias de forma consolidada e precoce
+    const isReportRequest = msgUpper.includes("GERAR RELATÓRIO") || 
+                            msgUpper.includes("GERAR RELATORIO") || 
+                            msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
+                            msgUpper.includes("[VALIDACAO E AUDITORIA]");
+
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
@@ -3922,12 +4011,41 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
+    } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
       selectedSystemPrompt = DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
     }
 
     if (isGenerationRequest) {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
+    if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE GERAÇÃO MODULAR]
+O usuário está solicitando a elaboração de uma ETAPA ESPECÍFICA da petição (indicada na mensagem).
+Você DEVE focar 100% de sua atenção e resposta APENAS na etapa solicitada.
+NÃO redija as outras seções/tópicos da petição.
+Deixe tudo extremamente aprofundado, fundamentado e com densidade de elite, mas circunscrito EXCLUSIVAMENTE ao conteúdo desta etapa.
+Não introduza conversas ou explicações casuais ("Aqui está...", "Com certeza..."). Escreva de forma direta e formal.`;
+    }
+
+    if (msgUpper.includes("[CORREÇÃO CIRÚRGICA]") || msgUpper.includes("[CORRECOES]") || msgUpper.includes("[CORRECAO CIRURGICA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE CORREÇÃO CIRÚRGICA DE PRECISÃO]
+O usuário indicou um fragmento de texto sob a tag "TRECHO ATUAL" e pediu correções sob a tag "CORREÇÃO SOLICITADA".
+Você DEVE reescrever EXCLUSIVAMENTE o bloco, parágrafo ou segmento que foi enviado corrigido, pronto para substituição por completo.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO retornar qualquer outra seção do documento que não esteja contida no trecho para correção.
+É TERMINANTEMENTE E ABSOLUTAMENTE PROIBIDO incluir preâmbulos, saudações, avaliações ("Aqui está seu trecho corrigido:", "Conforme solicitado...").
+Sua resposta DEVE conter APENAS o trecho reescrito diretamente, sem rodeios.`;
+    }
+
+    if (msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || msgUpper.includes("[VALIDACAO E AUDITORIA]")) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE AUDITORIA E VALIDAÇÃO JURÍDICA CIVIL]
+Você atuará como um auditor sênior rigoroso de petições cíveis/gerais. Analise o rascunho anterior (que está no prompt como base) de forma cirúrgica.
+Apresente um Relatório de Auditoria estruturado em tópicos objetivos:
+1. INCONSISTÊNCIAS E CONTRADIÇÕES (divergência de datas, números, dados pessoais ou pedidos sem fundamentação fática).
+2. OMISSÕES CRÍTICAS (artigos do Código de Processo Civil ausentes, entendimentos sumulados do STJ/STF que deveriam constar, rito processual ou pedidos obrigatórios omitidos).
+3. PLANO DE MELHORIAS (sugestões técnicas para tornar seus pedidos e fundamentações à prova de falhas).
+NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de auditoria técnica.`;
     }
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
@@ -4076,8 +4194,6 @@ ${message}`;
     }
 
     const contents = [...historyParts, { role: 'user', parts: currentMessageParts }];
-    const isReportRequest = (message || "").includes("GERAR RELATÓRIO") ||
-      (message || "").includes("GERAR RELATORIO");
     // FIX#4: Google Search desativado em geração de petições (contorna Regra de Ouro anti-alucinação)
     const tools = (isStorageRequest || isGenerationRequest || isReportRequest || intent === "[DÚVIDA]") ? undefined : [{ googleSearch: {} }];
 
@@ -4289,22 +4405,71 @@ app.post("/api/dr-michel/generate-docx", async (req, res) => {
   try {
     const { content } = req.body;
     
-    const lines = content.split('\n');
+    const lines = (content || "").split('\n');
     const paragraphs = lines.map((line: string) => {
-      const isBold = line.startsWith('**') && line.endsWith('**');
-      const text = line.replace(/\*\*/g, '');
-      
+      let trimmed = line.trim();
+      let size = 24; // Times New Roman 12pt (value: 24)
+      let boldAll = false;
+      let alignment: any = AlignmentType.JUSTIFIED;
+      let indent: any = undefined;
+
+      // Handle custom indent for standard paragraphs (e.g. four leading spaces or tab)
+      if (line.startsWith('    ') || line.startsWith('\t')) {
+        indent = { left: 720 }; // indentation of 0.5 inches is approx 720 dxa
+      }
+
+      // Check for Markdown headings and apply professional typography hierarchy
+      if (trimmed.startsWith('# ')) {
+        size = 28; // 14pt
+        boldAll = true;
+        trimmed = trimmed.substring(2).trim();
+        alignment = AlignmentType.CENTER;
+      } else if (trimmed.startsWith('## ')) {
+        size = 26; // 13pt
+        boldAll = true;
+        trimmed = trimmed.substring(3).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('### ')) {
+        size = 24; // 12pt
+        boldAll = true;
+        trimmed = trimmed.substring(4).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('#### ')) {
+        size = 24; // 12pt
+        boldAll = true;
+        trimmed = trimmed.substring(5).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        // Bullet list item
+        trimmed = trimmed.substring(2).trim();
+        indent = { left: 360, hanging: 360 }; // clean list indents
+      }
+
+      // Handle empty paragraphs to preserve spacing and negative space
+      if (trimmed === "") {
+        return new Paragraph({
+          spacing: { after: 120 },
+          children: []
+        });
+      }
+
+      // Precision Parser: Alternating splitter for inline "**" bold fragments
+      const parts = trimmed.split('**');
+      const children = parts.map((part, index) => {
+        const isBoldPart = index % 2 === 1;
+        return new TextRun({
+          text: part,
+          size: size,
+          font: "Times New Roman",
+          bold: boldAll || isBoldPart
+        });
+      });
+
       return new Paragraph({
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { line: 360 },
-        children: [
-          new TextRun({
-            text: text,
-            size: 24,
-            font: "Times New Roman",
-            bold: isBold
-          }),
-        ],
+        alignment: alignment,
+        spacing: { line: 360, after: 120 }, // 1.5 line height spacing and clean paragraph gaps
+        indent: indent,
+        children: children
       });
     });
 
@@ -4313,10 +4478,10 @@ app.post("/api/dr-michel/generate-docx", async (req, res) => {
         properties: {
           page: {
             margin: {
-              top: 1701,
-              left: 1701,
-              bottom: 1134,
-              right: 1134,
+              top: 1701, // 3cm standard (1701 dxa)
+              left: 1701, // 3cm standard
+              bottom: 1134, // 2cm standard (1134 dxa)
+              right: 1134, // 2cm standard
             },
           },
         },
@@ -4698,23 +4863,71 @@ app.post("/api/sec-fabricia/generate-docx", async (req, res) => {
   try {
     const { content } = req.body;
     
-    const lines = content.split('\n');
+    const lines = (content || "").split('\n');
     const paragraphs = lines.map((line: string) => {
-const isBold = line.startsWith('**') && line.endsWith('**');
-const text = line.replace(/\*\*/g, '');
+      let trimmed = line.trim();
+      let size = 24; // Times New Roman 12pt (value: 24)
+      let boldAll = false;
+      let alignment: any = AlignmentType.JUSTIFIED;
+      let indent: any = undefined;
 
-return new Paragraph({
-  alignment: AlignmentType.JUSTIFIED,
-  spacing: { line: 360 },
-  children: [
-    new TextRun({
-      text: text,
-      size: 24,
-      font: "Times New Roman",
-      bold: isBold
-    }),
-  ],
-});
+      // Handle custom indent for standard paragraphs (e.g. four leading spaces or tab)
+      if (line.startsWith('    ') || line.startsWith('\t')) {
+        indent = { left: 720 }; // 0.5 inches standard
+      }
+
+      // Check for Markdown headings and apply professional typography hierarchy
+      if (trimmed.startsWith('# ')) {
+        size = 28; // 14pt
+        boldAll = true;
+        trimmed = trimmed.substring(2).trim();
+        alignment = AlignmentType.CENTER;
+      } else if (trimmed.startsWith('## ')) {
+        size = 26; // 13pt
+        boldAll = true;
+        trimmed = trimmed.substring(3).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('### ')) {
+        size = 24; // 12pt
+        boldAll = true;
+        trimmed = trimmed.substring(4).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('#### ')) {
+        size = 24; // 12pt
+        boldAll = true;
+        trimmed = trimmed.substring(5).trim();
+        alignment = AlignmentType.LEFT;
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        trimmed = trimmed.substring(2).trim();
+        indent = { left: 360, hanging: 360 };
+      }
+
+      // Handle empty paragraphs to preserve spacing and negative space
+      if (trimmed === "") {
+        return new Paragraph({
+          spacing: { after: 120 },
+          children: []
+        });
+      }
+
+      // Precision Parser: Alternating splitter for inline "**" bold fragments
+      const parts = trimmed.split('**');
+      const children = parts.map((part, index) => {
+        const isBoldPart = index % 2 === 1;
+        return new TextRun({
+          text: part,
+          size: size,
+          font: "Times New Roman",
+          bold: boldAll || isBoldPart
+        });
+      });
+
+      return new Paragraph({
+        alignment: alignment,
+        spacing: { line: 360, after: 120 },
+        indent: indent,
+        children: children
+      });
     });
 
     const doc = new Document({
