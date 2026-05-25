@@ -2724,17 +2724,26 @@ app.post("/api/rag/process", async (req, res) => {
     const { text, metadata } = req.body;
     if (!text) return res.status(400).json({ error: "Text is required" });
 
-    // Simple chunking strategy: split by paragraphs, then combine up to ~1000 characters
-    const paragraphs = text.split(/\n\s*\n/);
+    // Chunking jurídico — padrão ouro 2.500 chars
+    // Agrupa artigos completos (caput + incisos + parágrafos) antes de quebrar
+    const TARGET_CHUNK_SIZE = 2500;
+    const MIN_CHUNK_SIZE = 800;
+
+    // Divide por artigo: quebra APENAS quando encontra novo "Art." no início de linha
+    const artigos = text.split(/(?=\n\s*Art\.?\s+\d+[\º°]?\s*[-–])/);
     const chunks: string[] = [];
     let currentChunk = "";
 
-    for (const p of paragraphs) {
-      if (currentChunk.length + p.length > 1000 && currentChunk.length > 0) {
+    for (const artigo of artigos) {
+      const trimmed = artigo.trim();
+      if (!trimmed) continue;
+
+      if (currentChunk.length + trimmed.length > TARGET_CHUNK_SIZE && currentChunk.length >= MIN_CHUNK_SIZE) {
         chunks.push(currentChunk.trim());
-        currentChunk = "";
+        currentChunk = trimmed + "\n\n";
+      } else {
+        currentChunk += trimmed + "\n\n";
       }
-      currentChunk += p + "\n\n";
     }
     if (currentChunk.trim().length > 0) {
       chunks.push(currentChunk.trim());
