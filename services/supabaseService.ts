@@ -862,11 +862,11 @@ export const supabaseService = {
     const seen = new Set<number>();
 
     for (const title of titles) {
-      // Query tolerante a caminhos JSONB e versões de PostgREST
+      // Query parametrizada segura via .eq para evitar erros 400 de PostgREST com parênteses/caracteres especiais no título
       const { data, error } = await supabase
         .from('legal_documents')
         .select('*')
-        .or(`metadata->title.eq."${title}",metadata->>title.eq."${title}"`)
+        .eq('metadata->>title', title)
         .limit(chunksPerTitle);
 
       if (!error && data) {
@@ -900,7 +900,8 @@ export const supabaseService = {
       // Supabase PostgREST uses % as wildcard, not *
       // IMPORTANT: Remove commas as they break the OR logic tree in PostgREST
       const escapedTerm = term.replace(/[%_]/g, '\\$0')
-                             .replace(/[(),]/g, '') // Remove parentheses and commas
+                             .replace(/[(),"'`\\/:]/g, '') // Remove potentially breaking characters
+                             .replace(/\s+/g, '%')          // Replace spaces with % to keep PostgREST URLs clean and continuous
                              .substring(0, 30);    // Avoid too long terms
       if (escapedTerm.length < 2) return;
       
