@@ -360,10 +360,15 @@ export default function KnowledgeBase() {
   const [fixProgress, setFixProgress] = useState({ done: 0, total: 0 });
 
   const handleFixEmbeddings = async () => {
-    if (!confirm('Gerar embeddings para os chunks sem vetor?\nProcessamento server-side — leva ~5 minutos.')) return;
+    const startTotal = status?.pending_embeddings || 0;
+    if (startTotal === 0) {
+      alert('Nenhum embedding pendente! Todos os seus documentos já estão indexados perfeitamente.');
+      return;
+    }
+    if (!confirm(`Gerar embeddings para os ${startTotal} chunks sem vetor?\nProcessamento server-side — leva cerca de 1 a 3 minutos.`)) return;
     setFixingEmbeddings(true);
     setFixLog(['Iniciando geração de embeddings server-side...']);
-    setFixProgress({ done: 0, total: 299 });
+    setFixProgress({ done: 0, total: startTotal });
     try {
       const response = await apiFetch('/api/admin/fix-embeddings', {
         method: 'POST',
@@ -399,7 +404,7 @@ export default function KnowledgeBase() {
               continue;
             }
             if (evt.log) setFixLog(prev => [...prev.slice(-40), evt.log]);
-            if (evt.progress) setFixProgress({ done: evt.progress, total: evt.total || 299 });
+            if (evt.progress) setFixProgress({ done: evt.progress, total: evt.total || startTotal });
             if (evt.done) {
               setFixLog(prev => [...prev, evt.log || '✅ Concluído!']);
               setFixProgress(p => ({ ...p, done: evt.processed || p.done }));
@@ -666,7 +671,10 @@ export default function KnowledgeBase() {
   const titleWarnings = useMemo(() => validateTitle(title), [title]);
   const tipoDetectado = useMemo(() => detectTipoDoc(title), [title]);
 
-  useEffect(() => { fetchDocs(); }, []);
+  useEffect(() => { 
+    fetchDocs(); 
+    fetchStatus();
+  }, []);
 
   const fetchDocs = async () => {
     setIsLoadingDocs(true);
@@ -997,15 +1005,39 @@ export default function KnowledgeBase() {
       )}
 
       {/* Botão fix embeddings server-side */}
-      <div className="flex justify-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 dark:bg-bordeaux-950/25 rounded-xl p-4 border border-slate-200/60 dark:border-gold-500/10 gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-800 dark:text-cream-55">
+            Sincronização de Vetores da IA
+          </h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {status?.pending_embeddings !== undefined 
+              ? (status.pending_embeddings > 0 
+                  ? `Existem ${status.pending_embeddings} trechos de documentos aguardando conversão vetorial para que a IA possa encontrá-los.` 
+                  : 'Todos os documentos cadastrados foram processados e estão 100% integrados à inteligência do escritório.')
+              : 'Analisando integridade dos documentos com a inteligência do escritório...'}
+          </p>
+        </div>
         <button
           onClick={handleFixEmbeddings}
-          disabled={fixingEmbeddings}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            fixingEmbeddings ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'
+          disabled={fixingEmbeddings || (status?.pending_embeddings === 0 && !fixingEmbeddings)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            fixingEmbeddings 
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
+              : status?.pending_embeddings === 0
+                ? 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-semibold cursor-default'
+                : 'bg-amber-600 hover:bg-amber-700 text-white hover:shadow-lg hover:shadow-amber-500/15 cursor-pointer'
           }`}
         >
-          {fixingEmbeddings ? <><Loader2 size={14} className="animate-spin" /> Gerando...</> : '⚡ Gerar 299 Embeddings Pendentes'}
+          {fixingEmbeddings ? (
+            <><Loader2 size={14} className="animate-spin" /> Gerando...</>
+          ) : status?.pending_embeddings === 0 ? (
+            <>✅ Base 100% Sincronizada</>
+          ) : status?.pending_embeddings !== undefined ? (
+            <>⚡ Gerar {status.pending_embeddings} Embeddings Pendentes</>
+          ) : (
+            <>⚡ Gerar Embeddings Pendentes</>
+          )}
         </button>
       </div>
 
