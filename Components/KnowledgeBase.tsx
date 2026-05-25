@@ -173,169 +173,67 @@ function validateTitle(titulo: string): string[] {
 };
 
 // ============================================================
-// CHUNKING PADRÃO OURO com overlap e sub-split de artigos gigantes
+// CHUNKING PADRÃO OURO - Agruda artigos completos até ~2.500 caracteres
 // ============================================================
-function chunkLegalText(text: string, maxChars = 2500, overlapChars = 200): string[] {
+function chunkLegalText(text: string, maxChars = 2500, _overlapChars?: number): string[] {
   if (!text) return [];
-  const chunks: string[] = [];
 
   // Passo 1: Limpar e normalizar quebras de linha
   const normalizedText = text.replace(/\r\n/g, '\n').trim();
 
-  // Passo 2: Dividir por artigo primeiro para manter integridade de artigos se existirem
-  const rawParts = normalizedText.split(/(?=\n\s*(?:Art\.|Artigo)\s+\d)/i);
+  // Divide por artigo: quebra APENAS quando encontra novo "Art." no início de linha
+  const artigos = normalizedText.split(/(?=\n\s*(?:Art\.?|Artigo)\s+\d+[\º°]?\s*[-–])/i);
+  const chunks: string[] = [];
+  let currentChunk = "";
 
-  const splitChunkHard = (txt: string, limit: number, overlap: number): string[] => {
-    // Se o texto é menor que o limite, retorna diretamente
-    if (txt.length <= limit) return [txt];
+  const TARGET_CHUNK_SIZE = maxChars; // 2500
+  const MIN_CHUNK_SIZE = 800;
 
-    const result: string[] = [];
-    let start = 0;
-    while (start < txt.length) {
-      let end = start + limit;
-      if (end < txt.length) {
-        // Tenta achar um espaço em branco para não cortar palavra no meio
-        const lastSpace = txt.lastIndexOf(' ', end);
-        if (lastSpace > start + limit * 0.75) {
-          end = lastSpace;
-        }
-      } else {
-        end = txt.length;
+  for (const artigo of artigos) {
+    const trimmed = artigo.trim();
+    if (!trimmed) continue;
+
+    // Se o próprio artigo sozinho for extremamente grande (ex: maior que 4000 caracteres),
+    // precisamos quebrar ele por parágrafos para não estourar o limite de contexto.
+    if (trimmed.length > 4000) {
+      // Primeiro salvamos o que acumulamos
+      if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = "";
       }
 
-      const chunk = txt.substring(start, end).trim();
-      if (chunk.length >= 40) { // ignorar resíduos irrisórios
-        result.push(chunk);
-      }
-
-      // Próximo início com overlap
-      start = end - overlap;
-      if (start < 0) start = 0;
-      // Salvaguarda para evitar loops infinitos se overlap >= limit
-      if (start >= end) {
-        start = end;
-      }
-    }
-    return result;
-  };
-
-  const processChunk = (txt: string) => {
-    const trimmed = txt.trim();
-    if (trimmed.length < 40) return;
-
-    // Se o chunk for menor que o limite máximo, adiciona direto
-    if (trimmed.length <= maxChars) {
-      chunks.push(trimmed);
-      return;
-    }
-
-    // Caso contrário, subdivide de forma inteligente por parágrafos duplos (\n\n)
-    const paragraphs = trimmed.split(/\n\n+/);
-    let currentBlock = '';
-
-    for (const paragraph of paragraphs) {
-      const p = paragraph.trim();
-      if (!p) continue;
-
-      // Se um parágrafo sozinho já é maior que maxChars, quebramos ele
-      if (p.length > maxChars) {
-        // Envia o que temos acumulado antes do parágrafo grande
-        if (currentBlock.length > 0) {
-          chunks.push(currentBlock);
-          currentBlock = '';
-        }
-
-        // Subdivide o parágrafo gigante de forma rígida com overlap
-        const subParts = p.split(/\n+/);
-        for (const part of subParts) {
-          if (part.length > maxChars) {
-            // Dividir sentenças por ponto final seguido de espaço
-            const sentences = part.split(/(?<=\.\s+)/);
-            let currentSentBlock = '';
-            for (const sent of sentences) {
-              if (sent.length > maxChars) {
-                if (currentSentBlock.length > 0) {
-                  chunks.push(currentSentBlock);
-                  currentSentBlock = '';
-                }
-                // Fatia de forma rígida
-                const hardSlices = splitChunkHard(sent, maxChars, overlapChars);
-                chunks.push(...hardSlices);
-              } else {
-                if ((currentSentBlock + '\n' + sent).length > maxChars) {
-                  if (currentSentBlock.length > 0) chunks.push(currentSentBlock);
-                  currentSentBlock = sent;
-                } else {
-                  currentSentBlock = currentSentBlock ? currentSentBlock + '\n' + sent : sent;
-                }
-              }
-            }
-            if (currentSentBlock.length > 0) {
-              chunks.push(currentSentBlock);
-            }
-          } else {
-            chunks.push(part);
-          }
-        }
-      } else {
-        // Parágrafo cabe no bloco atual?
-        if ((currentBlock + '\n\n' + p).length <= maxChars) {
-          currentBlock = currentBlock ? currentBlock + '\n\n' + p : p;
+      // Divide o artigo gigante por parágrafos duplos ou simples
+      const paragraphs = trimmed.split(/\n+/);
+      let subChunk = "";
+      for (const p of paragraphs) {
+        const pt = p.trim();
+        if (!pt) continue;
+        if (subChunk.length + pt.length > TARGET_CHUNK_SIZE && subChunk.length >= MIN_CHUNK_SIZE) {
+          chunks.push(subChunk.trim());
+          subChunk = pt + "\n\n";
         } else {
-          // Se não cabe, descarrega o bloco atual
-          if (currentBlock.length > 0) {
-            chunks.push(currentBlock);
-          }
-          currentBlock = p;
+          subChunk += pt + "\n\n";
         }
       }
-    }
-
-    if (currentBlock.length > 0) {
-      chunks.push(currentBlock);
-    }
-  };
-
-  // Agrupar partes curtas (como artigos de leis individuais) de forma contígua
-  // até atingirem aproximadamente o tamanho máximo para manter riqueza de contexto vizinho (bloquinhos robustos de ~2500 chars).
-  const groupedParts: string[] = [];
-  let currentGroup = '';
-
-  for (const part of rawParts) {
-    const trimmedPart = part.trim();
-    if (!trimmedPart) continue;
-
-    // Se adicionar esta parte ao grupo atual passar de maxChars (2500), descarregamos o grupo anterior
-    if (currentGroup && (currentGroup.length + 2 + trimmedPart.length) > maxChars) {
-      groupedParts.push(currentGroup);
-      currentGroup = trimmedPart;
+      if (subChunk.trim().length > 0) {
+        chunks.push(subChunk.trim());
+      }
     } else {
-      currentGroup = currentGroup ? currentGroup + '\n\n' + trimmedPart : trimmedPart;
-    }
-  }
-  if (currentGroup) {
-    groupedParts.push(currentGroup);
-  }
-
-  for (const group of groupedParts) {
-    processChunk(group);
-  }
-
-  // Garantia absoluta: filtrar possíveis pedaços vazios ou extremamente pequenos,
-  // e se por algum motivo sobrar algum trecho maior que maxChars, subdividir ele de forma rígida!
-  const finalChunks: string[] = [];
-  for (const chunk of chunks) {
-    const trimmed = chunk.trim();
-    if (trimmed.length < 40) continue;
-    if (trimmed.length > maxChars) {
-      const fallbackSlices = splitChunkHard(trimmed, maxChars, overlapChars);
-      finalChunks.push(...fallbackSlices);
-    } else {
-      finalChunks.push(trimmed);
+      if (currentChunk.length + trimmed.length > TARGET_CHUNK_SIZE && currentChunk.length >= MIN_CHUNK_SIZE) {
+        chunks.push(currentChunk.trim());
+        currentChunk = trimmed + "\n\n";
+      } else {
+        currentChunk += trimmed + "\n\n";
+      }
     }
   }
 
-  return finalChunks;
+  if (currentChunk.trim().length > 0) {
+    chunks.push(currentChunk.trim());
+  }
+
+  // Garantia absoluta: filtrar possíveis pedaços vazios ou extremamente pequenos
+  return chunks.map(c => c.trim()).filter(c => c.length >= 40);
 }
 
 export default function KnowledgeBase() {
@@ -1255,7 +1153,7 @@ export default function KnowledgeBase() {
               />
               {content.length > 100 && (
                 <p className="text-xs text-slate-400 mt-1">
-                  Chunking automático: divisão por artigo com sobreposição de 200 chars (padrão ouro).
+                  Otimização de trechos: agrupamento inteligente de artigos de lei até ~2.500 caracteres (padrão ouro).
                 </p>
               )}
             </div>
