@@ -296,8 +296,29 @@ function chunkLegalText(text: string, maxChars = 2500, overlapChars = 200): stri
     }
   };
 
+  // Agrupar partes curtas (como artigos de leis individuais) de forma contígua
+  // até atingirem aproximadamente o tamanho máximo para manter riqueza de contexto vizinho (bloquinhos robustos de ~2500 chars).
+  const groupedParts: string[] = [];
+  let currentGroup = '';
+
   for (const part of rawParts) {
-    processChunk(part);
+    const trimmedPart = part.trim();
+    if (!trimmedPart) continue;
+
+    // Se adicionar esta parte ao grupo atual passar de maxChars (2500), descarregamos o grupo anterior
+    if (currentGroup && (currentGroup.length + 2 + trimmedPart.length) > maxChars) {
+      groupedParts.push(currentGroup);
+      currentGroup = trimmedPart;
+    } else {
+      currentGroup = currentGroup ? currentGroup + '\n\n' + trimmedPart : trimmedPart;
+    }
+  }
+  if (currentGroup) {
+    groupedParts.push(currentGroup);
+  }
+
+  for (const group of groupedParts) {
+    processChunk(group);
   }
 
   // Garantia absoluta: filtrar possíveis pedaços vazios ou extremamente pequenos,
