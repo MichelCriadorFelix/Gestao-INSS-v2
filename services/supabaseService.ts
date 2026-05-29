@@ -935,17 +935,18 @@ export const supabaseService = {
             : null;
 
           const filterVariants: string[] = [];
-          const addVariant = (n: string) => {
-            filterVariants.push(`content.ilike.%Art% ${n}%`);
-            filterVariants.push(`content.ilike.%Art. ${n}%`);
-            filterVariants.push(`content.ilike.%Artigo ${n}%`);
+          const addV = (n: string) => {
+            filterVariants.push(`content.ilike.%Art. ${n}.%`); // "Art. 1.829." ponto final
+            filterVariants.push(`content.ilike.%Art. ${n} %`); // "Art. 725 P" espaço
+            filterVariants.push(`content.ilike.%Art. ${n},%`); // "Art. 15,"
+            filterVariants.push(`content.ilike.%Art. ${n}-%`); // "Art. 19-E"
             filterVariants.push(`content.ilike.%§ ${n}%`);
             filterVariants.push(`content.ilike.%§ ${n}º%`);
           };
 
-          addVariant(num);
-          if (semPonto !== num) addVariant(semPonto); // tinha ponto → adicionar sem ponto
-          if (comPonto && comPonto !== num) addVariant(comPonto); // sem ponto → adicionar com ponto
+          addV(num);
+          if (semPonto !== num) addV(semPonto); // tinha ponto → adicionar sem ponto
+          if (comPonto && comPonto !== num) addV(comPonto); // sem ponto → adicionar com ponto
 
           const uniqueVariants = [...new Set(filterVariants)];
           filters.push(...uniqueVariants);
@@ -955,8 +956,8 @@ export const supabaseService = {
 
         // Executa em lotes integrados no PostgREST para não estourar tamanho de query
         const batchSize = 18;
-        for (let i = 0; i < filters.length; i += batchSize) {
-          const filterSlice = filters.slice(i, i + batchSize).join(',');
+        for (let i = 0; i < uniqueFilters.length; i += batchSize) {
+          const filterSlice = uniqueFilters.slice(i, i + batchSize).join(',');
           subQueries.push(
             supabase
               .from('legal_documents')
@@ -992,21 +993,7 @@ export const supabaseService = {
         }
       }
 
-      // Fallback: carregar o contexto cronológico geral/inicial do documento
-      subQueries.push(
-        supabase
-          .from('legal_documents')
-          .select('*')
-          .eq('metadata->>title', title)
-          .order('id', { ascending: true }) // Mantém ordem sequencial científica dos artigos
-          .limit(chunksPerTitle)
-          .then(res => {
-            if (res.error) console.error(`Error in fallback query for title ${title}:`, res.error);
-            return res.data || [];
-          })
-      );
-
-      // Resolvendo todas as subqueries em paralelo
+      // Resolvendo as subqueries de artigo e palavra-chave primeiro
       const queryResults = await Promise.all(subQueries);
       queryResults.forEach((list) => {
         list.forEach((doc: any) => {
@@ -1022,6 +1009,31 @@ export const supabaseService = {
           }
         });
       });
+
+      // 3. Fallback: carrega chunks iniciais do documento APENAS quando
+      //    não foi especificado artigo ou keyword (contexto geral da lei).
+      //    Se artigo foi especificado, a busca direta já é suficiente e
+      //    o fallback só adicionaria ruído de Arts. 1-N irrelevantes.
+      const hasDirectHit = docResults.length > 0;
+      const skipFallback = (articleNumbers.length > 0 || keywords.length > 0) && hasDirectHit;
+
+      if (!skipFallback) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('legal_documents')
+          .select('*')
+          .eq('metadata->>title', title)
+          .order('id', { ascending: true }) // Mantém ordem sequencial científica dos artigos
+          .limit(chunksPerTitle);
+
+        if (!fallbackError && fallbackData) {
+          fallbackData.forEach((doc: any) => {
+            if (!titleSeen.has(doc.id)) {
+              titleSeen.add(doc.id);
+              docResults.push(doc);
+            }
+          });
+        }
+      }
 
       return docResults.map(doc => {
         let scoreBoost = 0.8;

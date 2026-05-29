@@ -469,7 +469,9 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         // a recuperar as leis principais do RGPS
         const isGenerationCommand =
           messageText.includes('GERAR') ||
-          messageText.includes('Gerar');
+          messageText.includes('Gerar') ||
+          messageText.includes('gerar') ||
+          messageText.includes('[FASE DE GERAÇÃO]');
 
         // Busca TODOS os títulos da base dinamicamente.
         // Qualquer lei, súmula ou jurisprudência adicionada
@@ -559,8 +561,20 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           return false;
         });
 
-        // Query limpa para busca vetorial (evitando poluição do vetor com títulos de outras leis não pertinentes)
-        const ragQuery = enrichedQueryText.substring(0, 600);
+        // Se for comando de geração com contexto semântico fraco,
+        // injeta os termos jurídicos do caso extraídos do histórico
+        // para garantir que o vetor recupere as leis certas.
+        let ragQuery = enrichedQueryText.substring(0, 600);
+        if (isGenerationCommand && ragQuery.trim().split(/\s+/).length < 20) {
+          // Histórico da sessão para extração de contexto jurídico
+          const allSessionText = session?.messages
+            ?.filter((m: any) => m.role === 'user')
+            ?.map((m: any) => m.content)
+            ?.filter((c: string) => c && c.length > 20 && !c.startsWith('[SYSTEM'))
+            ?.join(' ')
+            ?.substring(0, 1200) || '';
+          ragQuery = (ragQuery + ' ' + allSessionText).substring(0, 1500);
+        }
 
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
