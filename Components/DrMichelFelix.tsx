@@ -493,7 +493,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
         // Busca e filtra os títulos da base para consulta exata por título
         // Otimização: filtra apenas os títulos mencionados no prompt para evitar N+1 queries desnecessárias e diluição de contexto
-        const allLawTitles = await supabaseService.getAllLegalDocumentTitles();
+        const allLawTitles = await supabaseService.getLegalDocumentTitles();
         const allTitles = allLawTitles.filter((title: string) => {
           const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const normQuery = enrichedQueryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -502,9 +502,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           if (normQuery.includes(normTitle)) return true;
 
           // 2. Correspondência por números de lei/súmula/tema (ex: "11442" ou "8213")
+          const cleanQuery = normQuery.replace(/[./-]/g, '');
           const numbers = title.match(/\d+[\d./-]*\d*/g) || [];
           for (const num of numbers) {
-            if (num.length >= 2 && normQuery.includes(num.replace(/[./-]/g, ''))) {
+            const cleanNum = num.replace(/[./-]/g, '');
+            if (cleanNum.length >= 2 && (normQuery.includes(num) || cleanQuery.includes(cleanNum))) {
               return true;
             }
           }
