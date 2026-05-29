@@ -501,12 +501,26 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
           // 1. Inclusão direta do título
           if (normQuery.includes(normTitle)) return true;
 
-          // 2. Correspondência por números de lei/súmula/tema (ex: "11442" ou "8213")
-          const cleanQuery = normQuery.replace(/[./-]/g, '');
-          const numbers = title.match(/\d+[\d./-]*\d*/g) || [];
-          for (const num of numbers) {
-            const cleanNum = num.replace(/[./-]/g, '');
-            if (cleanNum.length >= 2 && (normQuery.includes(num) || cleanQuery.includes(cleanNum))) {
+          // 2. Correspondência por números de lei/súmula/tema/decreto/IN
+          //    Gera variantes do número do título e checa se a query contém alguma.
+          //    Ex.: "6.858/1980" -> {"68581980", "6858"}  (ano isolado é ignorado p/ evitar falso positivo)
+          const cleanQuery = normQuery.replace(/[.\-\/\s]/g, '');
+          const rawNumberTokens = title.match(/\d+(?:[.\-\/]\d+)*/g) || [];
+          const numberVariants = new Set<string>();
+          for (const token of rawNumberTokens) {
+            numberVariants.add(token.replace(/[.\-\/]/g, '')); // token cheio sem separadores
+            const segments = token.split('/');
+            segments.forEach((part) => {
+              const clean = part.replace(/[.\-]/g, '');
+              const looksLikeYear = /^(19|20)\d{2}$/.test(clean);
+              // indexa segmento isolado, salvo se for ano (a menos que seja o único segmento, ex.: Súmula 416)
+              if (clean.length >= 3 && (!looksLikeYear || segments.length === 1)) {
+                numberVariants.add(clean);
+              }
+            });
+          }
+          for (const variant of numberVariants) {
+            if (variant.length >= 3 && cleanQuery.includes(variant)) {
               return true;
             }
           }
