@@ -2643,7 +2643,9 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         max_tokens: params.max_tokens || 16383,
         stream: true,
         include_reasoning: true, 
-        reasoning_effort: params.thinkingConfig?.thinkingBudget > 10000 ? "high" : "medium"
+        reasoning_effort: params.thinkingConfig?.thinkingLevel === "high" ? "high"
+          : params.thinkingConfig?.thinkingLevel === "low" ? "low"
+          : "medium"
       })
     });
 
@@ -3241,20 +3243,25 @@ ${message}`;
 
 
     let maxOutputTokens = 8192;
-    let thinkingConfig: any = { thinkingBudget: 8192 };
+    // Gemini 3.5 Flash usa thinkingLevel (não thinkingBudget do 2.5).
+    // high = máximo raciocínio (geração de petição)
+    // medium = análise/relatório
+    // low = armazenamento/ciência (velocidade máxima)
+    let thinkingConfig: any = { thinkingLevel: "medium" };
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 18000; // Limite solicitado pelo usuário
-      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
+      maxOutputTokens = 18000;
+      thinkingConfig = { thinkingLevel: "high" }; // Máximo raciocínio para petições
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 4096 };
+      thinkingConfig = { thinkingLevel: "low" }; // Velocidade para armazenamento/relatório
     }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = { thinkingBudget: 16000 };
+      // OpenRouter usa reasoning_effort (calculado no callOpenRouterStream com thinkingLevel)
+      thinkingConfig = { thinkingLevel: "high" };
     }
 
     // FIX#11: Temperature calibrada por intenção (revisão = mesma que geração para consistência de estilo)
@@ -3770,20 +3777,19 @@ ${message}`;
 
 
     let maxOutputTokens = 8192;
-    let thinkingConfig: any = { thinkingBudget: 8192 };
+    let thinkingConfig: any = { thinkingLevel: "medium" };
 
-    // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 18000; // Limite solicitado pelo usuário
-      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
+      maxOutputTokens = 18000;
+      thinkingConfig = { thinkingLevel: "high" };
     } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 4096 };
+      thinkingConfig = { thinkingLevel: "low" };
     }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = { thinkingBudget: 16000 };
+      thinkingConfig = { thinkingLevel: "high" };
     }
 
     // Temperature calibrada por intenção
@@ -4225,20 +4231,19 @@ ${message}`;
 
 
     let maxOutputTokens = 8192;
-    let thinkingConfig: any = { thinkingBudget: 8192 };
+    let thinkingConfig: any = { thinkingLevel: "medium" };
 
-    // Destravando limites conforme solicitado pelo Dr. Felix
     if (isGenerationRequest) {
-      maxOutputTokens = 18000; // Limite solicitado pelo usuário
-      thinkingConfig = { thinkingBudget: 30000 }; // Limite solicitado pelo usuário
+      maxOutputTokens = 18000;
+      thinkingConfig = { thinkingLevel: "high" };
     } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingBudget: 4096 };
+      thinkingConfig = { thinkingLevel: "low" };
     }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 18000;
-      thinkingConfig = { thinkingBudget: 16000 };
+      thinkingConfig = { thinkingLevel: "high" };
     }
 
     // FIX#11: Temperature calibrada — revisão usa 0.15 para manter estilo consistente
@@ -4593,12 +4598,13 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const isGenerationRequest = false; // Fabrícia não gera petições
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
-    let maxOutputTokens = 600; 
-    let thinkingConfig: any = { thinkingBudget: 512 }; 
+    let maxOutputTokens = 600;
+    // minimal é o nível mais baixo disponível no 3.5 — velocidade máxima para respostas curtas
+    let thinkingConfig: any = { thinkingLevel: "minimal" };
 
     if (isStorageRequest || message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 2048;
-      thinkingConfig = { thinkingBudget: 1024 };
+      thinkingConfig = { thinkingLevel: "low" };
     }
 
     let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
