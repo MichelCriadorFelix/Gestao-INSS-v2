@@ -854,15 +854,14 @@ export const supabaseService = {
     return [...new Set(titles)] as string[];
   },
 
-  async searchByTitles(titles: string[], chunksPerTitle = 5, query?: string): Promise<any[]> {
+  async searchByTitles(titles: string[], chunksPerTitle = 15, query?: string): Promise<any[]> {
     const supabase = getSupabase();
     if (!supabase || titles.length === 0) return [];
 
     const results: any[] = [];
     const seen = new Set<number>();
 
-    // Extrair números de artigos ou parágrafos de forma inteligente
-    // Exemplo: "artigo 90", "art. 90", "Art 92", "Artigo 3", "§ 92"
+    // Extrair números de artigos ou parágrafos de forma inteligente de toda a query
     const articleNumbers: string[] = [];
     if (query) {
       const artMatches = [...query.matchAll(/(?:art(?:igo|\.)?|§|parágrafo|paragraph)\s*(\d+)/gi)];
@@ -870,8 +869,8 @@ export const supabaseService = {
         if (m[1]) articleNumbers.push(m[1]);
       });
       
-      // Também capturamos números isolados menores que 3 dígitos
-      const isolatedNumbers = query.match(/\b\d{1,3}\b/g) || [];
+      // Também capturamos números isolados menores que 4 dígitos que possam ser artigos
+      const isolatedNumbers = query.match(/\b\d{1,4}\b/g) || [];
       isolatedNumbers.forEach(num => {
         if (!articleNumbers.includes(num)) {
           articleNumbers.push(num);
@@ -879,7 +878,7 @@ export const supabaseService = {
       });
     }
 
-    // Extrair palavras-chave relevantes da query para busca direcionada complementar dentro das leis correspondentes
+    // Extrair palavras-chave relevantes da query para busca complementar interna nas leis correspondentes
     const keywords: string[] = [];
     if (query) {
       const stopWords = new Set([
@@ -896,85 +895,120 @@ export const supabaseService = {
       });
     }
 
-    for (const title of titles) {
+    // Execução concorrência 100% paralela de alto nível (Padrão Ouro / PHD) para busca de documentos!
+    const titlePromises = titles.map(async (title) => {
       const docResults: any[] = [];
+      const titleSeen = new Set<number>();
+      const subQueries: any[] = [];
 
-      // 1. Se informou número de artigo, faz uma busca pontual e direcionada
+      // 1. Busca integrada das partes do documento (Subqueries paralelas para o mesmo título)
       if (articleNumbers.length > 0) {
-        for (const num of articleNumbers) {
-          const orFilter = `content.ilike.%Art% ${num}%,content.ilike.%§% ${num}%,content.ilike.%Artigo% ${num}%,content.ilike.%Art% ${num}º%,content.ilike.%Art% ${num}-%,content.ilike.%§% ${num}º%`;
-          
-          const { data, error } = await supabase
-            .from('legal_documents')
-            .select('*')
-            .eq('metadata->>title', title)
-            .or(orFilter)
-            .limit(10);
-            
-          if (!error && data && data.length > 0) {
-            data.forEach((doc: any) => {
-              docResults.push({ ...doc, is_target_article: true });
-            });
-          }
+        const filters = articleNumbers.flatMap(num => [
+          `content.ilike.%Art% ${num}%`,
+          `content.ilike.%§% ${num}%`,
+          `content.ilike.%Artigo% ${num}%`,
+          `content.ilike.%Art% ${num}º%`,
+          `content.ilike.%Art% ${num}-%`,
+          `content.ilike.%§% ${num}º%`
+        ]);
+
+        // Executa em lotes integrados no PostgREST para não estourar tamanho de query
+        const batchSize = 18;
+        for (let i = 0; i < filters.length; i += batchSize) {
+          const filterSlice = filters.slice(i, i + batchSize).join(',');
+          subQueries.push(
+            supabase
+              .from('legal_documents')
+              .select('*')
+              .eq('metadata->>title', title)
+              .or(filterSlice)
+              .limit(15)
+              .then(res => {
+                if (res.error) console.error(`Error in article query for title ${title}:`, res.error);
+                return (res.data || []).map(d => ({ ...d, is_target_article: true }));
+              })
+          );
         }
       }
 
-      // 2. Se informou palavras-chave específicas, faz filtragem interna no documento
       if (keywords.length > 0) {
-        let keywordFilter = '';
-        keywords.forEach(kw => {
-          if (keywordFilter) keywordFilter += ',';
-          keywordFilter += `content.ilike.%${kw}%`;
-        });
-        
-        if (keywordFilter) {
-          const { data, error } = await supabase
-            .from('legal_documents')
-            .select('*')
-            .eq('metadata->>title', title)
-            .or(keywordFilter)
-            .limit(10);
-            
-          if (!error && data && data.length > 0) {
-            data.forEach((doc: any) => {
-              docResults.push({ ...doc, is_target_keyword: true });
-            });
-          }
+        const filters = keywords.map(kw => `content.ilike.%${kw}%`);
+        const batchSize = 10;
+        for (let i = 0; i < filters.length; i += batchSize) {
+          const filterSlice = filters.slice(i, i + batchSize).join(',');
+          subQueries.push(
+            supabase
+              .from('legal_documents')
+              .select('*')
+              .eq('metadata->>title', title)
+              .or(filterSlice)
+              .limit(10)
+              .then(res => {
+                if (res.error) console.error(`Error in keyword query for title ${title}:`, res.error);
+                return (res.data || []).map(d => ({ ...d, is_target_keyword: true }));
+              })
+          );
         }
       }
 
-      // 3. Fallback: carregar os primeiros trechos padrão do documento para contexto inicial
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('legal_documents')
-        .select('*')
-        .eq('metadata->>title', title)
-        .limit(chunksPerTitle);
+      // Fallback: carregar o contexto cronológico geral/inicial do documento
+      subQueries.push(
+        supabase
+          .from('legal_documents')
+          .select('*')
+          .eq('metadata->>title', title)
+          .order('id', { ascending: true }) // Mantém ordem sequencial científica dos artigos
+          .limit(chunksPerTitle)
+          .then(res => {
+            if (res.error) console.error(`Error in fallback query for title ${title}:`, res.error);
+            return res.data || [];
+          })
+      );
 
-      if (!fallbackError && fallbackData) {
-        fallbackData.forEach((doc: any) => {
-          docResults.push(doc);
-        });
-      }
-
-      // Merge sem duplicatas de chunks para este título específico, ponderando importância
-      docResults.forEach((doc: any) => {
-        if (!seen.has(doc.id)) {
-          seen.add(doc.id);
-          
-          let scoreBoost = 0.8;
-          if (doc.is_target_article) {
-            scoreBoost = 1.5;
-          } else if (doc.is_target_keyword) {
-            scoreBoost = 1.2;
+      // Resolvendo todas as subqueries em paralelo
+      const queryResults = await Promise.all(subQueries);
+      queryResults.forEach((list) => {
+        list.forEach((doc: any) => {
+          if (!titleSeen.has(doc.id)) {
+            titleSeen.add(doc.id);
+            docResults.push(doc);
+          } else {
+            const existing = docResults.find(d => d.id === doc.id);
+            if (existing) {
+              if (doc.is_target_article) existing.is_target_article = true;
+              if (doc.is_target_keyword) existing.is_target_keyword = true;
+            }
           }
-          
-          results.push({ ...doc, similarity: scoreBoost, source: 'title_exact' });
+        });
+      });
+
+      return docResults.map(doc => {
+        let scoreBoost = 0.8;
+        if (doc.is_target_article) {
+          scoreBoost = 1.8; // Artigos exatos possuem máxima precedência
+        } else if (doc.is_target_keyword) {
+          scoreBoost = 1.3;
+        }
+        return { ...doc, similarity: scoreBoost, source: 'title_exact' };
+      });
+    });
+
+    const docGroupResults = await Promise.all(titlePromises);
+    docGroupResults.forEach(r => results.push(...r));
+
+    // Ordena priorizando relevância estrutural e remove duplicatas globais
+    const finalSeen = new Set<number>();
+    const finalResults: any[] = [];
+    results
+      .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+      .forEach(doc => {
+        if (!finalSeen.has(doc.id)) {
+          finalSeen.add(doc.id);
+          finalResults.push(doc);
         }
       });
-    }
 
-    // Ordena priorizando artigos e palavras-chave específicas encontradas no documento
-    return results.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
+    return finalResults;
   },
 
   async keywordSearchLegalDocuments(query: string, matchCount = 15) {

@@ -513,19 +513,42 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
             segments.forEach((part) => {
               const clean = part.replace(/[.\-]/g, '');
               const looksLikeYear = /^(19|20)\d{2}$/.test(clean);
-              // indexa segmento isolado, salvo se for ano (a menos que seja o único segmento, ex.: Súmula 416)
-              if (clean.length >= 3 && (!looksLikeYear || segments.length === 1)) {
+              // indexa segmento isolado, salvo se for ano (a menos que seja o único segmento, ex.: Súmula 75 / Súmula 416)
+              // Alinhado com o Padrão Ouro PHD, aceitamos números com 2 ou mais dígitos para contemplar Súmulas/INs curtas
+              if (clean.length >= 2 && (!looksLikeYear || segments.length === 1)) {
                 numberVariants.add(clean);
               }
             });
           }
           for (const variant of numberVariants) {
-            if (variant.length >= 3 && cleanQuery.includes(variant)) {
+            if (variant.length >= 2 && cleanQuery.includes(variant)) {
               return true;
             }
           }
 
-          // 3. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
+          // 3. Correspondência inteligente por coocorrência (ex: "Súmula 75 TNU" -> se a query tem "sumula", "75" e "tnu")
+          //    Previne erros de digitação e variações imensas na ordem dos termos e formatações.
+          const titleLabelMatch = normTitle.match(/(sumula|decreto|lei|tema|instrucao|inss|tnu|stj|stf|ec)/gi) || [];
+          const numbersInTitle = normTitle.match(/\b\d+\b/g) || [];
+          if (numbersInTitle.length > 0) {
+            const matchedNumbers = numbersInTitle.filter(num => {
+              const looksLikeYear = /^(19|20)\d{2}$/.test(num);
+              return (num.length >= 2 || numbersInTitle.length === 1) && !looksLikeYear;
+            });
+            if (matchedNumbers.length > 0) {
+              const allNumbersInQuery = matchedNumbers.every(num => normQuery.includes(num));
+              const hasIndicator = titleLabelMatch.length === 0 || titleLabelMatch.some(label => {
+                const normLabel = label.toLowerCase();
+                if (normLabel === 'instrucao' && (normQuery.includes('in') || normQuery.includes('instrucao'))) return true;
+                return normQuery.includes(normLabel);
+              });
+              if (allNumbersInQuery && hasIndicator) {
+                return true;
+              }
+            }
+          }
+
+          // 4. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
           const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
           for (const kw of keywords) {
             if (normQuery.includes(kw)) {
