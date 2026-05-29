@@ -826,32 +826,18 @@ export const supabaseService = {
     });
 
     // Ordena decrescente pela similaridade
-    return merged.sort((a, b) => {
+    const sorted = merged.sort((a, b) => {
       const simA = a.similarity ?? a.a_similarity ?? 0;
       const simB = b.similarity ?? b.a_similarity ?? 0;
       return simB - simA;
-    }).slice(0, matchCount);
-  },
+    });
 
-  async getAllLegalDocumentTitles(): Promise<string[]> {
-    const supabase = getSupabase();
-    if (!supabase) return [];
+    if (sorted.length < 5 && matchThreshold > 0.25) {
+      console.log(`[RAG Self-Healing] Poucos resultados (${sorted.length}) com limiar ${matchThreshold}. Resgatando com limiar 0.25...`);
+      return this.searchLegalDocumentsByArea(embedding, areas, 0.25, matchCount);
+    }
 
-    const { data, error } = await supabase
-      .from('legal_documents')
-      .select("metadata");
-
-    if (error || !data) return [];
-
-    const titles = data
-      .map((row: any) => {
-        if (!row) return null;
-        if (row.metadata?.title) return row.metadata.title;
-        return row.title || row['metadata->title'] || row['metadata->>title'] || (typeof row === 'string' ? row : Object.values(row)[0]);
-      })
-      .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
-
-    return [...new Set(titles)] as string[];
+    return sorted.slice(0, matchCount);
   },
 
   async searchByTitles(titles: string[], chunksPerTitle = 15, query?: string): Promise<any[]> {
@@ -1243,6 +1229,122 @@ export const supabaseService = {
     }).filter(Boolean) as string[];
     
     return [...new Set(titles)].sort();
+  },
+
+  filterLawTitles(allLawTitles: string[], queryText: string): string[] {
+    const normQuery = queryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // 1. Conceitos Semânticos e Leis Principais Mapeadas
+    const matchedByConcept = new Set<string>();
+
+    // Conceito: Civil / Sucessões / Família / Alvará
+    const civilKeywords = ['alvara', 'sucess', 'herde', 'heranc', 'partilha', 'inventar', 'bens', 'filho', 'neto', 'avo', 'pai', 'mae', 'obito', 'morte', 'falec', 'represent', 'pre-mort', 'divorcio', 'casamento', 'uniao estavel', 'parentesco', 'morte', 'de cujus', 'legitima', 'quinhão', 'cota-parte', 'banco', 'saldo', 'poupança', 'levantamento', 'alvará judicial'];
+    if (civilKeywords.some(kw => normQuery.includes(kw))) {
+      // Buscar títulos que correspondem a Código Civil, CPC, Lei 6858
+      allLawTitles.forEach(t => {
+        const nt = t.toLowerCase();
+        if (nt.includes('codigo civil') || nt.includes('codigo de processo civil') || nt.includes('6.858') || nt.includes('85.845') || nt.includes('decreto 85')) {
+          matchedByConcept.add(t);
+        }
+      });
+    }
+
+    // Conceito: Previdenciário / Benefícios / INSS
+    const prevKeywords = ['aposentador', 'inss', 'previdenc', 'pensao', 'beneficio', 'loas', 'bpc', 'miserabilidad', 'renda', 'deficiente', 'idoso', 'carencia', 'tempo de contribuicao', 'cnis', 'segurado', 'auxilio', 'doenca', 'pericia', 'incapacidade', 'pensionista', 'rpps', 'der', 'dcb', 'concessão'];
+    if (prevKeywords.some(kw => normQuery.includes(kw))) {
+      allLawTitles.forEach(t => {
+        const nt = t.toLowerCase();
+        if (nt.includes('8.213') || nt.includes('3.048') || nt.includes('8.742') || nt.includes('8.212') || nt.includes('instrucao normativa') || nt.includes('pres/inss') || nt.includes('sumula') || nt.includes('tema')) {
+          matchedByConcept.add(t);
+        }
+      });
+    }
+
+    // Conceito: Trabalhista / CLT
+    const cltKeywords = ['trabalh', 'empregad', 'clt', 'demiss', 'justa causa', 'rescis', 'salario', 'hora extra', 'seguro-desemprego', 'aviso previo', 'fgts', 'carteira de trabalho', 'ctps', 'vinculo', 'adicional', 'maternidade', 'ferias', 'convenção coletiva'];
+    if (cltKeywords.some(kw => normQuery.includes(kw))) {
+      allLawTitles.forEach(t => {
+        const nt = t.toLowerCase();
+        if (nt.includes('consolidacao') || nt.includes('c.l.t') || nt.includes('8.036') || nt.includes('fgts') || nt.includes('constituição') || nt.includes('decreto-lei nº 5.452')) {
+          matchedByConcept.add(t);
+        }
+      });
+    }
+
+    // Conceito: Consumidor / Bancos
+    const consKeywords = ['consumidor', 'cdc', 'banc', 'tarifa', 'fraude', 'empréstimo', 'bloqueio', 'danos morais', 'vício', 'compra', 'serviço', 'fornecedor', 'súmula 297', 'súmula 479', 'responsabilidade objetiva'];
+    if (consKeywords.some(kw => normQuery.includes(kw))) {
+      allLawTitles.forEach(t => {
+        const nt = t.toLowerCase();
+        if (nt.includes('defesa do consumidor') || nt.includes('c.d.c') || nt.includes('297') || nt.includes('479')) {
+          matchedByConcept.add(t);
+        }
+      });
+    }
+
+    // 2. Filtro Geral inteligente para correspondências específicas
+    const matchedByGeneral = allLawTitles.filter((title) => {
+      const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      // 1. Inclusão direta do título
+      if (normQuery.includes(normTitle)) return true;
+
+      // 2. Correspondência por números de lei/súmula/tema/decreto/IN
+      const cleanQuery = normQuery.replace(/[.\-\/\s]/g, '');
+      const rawNumberTokens = title.match(/\d+(?:[.\-\/]\d+)*/g) || [];
+      const numberVariants = new Set<string>();
+      for (const token of rawNumberTokens) {
+        numberVariants.add(token.replace(/[.\-\/]/g, '')); // token cheio sem separadores
+        const segments = token.split('/');
+        segments.forEach((part) => {
+          const clean = part.replace(/[.\-]/g, '');
+          const looksLikeYear = /^(19|20)\d{2}$/.test(clean);
+          if (clean.length >= 2 && (!looksLikeYear || segments.length === 1)) {
+            numberVariants.add(clean);
+          }
+        });
+      }
+      for (const variant of numberVariants) {
+        if (variant.length >= 2 && cleanQuery.includes(variant)) {
+          return true;
+        }
+      }
+
+      // 3. Correspondência inteligente por coocorrência (ex: "Súmula 75 TNU")
+      const titleLabelMatch = normTitle.match(/(sumula|decreto|lei|tema|instrucao|inss|tnu|stj|stf|ec)/gi) || [];
+      const numbersInTitle = normTitle.match(/\b\d+\b/g) || [];
+      if (numbersInTitle.length > 0) {
+        const matchedNumbers = numbersInTitle.filter(num => {
+          const looksLikeYear = /^(19|20)\d{2}$/.test(num);
+          return (num.length >= 2 || numbersInTitle.length === 1) && !looksLikeYear;
+        });
+        if (matchedNumbers.length > 0) {
+          const allNumbersInQuery = matchedNumbers.every(num => normQuery.includes(num));
+          const hasIndicator = titleLabelMatch.length === 0 || titleLabelMatch.some(label => {
+            const normLabel = label.toLowerCase();
+            if (normLabel === 'instrucao' && (normQuery.includes('in') || normQuery.includes('instrucao'))) return true;
+            return normQuery.includes(normLabel);
+          });
+          if (allNumbersInQuery && hasIndicator) {
+            return true;
+          }
+         }
+       }
+
+       // 4. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
+       const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
+       for (const kw of keywords) {
+         if (normQuery.includes(kw)) {
+           return true;
+         }
+       }
+
+       return false;
+    });
+
+    // Combinar ambas as estratégias sem duplicatas
+    const finalTitles = new Set<string>([...matchedByConcept, ...matchedByGeneral]);
+    return [...finalTitles];
   },
 
   // Supabase Storage

@@ -478,72 +478,9 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           messageText.includes('[FASE DE GERAÇÃO]');
 
         // Busca e filtra os títulos da base para consulta exata por título
-        // Otimização: filtra apenas os títulos mencionados no prompt para evitar N+1 queries desnecessárias e diluição de contexto
+        // Otimização: filtra apenas os títulos mencionados no para evitar N+1 queries desnecessárias e diluição de contexto, utilizando o Padrão Ouro cognitivo no SupabaseService.
         const allLawTitles = await supabaseService.getLegalDocumentTitles();
-        const allTitles = allLawTitles.filter((title: string) => {
-          const normTitle = title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const normQuery = enrichedQueryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-          // 1. Inclusão direta do título
-          if (normQuery.includes(normTitle)) return true;
-
-          // 2. Correspondência por números de lei/súmula/tema/decreto/IN
-          //    Gera variantes do número do título e checa se a query contém alguma.
-          //    Ex.: "6.858/1980" -> {"68581980", "6858"}  (ano isolado é ignorado p/ evitar falso positivo)
-          const cleanQuery = normQuery.replace(/[.\-\/\s]/g, '');
-          const rawNumberTokens = title.match(/\d+(?:[.\-\/]\d+)*/g) || [];
-          const numberVariants = new Set<string>();
-          for (const token of rawNumberTokens) {
-            numberVariants.add(token.replace(/[.\-\/]/g, '')); // token cheio sem separadores
-            const segments = token.split('/');
-            segments.forEach((part) => {
-              const clean = part.replace(/[.\-]/g, '');
-              const looksLikeYear = /^(19|20)\d{2}$/.test(clean);
-              // indexa segmento isolado, salvo se for ano (a menos que seja o único segmento, ex.: Súmula 75 / Súmula 416)
-              // Alinhado com o Padrão Ouro PHD, aceitamos números com 2 ou mais dígitos para contemplar Súmulas/INs curtas
-              if (clean.length >= 2 && (!looksLikeYear || segments.length === 1)) {
-                numberVariants.add(clean);
-              }
-            });
-          }
-          for (const variant of numberVariants) {
-            if (variant.length >= 2 && cleanQuery.includes(variant)) {
-              return true;
-            }
-          }
-
-          // 3. Correspondência inteligente por coocorrência (ex: "Súmula 75 TNU" -> se a query tem "sumula", "75" e "tnu")
-          //    Previne erros de digitação e variações imensas na ordem dos termos e formatações.
-          const titleLabelMatch = normTitle.match(/(sumula|decreto|lei|tema|instrucao|inss|tnu|stj|stf|ec)/gi) || [];
-          const numbersInTitle = normTitle.match(/\b\d+\b/g) || [];
-          if (numbersInTitle.length > 0) {
-            const matchedNumbers = numbersInTitle.filter(num => {
-              const looksLikeYear = /^(19|20)\d{2}$/.test(num);
-              return (num.length >= 2 || numbersInTitle.length === 1) && !looksLikeYear;
-            });
-            if (matchedNumbers.length > 0) {
-              const allNumbersInQuery = matchedNumbers.every(num => normQuery.includes(num));
-              const hasIndicator = titleLabelMatch.length === 0 || titleLabelMatch.some(label => {
-                const normLabel = label.toLowerCase();
-                if (normLabel === 'instrucao' && (normQuery.includes('in') || normQuery.includes('instrucao'))) return true;
-                return normQuery.includes(normLabel);
-              });
-              if (allNumbersInQuery && hasIndicator) {
-                return true;
-              }
-            }
-          }
-
-          // 4. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
-          const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
-          for (const kw of keywords) {
-            if (normQuery.includes(kw)) {
-              return true;
-            }
-          }
-
-          return false;
-        });
+        const allTitles = supabaseService.filterLawTitles(allLawTitles, enrichedQueryText);
 
         // Se for comando de geração com contexto semântico fraco,
         // injeta os termos jurídicos do caso extraídos do histórico
