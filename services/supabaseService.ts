@@ -861,21 +861,44 @@ export const supabaseService = {
     const results: any[] = [];
     const seen = new Set<number>();
 
-    // Extrair números de artigos ou parágrafos de forma inteligente de toda a query
+    // Extração de números de artigos/parágrafos com suporte a:
+    //   - ponto milhar: "art. 1.829", "Art. 1.851"
+    //   - artigo composto: "art. 19-E", "art. 19-A"
+    //   - artigo simples: "art. 15", "art 725", "art. 1851"
+    //   - múltiplos: "arts. 124 e 127"
+    // NUNCA captura números soltos sem prefixo "art./§/parágrafo" — evita ruído.
     const articleNumbers: string[] = [];
     if (query) {
-      const artMatches = [...query.matchAll(/(?:art(?:igo|\.)?|§|parágrafo|paragraph)\s*(\d+)/gi)];
-      artMatches.forEach(m => {
-        if (m[1]) articleNumbers.push(m[1]);
-      });
-      
-      // Também capturamos números isolados menores que 4 dígitos que possam ser artigos
-      const isolatedNumbers = query.match(/\b\d{1,4}\b/g) || [];
-      isolatedNumbers.forEach(num => {
-        if (!articleNumbers.includes(num)) {
-          articleNumbers.push(num);
-        }
-      });
+      const add = (n: string) => { if (n && !articleNumbers.includes(n)) articleNumbers.push(n); };
+
+      // 1. Ponto milhar: "art. 1.829", "Art. 1.851-A"
+      [...query.matchAll(/(?:art(?:igo|s|\.)?|§|parágrafo)\s*(\d{1,4}\.\d{3}(?:\-[A-Za-z])?)/gi)]
+        .forEach(m => add(m[1]));
+
+      // 2. Artigo composto sem ponto milhar: "art. 19-E", "art 19-A"
+      [...query.matchAll(/(?:art(?:igo|s|\.)?|§|parágrafo)\s*(\d+\-[A-Za-z])/gi)]
+        .forEach(m => add(m[1]));
+
+      // 3. Artigo simples (1-4 dígitos): "art. 15", "art 725", "art. 1851"
+      [...query.matchAll(/(?:art(?:igo|s|\.)?|§|parágrafo)\s*(\d{1,4})/gi)]
+        .forEach(m => add(m[1]));
+
+      // 4. "e NNN" após artigo já detectado: "arts. 124 e 127"
+      [...query.matchAll(/\be\s+(\d{1,4})\b/gi)]
+        .forEach(m => add(m[1]));
+
+      // 5. Deduplicar: remover números que são prefixo de outro mais específico na lista
+      //    Ex.: ["1.829", "1"] → remove "1" porque "1829" já está coberto por "1.829"
+      articleNumbers.splice(0, articleNumbers.length,
+        ...articleNumbers.filter(n => {
+          const nDigits = n.replace(/[.\-]/g, '');
+          return !articleNumbers.some(other => {
+            if (other === n) return false;
+            const oDigits = other.replace(/[.\-]/g, '');
+            return oDigits.startsWith(nDigits) && oDigits.length > nDigits.length;
+          });
+        })
+      );
     }
 
     // Extrair palavras-chave relevantes da query para busca complementar interna nas leis correspondentes
@@ -903,14 +926,32 @@ export const supabaseService = {
 
       // 1. Busca integrada das partes do documento (Subqueries paralelas para o mesmo título)
       if (articleNumbers.length > 0) {
-        const filters = articleNumbers.flatMap(num => [
-          `content.ilike.%Art% ${num}%`,
-          `content.ilike.%§% ${num}%`,
-          `content.ilike.%Artigo% ${num}%`,
-          `content.ilike.%Art% ${num}º%`,
-          `content.ilike.%Art% ${num}-%`,
-          `content.ilike.%§% ${num}º%`
-        ]);
+        const filters: string[] = [];
+        articleNumbers.forEach(num => {
+          const semPonto = num.replace(/\./g, '');
+          // Converter número sem ponto milhar em com ponto: "1851" → "1.851"
+          const comPonto = /^\d{4}$/.test(semPonto)
+            ? `${semPonto.slice(0, 1)}.${semPonto.slice(1)}`
+            : null;
+
+          const filterVariants: string[] = [];
+          const addVariant = (n: string) => {
+            filterVariants.push(`content.ilike.%Art% ${n}%`);
+            filterVariants.push(`content.ilike.%Art. ${n}%`);
+            filterVariants.push(`content.ilike.%Artigo ${n}%`);
+            filterVariants.push(`content.ilike.%§ ${n}%`);
+            filterVariants.push(`content.ilike.%§ ${n}º%`);
+          };
+
+          addVariant(num);
+          if (semPonto !== num) addVariant(semPonto); // tinha ponto → adicionar sem ponto
+          if (comPonto && comPonto !== num) addVariant(comPonto); // sem ponto → adicionar com ponto
+
+          const uniqueVariants = [...new Set(filterVariants)];
+          filters.push(...uniqueVariants);
+        });
+
+        const uniqueFilters = [...new Set(filters)];
 
         // Executa em lotes integrados no PostgREST para não estourar tamanho de query
         const batchSize = 18;
