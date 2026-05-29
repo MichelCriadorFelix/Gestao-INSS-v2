@@ -3150,13 +3150,18 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (ragContext) {
+      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
+      if (ragTruncated.length < ragContext.length) {
+        console.log(`[RAG] ragContext truncado para Dr. Michel: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
+      }
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
 NUNCA afirme algo que contradiga o texto abaixo.
 ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO, você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
 Leis/jurisprudências recuperadas:
-${ragContext}`;
+${ragTruncated}`;
     }
 
     // FIX#1: sempre busca draft quando há sessionId (não depende mais de isCorrectionRequest)
@@ -3655,13 +3660,18 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
     if (ragContext) {
+      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
+      if (ragTruncated.length < ragContext.length) {
+        console.log(`[RAG] ragContext truncado para Dra. Luana: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
+      }
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
 NUNCA afirme algo que contradiga o texto abaixo.
 ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO (ex: "Revogado pela Lei...", "Revogado pela Emenda..."), você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
 Leis/jurisprudências recuperadas:
-${ragContext}`;
+${ragTruncated}`;
     }
 
     // FIX#1: sempre busca draft quando há sessionId
@@ -4134,7 +4144,14 @@ REGRAS DE OURO:
     // DETECÇÃO DE CORREÇÃO
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
     let finalMessage = message;
-    if (ragContext) { finalMessage += `\n\n${ragContext}`; }
+    if (ragContext) {
+      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
+      if (ragTruncated.length < ragContext.length) {
+        console.log(`[RAG] ragContext truncado para Dr. Felix: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
+      }
+      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]\nLeis/jurisprudências recuperadas:\n${ragTruncated}`;
+    }
     if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
 
     // Draft injection para revisão — sempre busca quando há sessionId
@@ -4622,13 +4639,18 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint;
     if (ragContext) {
-finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
+      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
+      if (ragTruncated.length < ragContext.length) {
+        console.log(`[RAG] ragContext truncado para Sec. Fabrícia: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
+      }
+      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
 NUNCA afirme algo que contradiga o texto abaixo.
 ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO, você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
 Leis/jurisprudências recuperadas:
-${ragContext}`;
+${ragTruncated}`;
     }
 
     if (sessionId) {
