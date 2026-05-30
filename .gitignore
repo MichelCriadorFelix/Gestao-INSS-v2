@@ -28,3 +28,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backups e arquivos temporários de restauração
+*.backup_restaurado
+*.backup
+*.bak

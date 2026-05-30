@@ -3015,6 +3015,159 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     };
 
+    // =========================================================================
+    // DYNAMIC PATTERN-MATCHING SCANNER FOR FUTURE COGNITIVE EXPANSION
+    // =========================================================================
+    // Garante que qualquer lei, decreto, súmula ou tema adicionado no futuro
+    // à base de conhecimento seja reconhecido de forma 100% dinâmica e automática
+    // quando referenciado pelo advogado nas mensagens do caso.
+    const allDbTitles = Array.from(titleAreas.keys());
+
+    const matchLawTitle = (title: string, lawNum: string, isDecreto: boolean): boolean => {
+      const normTitle = normalizeStr(title);
+      const cleanLawNum = lawNum.replace(/\./g, '');
+      
+      if (isDecreto) {
+        if (!normTitle.includes('decreto')) return false;
+      } else {
+        if (!normTitle.includes('lei') && !normTitle.includes('codigo') && !normTitle.includes('clt') && !normTitle.includes('constituicao') && !normTitle.includes('estatuto')) {
+          return false;
+        }
+      }
+      
+      const cleanTitle = normTitle.replace(/\./g, '');
+      const regex = new RegExp(`(?:[^\\d]|^)${cleanLawNum}(?:[^\\d]|$)`);
+      return regex.test(cleanTitle);
+    };
+
+    // 1. Deteção de Súmulas e Temas por Padrão Numérico
+    const sumulaMatches = caseContext.matchAll(/(?:s[uú]mula|s[uú]m)\s*(\d+)/gi);
+    const temaMatches = caseContext.matchAll(/(?:tema)\s*(\d+[\d\.]*)/gi);
+
+    for (const match of sumulaMatches) {
+      const num = match[1];
+      const matchedTitle = allDbTitles.find(t => {
+        const norm = normalizeStr(t);
+        if (!norm.includes("sumula")) return false;
+        const numRegex = new RegExp(`(?:[^\\d]|^)${num}(?:[^\\d]|$)`);
+        return numRegex.test(norm);
+      });
+      if (matchedTitle) {
+        injectIntoPlan(matchedTitle, [], true);
+      }
+    }
+
+    for (const match of temaMatches) {
+      const numRaw = match[1];
+      const cleanNum = numRaw.replace(/\./g, '');
+      const matchedTitle = allDbTitles.find(t => {
+        const norm = normalizeStr(t);
+        if (!norm.includes("tema")) return false;
+        const normClean = norm.replace(/\./g, '');
+        const numRegex = new RegExp(`(?:[^\\d]|^)${cleanNum}(?:[^\\d]|$)`);
+        return numRegex.test(normClean);
+      });
+      if (matchedTitle) {
+        injectIntoPlan(matchedTitle, [], true);
+      }
+    }
+
+    // 2. Detecção de correspondências de Leis/Decretos com artigos conjugados (Ex: "art. 42 da lei 8.213" ou "lei 8213, art 59")
+    const artBeforeLawMatches = caseContext.matchAll(/(?:art\.?|artigo)\s*(\d+)\s*(?:[º°ª\s])*(?:da|do|de)?\s*(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
+    for (const match of artBeforeLawMatches) {
+      const art = match[1];
+      const type = match[2].toLowerCase();
+      const lawNum = match[3];
+      const isDecreto = type === "decreto";
+      
+      const matchedTitle = allDbTitles.find(t => matchLawTitle(t, lawNum, isDecreto));
+      if (matchedTitle) {
+        injectIntoPlan(matchedTitle, [art]);
+      }
+    }
+
+    const lawBeforeArtMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)\s*,?\s*(?:art\.?|artigo)\s*(\d+)/gi);
+    for (const match of lawBeforeArtMatches) {
+      const type = match[1].toLowerCase();
+      const lawNum = match[2];
+      const art = match[3];
+      const isDecreto = type === "decreto";
+      
+      const matchedTitle = allDbTitles.find(t => matchLawTitle(t, lawNum, isDecreto));
+      if (matchedTitle) {
+        injectIntoPlan(matchedTitle, [art]);
+      }
+    }
+
+    // 3. Detecção de menção simples de Leis / Decretos com varredura local de artigos próximos
+    const genericLawMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
+    for (const match of genericLawMatches) {
+      const type = match[1].toLowerCase();
+      const lawNum = match[2];
+      const isDecreto = type === "decreto";
+      
+      const matchedTitle = allDbTitles.find(t => matchLawTitle(t, lawNum, isDecreto));
+      if (matchedTitle) {
+        const matchIndex = match.index || 0;
+        const windowStart = Math.max(0, matchIndex - 100);
+        const windowEnd = Math.min(caseContext.length, matchIndex + 150);
+        const contextWindow = caseContext.substring(windowStart, windowEnd);
+        
+        const localArts: string[] = [];
+        const artMatches = contextWindow.matchAll(/(?:art\.?|artigo)\s*(\d+)/gi);
+        for (const am of artMatches) {
+          localArts.push(am[1]);
+        }
+        
+        injectIntoPlan(matchedTitle, localArts);
+      }
+    }
+
+    // 4. Mapeamento de abreviações e palavras-chave para Leis Históricas
+    const specialKeywords = [
+      { keys: ["clt", "consolidacao das leis do trabalho", "decreto-lei 5452", "decreto-lei 5.452"], title: "Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)" },
+      { keys: ["codigo de processo civil", "cpc", "lei 13105", "lei 13.105"], title: "Código de Processo Civil (Lei nº 13.105/2015)" },
+      { keys: ["codigo civil", "cc", "lei 10406", "lei 10.406"], title: "Código Civil (Lei nº 10.406/2002)" },
+      { keys: ["constituicao", "cf", "cf88", "cf/88", "carta magna"], title: "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988" },
+      { keys: ["loas", "lei organica da assistencia social", "lei 8742", "lei 8.742"], title: "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)" },
+      { keys: ["lei de beneficios", "lei 8213", "lei 8.213"], title: "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)" },
+      { keys: ["regimento da previdencia", "regulamento da previdência", "decreto 3048", "decreto 3.048"], title: "Regulamento da Previdência Social (Decreto nº 3.048/1999)" },
+      { keys: ["estatuto do idoso", "lei 10741", "lei 10.741"], title: "Estatuto do Idoso (Lei nº 10.741/2003)" }
+    ];
+
+    for (const sk of specialKeywords) {
+      const normKeys = sk.keys.map(k => normalizeStr(k));
+      const hasMention = normKeys.some(k => {
+        if (k.length <= 4) {
+          const regex = new RegExp(`(?:[^a-zA-Z]|^)${k}(?:[^a-zA-Z]|$)`, 'i');
+          return regex.test(caseContext);
+        }
+        return caseContext.toLowerCase().includes(k);
+      });
+
+      if (hasMention) {
+        const normStr = caseContext.toLowerCase();
+        let index = -1;
+        for (const k of normKeys) {
+          index = normStr.indexOf(k);
+          if (index > -1) break;
+        }
+        
+        const localArts: string[] = [];
+        if (index > -1) {
+          const windowStart = Math.max(0, index - 100);
+          const windowEnd = Math.min(caseContext.length, index + 150);
+          const contextWindow = caseContext.substring(windowStart, windowEnd);
+          const artMatches = contextWindow.matchAll(/(?:art\.?|artigo)\s*(\d+)/gi);
+          for (const am of artMatches) {
+            localArts.push(am[1]);
+          }
+        }
+        
+        injectIntoPlan(sk.title, localArts);
+      }
+    }
+
     // 1. PREVIDENCIÁRIO (Social Security - INSS/RPPS)
     const isPrevidenciario = /previdenci[áa]ri|inss|aposentador|tempo\s+de\s+contribuiç|pension|pens[ãa]o|bpc|loas|benef[íi]cio/i.test(contextStr);
 
