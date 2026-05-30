@@ -1697,8 +1697,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between gap-1.5 px-2.5 sm:px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
-                <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 px-2 sm:px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0 flex-1 mr-1">
                   <input 
                     type="file" 
                     multiple 
@@ -1722,7 +1722,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   >
                     <Users className="w-5 h-5" />
                   </button>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-1 sm:mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
                   <select
                     value={petitionLength}
                     onChange={(e) => {
@@ -1733,16 +1733,16 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[105px] sm:max-w-[140px] cursor-pointer"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[80px] xs:max-w-[105px] sm:max-w-[140px] cursor-pointer"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
-                    <option value="Padrão (Livre)">Tamanho Livre</option>
-                    <option value="Mínimo 3000 palavras">Mínimo 3k pal.</option>
-                    <option value="Médio 4000 palavras">Médio 4k pal.</option>
-                    <option value="Máximo 5000 palavras">Máximo 5k pal.</option>
-                    <option value="Premium 7000 palavras">Premium 7k pal.</option>
+                    <option value="Padrão (Livre)">Livre</option>
+                    <option value="Mínimo 3000 palavras">3k pal.</option>
+                    <option value="Médio 4000 palavras">4k pal.</option>
+                    <option value="Máximo 5000 palavras">5k pal.</option>
+                    <option value="Premium 7000 palavras">7k pal.</option>
                   </select>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-1 sm:mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
                   <select
                     value={selectedModel}
                     onChange={(e) => {
@@ -1754,7 +1754,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('gemini');
                       }
                     }}
-                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[90px] sm:max-w-[150px] truncate"
+                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[75px] xs:max-w-[90px] sm:max-w-[150px] truncate"
                   >
                     <optgroup label="Google Gemini">
                       <option value="gemini-3-flash-preview">Gemini 3 Preview</option>
@@ -1769,6 +1769,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
                   className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
+                  title="Enviar mensagem"
                 >
                   <Send className="w-5 h-5" />
                 </button>
