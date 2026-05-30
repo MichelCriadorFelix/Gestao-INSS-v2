@@ -51,7 +51,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
   const taskLog = dailyFocusState?.taskLog || [];
 
   const contractTasks = useMemo(() => {
-    let tasks: FocusTask[] = [];
+    const tasks: FocusTask[] = [];
     const today = new Date();
 
     const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
@@ -109,7 +109,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
   }, [contracts, resolvedTasks, postponedTasks, taskLog]);
 
   const maintenanceTasks = useMemo(() => {
-    let tasks: FocusTask[] = [];
+    const tasks: FocusTask[] = [];
     const today = new Date();
 
     const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
@@ -133,7 +133,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
         if (dateStr && isUrgentDate(dateStr)) {
           const taskId = `alert-${client.id}-${key}`;
           if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
-            let parsedDate = parseDate(dateStr);
+            const parsedDate = parseDate(dateStr);
             if (!parsedDate) return;
 
             tasks.push({

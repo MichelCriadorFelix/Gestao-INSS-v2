@@ -557,7 +557,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           const words = text.split(/\s+/); // Separa por qualquer espaço em branco
           const spaceWidth = doc.getTextWidth(" "); // Largura padrão do espaço
 
-          let lines: string[][] = [];
+          const lines: string[][] = [];
           let currentLineWords: string[] = [];
           let currentLineWidth = 0;
 

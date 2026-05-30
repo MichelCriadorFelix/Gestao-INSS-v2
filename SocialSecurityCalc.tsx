@@ -177,7 +177,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 const salaryMap = new Map(b.sc.map(s => [s.month, s]));
                 const newSc = [...b.sc];
 
-                let current = new Date(start);
+                const current = new Date(start);
                 // Limit loop to avoid infinite loops
                 let safety = 0;
                 while (current <= end && safety < 1200) {
@@ -348,9 +348,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         }
         
         let years = Math.floor(totalAdjustedDays / 365);
-        let remainingDays = totalAdjustedDays % 365;
+        const remainingDays = totalAdjustedDays % 365;
         let months = Math.floor(remainingDays / 30);
-        let days = Math.floor(remainingDays % 30);
+        const days = Math.floor(remainingDays % 30);
         
         if (months >= 12) {
             years += 1;
@@ -406,7 +406,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const start = parseDateLocal(b.startDate);
             start.setHours(12, 0, 0, 0);
             
-            let endStr = b.endDate;
+            const endStr = b.endDate;
             let end = parseDateLocal(endStr);
             end.setHours(12, 0, 0, 0);
 
@@ -438,7 +438,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         let totalAdjustedDays = 0;
         
         // 2. Iterate Day by Day using Date object to avoid DST drift
-        let current = new Date(minDateMs);
+        const current = new Date(minDateMs);
         const maxDate = new Date(maxDateMs);
         
         // Limit to 100 years to prevent infinite loops
@@ -499,7 +499,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             // Priority: Date Range (since SCs might be missing from AI)
             if (bond.startDate && bond.endDate) {
-                let current = parseDateLocal(bond.startDate);
+                const current = parseDateLocal(bond.startDate);
                 // Normalize to start of month and noon to avoid timezone issues
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
@@ -577,7 +577,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const bondMonths = new Set<string>();
             
             if (bond.startDate && bond.endDate) {
-                let current = parseDateLocal(bond.startDate);
+                const current = parseDateLocal(bond.startDate);
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
                 
@@ -638,7 +638,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             return bond.sc.map(s => ({ month: s.month, value: s.value, indicators: s.indicators || [], isMissing: false }));
         }
 
-        let current = parseDateLocal(bond.startDate);
+        const current = parseDateLocal(bond.startDate);
         // Normalize to start of month
         current.setDate(1);
         current.setHours(12, 0, 0, 0);
@@ -964,7 +964,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     if (processed.length === 0) return "0a 0m 0d";
 
     let totalAdjustedDays = 0;
-    let current = new Date(minMs);
+    const current = new Date(minMs);
     const maxDate = new Date(maxMs);
     let loops = 0;
 
@@ -1252,7 +1252,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         if (analysisResult.isPcd) doc.text(`Pessoa com Deficiência (PcD): Sim`, margin, 122);
         
         // Bonds Table
-        let yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
+        const yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text("Detalhamento dos Vínculos Utilizados", margin, yPosBonds);
@@ -1302,7 +1302,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         });
 
         // @ts-ignore
-        let finalY = doc.lastAutoTable.finalY + 5;
+        const finalY = doc.lastAutoTable.finalY + 5;
         doc.setFontSize(8);
         doc.text("* Data fim limitada à DER para fins de cálculo.", margin, finalY);
 
@@ -2441,7 +2441,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                                     const end = new Date(y2, m2 - 1, 1);   // Start of month
                                                                                                     
                                                                                                     const newSc: { month: string; value: number; indicators: string[] }[] = [];
-                                                                                                    let current = new Date(start);
+                                                                                                    const current = new Date(start);
                                                                                                     
                                                                                                     while (current <= end) {
                                                                                                         const m = String(current.getMonth() + 1).padStart(2, '0');

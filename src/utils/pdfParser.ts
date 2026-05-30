@@ -137,7 +137,7 @@ export async function extractTextFromPDF(
                 const currentLongestSide = Math.max(originalViewport.width, originalViewport.height);
                 const dynamicScale = Math.min(3.0, targetLongestSide / currentLongestSide);
                 
-                let viewport = page.getViewport({ scale: dynamicScale });
+                const viewport = page.getViewport({ scale: dynamicScale });
                 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d', { alpha: false }); 

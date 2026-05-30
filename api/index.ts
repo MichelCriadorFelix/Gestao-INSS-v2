@@ -99,7 +99,7 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
     
     if ((isInvalidKey || isOverloaded) && retries > 0) {
       currentKeyIndex++;
-      let delay = isInvalidKey ? 500 : 3000;
+      const delay = isInvalidKey ? 500 : 3000;
       await new Promise(resolve => setTimeout(resolve, delay));
       return uploadFileToGeminiWithRetry(filePath, mimetype, originalname, retries - 1, forcedKeyIndex);
     }
@@ -2903,7 +2903,7 @@ app.post("/api/marketing/generate", async (req, res) => {
       else strategyDesc = strategy;
     }
 
-    let assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
+    const assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
     let jsonFormat = "";
     let taskDesc = "";
 
@@ -3272,7 +3272,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      let currentContents = [...contents];
+      const currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
@@ -3800,7 +3800,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      let currentContents = [...contents];
+      const currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
@@ -3976,7 +3976,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       clearInterval(heartbeat);
       console.error("Stream error (Dra. Luana):", streamError);
       
-      let errorMessage = streamError.message || "Erro durante a geração do texto.";
+      const errorMessage = streamError.message || "Erro durante a geração do texto.";
       
       res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
@@ -4253,7 +4253,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      let currentContents = [...contents];
+      const currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       let targetInstruction = "";
@@ -4607,7 +4607,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     }
 
     let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
-    let temperature = 0.3; // A bit more creative for writing Whatsapp messages
+    const temperature = 0.3; // A bit more creative for writing Whatsapp messages
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT ======
     const inputBudget = getInputBudget(modelProvider, model);
@@ -4640,7 +4640,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     }));
 
     // FIX#1: isCorrectionRequest removido — dead variable (Fabrícia não gera petições)
-    let lengthConstraint = "";
+    const lengthConstraint = "";
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint;
     if (ragContext) {
@@ -4778,7 +4778,7 @@ return;
 let isFinished = false;
 let attempt = 0;
 let fullResponseText = "";
-let currentContents = [...contents];
+const currentContents = [...contents];
 let finalMaxTokensHit = false;
 const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
 const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
