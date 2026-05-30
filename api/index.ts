@@ -2790,6 +2790,115 @@ app.post("/api/rag/embed", async (req, res) => {
   }
 });
 
+// ============================================================
+// RAG DETERMINÍSTICO — PLANNER AGÊNTICO + FETCH POR PLANO
+// ============================================================
+// Replica o método humano de busca na base: (1) lê o inventário
+// completo de títulos reais, (2) o Flash decide EXATAMENTE quais
+// dispositivos o caso exige (artigos para leis/códigos, integral
+// para súmulas/temas/jurisprudência), escolhendo SOMENTE da lista
+// (grounding = sem alucinação), (3) fetch determinístico via RPC
+// fetch_legal_by_plan (sem threshold, sem embedding → 100% do que existe).
+const RAG_PLANNER_PROMPT = `Você é um PLANEJADOR DE RECUPERAÇÃO JURÍDICA. Sua única tarefa é decidir QUAIS dispositivos da base de conhecimento são necessários para o caso, escolhendo EXCLUSIVAMENTE da lista de títulos fornecida.
+
+REGRAS:
+1. Você SÓ pode escolher títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE como está (cada caractere). É PROIBIDO inventar, abreviar ou alterar títulos.
+2. Para LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS e a CONSTITUIÇÃO: liste os ARTIGOS específicos relevantes ao caso no campo "artigos" (apenas o número/identificador, ex.: "16", "74", "19-E", "1.829"). Seja generoso — inclua todos os artigos que possam fundamentar a peça/relatório.
+3. Para SÚMULAS, TEMAS e JURISPRUDÊNCIAS (títulos que começam com "SÚMULA", "TEMA", "JURISPRUDÊNCIA", "ORIENTAÇÃO"): use "integral": true (são curtos e autossuficientes).
+4. Pense no que uma petição ou relatório COMPLETO sobre este caso exigiria: requisitos do benefício/direito, qualidade dos sujeitos, prazos, procedimento, jurisprudência de apoio. Recupere tudo que for plausível — over-inclusão é melhor que faltar fundamento.
+5. Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown. Formato:
+[{"titulo":"<título exato>","artigos":["16","74"]},{"titulo":"<título exato de súmula>","integral":true}]
+Se nada se aplicar, responda [].`;
+
+app.post("/api/rag/plan", async (req, res) => {
+  try {
+    const { caseContext, areas } = req.body;
+    if (!caseContext || String(caseContext).trim().length < 10) {
+      return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
+    }
+
+    // 1. INVENTÁRIO — títulos reais da base (filtra por área quando informado)
+    let titlesQuery = supabaseAdmin
+      .from('legal_documents')
+      .select('metadata');
+    const { data: rows, error: invErr } = await titlesQuery;
+    if (invErr) throw invErr;
+
+    const areaSet = Array.isArray(areas) && areas.length > 0 ? new Set(areas) : null;
+    const titleAreas = new Map<string, Set<string>>();
+    (rows || []).forEach((r: any) => {
+      const t = r?.metadata?.title;
+      if (!t) return;
+      const a: string[] = Array.isArray(r?.metadata?.areas) ? r.metadata.areas : [];
+      if (!titleAreas.has(t)) titleAreas.set(t, new Set());
+      a.forEach(x => titleAreas.get(t)!.add(x));
+    });
+
+    // Mantém títulos da(s) área(s) do agente OU sem área classificada (retrocompat)
+    const inventory: string[] = [];
+    for (const [t, a] of titleAreas.entries()) {
+      if (!areaSet || a.size === 0 || [...a].some(x => areaSet.has(x))) {
+        inventory.push(t);
+      }
+    }
+    if (inventory.length === 0) {
+      return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
+    }
+
+    // 2. PLANNER — Flash escolhe da lista (grounding)
+    const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContext).substring(0, 6000)}`;
+
+    const plannerResp = await callGemini({
+      model: "gemini-3.5-flash",
+      contents: { role: "user", parts: [{ text: plannerInput }] },
+      config: {
+        systemInstruction: RAG_PLANNER_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        maxOutputTokens: 4096
+      }
+    });
+
+    let rawPlan = (plannerResp.text || "[]").trim();
+    if (rawPlan.startsWith('```')) rawPlan = rawPlan.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
+    let plan: any[] = [];
+    try {
+      const parsed = JSON.parse(rawPlan);
+      if (Array.isArray(parsed)) plan = parsed;
+    } catch {
+      const s = rawPlan.indexOf('['); const e = rawPlan.lastIndexOf(']');
+      if (s > -1 && e > s) { try { plan = JSON.parse(rawPlan.substring(s, e + 1)); } catch { plan = []; } }
+    }
+
+    // Saneamento: descarta títulos que o planner não copiou exato (anti-alucinação)
+    const inventorySet = new Set(inventory);
+    plan = (plan || []).filter((it: any) => it && typeof it.titulo === 'string' && inventorySet.has(it.titulo));
+    if (plan.length === 0) {
+      return res.json({ ragContext: "", plan: [], titlesConsidered: inventory.length });
+    }
+
+    // 3. FETCH DETERMINÍSTICO via RPC
+    const { data: chunks, error: rpcErr } = await supabaseAdmin
+      .rpc('fetch_legal_by_plan', { p_plan: plan });
+    if (rpcErr) throw rpcErr;
+
+    // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
+    const ragContext = (chunks || [])
+      .map((c: any) => `FONTE: ${c.title} [Recuperação Exata]\n${c.content}`)
+      .join('\n\n---\n\n');
+
+    res.json({
+      ragContext,
+      plan,
+      titlesConsidered: inventory.length,
+      chunksFound: (chunks || []).length
+    });
+  } catch (error: any) {
+    console.error("Error in /api/rag/plan:", error);
+    res.status(500).json({ error: error.message || "Failed to plan RAG", ragContext: "" });
+  }
+});
+
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
     const { cnisContent, model = "gemini-3.5-flash" } = req.body;

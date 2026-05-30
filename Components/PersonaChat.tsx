@@ -585,6 +585,45 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
+
+        // ============================================================
+        // RAG DETERMINÍSTICO (PLANNER) — PRIORIDADE MÁXIMA
+        // ============================================================
+        // Replica o método humano: planner Flash escolhe da lista real
+        // de títulos e o backend faz fetch determinístico (sem threshold).
+        // Garante que TODO dispositivo que o caso exige e que EXISTE na
+        // base seja recuperado. Prepende ao ragContext (vetorial/keyword
+        // viram cobertura complementar de breadth).
+        try {
+          const plannerContext = (() => {
+            const userTexts = (session?.messages || [])
+              .filter((m: any) => m.role === 'user')
+              .map((m: any) => m.content)
+              .filter((c: string) => c && c.length > 20 && !c.startsWith('[SYSTEM'))
+              .slice(-6)
+              .join('\n');
+            return `${messageText}\n${userTexts}`.substring(0, 6000);
+          })();
+
+          const planResp = await apiFetch('/api/rag/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caseContext: plannerContext, areas: AGENT_AREAS }),
+            signal: abortController.signal
+          });
+
+          if (planResp.ok) {
+            const { ragContext: deterministicRag, chunksFound } = await planResp.json();
+            if (deterministicRag && deterministicRag.trim().length > 0) {
+              console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados por plano (prioridade máxima).`);
+              ragContext = ragContext
+                ? `${deterministicRag}\n\n---\n\n${ragContext}`
+                : deterministicRag;
+            }
+          }
+        } catch (planErr) {
+          console.warn("RAG planner falhou (seguindo só com vetorial/keyword):", planErr);
+        }
         } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
