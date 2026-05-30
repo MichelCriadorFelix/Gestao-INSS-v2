@@ -1733,7 +1733,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[80px] xs:max-w-[105px] sm:max-w-[140px] cursor-pointer"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer max-w-[70px] xs:max-w-[105px] sm:max-w-none truncate shrink-0"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
                     <option value="Padrão (Livre)">Livre</option>
@@ -1754,7 +1754,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('gemini');
                       }
                     }}
-                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[75px] xs:max-w-[90px] sm:max-w-[150px] truncate"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors max-w-[80px] xs:max-w-[110px] sm:max-w-none truncate shrink-0"
                   >
                     <optgroup label="Google Gemini">
                       <option value="gemini-3-flash-preview">Gemini 3 Preview</option>

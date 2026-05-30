@@ -1646,8 +1646,8 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
-                <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 px-2 sm:px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0 flex-1 mr-1">
                   <input 
                     type="file" 
                     multiple 
@@ -1658,7 +1658,7 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
                     title="Anexar documentos (CNIS, PPP, etc.)"
                   >
                     {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
@@ -1666,12 +1666,12 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                   <button 
                     onClick={() => setIsClientModalOpen(true)}
                     disabled={isUploading}
-                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
+                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
                     title="Importar Cliente (GED)"
                   >
                     <Users className="w-5 h-5" />
                   </button>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
                   <select
                     value={petitionLength}
                     onChange={(e) => {
@@ -1682,16 +1682,16 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[140px]"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer max-w-[70px] xs:max-w-[105px] sm:max-w-none truncate shrink-0"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
-                    <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
-                    <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
-                    <option value="Médio 4000 palavras">Médio 4.000 palavras</option>
-                    <option value="Máximo 5000 palavras">Máximo 5.000 palavras</option>
-                    <option value="Premium 7000 palavras">Premium 7.000 palavras (Somente OpenRouter)</option>
+                    <option value="Padrão (Livre)">Livre</option>
+                    <option value="Mínimo 3000 palavras">3k pal.</option>
+                    <option value="Médio 4000 palavras">4k pal.</option>
+                    <option value="Máximo 5000 palavras">5k pal.</option>
+                    <option value="Premium 7000 palavras">7k pal.</option>
                   </select>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
                   <select
                     value={selectedModel}
                     onChange={(e) => {
@@ -1703,14 +1703,14 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                         setSelectedModelProvider('gemini');
                       }
                     }}
-                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors max-w-[80px] xs:max-w-[110px] sm:max-w-none truncate shrink-0"
                   >
-                    <optgroup label="Google Gemini · Gratuito (Padrão)">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ⭐</option>
-                      <option value="gemini-3.5-flash">Gemini 3.5 Flash · Padrão Ouro ⭐</option>
+                    <optgroup label="Google Gemini">
+                      <option value="gemini-3-flash-preview">Gemini 3 Preview</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Padrão</option>
                     </optgroup>
-                    <optgroup label="OpenRouter · API Paga (Premium)">
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Raciocínio ⭐</option>
+                    <optgroup label="OpenRouter">
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
                     </optgroup>
                   </select>
                 </div>
@@ -1718,6 +1718,7 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
                   className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
+                  title="Enviar mensagem"
                 >
                   <Send className="w-5 h-5" />
                 </button>
