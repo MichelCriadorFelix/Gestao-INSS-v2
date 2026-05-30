@@ -1695,7 +1695,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                           setSelectedModelProvider('openrouter');
                         }
                       }}
-                      className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500/30 cursor-pointer w-[75px] sm:w-auto truncate shrink-0"
+                      className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500/30 cursor-pointer flex-1 min-w-0 max-w-[80px] sm:max-w-none sm:w-auto truncate shrink"
                       title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                     >
                       <option value="Padrão (Livre)">Livre</option>
@@ -1716,7 +1716,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                           setSelectedModelProvider('gemini');
                         }
                       }}
-                      className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-rose-600 transition-colors w-[85px] sm:w-auto truncate shrink-0"
+                      className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-rose-600 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
                     >
                       <optgroup label="Google Gemini">
                         <option value="gemini-3-flash-preview">Gemini 3 Preview</option>
