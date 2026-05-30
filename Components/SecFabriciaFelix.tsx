@@ -1706,7 +1706,6 @@ Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não inf
                     className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
                   >
                     <optgroup label="Google Gemini">
-                      <option value="gemini-3-flash-preview">Gemini 3 Preview</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Padrão</option>
                     </optgroup>
                     <optgroup label="OpenRouter">
