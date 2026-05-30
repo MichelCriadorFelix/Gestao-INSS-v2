@@ -449,7 +449,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       // 1. Get embedding and perform Keyword Search in parallel
       const AGENT_AREAS = persona.agentAreas;
       let ragContext = '';
+
+      // Detectar mensagens casuais para evitar busca RAG desnecessária
+      const isCasualMessage = /^(oi|olá|bom dia|boa tarde|boa noite|obrigad|tudo bem|tudo bom|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza)/i.test(messageText.trim()) && messageText.trim().length < 60;
+
       try {
+        if (isCasualMessage) {
+          // Mensagem casual: pular busca RAG completamente
+          ragContext = '';
+        } else {
         // Context-aware query enrichment for RAG:
         // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
         // the search misses because the current message has no semantic legal terms.
@@ -582,6 +590,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
+        } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
       }
@@ -642,6 +651,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
+              ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
               ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
@@ -822,6 +832,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
+                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", 
                 keyIndex: preferredKeyIndex
               })
@@ -931,6 +942,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
+                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", // Use flash for mapping to be faster and cheaper
                 keyIndex: preferredKeyIndex
               })

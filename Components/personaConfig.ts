@@ -14,6 +14,7 @@ export interface PersonaConfig {
   placeholder: string;       // placeholder do input
   petitionTitlePrefix: string; // prefixo do título de petição gerada
   footer: string;            // aviso de rodapé
+  sendMinWage: boolean;      // envia salário mínimo ao backend (relevante p/ valor da causa previdenciário/trabalhista)
 }
 
 export const MICHEL_PERSONA: PersonaConfig = {
@@ -29,6 +30,7 @@ export const MICHEL_PERSONA: PersonaConfig = {
   placeholder: 'Como posso te ajudar, Dr. Michel?',
   petitionTitlePrefix: 'Petição Dr. Michel',
   footer: 'Dr. Michel Felix IA pode cometer erros. Verifique informações importantes.',
+  sendMinWage: true,
 };
 
 export const FELIX_CASTRO_PERSONA: PersonaConfig = {
@@ -44,4 +46,5 @@ export const FELIX_CASTRO_PERSONA: PersonaConfig = {
   placeholder: 'Como posso te ajudar, Dr. Felix e Castro?',
   petitionTitlePrefix: 'Petição Dr. Felix e Castro',
   footer: 'Dr. Felix e Castro IA pode cometer erros. Verifique informações importantes.',
+  sendMinWage: false,
 };
