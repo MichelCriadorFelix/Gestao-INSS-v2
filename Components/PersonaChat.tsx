@@ -1646,8 +1646,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
                   <input 
                     type="file" 
                     multiple 
@@ -1682,7 +1682,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-40"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[140px]"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
                     <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
@@ -1717,7 +1717,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 <button 
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
-                  className="bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
+                  className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
                 >
                   <Send className="w-5 h-5" />
                 </button>

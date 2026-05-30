@@ -1618,8 +1618,8 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
                   <input 
                     type="file" 
                     multiple 
@@ -1654,7 +1654,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-40"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate max-w-[140px]"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
                     <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
@@ -1689,7 +1689,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                 <button 
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
-                  className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:hover:bg-rose-600 text-white p-2.5 rounded-xl shadow-lg shadow-rose-500/30 transition-all active:scale-95"
+                  className="flex-shrink-0 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:hover:bg-rose-600 text-white p-2.5 rounded-xl shadow-lg shadow-rose-500/30 transition-all active:scale-95"
                 >
                   <Send className="w-5 h-5" />
                 </button>
