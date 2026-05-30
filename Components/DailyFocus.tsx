@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AgendaEvent, ClientRecord, ContractRecord, User } from '../types';
-import { format, isBefore, startOfDay, parseISO, isSameDay } from 'date-fns';
+import { format, isBefore, startOfDay, addDays, parseISO, isSameDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { 
   CheckCircleIcon, 
   XMarkIcon, 
@@ -50,7 +51,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
   const taskLog = dailyFocusState?.taskLog || [];
 
   const contractTasks = useMemo(() => {
-    const tasks: FocusTask[] = [];
+    let tasks: FocusTask[] = [];
     const today = new Date();
 
     const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
@@ -108,7 +109,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
   }, [contracts, resolvedTasks, postponedTasks, taskLog]);
 
   const maintenanceTasks = useMemo(() => {
-    const tasks: FocusTask[] = [];
+    let tasks: FocusTask[] = [];
     const today = new Date();
 
     const completedTodayCount = taskLog.filter((l: TaskLogEntry) => 
@@ -132,7 +133,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
         if (dateStr && isUrgentDate(dateStr)) {
           const taskId = `alert-${client.id}-${key}`;
           if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
-            const parsedDate = parseDate(dateStr);
+            let parsedDate = parseDate(dateStr);
             if (!parsedDate) return;
 
             tasks.push({

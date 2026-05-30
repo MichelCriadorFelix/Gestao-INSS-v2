@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import { apiFetch } from '../services/apiService';
 import { 
   PhotoIcon, 

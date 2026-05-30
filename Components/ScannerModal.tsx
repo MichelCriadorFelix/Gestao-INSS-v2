@@ -72,7 +72,7 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
         const yPct = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
 
         setCrop(prev => {
-            const newCrop = { ...prev };
+            let newCrop = { ...prev };
             
             if (dragHandle === 'tl') {
                 const right = prev.x + prev.w;
@@ -150,10 +150,10 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
         const cropBoxW = (crop.w / 100) * contW;
         const cropBoxH = (crop.h / 100) * contH;
 
-        const startX = cropBoxX - offX;
-        const startY = cropBoxY - offY;
-        const finalW = cropBoxW;
-        const finalH = cropBoxH;
+        let startX = cropBoxX - offX;
+        let startY = cropBoxY - offY;
+        let finalW = cropBoxW;
+        let finalH = cropBoxH;
 
         const scale = natW / rendW;
 

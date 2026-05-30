@@ -1,8 +1,8 @@
 import React from 'react';
-import { format, isBefore, isToday, isTomorrow, parseISO, startOfDay } from 'date-fns';
+import { format, isAfter, isBefore, isToday, isTomorrow, parseISO, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AgendaEvent } from '../types';
-import { CalendarIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface UpcomingEventsWidgetProps {
   events: AgendaEvent[];

@@ -2,9 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { DocumentTextIcon, CalculatorIcon, 
+import { 
+  UserIcon, DocumentTextIcon, CalculatorIcon, 
   ArrowDownTrayIcon, TrashIcon, PlusIcon, 
-  CheckCircleIcon, ExclamationTriangleIcon, CloudArrowUpIcon, Cog6ToothIcon, TableCellsIcon,
+  CheckCircleIcon, ExclamationTriangleIcon,
+  CalendarDaysIcon, CurrencyDollarIcon, CloudArrowUpIcon,
+  MagnifyingGlassIcon, Cog6ToothIcon, TableCellsIcon,
   ChartBarIcon, FolderOpenIcon, PencilSquareIcon, CheckIcon, XCircleIcon
 } from '@heroicons/react/24/outline';
 import { ClientRecord } from './types';
@@ -174,7 +177,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 const salaryMap = new Map(b.sc.map(s => [s.month, s]));
                 const newSc = [...b.sc];
 
-                const current = new Date(start);
+                let current = new Date(start);
                 // Limit loop to avoid infinite loops
                 let safety = 0;
                 while (current <= end && safety < 1200) {
@@ -345,9 +348,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         }
         
         let years = Math.floor(totalAdjustedDays / 365);
-        const remainingDays = totalAdjustedDays % 365;
+        let remainingDays = totalAdjustedDays % 365;
         let months = Math.floor(remainingDays / 30);
-        const days = Math.floor(remainingDays % 30);
+        let days = Math.floor(remainingDays % 30);
         
         if (months >= 12) {
             years += 1;
@@ -403,7 +406,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const start = parseDateLocal(b.startDate);
             start.setHours(12, 0, 0, 0);
             
-            const endStr = b.endDate;
+            let endStr = b.endDate;
             let end = parseDateLocal(endStr);
             end.setHours(12, 0, 0, 0);
 
@@ -435,7 +438,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         let totalAdjustedDays = 0;
         
         // 2. Iterate Day by Day using Date object to avoid DST drift
-        const current = new Date(minDateMs);
+        let current = new Date(minDateMs);
         const maxDate = new Date(maxDateMs);
         
         // Limit to 100 years to prevent infinite loops
@@ -496,7 +499,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             // Priority: Date Range (since SCs might be missing from AI)
             if (bond.startDate && bond.endDate) {
-                const current = parseDateLocal(bond.startDate);
+                let current = parseDateLocal(bond.startDate);
                 // Normalize to start of month and noon to avoid timezone issues
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
@@ -574,7 +577,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const bondMonths = new Set<string>();
             
             if (bond.startDate && bond.endDate) {
-                const current = parseDateLocal(bond.startDate);
+                let current = parseDateLocal(bond.startDate);
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
                 
@@ -635,7 +638,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             return bond.sc.map(s => ({ month: s.month, value: s.value, indicators: s.indicators || [], isMissing: false }));
         }
 
-        const current = parseDateLocal(bond.startDate);
+        let current = parseDateLocal(bond.startDate);
         // Normalize to start of month
         current.setDate(1);
         current.setHours(12, 0, 0, 0);
@@ -961,7 +964,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     if (processed.length === 0) return "0a 0m 0d";
 
     let totalAdjustedDays = 0;
-    const current = new Date(minMs);
+    let current = new Date(minMs);
     const maxDate = new Date(maxMs);
     let loops = 0;
 
@@ -1249,7 +1252,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         if (analysisResult.isPcd) doc.text(`Pessoa com Deficiência (PcD): Sim`, margin, 122);
         
         // Bonds Table
-        const yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
+        let yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text("Detalhamento dos Vínculos Utilizados", margin, yPosBonds);
@@ -1299,7 +1302,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         });
 
         // @ts-ignore
-        const finalY = doc.lastAutoTable.finalY + 5;
+        let finalY = doc.lastAutoTable.finalY + 5;
         doc.setFontSize(8);
         doc.text("* Data fim limitada à DER para fins de cálculo.", margin, finalY);
 
@@ -2438,7 +2441,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                                     const end = new Date(y2, m2 - 1, 1);   // Start of month
                                                                                                     
                                                                                                     const newSc: { month: string; value: number; indicators: string[] }[] = [];
-                                                                                                    const current = new Date(start);
+                                                                                                    let current = new Date(start);
                                                                                                     
                                                                                                     while (current <= end) {
                                                                                                         const m = String(current.getMonth() + 1).padStart(2, '0');

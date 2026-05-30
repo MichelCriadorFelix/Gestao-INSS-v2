@@ -901,7 +901,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos.
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -1601,7 +1601,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO recalcular, estimar, arredondar ou alterar QUALQUER valor da planilha de cálculos. O cálculo enviado é a única fonte de verdade. Transcreva os valores EXATOS — nem um centavo a mais ou a menos.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos.
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -1889,7 +1889,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos.
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -2787,14 +2787,9 @@ Uma petição bem fundamentada NÃO é a que cita mais lei — é a que cita o n
 
 REGRAS DE SELEÇÃO:
 1. Escolha SOMENTE títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE (cada caractere). PROIBIDO inventar, abreviar ou alterar.
-2. ALVO DE QUANTIDADE: entre 2 e 6 itens no total. Mantenha a peça limpa e extremamente focada!
-3. PRIORIZE LEI SECA / DIRETA (CONSTITUIÇÃO, LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS).
-   * Você DEVE SEMPRE incluir os artigos basilares da lei stricto sensu que fundamentam a concessão ou restabelecimento do benefício em análise.
-   * EXEMPLO MANDATÓRIO (Previdenciário): Em casos de benefícios por incapacidade ou benefício por incapacidade temporária/permanente (como Auxílio-doença, Aposentadoria por invalidez, Auxílio-Acidente), você DEVE incluir o título "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)" com os artigos selecionados: "59" (para incapacidade temporária/auxílio-doença), "42" (para incapacidade permanente/aposentadoria por invalidez) e/ou "86" (para auxílio-acidente). Jamais deixe de incluí-los!
-   * Liste no campo "artigos" APENAS os números dos artigos úteis (ex.: "42", "59", "86", "29", "15"). Nunca use "integral" para Leis, Decretos ou Instruções Normativas.
-4. EXCLUSÃO SEVERA DE SÚMULAS E JURISPRUDÊNCIA (CONTRA "SÚMULITE" CRÔNICA):
-   * O advogado proíbe expressamente encher a petição com súmulas, jurisprudências e temas repetitivos sem absoluta necessidade.
-   * SÓ inclua títulos que começam com "SÚMULA", "TEMA", "JURISPRUDÊNCIA" ou "ORIENTAÇÃO" se a controvérsia fática for extremamente complexa e o direito estrito da lei seca não for pacífico ou suficiente para garantir a tese. Se o direito for claro pelas leis secas, EXCLUA todas as súmulas e jurisprudências para manter a petição limpa.
+2. ALVO DE QUANTIDADE: entre 5 e 15 itens no total (um "item" = um título com seus artigos, ou uma súmula/tema). Caso simples e com prova robusta → fique perto de 5. Caso complexo → pode chegar a 15. NUNCA estoure 15 sem necessidade real.
+3. PRIORIZE ARTIGO DIRETO. Para LEIS/CÓDIGOS/DECRETOS/INSTRUÇÕES NORMATIVAS/CONSTITUIÇÃO, liste no campo "artigos" SÓ os artigos que fundamentam diretamente a tese (ex.: "42","59","15"). Não despeje artigos "que poderiam servir". NUNCA use "integral" em lei/código/decreto.
+4. SÚMULA/TEMA/JURISPRUDÊNCIA (títulos que começam com SÚMULA/TEMA/JURISPRUDÊNCIA/ORIENTAÇÃO) → use "integral": true. MAS inclua APENAS quando: (a) um fato do caso exige entendimento sumulado/repetitivo para ser aceito, OU (b) o item neutraliza diretamente uma defesa provável da parte contrária. Se a prova é robusta e o caso é claro, NÃO traga jurisprudência só para enfeitar.
 5. PROIBIDO ANALOGIA: não selecione item que só se aplica "por analogia" a outro benefício/situação. Só inclua analogia se a tese principal for fraca E não houver fundamento direto — e, nesse caso, é exceção rara.
 6. Selecione o que se aplica à TESE concreta do caso. Ex.: caso de restabelecimento de benefício por incapacidade NÃO precisa de presunção de CTPS nem de auxílio-acidente, salvo se o caso expressamente discutir vínculo controvertido ou pedir auxílio-acidente subsidiário.
 
@@ -2867,361 +2862,14 @@ app.post("/api/rag/plan", async (req, res) => {
 
     // Saneamento: descarta títulos que o planner não copiou exato (anti-alucinação)
     const inventorySet = new Set(inventory);
-    const fullInventorySet = new Set(titleAreas.keys());
-
-    // Helper para normalizar e buscar títulos de forma flexível (case-insensitive, sem acentos, com sinônimos conhecidos)
-    const normalizeStr = (str: string) => {
-      return str
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // remove acentos
-        .trim();
-    };
-
-    const synonymMap: Record<string, string> = {
-      "cf": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "cf88": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "cf/88": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "constituicao": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "constituicao federal": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "constituicao de 1988": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "constituicao da republica federativa do brasil de 1988": "CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988",
-      "clt": "Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)",
-      "consolidacao das leis do trabalho": "Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)",
-      "codigo civil": "Código Civil (Lei nº 10.406/2002)",
-      "cc": "Código Civil (Lei nº 10.406/2002)",
-      "cpc": "Código de Processo Civil (Lei nº 13.105/2015)",
-      "codigo de processo civil": "Código de Processo Civil (Lei nº 13.105/2015)",
-      "lei de beneficios": "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)",
-      "lei 8.213": "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)",
-      "lei 8213": "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)",
-      "lei de beneficios da previdencia social": "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)",
-      "loas": "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)",
-      "lei organica da assistencia social": "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)",
-      "lei 8.742": "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)",
-      "lei 8742": "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)",
-      "lei organica da seguridade social": "Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)",
-      "lei 8.212": "Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)",
-      "lei 8212": "Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)",
-      "regimento da previdencia social": "Regulamento da Previdência Social (Decreto nº 3.048/1999)",
-      "regulamento da previdência social": "Regulamento da Previdência Social (Decreto nº 3.048/1999)",
-      "decreto 3.048": "Regulamento da Previdência Social (Decreto nº 3.048/1999)",
-      "decreto 3048": "Regulamento da Previdência Social (Decreto nº 3.048/1999)",
-      "lei do fgts": "Lei do FGTS (Lei nº 8.036/1990)",
-      "fgts": "Lei do FGTS (Lei nº 8.036/1990)",
-      "lei 8.036": "Lei do FGTS (Lei nº 8.036/1990)",
-      "lei 8036": "Lei do FGTS (Lei nº 8.036/1990)",
-      "estatuto do idoso": "Estatuto do Idoso (Lei nº 10.741/2003)",
-      "instrucao normativa 128": "INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022",
-      "in 128": "INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022",
-      "reforma da previdencia": "Reforma da Previdência (EC nº 103/2019)"
-    };
-
-    const resolveTitle = (inputTitle: string, useFull = false): string | null => {
-      if (!inputTitle) return null;
-      const normalizedInput = normalizeStr(inputTitle);
-      const targetList = useFull ? Array.from(titleAreas.keys()) : inventory;
-      const targetSet = useFull ? fullInventorySet : inventorySet;
-      
-      // 1. Tenta correspondência direta de sinônimo
-      if (synonymMap[normalizedInput]) {
-        const mapped = synonymMap[normalizedInput];
-        if (targetSet.has(mapped)) return mapped;
-      }
-      
-      // 2. Procura sinônimo parcial em chaves do synonymMap
-      for (const key of Object.keys(synonymMap)) {
-        if (normalizedInput.includes(key) || key.includes(normalizedInput)) {
-          const mapped = synonymMap[key];
-          if (targetSet.has(mapped)) return mapped;
-        }
-      }
-      
-      // 3. Tenta correspondência direta case/acentuação no inventário alvo
-      for (const realTitle of targetList) {
-        if (normalizeStr(realTitle) === normalizedInput) {
-          return realTitle;
-        }
-      }
-      
-      // 4. Tenta correspondência parcial no inventário alvo
-      for (const realTitle of targetList) {
-        const normReal = normalizeStr(realTitle);
-        if (normReal.includes(normalizedInput) || normalizedInput.includes(normReal)) {
-          return realTitle;
-        }
-      }
-      
-      return null;
-    };
-
-    let curatedPlan: any[] = [];
-    (plan || []).forEach((it: any) => {
-      if (it && typeof it.titulo === 'string') {
-        const correctTitle = resolveTitle(it.titulo, false);
-        if (correctTitle) {
-          const existing = curatedPlan.find((x: any) => x.titulo === correctTitle);
-          if (existing) {
-            if (it.integral) {
-              existing.integral = true;
-            } else if (it.artigos) {
-              const arts = new Set(existing.artigos || []);
-              (it.artigos || []).forEach((a: string) => arts.add(a));
-              existing.artigos = Array.from(arts);
-            }
-          } else {
-            curatedPlan.push({
-              titulo: correctTitle,
-              artigos: it.artigos || [],
-              ...(it.integral ? { integral: true } : {})
-            });
-          }
-        }
-      }
-    });
-
-    // COGNITIVE SAFETY-NET: Se o caso tratar de qualquer especialidade (Cível, Consumidor, Trabalhista, Previdenciário), nós garantimos que as leis basilares, decretos e súmulas são injetados no plano de RAG.
-    const contextStr = String(caseContext).toLowerCase();
-
-    // Helper para injetar/mesclar artigos em um título do plano curatedPlan (usa useFull = true para bypassar filtros de área na segurança cognitiva)
-    const injectIntoPlan = (title: string, articles: string[], isWhole = false) => {
-      const resolvedTitle = resolveTitle(title, true);
-      if (!resolvedTitle) return;
-
-      let found = false;
-      curatedPlan = curatedPlan.map((item: any) => {
-        if (item.titulo === resolvedTitle) {
-          found = true;
-          if (isWhole) {
-            return { ...item, integral: true };
-          } else {
-            const currentArts = new Set(item.artigos || []);
-            articles.forEach(art => currentArts.add(art));
-            return {
-              ...item,
-              artigos: Array.from(currentArts)
-            };
-          }
-        }
-        return item;
-      });
-
-      if (!found) {
-        if (isWhole) {
-          curatedPlan.push({ titulo: resolvedTitle, integral: true });
-        } else {
-          curatedPlan.push({ titulo: resolvedTitle, artigos: articles });
-        }
-      }
-    };
-
-    // 1. PREVIDENCIÁRIO (Social Security - INSS/RPPS)
-    const isPrevidenciario = /previdenci[áa]ri|inss|aposentador|tempo\s+de\s+contribuiç|pension|pens[ãa]o|bpc|loas|benef[íi]cio/i.test(contextStr);
-
-    if (isPrevidenciario) {
-      // 1a. Benefícios por Incapacidade
-      const isDisabilityCase = /incapacidade|aux[íi]lio[- s]doen[çc]a|invalidez|aposentadoria por incapacidade|aux[íi]lio[- s]acidente|t[uú]nel do carpo|fibromialgia|laudo|per[íi]cia|perito/i.test(contextStr);
-      if (isDisabilityCase) {
-        injectIntoPlan("Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)", ["42", "59", "86"]);
-        
-        if (/reintegraç|trabalho|per[íi]odo/i.test(contextStr)) {
-          injectIntoPlan("TEMA 1.013 STJ — PREVIDENCIÁRIO — Trabalho durante aguardo de benefício por incapacidade", [], true);
-        }
-        if (/acidente|sequela|limitaç/i.test(contextStr)) {
-          injectIntoPlan("SÚMULA 88 TNU — PREVIDENCIÁRIO — Auxílio-acidente e limitação leve para atividade habitual", [], true);
-          injectIntoPlan("SÚMULA 89 TNU — PREVIDENCIÁRIO — Auxílio-acidente e ausência de redução da capacidade laborativa", [], true);
-        }
-      }
-
-      // 1b. LOAS / BPC
-      const isLOASCase = /loas|bpc|miserabilidade|assistencial|benef[íi]cio assistencial|defici[êe]ncia|baixa renda/i.test(contextStr);
-      if (isLOASCase) {
-        injectIntoPlan("Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)", ["20", "21"]);
-        injectIntoPlan("Regulamento do BPC/LOAS (Decreto nº 6.214/2007)", [], true);
-        injectIntoPlan("SÚMULA 48 TNU — PREVIDENCIÁRIO — BPC e impedimento de longo prazo", [], true);
-        injectIntoPlan("SÚMULA 79 TNU — PREVIDENCIÁRIO — BPC e comprovação de condições socioeconômicas", [], true);
-        injectIntoPlan("SÚMULA 80 TNU — PREVIDENCIÁRIO — BPC e avaliação social por assistente social", [], true);
-        injectIntoPlan("TEMA 640 STJ — PREVIDENCIÁRIO — BPC e exclusão de benefício de idoso no cálculo da renda", [], true);
-        
-        if (/miserabilidade|renda|¼/i.test(contextStr)) {
-          injectIntoPlan("JURISPRUDÊNCIA STF — PREVIDENCIÁRIO — RE 567985 — BPC e miserabilidade", [], true);
-          injectIntoPlan("JURISPRUDÊNCIA STF — PREVIDENCIÁRIO — RE 580963 — BPC e exclusão de benefício de salário mínimo", [], true);
-          injectIntoPlan("JURISPRUDÊNCIA STF — PREVIDENCIÁRIO — Inconstitucionalidade do critério de 1/4 SM no BPC", [], true);
-        }
-      }
-
-      // IDOSO/IDADE (LOAS Elder / General Elder Special Exclusion)
-      if (isLOASCase || /idos[oa]/i.test(contextStr)) {
-        injectIntoPlan("Estatuto do Idoso (Lei nº 10.741/2003)", ["15", "34"]);
-      }
-
-      // 1c. Pensão por morte
-      const isPensionCase = /pens[aã]o\s+por\s+morte|morte|falec|óbito|de\s+cujus|vi[uú]v/i.test(contextStr);
-      if (isPensionCase) {
-        injectIntoPlan("Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)", ["74", "75", "76", "77", "78"]);
-        injectIntoPlan("SÚMULA 63 TNU — PREVIDENCIÁRIO — União estável e pensão por morte", [], true);
-        injectIntoPlan("SÚMULA 416 STJ — PREVIDENCIÁRIO — Pensão por morte de quem preencheu requisitos de aposentadoria", [], true);
-        injectIntoPlan("TEMA 286 TNU — PREVIDENCIÁRIO — Pensão por morte e segurado facultativo de baixa renda", [], true);
-      }
-
-      // 1d. Tempo de Serviço / Especial / Agentes nocivos / Ruído
-      const isSpecialCase = /especial|insalubre|nocivo|agente|ru[íi]do|ppp|ltcat|qu[íi]mico|copeiro|frigor[íi]fico/i.test(contextStr);
-      if (isSpecialCase) {
-        injectIntoPlan("Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)", ["57", "58"]);
-        injectIntoPlan("QUADRO ANEXO — Atividades Profissionais e Agentes Nocivos (Decreto nº 53.831/1964)", [], true);
-        injectIntoPlan("SÚMULA 32 TNU — PREVIDENCIÁRIO — Atividade especial com ruído (CANCELADA)", [], true);
-        if (/copeiro|hospital/i.test(contextStr)) {
-          injectIntoPlan("JURISPRUDÊNCIA TRF — PREVIDENCIÁRIO — Aposentadoria especial copeiro hospitalar", [], true);
-        }
-      }
-
-      // 1e. Carência / Idade / DER e Reafirmação
-      const isAgeOrCarenciaCase = /idade|car[êe]ncia|tempo de contribuiç|der|reafirmaç/i.test(contextStr);
-      if (isAgeOrCarenciaCase) {
-        injectIntoPlan("Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)", ["24", "25", "26", "48", "49"]);
-        injectIntoPlan("SÚMULA 73 TNU — PREVIDENCIÁRIO — Gozo de auxílio-doença e tempo de contribuição", [], true);
-        if (/reafirmaç|reafirmar/i.test(contextStr)) {
-          injectIntoPlan("TEMA 995 STJ — PREVIDENCIÁRIO — Reafirmação da DER", [], true);
-        }
-        if (/idade/i.test(contextStr)) {
-          injectIntoPlan("SÚMULA 44 TNU — PREVIDENCIÁRIO — Carência na aposentadoria por idade urbana", [], true);
-        }
-        if (/tempo de serviç|tempo de contrib/i.test(contextStr)) {
-          injectIntoPlan("SÚMULA 33 TNU — PREVIDENCIÁRIO — Termo inicial da aposentadoria por tempo de serviço", [], true);
-        }
-      }
-
-      // 1f. Demora do INSS/MS e Processo Administrativo
-      const isDelayCase = /demora|atraso|prazo|mandado de segurança|ms\s+|liminar\s+ms|requerimento\s+administrativo/i.test(contextStr);
-      if (isDelayCase) {
-        injectIntoPlan("JURISPRUDÊNCIA TRF — PREVIDENCIÁRIO — Demora injustificada do INSS e mandado de segurança", [], true);
-        injectIntoPlan("SÚMULA 74 TNU — PREVIDENCIÁRIO — Suspensão da prescrição pelo requerimento administrativo", [], true);
-      }
-
-      // 1g. Recolhimento do empregador / CTPS
-      if (/recolhimento|recolher|contribuiç[ãoãe]es\s+do\s+empregador|ctps|carteira\s+de\s+trabalho|v[íi]nculo/i.test(contextStr)) {
-        injectIntoPlan("JURISPRUDÊNCIA TRF — PREVIDENCIÁRIO — Responsabilidade do empregador pelo recolhimento de contribuições", [], true);
-        injectIntoPlan("SÚMULA 75 TNU — PREVIDENCIÁRIO — CTPS como prova de tempo de serviço", [], true);
-      }
-
-      // 1h. Instrução Normativa 128 / Regulamento Geral / Reforma
-      if (/in\s*128|instruç[aã]o\s+normativa|processo\s+administrativo/i.test(contextStr)) {
-        injectIntoPlan("INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022", ["1", "2"]);
-      }
-      if (/reforma|ec\s*103|regras\s+de\s+transiç/i.test(contextStr)) {
-        injectIntoPlan("Reforma da Previdência (EC nº 103/2019)", [], true);
-      }
-      if (/decreto\s*3\.?048|regulamento/i.test(contextStr)) {
-        injectIntoPlan("Regulamento da Previdência Social (Decreto nº 3.048/1999)", [], true);
-        injectIntoPlan("Regulamento da Previdência Social — Alterações (Decreto nº 10.410/2020)", [], true);
-      }
-      if (/fluxo|lei\s*14\.?441/i.test(contextStr)) {
-        injectIntoPlan("Fluxo de Análise de Benefícios Previdenciários e Assistenciais (Lei nº 14.441/2022)", [], true);
-      }
-
-      // 1i. RPPS (Regime Próprio / Funcionários Públicos / São João de Meriti)
-      const isRPPSCase = /rpps|servidor|servidora|p[uú]blico|municipal|s[aã]o\s+jo[aã]o|meriti|estatuto|pec[uú]nia|licenç/i.test(contextStr);
-      if (isRPPSCase) {
-        injectIntoPlan("Estatuto dos Funcionários Públicos de São João de Meriti (Lei Municipal nº 258/1982)", [], true);
-        injectIntoPlan("Lei Orgânica do Município de São João de Meriti (LOM/1990)", [], true);
-        injectIntoPlan("Reforma da Previdência dos Servidores Públicos (EC nº 41/2003)", [], true);
-        
-        if (/licenç/i.test(contextStr)) {
-          injectIntoPlan("JURISPRUDÊNCIA – PREVIDENCIA RPPS – LICENÇA PRÊMIO CONVERÇÃO EM PECÚNIA", [], true);
-          injectIntoPlan("JURISPRUDÊNCIA — PREVIDENCIÁRIO RPPS — LICÊNCIA PRÊMIO CONVERÇÃO EM PECÚNIA SERVIDOR MUNICIPAL", [], true);
-          injectIntoPlan("JURISPRUDÊNCIA TRF — CÍVEL/SERVIDOR PÚBLICO — Licença-prêmio não gozada convertida em pecúnia", [], true);
-        }
-        if (/adicional|fim\s+de\s+carreira|perman/i.test(contextStr)) {
-          injectIntoPlan("JURISPRUDÊNCIA — PREVIDENCIÁRIO SERVIDOR — ADICIONAL FIM DE CARREIRA", [], true);
-        }
-      }
-    }
-
-    // 2. TRABALHISTA (Labor)
-    const isLaborCase = /trabalhist[oa]|v[íi]nculo|fgts|rescis[ãã]o|justa\s+causa|indireta|horas\s+extras|sal[áa]rio|verbas\s+rescis[óo]rias|dano\s+moral\s+trabalhista|reclamant|reclamad|clt/i.test(contextStr);
-    if (isLaborCase) {
-      injectIntoPlan("Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)", ["2", "3", "29", "483"]);
-      if (/horas?\s+extras?/i.test(contextStr)) {
-        injectIntoPlan("Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)", ["58", "59", "71"]);
-      }
-      if (/rescis[ãa]o\s+indireta/i.test(contextStr)) {
-        injectIntoPlan("Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)", ["483"]);
-      }
-      if (/justa\s+causa/i.test(contextStr)) {
-        injectIntoPlan("Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)", ["482"]);
-      }
-      if (/insalubridade|periculosidade/i.test(contextStr)) {
-        injectIntoPlan("Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)", ["189", "192", "193"]);
-      }
-      if (/fgts/i.test(contextStr)) {
-        injectIntoPlan("Lei do FGTS (Lei nº 8.036/1990)", ["15", "20"]);
-      }
-      if (/motorista|carga|rodovi[áa]ri/i.test(contextStr)) {
-        injectIntoPlan("Transporte Rodoviário de Cargas por Conta de Terceiros (Lei nº 11.442/2007)", [], true);
-      }
-    }
-
-    // 3. CONSUMIDOR (Consumer)
-    const isConsumerCase = /consumidor|cdc|banc[áa]ri|banco|fraude|golpe|central|falsa|transaç|at[íi]pic|cart[ãa]o|cr[ée]dit|bloqueio|ind[ée]bit|desconto\s+indevido|suspens[ãa]o|interrupç[ãa]o|energia|água|luz|internet/i.test(contextStr);
-    if (isConsumerCase) {
-      if (/banco|banc[áa]ri|instituiç|financeir|cr[ée]dit|cart[ãa]o/i.test(contextStr)) {
-        injectIntoPlan("SÚMULA 297 STJ — CONSUMERISTA — CDC aplicável às instituições financeiras", [], true);
-        injectIntoPlan("SÚMULA 479 STJ — CONSUMERISTA — Responsabilidade objetiva por fraudes bancárias", [], true);
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Responsabilidade bancária por transações atípicas", [], true);
-      }
-      if (/golpe|falsa central|central de atendimento/i.test(contextStr)) {
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Responsabilidade bancária por golpe da falsa central de atendimento (II)", [], true);
-        injectIntoPlan("SÚMULA 479 STJ — CONSUMERISTA — Responsabilidade objetiva por fraudes bancárias", [], true);
-      }
-      if (/desconto\s+indevido|descontos\s+indevidos|empr[ée]stim/i.test(contextStr)) {
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Dano moral por descontos indevidos em benefício previdenciário (I)", [], true);
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Dano moral por descontos indevidos em benefício previdenciário (II)", [], true);
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Repetição de indébito por descontos indevidos (II)", [], true);
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Suspensão de descontos indevidos em benefício previdenciário", [], true);
-      }
-      if (/energia|água|luz|internet|serviço\s+essencial|interrupç/i.test(contextStr)) {
-        injectIntoPlan("SÚMULA 192 TJRJ — CONSUMERISTA — Dano moral por interrupção de serviços essenciais", [], true);
-      }
-      if (/bloqueio/i.test(contextStr)) {
-        injectIntoPlan("JURISPRUDÊNCIA — CONSUMERISTA — Dano moral por bloqueio cautelar indevido", [], true);
-      }
-    }
-
-    // 4. CÍVEL / CIVIL (General Civil)
-    const isCivilCase = /c[ií]vel|civil|fam[íi]li|alimento|guard|invent[áa]ri|heranç|sucess[ãa]o|partilh|casamento|div[óo]rci|contrato|neg[óo]cio\s+jur[íi]dic|dano\s+moral|indeniz|ato\s+il[íi]cit|responsabilidade|obrigar/i.test(contextStr);
-    if (isCivilCase) {
-      injectIntoPlan("Código Civil (Lei nº 10.406/2002)", ["186", "187", "927"]);
-      if (/contrato|pacto|neg[óo]cio/i.test(contextStr)) {
-        injectIntoPlan("Código Civil (Lei nº 10.406/2002)", ["104", "113", "421", "422"]);
-      }
-      if (/heranç|sucess[ãa]o|invent[áa]ri|partilh|óbito/i.test(contextStr)) {
-        injectIntoPlan("Lei nº 6.858/1980 — Pagamento de Valores Não Recebidos em Vida", [], true);
-        injectIntoPlan("Decreto nº 85.845/1981 — Regulamento da Lei nº 6.858/1980 (PIS/PASEP e Valores Não Recebidos)", [], true);
-      }
-      if (/roubo|assalto|fortuito/i.test(contextStr)) {
-        injectIntoPlan("JURISPRUDÊNCIA TJ — CÍVEL — Roubo Fortuito Externo", [], true);
-      }
-    }
-
-    // Integração Constitucional (Constituição Federal)
-    const isConstitutional = /constituiç|constitucional|cf\/88|cf88|direito\s+constitucional|carta\s+magna/i.test(contextStr) || isPrevidenciario || isLaborCase;
-    if (isConstitutional) {
-      injectIntoPlan("CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988", ["5", "6", "194", "195", "201", "203"]);
-    }
-
-    // 5. PROCESSO CIVIL / CPC (Always helpful for Petições in Civil etc.)
-    const needsCPC = /petiç|inicial|tutela|urg[êe]ncia|liminar|provas?|ônus|benef[íi]cio\s+da\s+justiça\s+gratuita|justiça\s+gratuita|gratuidade/i.test(contextStr) || isCivilCase || isConsumerCase || isLaborCase || isPrevidenciario;
-    if (needsCPC) {
-      injectIntoPlan("Código de Processo Civil (Lei nº 13.105/2015)", ["98", "99", "100", "294", "300", "319", "373"]);
-    }
-
-    if (curatedPlan.length === 0) {
+    plan = (plan || []).filter((it: any) => it && typeof it.titulo === 'string' && inventorySet.has(it.titulo));
+    if (plan.length === 0) {
       return res.json({ ragContext: "", plan: [], titlesConsidered: inventory.length });
     }
 
     // 3. FETCH DETERMINÍSTICO via RPC
     const { data: chunks, error: rpcErr } = await supabaseAdmin
-      .rpc('fetch_legal_by_plan', { p_plan: curatedPlan });
+      .rpc('fetch_legal_by_plan', { p_plan: plan });
     if (rpcErr) throw rpcErr;
 
     // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
@@ -3231,7 +2879,7 @@ app.post("/api/rag/plan", async (req, res) => {
 
     res.json({
       ragContext,
-      plan: curatedPlan,
+      plan,
       titlesConsidered: inventory.length,
       chunksFound: (chunks || []).length
     });

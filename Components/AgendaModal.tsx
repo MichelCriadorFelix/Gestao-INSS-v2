@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CalendarIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { AgendaEvent, User } from '../types';
 import ResolutionNoteModal from './ResolutionNoteModal';
-import { format, isBefore, parseISO, startOfDay } from 'date-fns';
+import { format, isAfter, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface AgendaModalProps {
