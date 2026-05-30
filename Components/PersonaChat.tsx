@@ -596,13 +596,25 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         // viram cobertura complementar de breadth).
         try {
           const plannerContext = (() => {
-            const userTexts = (session?.messages || [])
+            const msgs = session?.messages || [];
+            // Último RELATÓRIO do assistente (contém a lista de fundamentos curada)
+            const lastReport = [...msgs].reverse().find((m: any) =>
+              m.role === 'assistant' && typeof m.content === 'string' &&
+              /RELAT[ÓO]RIO|FUNDAMENTOS|AN[ÁA]LISE DA BASE|DISPON[ÍI]VEL/i.test(m.content)
+            );
+            const userTexts = msgs
               .filter((m: any) => m.role === 'user')
               .map((m: any) => m.content)
               .filter((c: string) => c && c.length > 20 && !c.startsWith('[SYSTEM'))
               .slice(-6)
               .join('\n');
-            return `${messageText}\n${userTexts}`.substring(0, 6000);
+            let ctx = `${messageText}\n${userTexts}`;
+            if (lastReport) {
+              // Relatório primeiro: se a lista de fundamentos já existe, o planner a segue
+              // e aplica as exclusões/adições pedidas pelo advogado nas mensagens.
+              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
+            }
+            return ctx.substring(0, 9000);
           })();
 
           const planResp = await apiFetch('/api/rag/plan', {

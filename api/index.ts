@@ -1056,45 +1056,27 @@ COMANDO "GERAR RELATÓRIO":
    7. PRINCÍPIOS PREVIDENCIÁRIOS: princípios aplicáveis ao caso.
    8. ESTRATÉGIA JURÍDICA: caminhos processuais com prós e contras.
    9. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Com base na complexidade dos fatos, volume de provas (OCR) e densidade da Base de Conhecimento (RAG), sugira qual a extensão de palavras aconselhável para este caso específico: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique sua escolha com base na necessidade de citação direta de dispositivos e profundidade argumentativa.
-   10. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
-      Liste TODOS os fundamentos a serem usados. Para cada um, informe:
-      → [DISPONÍVEL — SERÁ CITADA EM BLOCKQUOTE] se apareceu no RAG com prefixo 'FONTE:'
-      → [NÃO RECUPERADA NESTA BUSCA — SOLICITAR AO ADVOGADO ADICIONAR] se a lei/fundamento for essencial mas NÃO constar no RAG. Você **NÃO** deve utilizar ou citar leis fora do RAG, devendo alertar o advogado da falta dela.
-      
-      CATÁLOGO DA BASE DO ESCRITÓRIO (títulos exatos):
-      LEGISLAÇÃO PREVIDENCIÁRIA:
-      'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'
-      'Lei Orgânica da Seguridade Social (Lei nº 8.212/1991)'
-      'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)'
-      'Reforma da Previdência (EC nº 103/2019)'
-      'Regulamento da Previdência Social (Decreto nº 3.048/1999)'
-      'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022'
-      'DECRETO Nº 10.410 DE 30 DE JUNHO DE 2020'
-      'QUADRO ANEXO DO Decreto nº 53.831 de 25/03/1964ETO'
-      'ESTATUTO DO IDOSO'
-      SÚMULAS E TEMAS:
-      'SÚMULA 75 TNU'
-      'Súmula n. 416 do STJ'
-      'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF'
-      'Tema 905/STJ — Correção Monetária e Juros nas Condenações da Fazenda Pública'
-      'JURISPRUDÊNCIA - Tema 286 da TNU'
-      JURISPRUDÊNCIA PREVIDENCIÁRIA:
-      'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
-      'JURISPRUDÊNCIA DEMORA INJUSTIFICADA DO INSS IMPETRAÇÃO DE MANDADO DE SEGURANÇA'
-      'JURISPRUDÊNCIA INCONSTITUCIONALIDADE PARCIAL PARA UTILIZAÇÃO DO REQUISITO DE 1/4 DO SALÁRIO MÍNIMO BPC LOAS'
-      'JURISPRUDÊNCIA STF INCONSTITUCIONALIDADE DA CARÊNCIA AUXÍLIO-MATERNIDADE'
-      'JURISPRUDÊNCIA: A Relativização do Critério de Renda na Análise da Miserabilidade'
-      'NÃO APLICAÇÃO DO PRAZO DECADENCIAL DE 120 PARA PROPOSITURA DO MANDADO DE SEGURANÇA CONTRA INSS'
-      'PREVIDENCIÁRIO. INEXIGIBILIDADE DE DÉBITO. TEMA 979/STJ. ERRO AUTARQUIA. RECEBIMENTO BOA FÉ. RESTITUIR VALORES'
-      LEGISLAÇÃO PROCESSUAL:
-      'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
-      'Código de Processo Civil (Lei nº 13.105/2015)'
+   10. CURADORIA DE FUNDAMENTAÇÃO (OBRIGATÓRIO — NÃO PULE):
+      Selecione APENAS os fundamentos que se aplicam DIRETAMENTE à(s) tese(s) deste caso concreto. PRECISÃO acima de volume: petição bem fundamentada não é a que cita mais lei, é a que cita o necessário e nada além — excesso de fundamento irrelevante cansa o julgador e enfraquece a peça. ALVO: 5 a 15 fundamentos no total (caso simples com prova robusta → perto de 5; complexo → até 15; nunca estoure sem necessidade real).
+      REGRAS DE CURADORIA:
+      • PRIORIZE ARTIGO DIRETO. Súmula/Tema/Jurisprudência SÓ quando um fato do caso exigir entendimento sumulado/repetitivo para ser aceito OU para neutralizar defesa provável da parte contrária. Prova robusta + caso claro → pode dispensar jurisprudência.
+      • PROIBIDO incluir fundamento que só se aplica por ANALOGIA, salvo se a tese principal for fraca e inexistir fundamento direto (exceção rara — justifique expressamente).
+      • NÃO traga fundamento de tese que o caso não discute (ex.: não inclua dispositivo de matéria que a causa não suscita).
+      FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
+      → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
+      → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
+      Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
    12. DOCUMENTOS ANALISADOS: lista final completa.
 → TRAVA: NUNCA redija a petição nesta fase. Aguarde "GERAR PEÇA".
 
 COMANDO "GERAR PEÇA":
 → Inicie IMEDIATAMENTE a petição sem pedir permissão.
+→ FUNDAMENTAÇÃO = LISTA APROVADA: cite EXATAMENTE os fundamentos da CURADORIA do relatório, já aplicadas as exclusões/adições que o advogado pediu. NÃO acrescente lei/súmula/tema/jurisprudência fora dessa lista. NÃO use analogia.
+→ CITAÇÃO SÓ EM "DO DIREITO": as transcrições em blockquote (>) dos dispositivos da base ocorrem EXCLUSIVAMENTE na seção DO DIREITO, organizadas por tópicos e subtópicos (um fundamento por tópico/subtópico, conforme a tese). Nas demais seções (preliminares, fatos, tutela, pedidos) NÃO transcreva dispositivos — apenas remeta a eles.
+→ CITE TODOS OS APROVADOS: cada fundamento da lista aprovada DEVE ser transcrito em blockquote, idêntico ao texto do RAG, no tópico pertinente de DO DIREITO. Não omita nenhum item aprovado.
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (AO JUÍZO...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
@@ -1747,28 +1729,27 @@ COMANDO "GERAR RELATÓRIO":
    7. PRINCÍPIOS TRABALHISTAS APLICÁVEIS.
    8. ESTRATÉGIA JURÍDICA: caminhos processuais com prós e contras.
    9. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Com base na complexidade das verbas trabalhistas e volume de evidências, sugira a extensão de palavras aconselhável: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique a escolha levando em conta as citações diretas necessárias.
-   10. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
-      Liste TODOS os fundamentos a serem usados. Para cada um:
-      → [DISPONÍVEL — SERÁ CITADA EM BLOCKQUOTE] se apareceu no RAG
-      → [NÃO RECUPERADA NESTA BUSCA — SOLICITAR AO ADVOGADO ADICIONAR] se a lei/fundamento for essencial mas NÃO constar no RAG. Você **NÃO** deve utilizar ou citar leis fora do RAG, devendo alertar o advogado da falta dela.
-      
-      CATÁLOGO DA BASE DO ESCRITÓRIO (títulos exatos):
-      LEGISLAÇÃO TRABALHISTA:
-      'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)'
-      'Reforma Trabalhista (Lei nº 13.467/2017)'
-      'Lei do FGTS (Lei nº 8.036/1990)'
-      'Lei do Seguro-Desemprego (Lei nº 7.998/1990)'
-      'Lei do Trabalho Doméstico (LC nº 150/2015)'
-      'TST - Orientação Jurisprudencial - OJ n. 42 do SDI1 do TST'
-      LEGISLAÇÃO PROCESSUAL:
-      'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
-      'Código de Processo Civil (Lei nº 13.105/2015)'
+   10. CURADORIA DE FUNDAMENTAÇÃO (OBRIGATÓRIO — NÃO PULE):
+      Selecione APENAS os fundamentos que se aplicam DIRETAMENTE à(s) tese(s) deste caso concreto. PRECISÃO acima de volume: petição bem fundamentada não é a que cita mais lei, é a que cita o necessário e nada além — excesso de fundamento irrelevante cansa o julgador e enfraquece a peça. ALVO: 5 a 15 fundamentos no total (caso simples com prova robusta → perto de 5; complexo → até 15; nunca estoure sem necessidade real).
+      REGRAS DE CURADORIA:
+      • PRIORIZE ARTIGO DIRETO. Súmula/Tema/Jurisprudência SÓ quando um fato do caso exigir entendimento sumulado/repetitivo para ser aceito OU para neutralizar defesa provável da parte contrária. Prova robusta + caso claro → pode dispensar jurisprudência.
+      • PROIBIDO incluir fundamento que só se aplica por ANALOGIA, salvo se a tese principal for fraca e inexistir fundamento direto (exceção rara — justifique expressamente).
+      • NÃO traga fundamento de tese que o caso não discute (ex.: não inclua dispositivo de matéria que a causa não suscita).
+      FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
+      → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
+      → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
+      Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
    12. DOCUMENTOS ANALISADOS: lista final completa.
 → TRAVA: NUNCA redija a petição nesta fase. Aguarde "GERAR PEÇA".
 
 COMANDO "GERAR PEÇA":
 → Inicie IMEDIATAMENTE a petição sem pedir permissão.
+→ FUNDAMENTAÇÃO = LISTA APROVADA: cite EXATAMENTE os fundamentos da CURADORIA do relatório, já aplicadas as exclusões/adições que o advogado pediu. NÃO acrescente lei/súmula/tema/jurisprudência fora dessa lista. NÃO use analogia.
+→ CITAÇÃO SÓ EM "DO DIREITO": as transcrições em blockquote (>) dos dispositivos da base ocorrem EXCLUSIVAMENTE na seção DO DIREITO, organizadas por tópicos e subtópicos (um fundamento por tópico/subtópico, conforme a tese). Nas demais seções (preliminares, fatos, tutela, pedidos) NÃO transcreva dispositivos — apenas remeta a eles.
+→ CITE TODOS OS APROVADOS: cada fundamento da lista aprovada DEVE ser transcrito em blockquote, idêntico ao texto do RAG, no tópico pertinente de DO DIREITO. Não omita nenhum item aprovado.
 → SILENT MODE: OMITA completamente as Fases 1, 2 e 4 do output. Comece direto no endereçamento (Ao Juízo da Vara do Trabalho de...).
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
@@ -2056,27 +2037,27 @@ COMANDO "GERAR RELATÓRIO":
    9. PRINCÍPIOS APLICÁVEIS (mín. 150 palavras): vulnerabilidade do consumidor, boa-fé objetiva, função social do contrato, vedação ao enriquecimento sem causa, etc.
    10. ESTRATÉGIA JURÍDICA (mín. 200 palavras): caminhos processuais com prós e contras. Tutela de urgência? Dano moral? Repetição de indébito?
    11. RECOMENDAÇÃO DE EXTENSÃO DA PEÇA (OBRIGATÓRIO): Sugira extensão aconselhável: **Mínimo 3000**, **Médio 5000** ou **Máximo 7000** palavras. Justifique.
-   12. ANÁLISE DA BASE DE CONHECIMENTO (OBRIGATÓRIO — NÃO PULE):
-      Liste TODOS os fundamentos a serem usados. Para cada um, informe:
-      → [DISPONÍVEL — SERÁ CITADA EM BLOCKQUOTE] se apareceu no RAG com prefixo 'FONTE:'
-      → [NÃO RECUPERADA NESTA BUSCA — SOLICITAR AO ADVOGADO ADICIONAR] se essencial mas NÃO constar no RAG.
-      
-      CATÁLOGO DA BASE DO ESCRITÓRIO (títulos exatos):
-      LEGISLAÇÃO CONSUMERISTA:
-      'Código de Defesa do Consumidor (Lei nº 8.078/1990)'
-      LEGISLAÇÃO CIVIL:
-      'Código Civil (Lei nº 10.406/2002)' (quando disponível na base)
-      LEGISLAÇÃO PROCESSUAL:
-      'CONSTITUIÇÃO DA REPÚBLICA FEDERATIVA DO BRASIL DE 1988'
-      'Código de Processo Civil (Lei nº 13.105/2015)'
-      SÚMULAS E JURISPRUDÊNCIA:
-      (Listar as que estiverem disponíveis na base)
+   12. CURADORIA DE FUNDAMENTAÇÃO (OBRIGATÓRIO — NÃO PULE):
+      Selecione APENAS os fundamentos que se aplicam DIRETAMENTE à(s) tese(s) deste caso concreto. PRECISÃO acima de volume: petição bem fundamentada não é a que cita mais lei, é a que cita o necessário e nada além — excesso de fundamento irrelevante cansa o julgador e enfraquece a peça. ALVO: 5 a 15 fundamentos no total (caso simples com prova robusta → perto de 5; complexo → até 15; nunca estoure sem necessidade real).
+      REGRAS DE CURADORIA:
+      • PRIORIZE ARTIGO DIRETO. Súmula/Tema/Jurisprudência SÓ quando um fato do caso exigir entendimento sumulado/repetitivo para ser aceito OU para neutralizar defesa provável da parte contrária. Prova robusta + caso claro → pode dispensar jurisprudência.
+      • PROIBIDO incluir fundamento que só se aplica por ANALOGIA, salvo se a tese principal for fraca e inexistir fundamento direto (exceção rara — justifique expressamente).
+      • NÃO traga fundamento de tese que o caso não discute (ex.: não inclua dispositivo de matéria que a causa não suscita).
+      FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
+      → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
+      → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
+      Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    13. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas — incluir obrigatoriamente: "A ação será proposta no Juizado Especial Cível ou na Vara Cível? Qual a comarca (domicílio do autor)?").
    14. DOCUMENTOS ANALISADOS: lista final completa.
 → TRAVA: NUNCA redija a petição nesta fase. Aguarde "GERAR PEÇA".
 
 COMANDO "GERAR PEÇA":
 → Inicie IMEDIATAMENTE a petição sem pedir permissão.
+→ FUNDAMENTAÇÃO = LISTA APROVADA: cite EXATAMENTE os fundamentos da CURADORIA do relatório, já aplicadas as exclusões/adições que o advogado pediu. NÃO acrescente lei/súmula/tema/jurisprudência fora dessa lista. NÃO use analogia.
+→ CITAÇÃO SÓ EM "DO DIREITO": as transcrições em blockquote (>) dos dispositivos da base ocorrem EXCLUSIVAMENTE na seção DO DIREITO, organizadas por tópicos e subtópicos (um fundamento por tópico/subtópico, conforme a tese). Nas demais seções (preliminares, fatos, tutela, pedidos) NÃO transcreva dispositivos — apenas remeta a eles.
+→ CITE TODOS OS APROVADOS: cada fundamento da lista aprovada DEVE ser transcrito em blockquote, idêntico ao texto do RAG, no tópico pertinente de DO DIREITO. Não omita nenhum item aprovado.
 → SILENT MODE: OMITA completamente as Fases de análise do output. Comece direto no endereçamento.
 → Siga a ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 → Entregue COMPLETA — do endereçamento até a assinatura — em uma única resposta.
@@ -2799,15 +2780,24 @@ app.post("/api/rag/embed", async (req, res) => {
 // para súmulas/temas/jurisprudência), escolhendo SOMENTE da lista
 // (grounding = sem alucinação), (3) fetch determinístico via RPC
 // fetch_legal_by_plan (sem threshold, sem embedding → 100% do que existe).
-const RAG_PLANNER_PROMPT = `Você é um PLANEJADOR DE RECUPERAÇÃO JURÍDICA. Sua única tarefa é decidir QUAIS dispositivos da base de conhecimento são necessários para o caso, escolhendo EXCLUSIVAMENTE da lista de títulos fornecida.
+const RAG_PLANNER_PROMPT = `Você é um CURADOR DE FUNDAMENTAÇÃO JURÍDICA. Sua tarefa é selecionar APENAS os dispositivos da base de conhecimento que se aplicam DIRETAMENTE ao caso concreto, escolhendo EXCLUSIVAMENTE da lista de títulos fornecida.
 
-REGRAS:
-1. Você SÓ pode escolher títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE como está (cada caractere). É PROIBIDO inventar, abreviar ou alterar títulos.
-2. Para LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS e a CONSTITUIÇÃO: liste os ARTIGOS específicos relevantes ao caso no campo "artigos" (apenas o número/identificador, ex.: "16", "74", "19-E", "1.829"). Seja generoso — inclua todos os artigos que possam fundamentar a peça/relatório.
-3. Para SÚMULAS, TEMAS e JURISPRUDÊNCIAS (títulos que começam com "SÚMULA", "TEMA", "JURISPRUDÊNCIA", "ORIENTAÇÃO"): use "integral": true (são curtos e autossuficientes).
-4. Pense no que uma petição ou relatório COMPLETO sobre este caso exigiria: requisitos do benefício/direito, qualidade dos sujeitos, prazos, procedimento, jurisprudência de apoio. Recupere tudo que for plausível — over-inclusão é melhor que faltar fundamento.
-5. Responda APENAS com um array JSON, sem texto antes ou depois, sem markdown. Formato:
-[{"titulo":"<título exato>","artigos":["16","74"]},{"titulo":"<título exato de súmula>","integral":true}]
+FILOSOFIA (LEIA COM ATENÇÃO):
+Uma petição bem fundamentada NÃO é a que cita mais lei — é a que cita o necessário e nada além. Excesso de fundamentos irrelevantes cansa o julgador e enfraquece a peça. PRECISÃO acima de volume. Em caso de dúvida sobre a aplicação de um item ao caso, NÃO inclua.
+
+REGRAS DE SELEÇÃO:
+1. Escolha SOMENTE títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE (cada caractere). PROIBIDO inventar, abreviar ou alterar.
+2. ALVO DE QUANTIDADE: entre 5 e 15 itens no total (um "item" = um título com seus artigos, ou uma súmula/tema). Caso simples e com prova robusta → fique perto de 5. Caso complexo → pode chegar a 15. NUNCA estoure 15 sem necessidade real.
+3. PRIORIZE ARTIGO DIRETO. Para LEIS/CÓDIGOS/DECRETOS/INSTRUÇÕES NORMATIVAS/CONSTITUIÇÃO, liste no campo "artigos" SÓ os artigos que fundamentam diretamente a tese (ex.: "42","59","15"). Não despeje artigos "que poderiam servir". NUNCA use "integral" em lei/código/decreto.
+4. SÚMULA/TEMA/JURISPRUDÊNCIA (títulos que começam com SÚMULA/TEMA/JURISPRUDÊNCIA/ORIENTAÇÃO) → use "integral": true. MAS inclua APENAS quando: (a) um fato do caso exige entendimento sumulado/repetitivo para ser aceito, OU (b) o item neutraliza diretamente uma defesa provável da parte contrária. Se a prova é robusta e o caso é claro, NÃO traga jurisprudência só para enfeitar.
+5. PROIBIDO ANALOGIA: não selecione item que só se aplica "por analogia" a outro benefício/situação. Só inclua analogia se a tese principal for fraca E não houver fundamento direto — e, nesse caso, é exceção rara.
+6. Selecione o que se aplica à TESE concreta do caso. Ex.: caso de restabelecimento de benefício por incapacidade NÃO precisa de presunção de CTPS nem de auxílio-acidente, salvo se o caso expressamente discutir vínculo controvertido ou pedir auxílio-acidente subsidiário.
+
+PRIORIDADE AO RELATÓRIO (quando houver):
+Se o CONTEXTO contiver um RELATÓRIO com uma lista de fundamentos já definida, ESSA LISTA É A BASE. Reproduza exatamente os itens dela e APLIQUE as exclusões/adições que o advogado pediu nas mensagens seguintes ("tire X", "adicione Y", "remova a súmula Z"). Não acrescente itens que o advogado não pediu.
+
+SAÍDA: responda APENAS um array JSON, sem texto antes/depois, sem markdown:
+[{"titulo":"<título exato>","artigos":["42","59"]},{"titulo":"<título exato de súmula>","integral":true}]
 Se nada se aplicar, responda [].`;
 
 app.post("/api/rag/plan", async (req, res) => {
@@ -2846,7 +2836,7 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 2. PLANNER — Flash escolhe da lista (grounding)
-    const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContext).substring(0, 6000)}`;
+    const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContext).substring(0, 9000)}`;
 
     const plannerResp = await callGemini({
       model: "gemini-3.5-flash",
