@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { AgendaEvent, ClientRecord, ContractRecord, User } from '../types';
-import { format, isBefore, startOfDay, addDays, parseISO, isSameDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, isBefore, startOfDay, parseISO, isSameDay } from 'date-fns';
 import { 
   CheckCircleIcon, 
   XMarkIcon, 

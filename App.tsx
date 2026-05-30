@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, AUTHORIZED_USERS } from './types';
+import { User, AUTHORIZED_USERS } from './types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
 import Dashboard from './Components/Dashboard'; 

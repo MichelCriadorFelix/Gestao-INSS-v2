@@ -185,7 +185,7 @@ export const calculateAge = (birthDateStr: string, targetDateStr: string) => {
 };
 
 // --- RMI Calculation Logic ---
-import { IBGE_LIFE_EXPECTANCY, getLifeExpectancy } from './src/constants/ibgeTable';
+import { getLifeExpectancy } from './src/constants/ibgeTable';
 import { IBGELifeExpectancy, getLifeExpectancyFromTable } from './src/services/ibgeService';
 
 export const calculateRMI = (

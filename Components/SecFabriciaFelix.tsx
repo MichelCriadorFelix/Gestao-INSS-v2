@@ -10,21 +10,16 @@ import {
   ChevronRightIcon as ChevronRight, 
   ArrowDownTrayIcon as Download, 
   ArrowPathIcon as Loader2, 
-  UserIcon as User, 
   UsersIcon as Users,
   CpuChipIcon as Bot,
   ClockIcon as History, 
-  ChatBubbleLeftRightIcon as MessageSquare, 
   TrashIcon as Trash2,
   ClipboardIcon as Copy,
   PencilIcon as Edit2,
   XMarkIcon as XMark
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
-import { SocialSecurityData } from '../SocialSecurityCalc';
-import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
-import { safeSetLocalStorage } from '../utils';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   CalculatorIcon, 
   BanknotesIcon, 
@@ -10,9 +10,6 @@ import {
   PlusIcon,
   ArchiveBoxIcon,
   PencilSquareIcon,
-  UserIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
   CalendarIcon,
   BriefcaseIcon
 } from '@heroicons/react/24/outline';

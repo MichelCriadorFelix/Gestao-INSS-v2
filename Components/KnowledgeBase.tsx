@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabaseService } from '../services/supabaseService';
 import { apiFetch } from '../services/apiService';
-import { CheckCircle2, Plus, Trash2, BookOpen, Loader2, AlertTriangle, Info, FileText, Gavel, Scale, BookMarked, Landmark, ClipboardList, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Plus, Trash2, BookOpen, Loader2, AlertTriangle, Info, Wrench } from 'lucide-react';
 
 // ============================================================
 // PADRÃO OURO — NOMENCLATURA DA BASE DE CONHECIMENTO

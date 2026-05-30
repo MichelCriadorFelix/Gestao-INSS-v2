@@ -9,7 +9,6 @@ import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from 'tiptap-extension-resizable-image';
 import 'tiptap-extension-resizable-image/styles.css';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
 
 const styles = `
   .ProseMirror-selectednode {
@@ -72,9 +71,8 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import { 
-  Bold, Italic, Underline as UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, Quote, Undo, Redo, Image as ImageIcon, Table as TableIcon, Save, 
-  Trash2, Layout, ChevronLeft, ChevronDown, Search, Plus, FileDown, User, X, Settings, Palette, Scale,
+  Bold, Italic, Underline as UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify, Quote, Undo, Redo, Image as ImageIcon, Table as TableIcon, Save, 
+  Trash2, Layout, ChevronLeft, ChevronDown, Search, Plus, FileDown, User, X, Settings, Scale,
   Phone, Mail, Instagram, Upload, Check, FileText as FileTextIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

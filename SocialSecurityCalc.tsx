@@ -2,12 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { 
-  UserIcon, DocumentTextIcon, CalculatorIcon, 
+import { DocumentTextIcon, CalculatorIcon, 
   ArrowDownTrayIcon, TrashIcon, PlusIcon, 
-  CheckCircleIcon, ExclamationTriangleIcon,
-  CalendarDaysIcon, CurrencyDollarIcon, CloudArrowUpIcon,
-  MagnifyingGlassIcon, Cog6ToothIcon, TableCellsIcon,
+  CheckCircleIcon, ExclamationTriangleIcon, CloudArrowUpIcon, Cog6ToothIcon, TableCellsIcon,
   ChartBarIcon, FolderOpenIcon, PencilSquareIcon, CheckIcon, XCircleIcon
 } from '@heroicons/react/24/outline';
 import { ClientRecord } from './types';

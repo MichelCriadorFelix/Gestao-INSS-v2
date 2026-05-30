@@ -1,5 +1,4 @@
 import { supabase } from '../supabaseClient';
-import LZString from 'lz-string';
 
 const getSupabase = () => supabase;
 
