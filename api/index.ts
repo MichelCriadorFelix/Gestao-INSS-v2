@@ -2952,7 +2952,6 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
 
 app.get("/api/bcdata/inpc", async (req, res) => {
   try {
-    const fetch = await import('node-fetch').then(m => m.default);
     const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json');
     if (!response.ok) {
       return res.status(response.status).json({ error: "Failed to fetch from BCB" });
