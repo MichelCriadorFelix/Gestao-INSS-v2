@@ -523,9 +523,9 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
-            // Threshold 0.50 e máximo 30 resultados para ampla cobertura de buscas por área e retrocompatibilidade de legados
+            // Threshold 0.25 e máximo 30 resultados para ampla cobertura de buscas por área e retrocompatibilidade de legados
             const vectorResults = await supabaseService
-              .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.50, 30);
+              .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.25, 30);
 
             // Merge sem duplicatas, priorizando vetorial
             const seen = new Set<number>();

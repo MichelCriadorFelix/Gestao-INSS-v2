@@ -2812,12 +2812,33 @@ app.post("/api/rag/plan", async (req, res) => {
       return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
     }
 
-    // 1. INVENTÁRIO — títulos reais da base (filtra por área quando informado)
-    let titlesQuery = supabaseAdmin
-      .from('legal_documents')
-      .select('metadata');
-    const { data: rows, error: invErr } = await titlesQuery;
-    if (invErr) throw invErr;
+    // 1. INVENTÁRIO — títulos reais da base (filtra por área quando informado) — Paginação robusta!
+    let rows: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin
+        .from('legal_documents')
+        .select('metadata')
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+        
+      if (error) {
+        throw error;
+      }
+      
+      if (data && data.length > 0) {
+        rows = [...rows, ...data];
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
 
     const areaSet = Array.isArray(areas) && areas.length > 0 ? new Set(areas) : null;
     const titleAreas = new Map<string, Set<string>>();

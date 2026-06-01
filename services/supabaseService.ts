@@ -735,7 +735,7 @@ export const supabaseService = {
     return data;
   },
 
-  async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
+  async searchLegalDocuments(embedding: number[], matchThreshold = 0.25, matchCount = 5): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
     const supabase = getSupabase();
     if (!supabase) return [];
     
@@ -760,7 +760,7 @@ export const supabaseService = {
   async searchLegalDocumentsByArea(
     embedding: number[],
     areas: string[],
-    matchThreshold = 0.50,
+    matchThreshold = 0.25,
     matchCount = 30
   ): Promise<Array<{id: number, content: string,
     metadata: any, similarity: number,
