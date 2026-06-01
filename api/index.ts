@@ -3612,7 +3612,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       temperature = 0.1;
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag) ragContext = "";
+      if (!req.body.forceRag && !ragContext) ragContext = "";
     } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
       selectedSystemPrompt = DR_MICHEL_DUVIDA_PROMPT + getCurrentDateContext();
     }
@@ -4147,7 +4147,7 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     } else if (isCasualIntent) {
       console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
       selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag) ragContext = "";
+      if (!req.body.forceRag && !ragContext) ragContext = "";
     } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
       console.log("Modo Dra. Luana Dúvida Ativado (Consultora Trabalhista)");
       selectedSystemPrompt = DRA_LUANA_DUVIDA_PROMPT + getCurrentDateContext();
@@ -4638,7 +4638,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       temperature = 0.1;
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag) ragContext = "";
+      if (!req.body.forceRag && !ragContext) ragContext = "";
     } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
       selectedSystemPrompt = DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
     }

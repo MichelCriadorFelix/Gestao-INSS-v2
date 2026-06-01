@@ -441,8 +441,9 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const AGENT_AREAS = ['TRABALHISTA','CIVEL','CONSUMIDOR','INSS','RPPS'];
       let ragContext = '';
 
-      // Detectar mensagens casuais para evitar busca RAG desnecessária
-      const isCasualMessage = /^(oi|olá|bom dia|boa tarde|boa noite|obrigad|tudo bem|tudo bom|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza)/i.test(messageText.trim()) && messageText.trim().length < 60;
+      // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
+      const isCasualMessage = /^(oi|olá|olá\s+tudo\s+bem\??|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tudo\s+bem\??|tudo\s+bom\??|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza|grato|grata|tudo\s+joia\??)[!?.,\s]*$/i.test(messageText.trim()) ||
+                              /^(oi|olá)[!?.,\s]+(tudo\s+bem\??|tudo\s+bom\??|como\s+vai\??)[!?.,\s]*$/i.test(messageText.trim());
 
       try {
         if (isCasualMessage) {
