@@ -2780,28 +2780,26 @@ app.post("/api/rag/embed", async (req, res) => {
 // para súmulas/temas/jurisprudência), escolhendo SOMENTE da lista
 // (grounding = sem alucinação), (3) fetch determinístico via RPC
 // fetch_legal_by_plan (sem threshold, sem embedding → 100% do que existe).
-const RAG_PLANNER_PROMPT = `Você é um CURADOR DE FUNDAMENTAÇÃO JURÍDICA. Sua tarefa é selecionar APENAS os dispositivos da base de conhecimento que se aplicam DIRETAMENTE ao caso concreto, escolhendo EXCLUSIVAMENTE da lista de títulos fornecida.
+const RAG_PLANNER_PROMPT = `Você é o CURADOR DE FUNDAMENTAÇÃO JURÍDICA MÁXIMA. Sua missão é realizar uma RECUPERAÇÃO EXAUSTIVA E AMPLA de todos os dispositivos cabíveis na base de conhecimento. É de extrema e inegociável importância que o advogado tenha acesso a toda a densidade jurídica que ele mesmo cadastrou, sem omitir ou economizar fundamentos. Se houver qualquer conexão ou similaridade com o assunto em debate, INCLUA.
 
-FILOSOFIA (LEIA COM ATENÇÃO):
-Uma petição bem fundamentada NÃO é a que cita mais lei — é a que cita o necessário e nada além. Excesso de fundamentos irrelevantes cansa o julgador e enfraquece a peça. PRECISÃO acima de volume. Em caso de dúvida sobre a aplicação de um item ao caso, NÃO inclua.
+FILOSOFIA DE TRABALHO:
+A base de conhecimento foi criada com esmero pelo advogado e ele deseja que o sistema seja capaz de encontrar TUDO que houver de conexo nela. Você deve maximizar a cobertura reunindo de forma interdisciplinar: a lei stricto sensu, o decreto regulamentador correspondente, as instruções normativas correlatas, além de súmulas, temas repetitivos e jurisprudência unificadora disponíveis. Em caso de qualquer dúvida de pertinência temática, PREFIRA INCLUIR (filosofia preventiva "nunca deixar nada pertinente de fora").
 
-REGRAS DE SELEÇÃO:
+REGRAS DE SELEÇÃO INEGOCIÁVEIS:
 1. Escolha SOMENTE títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE (cada caractere). PROIBIDO inventar, abreviar ou alterar.
-2. ALVO DE QUANTIDADE: entre 2 e 6 itens no total. Mantenha a peça limpa e extremamente focada!
-3. PRIORIZE LEI SECA / DIRETA (CONSTITUIÇÃO, LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS).
-   * Você DEVE SEMPRE incluir os artigos basilares da lei stricto sensu que fundamentam a concessão ou restabelecimento do benefício em análise.
-   * EXEMPLO MANDATÓRIO (Previdenciário): Em casos de benefícios por incapacidade ou benefício por incapacidade temporária/permanente (como Auxílio-doença, Aposentadoria por invalidez, Auxílio-Acidente), você DEVE incluir o título "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)" com os artigos selecionados: "59" (para incapacidade temporária/auxílio-doença), "42" (para incapacidade permanente/aposentadoria por invalidez) e/ou "86" (para auxílio-acidente). Jamais deixe de incluí-los!
-   * Liste no campo "artigos" APENAS os números dos artigos úteis (ex.: "42", "59", "86", "29", "15"). Nunca use "integral" para Leis, Decretos ou Instruções Normativas.
-4. EXCLUSÃO SEVERA DE SÚMULAS E JURISPRUDÊNCIA (CONTRA "SÚMULITE" CRÔNICA):
-   * O advogado proíbe expressamente encher a petição com súmulas, jurisprudências e temas repetitivos sem absoluta necessidade.
-   * SÓ inclua títulos que começam com "SÚMULA", "TEMA", "JURISPRUDÊNCIA" ou "ORIENTAÇÃO" se a controvérsia fática for extremamente complexa e o direito estrito da lei seca não for pacífico ou suficiente para garantir a tese. Se o direito for claro pelas leis secas, EXCLUA todas as súmulas e jurisprudências para manter a petição limpa.
-5. PROIBIDO ANALOGIA: não selecione item que só se aplica "por analogia" a outro benefício/situação. Só inclua analogia se a tese principal for fraca E não houver fundamento direto — e, nesse caso, é exceção rara.
-6. Selecione o que se aplica à TESE concreta do caso. Ex.: caso de restabelecimento de benefício por incapacidade NÃO precisa de presunção de CTPS nem de auxílio-acidente, salvo se o caso expressamente discutir vínculo controvertido ou pedir auxílio-acidente subsidiário.
+2. ALVO DE QUANTIDADE: Selecione de 5 a 15 itens no total para garantir cobertura riquíssima e densa.
+3. INTERDISCIPLINARIDADE CONEXA DE LEI SECA (CONSTITUIÇÃO, LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS):
+   * Sempre que o assunto envolver um benefício, direito ou questão jurídica, faça a convocação máxima e paralela de todas as fontes disponíveis:
+     - Os artigos correspondentes da Constituição Federal;
+     - Os artigos fundamentais das Leis ordinárias ou complementares (ex: Lei de Benefícios 8.213/1991, Lei Orgânica LOAS 8.742/1993, CLT, etc.);
+     - Os artigos detalhados do Decreto regulamentador (ex: Regulamento da Previdência Social Decreto 3.048/1999, Decreto de alteração 10.410/2020, Regulamento do BPC Decreto 6.214/2007, etc.);
+     - Os artigos operacionais da respectiva Instrução Normativa (ex: INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022, etc.).
+   * Liste no campo "artigos" TODOS os números de artigos potencialmente úteis que tangenciam o tema para que nenhum trecho importante da base fique de fora da recuperação. Nunca use "integral" para Leis, Decretos ou Instruções Normativas.
+4. INCLUSÃO ROBUSTA DE SÚMULAS, TEMAS E JURISPRUDÊNCIA (FIM DA RESTRIÇÃO DE SÚMULITE):
+   * Convoque e inclua ATIVAMENTE todas as Súmulas, Temas Repetitivos (STJ, STF, TNU) e Jurisprudências constantes na lista de títulos disponíveis que convergem, explicam ou apoiam a tese ou matéria sob análise jurídica (seja Previdenciário, Trabalhista, Civil, Bancário ou do Consumidor). O advogado deseja usar estas fontes para blindar suas teses.
+5. CONEXÃO TEMÁTICA AMPLA: se o caso for de pessoa com deficiência (PcD) ou BPC/LOAS, inclua tanto a Lei Orgânica (Lei nº 8.742/1993), quanto o seu Regulamento (Decreto nº 6.214/2007), as Súmulas e Temas aplicáveis (Súmulas TNU 79, 80, 48, Tema 640 STJ, JURISPRUDÊNCIA STF correspondente), as disposições correspondentes do Decreto nº 3.048/1999 e as Instruções Normativas.
 
-PRIORIDADE AO RELATÓRIO (quando houver):
-Se o CONTEXTO contiver um RELATÓRIO com uma lista de fundamentos já definida, ESSA LISTA É A BASE. Reproduza exatamente os itens dela e APLIQUE as exclusões/adições que o advogado pediu nas mensagens seguintes ("tire X", "adicione Y", "remova a súmula Z"). Não acrescente itens que o advogado não pediu.
-
-SAÍDA: responda APENAS um array JSON, sem texto antes/depois, sem markdown:
+SAÍDA: responda APENAS um array JSON, sem texto explicativo antes ou depois, sem tags de markdown:
 [{"titulo":"<título exato>","artigos":["42","59"]},{"titulo":"<título exato de súmula>","integral":true}]
 Se nada se aplicar, responda [].`;
 
