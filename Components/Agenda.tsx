@@ -132,10 +132,12 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   const handleSave = (closeForm = true) => {
     if (!selectedDate || !formData.type || !formData.time) return;
     
+    const targetDateStr = formData.date || format(selectedDate, 'yyyy-MM-dd');
+    
     const newEvent: AgendaEvent = {
       ...formData,
       id: formData.id || Math.random().toString(36).substr(2, 9),
-      date: format(selectedDate, 'yyyy-MM-dd'),
+      date: targetDateStr,
       time: formData.time,
       type: formData.type as any,
       description: formData.description || '',
@@ -146,6 +148,19 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
     } as AgendaEvent;
 
     onSaveEvent(newEvent);
+
+    if (targetDateStr !== format(selectedDate, 'yyyy-MM-dd')) {
+      try {
+        const newD = parseISO(targetDateStr);
+        setSelectedDate(newD);
+        if (newD.getMonth() !== currentDate.getMonth() || newD.getFullYear() !== currentDate.getFullYear()) {
+          setCurrentDate(newD);
+        }
+      } catch (e) {
+        console.error("Erro ao converter data para selectedDate:", e);
+      }
+    }
+
     if (closeForm) {
         setIsFormOpen(false);
     }

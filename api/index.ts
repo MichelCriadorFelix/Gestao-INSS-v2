@@ -60,7 +60,7 @@ const getCurrentDateContext = () => {
 
 // Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
+  if (req.path === "/health" || req.path === "/config" || req.path === "/rag/plan" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
   authenticate(req, res, next);
 });
 
@@ -2224,7 +2224,8 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
-  "gemini-3-flash-preview"
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
@@ -2341,7 +2342,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota, 
   // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
-  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = (modelIndex === 0) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
   
   // Override model in params
@@ -2430,7 +2431,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
          // Switch model faster on quota errors if all keys are exhausted.
-         if (errorMessage.includes('Quota exceeded') && failuresOnCurrentModel >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
              console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
@@ -2470,7 +2471,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
   // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota,
   // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
-  const requestedModel = (modelIndex === 0 || params.model) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = (modelIndex === 0) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
   const currentModel = getEffectiveModel(requestedModel);
   
   const finalParams = { ...params, model: currentModel };
@@ -2524,7 +2525,7 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         if (errorMessage.includes('Quota exceeded') && nextFailures >= keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
              console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
@@ -2806,11 +2807,12 @@ Se nada se aplicar, responda [].`;
 app.post("/api/rag/plan", async (req, res) => {
   try {
     const { caseContext, areas } = req.body;
+    console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
     if (!caseContext || String(caseContext).trim().length < 10) {
       return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
     }
 
-    // 1. INVENTÁRIO — títulos reais da base (filtra por área quando informado) — Paginação robusta!
+    console.log("[RAG PLAN_API] 1. Carregando inventário de metadados da base...");
     let rows: any[] = [];
     let page = 0;
     const pageSize = 1000;
@@ -2861,7 +2863,8 @@ app.post("/api/rag/plan", async (req, res) => {
 
     // 2. PLANNER — Flash escolhe da lista (grounding)
     const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContext).substring(0, 9000)}`;
-
+    
+    console.log(`[RAG PLAN_API] 2. Invocando modelo de IA para selecionar documentos de ${inventory.length} opções...`);
     const plannerResp = await callGemini({
       model: "gemini-3.5-flash",
       contents: { role: "user", parts: [{ text: plannerInput }] },
@@ -2873,6 +2876,7 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     });
 
+    console.log(`[RAG PLAN_API] IA respondeu o plano. Parseando rascunho de plano...`);
     let rawPlan = (plannerResp.text || "[]").trim();
     if (rawPlan.startsWith('```')) rawPlan = rawPlan.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
     let plan: any[] = [];
@@ -2933,7 +2937,13 @@ app.post("/api/rag/plan", async (req, res) => {
       "estatuto do idoso": "Estatuto do Idoso (Lei nº 10.741/2003)",
       "instrucao normativa 128": "INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022",
       "in 128": "INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022",
-      "reforma da previdencia": "Reforma da Previdência (EC nº 103/2019)"
+      "reforma da previdencia": "Reforma da Previdência (EC nº 103/2019)",
+      "lc 142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013",
+      "lc142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013",
+      "lei complementar 142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013",
+      "lei complementar n 142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013",
+      "lei complementar nº 142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013",
+      "lei complementar numero 142": "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013"
     };
 
     const resolveTitle = (inputTitle: string, useFull = false): string | null => {
@@ -3151,7 +3161,8 @@ app.post("/api/rag/plan", async (req, res) => {
       { keys: ["loas", "lei organica da assistencia social", "lei 8742", "lei 8.742"], title: "Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)" },
       { keys: ["lei de beneficios", "lei 8213", "lei 8.213"], title: "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)" },
       { keys: ["regimento da previdencia", "regulamento da previdência", "decreto 3048", "decreto 3.048"], title: "Regulamento da Previdência Social (Decreto nº 3.048/1999)" },
-      { keys: ["estatuto do idoso", "lei 10741", "lei 10.741"], title: "Estatuto do Idoso (Lei nº 10.741/2003)" }
+      { keys: ["estatuto do idoso", "lei 10741", "lei 10.741"], title: "Estatuto do Idoso (Lei nº 10.741/2003)" },
+      { keys: ["lc 142", "lc142", "lei complementar 142", "lei complementar nº 142"], title: "LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013" }
     ];
 
     for (const sk of specialKeywords) {
@@ -3225,6 +3236,14 @@ app.post("/api/rag/plan", async (req, res) => {
       // IDOSO/IDADE (LOAS Elder / General Elder Special Exclusion)
       if (isLOASCase || /idos[oa]/i.test(contextStr)) {
         injectIntoPlan("Estatuto do Idoso (Lei nº 10.741/2003)", ["15", "34"]);
+      }
+
+      // 1j. Aposentadoria da Pessoa com Deficiência (PcD - LC 142/2013 e regras de conversão)
+      const isPcDCase = /pcd|defici[êe]ncia|deficiente|lc\s*142|lei\s+complementar\s*(?:nº\s*)?142/i.test(contextStr);
+      if (isPcDCase) {
+        injectIntoPlan("LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
+        injectIntoPlan("Regulamento da Previdência Social (Decreto nº 3.048/1999)", ["70-A", "70-B", "70-C", "70-D", "70-E", "70-F", "70-G", "70-H", "70-I"]);
+        injectIntoPlan("INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022", ["350", "351", "352", "353", "354", "355", "356", "357", "358"]);
       }
 
       // 1c. Pensão por morte
@@ -3392,9 +3411,11 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 3. FETCH DETERMINÍSTICO via RPC
+    console.log(`[RAG PLAN_API] 3. Disparando RPC fetch_legal_by_plan com plano curado de ${curatedPlan.length} documentos...`);
     const { data: chunks, error: rpcErr } = await supabaseAdmin
       .rpc('fetch_legal_by_plan', { p_plan: curatedPlan });
     if (rpcErr) throw rpcErr;
+    console.log(`[RAG PLAN_API] RPC completo com sucesso. Carregou ${chunks?.length || 0} chunks.`);
 
     // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
     const ragContext = (chunks || [])
