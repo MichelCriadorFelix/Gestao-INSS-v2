@@ -1091,6 +1091,7 @@ export default function Dashboard({
       } else {
           updated = [...agendaEvents, event];
       }
+      setAgendaEvents(updated); // Optimistic Update
       saveData('agenda', updated);
 
       // Sincronizar com o cliente se for um evento virtual
@@ -1106,7 +1107,13 @@ export default function Dashboard({
                   const updatedClient = { ...client };
                   
                   // Se a data mudou, atualiza no cliente
-                  const eventDateFormatted = format(parseISO(event.date), 'dd/MM/yyyy');
+                  let eventDateFormatted = event.date;
+                  if (event.date && event.date.includes('-')) {
+                      const [y, m, d] = event.date.split('-');
+                      if (y && m && d) {
+                           eventDateFormatted = `${d}/${m}/${y}`;
+                      }
+                  }
                   const currentClientDate = updatedClient[fieldKey as keyof ClientRecord];
                   
                   if (currentClientDate !== eventDateFormatted && currentClientDate !== event.date) {
@@ -1251,12 +1258,15 @@ export default function Dashboard({
           if (isVirtual) {
               const virtualEvent = mergedAgendaEvents.find(e => e.id === id);
               if (virtualEvent) {
-                  const updated = [...agendaEvents, { ...virtualEvent, status: 'cancelled' }];
+                  const updated = [...agendaEvents, { ...virtualEvent, status: 'cancelled' as const }];
+                  setAgendaEvents(updated);
                   saveData('agenda', updated);
                   return;
               }
           }
-          saveData('agenda', agendaEvents.filter(e => e.id !== id));
+          const filtered = agendaEvents.filter(e => e.id !== id);
+          setAgendaEvents(filtered);
+          saveData('agenda', filtered);
       }
   };
 

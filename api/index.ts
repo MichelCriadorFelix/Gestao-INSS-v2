@@ -2788,7 +2788,7 @@ A base de conhecimento foi criada com esmero pelo advogado e ele deseja que o si
 
 REGRAS DE SELEÇÃO INEGOCIÁVEIS:
 1. Escolha SOMENTE títulos que aparecem LITERALMENTE na lista "TÍTULOS DISPONÍVEIS". Copie o título EXATAMENTE (cada caractere). PROIBIDO inventar, abreviar ou alterar.
-2. ALVO DE QUANTIDADE: Selecione de 5 a 15 itens no total para garantir cobertura riquíssima e densa.
+2. ALVO DE QUANTIDADE: Selecione TODOS os itens que possuam relevância, conexão ou incidência para o caso concreto. NÃO economize. Não há limite máximo de itens a serem listados.
 3. INTERDISCIPLINARIDADE CONEXA DE LEI SECA (CONSTITUIÇÃO, LEIS, CÓDIGOS, DECRETOS, INSTRUÇÕES NORMATIVAS):
    * Sempre que o assunto envolver um benefício, direito ou questão jurídica, faça a convocação máxima e paralela de todas as fontes disponíveis:
      - Os artigos correspondentes da Constituição Federal;
@@ -3410,15 +3410,69 @@ app.post("/api/rag/plan", async (req, res) => {
       return res.json({ ragContext: "", plan: [], titlesConsidered: inventory.length });
     }
 
-    // 3. FETCH DETERMINÍSTICO via RPC
-    console.log(`[RAG PLAN_API] 3. Disparando RPC fetch_legal_by_plan com plano curado de ${curatedPlan.length} documentos...`);
-    const { data: chunks, error: rpcErr } = await supabaseAdmin
-      .rpc('fetch_legal_by_plan', { p_plan: curatedPlan });
-    if (rpcErr) throw rpcErr;
-    console.log(`[RAG PLAN_API] RPC completo com sucesso. Carregou ${chunks?.length || 0} chunks.`);
+    // 3. FETCH DETERMINÍSTICO via Aplicação (Substituindo RPC para evitar limitação oculta)
+    console.log(`[RAG PLAN_API] 3. Disparando varredura paralela determinística para plano curado de ${curatedPlan.length} documentos...`);
+    
+    let allChunks: any[] = [];
+    
+    // Batch process to avoid hitting concurrent connection limits
+    const batchSize = 5;
+    for (let i = 0; i < curatedPlan.length; i += batchSize) {
+      const batch = curatedPlan.slice(i, i + batchSize);
+      
+      const promises = batch.map(async (planItem: any) => {
+        let query = supabaseAdmin
+          .from('legal_documents')
+          .select('id, content, metadata')
+          .eq('metadata->>title', planItem.titulo);
+          
+        if (!planItem.integral && planItem.artigos && planItem.artigos.length > 0) {
+          const filters = [];
+          for (const num of planItem.artigos) {
+            const semPonto = num.replace(/\./g, '');
+            const comPonto = /^\d{4}$/.test(semPonto) ? `${semPonto.slice(0, 1)}.${semPonto.slice(1)}` : null;
+            
+            filters.push(`content.ilike.%Art. ${num}.%`);
+            filters.push(`content.ilike.%Art. ${num} %`);
+            filters.push(`content.ilike.%Art. ${num},%`);
+            filters.push(`content.ilike.%Art. ${num}-%`);
+            filters.push(`content.ilike.%§ ${num}%`);
+            filters.push(`content.ilike.%§ ${num}º%`);
+            
+            if (semPonto !== num) {
+              filters.push(`content.ilike.%Art. ${semPonto}.%`);
+              filters.push(`content.ilike.%Art. ${semPonto} %`);
+            }
+            if (comPonto && comPonto !== num) {
+              filters.push(`content.ilike.%Art. ${comPonto}.%`);
+              filters.push(`content.ilike.%Art. ${comPonto} %`);
+            }
+          }
+          query = query.or(filters.join(','));
+        }
+        
+        // Execute sem limite (ou limite alto) para garantir q não perde artigo
+        const { data, error } = await query.limit(200); 
+        if (error) {
+           console.error("Error fetching doc in PLAN:", error);
+           return [];
+        }
+        return (data || []).map(d => ({
+          title: planItem.titulo,
+          content: d.content
+        }));
+      });
+      
+      const results = await Promise.all(promises);
+      results.forEach(res => {
+        allChunks = [...allChunks, ...res];
+      });
+    }
+
+    console.log(`[RAG PLAN_API] Varredura completa. Carregou ${allChunks.length} chunks.`);
 
     // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
-    const ragContext = (chunks || [])
+    const ragContext = allChunks
       .map((c: any) => `FONTE: ${c.title} [Recuperação Exata]\n${c.content}`)
       .join('\n\n---\n\n');
 
@@ -3426,7 +3480,7 @@ app.post("/api/rag/plan", async (req, res) => {
       ragContext,
       plan: curatedPlan,
       titlesConsidered: inventory.length,
-      chunksFound: (chunks || []).length
+      chunksFound: (allChunks || []).length
     });
   } catch (error: any) {
     console.error("Error in /api/rag/plan:", error);
@@ -3700,9 +3754,15 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     // Reserva: system prompt base (~10k) + ELITE_REDACTION (~3k) + history (~5k) + draft (~5k) + nova msg (~2k)
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
-    // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
-    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
+    
+    // Dynamic Distribution
+    let ratioDoc = documentContext ? 0.60 : 0;
+    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
+    
+    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
@@ -3795,7 +3855,8 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (ragContext) {
-      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      // Dynamic RAG Budget based on ratios computed upstream
+      const ragBudgetChars = Math.floor(availableForContext * ratioRag * 3.5);
       const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
       if (ragTruncated.length < ragContext.length) {
         console.log(`[RAG] ragContext truncado para Dr. Michel: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
@@ -4210,9 +4271,15 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     // Reserva: system prompt base (~10k) + ELITE_REDACTION (~3k) + history (~5k) + draft (~5k) + nova msg (~2k)
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
-    // Distribuição: 60% documentContext, 30% customLaws, 10% ragContext (RAG já vem compacto)
-    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
+    
+    // Dynamic Distribution
+    let ratioDoc = documentContext ? 0.60 : 0;
+    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
+    
+    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
@@ -4724,8 +4791,15 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const inputBudget = getInputBudget(modelProvider, model);
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens;
-    const maxDocCtxChars = Math.floor(availableForContext * 0.60 * 3.5);
-    const maxLawsChars = Math.floor(availableForContext * 0.30 * 3.5);
+    
+    // Dynamic Distribution
+    let ratioDoc = documentContext ? 0.60 : 0;
+    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    if (ratioRag < 0.35) ratioRag = 0.35;
+
+    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+    const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     if (documentContext) {
       const originalDocSize = documentContext.length;
@@ -4794,7 +4868,7 @@ REGRAS DE OURO:
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
     let finalMessage = message;
     if (ragContext) {
-      const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
+      const ragBudgetChars = Math.floor(availableForContext * ratioRag * 3.5);
       const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
       if (ragTruncated.length < ragContext.length) {
         console.log(`[RAG] ragContext truncado para Dr. Felix: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
