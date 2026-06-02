@@ -3893,28 +3893,32 @@ ${ragTruncated}`;
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
-A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
-Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
-Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+          // Correção pontual — REESCREVE A PETIÇÃO INTEIRA aplicando a correção, para não quebrar a persistência e UI
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
+O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo toda a estrutura, provas e citações idênticas à versão anterior, mas aplique a correção ou ajuste solicitado na parte pertinente.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
-[FIM DA REFERÊNCIA]`;
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
         } else if (revisionIntent === 'ADDITION') {
-          // Adição — devolve só o trecho novo.
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
-A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
-Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
-Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+          // Adição — REESCREVE A PETIÇÃO INTEIRA aplicando a adição
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
+O usuário pediu para ACRESCENTAR algo. REESCREVA a petição por completo, mantendo a estrutura da versão anterior, mas inserindo o novo argumento, tópico ou parágrafo no local apropriado.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-        } else {
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+        } else if (revisionIntent === 'FULL_REGENERATION') {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
           // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
           const draftParaRegen = draftContent.substring(0, 60000);
@@ -3923,7 +3927,7 @@ O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças s
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
@@ -4414,26 +4418,30 @@ ${ragTruncated}`;
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
-A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
-Mantenha densidade, valores da planilha e formatação idênticas ao padrão da peça original.
-Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
+O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a exata correção solicitada na parte pertinente.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
-[FIM DA REFERÊNCIA]`;
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
-A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
-Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
-Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
+O usuário pediu para ACRESCENTAR algo à peça já existente. REESCREVA a petição inteira e completa integrando organicamente o novo parágrafo ou tópico.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-        } else {
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+        } else if (revisionIntent === 'FULL_REGENERATION') {
           // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
           const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
@@ -4441,7 +4449,7 @@ O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças s
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
@@ -4898,25 +4906,30 @@ REGRAS DE OURO:
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
-A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO.
-Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
+O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a correção pertinente.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
-[FIM DA REFERÊNCIA]`;
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça truncada ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftEnxuto = draftContent.substring(0, 40000);
-          finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
-A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
-Devolva APENAS o novo trecho no estilo e densidade da peça original.
-Indique onde o trecho deve ser inserido.
+          const draftParaRegen = draftContent.substring(0, 60000);
+          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
+O usuário pediu para ACRESCENTAR algo à peça. REESCREVA a petição inteira e completa integrando o novo parágrafo ou tópico apropriadamente.
+NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-        } else {
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+        } else if (revisionIntent === 'FULL_REGENERATION') {
           // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
           const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
@@ -4924,7 +4937,7 @@ O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças s
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
@@ -5398,28 +5411,32 @@ console.log(`[Sec.Fabricia] Revisão detectada: ${revisionIntent} | Draft existe
 
 if (draftContent) {
   if (revisionIntent === 'POINT_CORRECTION') {
-    // Correção pontual — devolve só o trecho corrigido. Injeta draft enxuto (15k chars) só para localização.
-    const draftEnxuto = draftContent.substring(0, 40000);
-    finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — DEVOLVA APENAS O TRECHO CORRIGIDO]
-A petição anterior está abaixo. Localize o tópico/trecho que o usuário pediu para corrigir e DEVOLVA APENAS ESSE TRECHO CORRIGIDO — não a petição inteira.
-Mantenha densidade, citações em blockquote e formatação idênticas ao padrão da peça original.
-Se o usuário não especificou tópico, peça esclarecimento em UMA frase.
+    // Correção pontual — REESCREVE A PETIÇÃO INTEIRA
+    const draftParaRegen = draftContent.substring(0, 60000);
+    finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
+O usuário pediu uma correção. REESCREVA a petição por completo aplicando a alteração, mantendo o estilo original intacto para os demais tópicos.
+NÃO devolva apenas o trecho.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA PARA LOCALIZAR O TRECHO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... peça truncada em 40k chars — use o Editor de Petições para ver o texto completo ...]' : ''}
-[FIM DA REFERÊNCIA]`;
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
   } else if (revisionIntent === 'ADDITION') {
-    // Adição — devolve só o trecho novo.
-    const draftEnxuto = draftContent.substring(0, 40000);
-    finalMessage += `\n\n[MODO ADIÇÃO — DEVOLVA APENAS O NOVO TRECHO/TÓPICO]
-A petição anterior está abaixo. O usuário pediu para ACRESCENTAR algo à peça já existente.
-Devolva APENAS o novo trecho (tópico, parágrafo ou argumento) no estilo e densidade da peça original — não reescreva a petição inteira.
-Indique onde o trecho deve ser inserido (ex: "[Inserir após o tópico III. DOS FATOS]").
+    // Adição — REESCREVE A PETIÇÃO INTEIRA
+    const draftParaRegen = draftContent.substring(0, 60000);
+    finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
+O usuário pediu para adicionar algo. REESCREVA a petição inteira integrando o novo trecho.
+NÃO devolva apenas o trecho.
 
-[PETIÇÃO ANTERIOR — REFERÊNCIA DE ESTILO]
-${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]' : ''}
-[FIM DA REFERÊNCIA]`;
-  } else {
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
+${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+[FIM DA REFERÊNCIA]
+
+[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+${message}`;
+  } else if (revisionIntent === 'FULL_REGENERATION') {
     // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
     // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
     const draftParaRegen = draftContent.substring(0, 60000);
@@ -5427,7 +5444,7 @@ ${draftEnxuto}${draftContent.length > 40000 ? '\n[... truncado em 40k chars ...]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
-[VERSÃO ANTERIOR — REFERÊNCIA OBRIGATÓRIA DE FATOS, PROVAS E CITAÇÕES]
+[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
