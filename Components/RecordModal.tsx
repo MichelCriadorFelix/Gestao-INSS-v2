@@ -271,7 +271,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let value = e.target.value;
+    if (e.target.name === 'cpf' || e.target.name === 'legalRepresentativeCpf') {
+      let v = value.replace(/\D/g, "");
+      if (v.length > 11) v = v.slice(0, 11);
+      value = v
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    } else if (['der', 'medExpertiseDate', 'socialExpertiseDate', 'extensionDate', 'dcbDate', 'ninetyDaysDate', 'securityMandateDate'].includes(e.target.name)) {
+      let v = value.replace(/\D/g, "");
+      if (v.length > 8) v = v.slice(0, 8);
+      value = v
+        .replace(/(\d{2})(\d)/, "$1/$2")
+        .replace(/(\d{2})(\d)/, "$1/$2");
+    }
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
