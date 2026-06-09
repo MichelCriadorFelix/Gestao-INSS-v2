@@ -656,7 +656,7 @@ REGRAS DESTE MODO:
 1. DIRETO AO PONTO: Vá direto à resposta. Sem introduções longas, sem repetir a pergunta.
 2. FUNDAMENTADO (REGRA DE OURO): Use EXCLUSIVAMENTE a Base de Conhecimento (RAG). Cite o dispositivo legal exato — CDC, Código Civil, CPC ou CF/88 que conste no contexto enviado. Se NÃO estiver na base, informe que a fonte não foi encontrada e não responda com base em conhecimento externo para evitar alucinações.
 3. PRÁTICO: Termine sempre com a implicação prática para o caso concreto do advogado (competência, prazo, rito, risco).
-4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, potde ir além — mas sem enrolação.
+4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
 5. COMPETÊNCIA E RITO: Sempre que relevante, informe se o caso cabe no JEC (até 40 salários mínimos) ou Vara Cível, e as implicações práticas (advogado obrigatório acima de 20 SM no JEC, recursos, etc.).
 6. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis, artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel) ou Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento.
 7. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as posições do STJ, TJRJ e Turmas Recursais relevantes, indicando a tendência predominante.
@@ -872,7 +872,7 @@ const ELITE_REDACTION_MANUAL = `
 
 10. VALOR DA CAUSA E RMI (FIDELIDADE OBRIGATÓRIA):
     - PROIBIDO inventar Valor da Causa ou RMI.
-    - Sem dados: calcule com salário mínimo vigente (R$ 1.518,00 em 2026) e registre que é estimado, sujeito a liquidação. NUNCA use o placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
+    - Sem dados: calcule com salário mínimo vigente (R$ 1.621,00 em 2026) e registre que é estimado, sujeito a liquidação. NUNCA use o placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
     - Com dados: média de 100% das contribuições desde 07/1994 (EC 103/2019). Valor da Causa = parcelas vencidas + 12 vincendas.
     - PROIBIDO valores redondos sem base factual ("R$ 100.000,00", "R$ 150.000,00").
 
@@ -900,7 +900,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
+🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
 
 🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
 
@@ -1029,13 +1029,13 @@ QUANDO NÃO HÁ DADOS SALARIAIS (ou benefício é BPC/LOAS): use o salário mín
 
   1. Identifique a DER (data do requerimento administrativo) e a data de ajuizamento
   2. Calcule os meses vencidos: (data ajuizamento) − (DER) = N meses
-  3. Salário mínimo 2026: R$ 1.518,00
-  4. Parcelas vencidas = N × R$ 1.518,00
-  5. Parcelas vincendas = 12 × R$ 1.518,00 = R$ 18.216,00
-  6. Valor da Causa = parcelas vencidas + R$ 18.216,00
+  3. Salário mínimo 2026: R$ 1.621,00
+  4. Parcelas vencidas = N × R$ 1.621,00
+  5. Parcelas vincendas = 12 × R$ 1.621,00 = R$ 19.452,00
+  6. Valor da Causa = parcelas vencidas + R$ 19.452,00
 
 Detalhe a memória de cálculo no tópico "Valor da Causa" da peça, com a seguinte nota:
-"Valor estimado com base no salário mínimo vigente (R$ 1.518,00), por ausência de dados salariais precisos, sujeito a revisão em liquidação de sentença."
+"Valor estimado com base no salário mínimo vigente (R$ 1.621,00), por ausência de dados salariais precisos, sujeito a revisão em liquidação de sentença."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 5 — FLUXO DE TRABALHO (COMANDOS)
@@ -1602,7 +1602,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO recalcular, estimar, arredondar ou alterar QUALQUER valor da planilha de cálculos. O cálculo enviado é a única fonte de verdade. Transcreva os valores EXATOS — nem um centavo a mais ou a menos.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: os títulos descritivos do RAG abrangem fielmente suas variações usuais — ex.: 'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)' abrange 'CLT'; 'Constituição Federal (CF/1988)' abrange 'CF/88'. Quando o título do RAG representar a norma pedida, fundamente e cite seus artigos normalmente e NUNCA declare que tal norma está ausente do RAG!).
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -1890,7 +1890,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: os títulos descritivos do RAG abrangem fielmente suas variações usuais — ex.: 'Código de Defesa do Consumidor (Lei nº 8.078/1990)' abrange 'CDC' ou 'Lei 8.078/90'; 'Código Civil (Lei nº 10.406/2002)' abrange 'CC' ou 'CC/02'; 'Código de Processo Civil (Lei nº 13.105/2015)' abrange 'CPC' ou 'CPC/15'. Quando o título do RAG representar a norma pedida, fundamente e cite seus artigos normalmente e NUNCA declare que tal norma está ausente do RAG!).
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -2012,7 +2012,7 @@ COMPOSIÇÃO DO VALOR DA CAUSA EM AÇÕES CDC/CÍVEIS:
 4. Obrigação de Fazer/Não Fazer: estimar o proveito econômico.
 5. Valor da Causa = soma de todos os componentes.
 
-Se JEC: o valor da causa NÃO pode exceder 40 salários mínimos (40 × R$ 1.518,00 = R$ 60.720,00 em 2026). Se exceder, o advogado deve ser alertado para renunciar ao excedente ou ajuizar na Vara Cível.
+Se JEC: o valor da causa NÃO pode exceder 40 salários mínimos (40 × R$ 1.621,00 = R$ 64.840,00 em 2026). Se exceder, o advogado deve ser alertado para renunciar ao excedente ou ajuizar na Vara Cível.
 
 Detalhe a memória de cálculo no tópico "Valor da Causa" da peça.
 
@@ -3815,7 +3815,7 @@ REGRAS DE OURO:
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
+    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
     **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
@@ -4011,7 +4011,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro della seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
           const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
@@ -5481,7 +5481,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
 const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
