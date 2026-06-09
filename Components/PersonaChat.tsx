@@ -436,7 +436,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
         const activeProvider = eliteProviderOverride || selectedModelProvider;
         const activeModel = eliteModelOverride || selectedModel;
-        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000));
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 2500000));
         const fullTextPart = doc.fullText ? `CONTEÚDO:\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
@@ -876,7 +876,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 2500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
                 ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),

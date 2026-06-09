@@ -791,8 +791,9 @@ function getInputBudget(modelProvider?: string, model?: string): number {
     // DeepSeek V3.2 e similares têm contexto de 163k. Deixar 30k para output + system + history.
     return 120_000; // tokens
   }
-  // Gemini Flash: input ideal abaixo de 100k tokens para preservar qualidade do output
-  return 100_000;
+  // Gemini 1.5/3.5 Flash support up to 1M+ tokens. We can safely allocate a large budget for input 
+  // without losing quality excessively, especially when users need whole laws.
+  return 800_000;
 }
 
 /**
