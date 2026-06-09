@@ -46,9 +46,21 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         if (initialData) {
             const normalizedPayments = initialData.payments?.map(p => ({
                 ...p,
-                dueDate: p.dueDate || p.date // Fallback to date if dueDate is missing
+                dueDate: p.dueDate || p.date 
             })) || [];
-            setFormData({ ...initialData, payments: normalizedPayments });
+            
+            const formatCpf = (val: string) => {
+                if (!val) return val;
+                let v = val.replace(/\D/g, "");
+                if (v.length > 11) v = v.slice(0, 11);
+                return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+            };
+            
+            setFormData({ 
+                ...initialData, 
+                payments: normalizedPayments,
+                cpf: formatCpf(initialData.cpf || '')
+            });
         } else {
             setFormData({ 
                 status: 'Pendente', 
@@ -90,6 +102,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
             } else {
                 setFormData({ ...formData, paymentMethod: method });
             }
+        } else if (e.target.name === 'cpf') {
+            let value = e.target.value;
+            let v = value.replace(/\D/g, "");
+            if (v.length > 11) v = v.slice(0, 11);
+            value = v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+            setFormData({ ...formData, [e.target.name]: value });
         } else {
             setFormData({ ...formData, [e.target.name]: e.target.value });
         }

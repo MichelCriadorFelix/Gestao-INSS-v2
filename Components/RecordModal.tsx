@@ -181,10 +181,33 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      const formattedData = { ...initialData };
+      const formatCpf = (val: string) => {
+        if (!val) return val;
+        let v = val.replace(/\D/g, "");
+        if (v.length > 11) v = v.slice(0, 11);
+        return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+      };
+      const formatDateStr = (val: string) => {
+        if (!val) return val;
+        let v = val.replace(/\D/g, "");
+        if (v.length > 8) v = v.slice(0, 8);
+        return v.replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2");
+      };
+
+      if (formattedData.cpf) formattedData.cpf = formatCpf(formattedData.cpf);
+      if (formattedData.legalRepresentativeCpf) formattedData.legalRepresentativeCpf = formatCpf(formattedData.legalRepresentativeCpf);
+
+      ['der', 'medExpertiseDate', 'socialExpertiseDate', 'extensionDate', 'dcbDate', 'ninetyDaysDate', 'securityMandateDate'].forEach(dateField => {
+        if ((formattedData as any)[dateField]) {
+            (formattedData as any)[dateField] = formatDateStr((formattedData as any)[dateField]);
+        }
+      });
+      
+      setFormData(formattedData);
     } else {
       setFormData({
-          nationality: 'Brasileira',
+          nationality: 'brasileiro',
           maritalStatus: 'Solteiro(a)',
           profession: ''
       });
