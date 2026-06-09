@@ -67,12 +67,12 @@ app.use("/api", (req, res, next) => {
 // File Upload Endpoint for Gemini File API
 const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = MAX_RETRIES, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
@@ -2219,17 +2219,19 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 
 `;
 
+const MAX_RETRIES = 12; // Reduzido de 30: evita travar a UI por minutos em erro de cota
+
 // Logic for API Key Rotation (Round-Robin)
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
-  "gemini-3-flash-preview",
-  "gemini-2.5-flash"
+  "gemini-3-flash-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
+  "gemini-2.5-flash": "gemini-3.5-flash",
   "gemini-2.0-flash-exp": "gemini-3.5-flash",
   "gemini-1.5-flash-latest": "gemini-3.5-flash",
   "gemini-3-flash-preview": "gemini-3.5-flash"
@@ -2330,12 +2332,12 @@ function stripExpiredFileData(params: any): any {
   return cleaned;
 }
 
-async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
+async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2419,29 +2421,29 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
              nextModelIndex++;
              nextFailures = 0;
              delay = 500;
-             console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
          } else {
              delay = 500;
-             console.log(`[Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
          }
       } else if (isEmpty) {
          delay = 1000;
-         console.log(`[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
+         console.log(`[Tentativa ${MAX_RETRIES - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
       } else {
          // 429/503: Retry logic
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
          // Switch model faster on quota errors if all keys are exhausted.
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             console.log(`[Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
       }
       
@@ -2451,7 +2453,7 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
     
     // Critical Failure
     if (retries === 0) {
-      throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS.
+      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS.
       Último modelo: ${currentModel}.
       Erro Original: ${errorMessage}.
       Chaves ativas: ${keys.length}.
@@ -2461,11 +2463,11 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
   }
 }
 
-async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
+async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2518,24 +2520,24 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
              nextModelIndex++;
              nextFailures = 0;
              delay = 500;
-             console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
          } else {
              delay = 500;
-             console.log(`[Stream Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
+             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
          }
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
+             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             console.log(`[Stream Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
       }
       
@@ -2544,13 +2546,13 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
     }
     
     if (retries === 0) {
-      throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
+      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
     throw error;
   }
 }
 
-async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
+async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<number[]> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
