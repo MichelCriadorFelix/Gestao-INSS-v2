@@ -2332,6 +2332,35 @@ function stripExpiredFileData(params: any): any {
   return cleaned;
 }
 
+
+/**
+ * Prepara histórico para o caminho OpenRouter (DeepSeek: 163k tokens de contexto total).
+ * Sem isso, sessões longas (peça de 7000 palavras + relatório no histórico) estouram
+ * o contexto na geração Premium. Mensagens individuais > 24k chars são comprimidas
+ * (início+fim preservados) e o total fica limitado a ~180k chars (~51k tokens),
+ * priorizando as mensagens mais recentes.
+ */
+function buildOrHistory(history: any[]): any[] {
+  const PER_MSG_CHARS = 24_000;
+  const TOTAL_CHARS = 180_000;
+  const msgs = (history || []).map((h: any) => ({
+    role: h.role === 'model' ? 'assistant' : h.role,
+    content: typeof h.content === 'string' && h.content.length > PER_MSG_CHARS
+      ? smartTruncate(h.content, PER_MSG_CHARS)
+      : h.content
+  }));
+  // Acumula do mais recente para o mais antigo até o teto total
+  let acc = 0;
+  const kept: any[] = [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const len = (msgs[i].content || '').length;
+    if (acc + len > TOTAL_CHARS && kept.length > 0) break;
+    acc += len;
+    kept.unshift(msgs[i]);
+  }
+  return kept;
+}
+
 async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
@@ -4042,11 +4071,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-          for (const h of history) {
-            const role = h.role === 'model' ? 'assistant' : h.role;
-            orMessages.push({ role, content: h.content });
-          }
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -4578,11 +4603,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
 5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
 
-          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
-          for (const h of history) {
-            const role = h.role === 'model' ? 'assistant' : h.role;
-            orMessages.push({ role, content: h.content });
-          }
+          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }, ...buildOrHistory(history)];
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -5057,11 +5078,7 @@ REGRAS ABSOLUTAS:
 5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
 6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-          for (const h of history) {
-            const role = h.role === 'model' ? 'assistant' : h.role;
-            orMessages.push({ role, content: h.content });
-          }
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -5512,11 +5529,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
-for (const h of history) {
-  const role = h.role === 'model' ? 'assistant' : h.role;
-  orMessages.push({ role, content: h.content });
-}
+const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 orMessages.push({ role: "user", content: finalMessage });
 await callOpenRouterStream({
   model: model || "deepseek/deepseek-v4-flash",
