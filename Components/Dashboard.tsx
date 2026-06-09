@@ -35,10 +35,8 @@ import AgendaModal from './AgendaModal';
 import SettingsModal from './SettingsModal';
 import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
-import DrMichelFelix from './DrMichelFelix';
-import DraLuanaCastro from './DraLuanaCastro';
-import DrFelixECastro from './DrFelixECastro';
-import SecFabriciaFelix from './SecFabriciaFelix';
+import PersonaChat from './PersonaChat';
+import { MICHEL_PERSONA, LUANA_PERSONA, FELIX_CASTRO_PERSONA, FABRICIA_PERSONA } from './personaConfig';
 import Agenda from './Agenda';
 import PetitionEditor from './PetitionEditor';
 import MeuINSS from './MeuINSS';
@@ -1702,28 +1700,36 @@ export default function Dashboard({
              
              {/* CONTENT SWITCHER */}
              {currentView === 'dr_michel' ? (
-                 <DrMichelFelix 
+                 <PersonaChat 
+                    key="michel"
+                    persona={MICHEL_PERSONA}
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'dra_luana' ? (
-                 <DraLuanaCastro 
+                 <PersonaChat 
+                    key="luana"
+                    persona={LUANA_PERSONA}
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'dr_felix_castro' ? (
-                 <DrFelixECastro 
+                 <PersonaChat 
+                    key="felix_castro"
+                    persona={FELIX_CASTRO_PERSONA}
                     initialSessions={drFelixCastroSessions} 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'sec_fabricia' ? (
-                 <SecFabriciaFelix 
+                 <PersonaChat 
+                    key="fabricia"
+                    persona={FABRICIA_PERSONA}
                     initialSessions={secFabriciaSessions} 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}

@@ -1229,7 +1229,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   const generateDocx = async (content: string) => {
     try {
-      const response = await apiFetch('/api/dr-michel/generate-docx', {
+      const response = await apiFetch(persona.docxEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
@@ -1241,7 +1241,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Peticao_Dr_Michel_${Date.now()}.docx`;
+      a.download = `${persona.docxFilePrefix}_${Date.now()}.docx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -1392,8 +1392,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             <div className="max-w-4xl mx-auto mt-12 space-y-12">
               <div className="text-center space-y-4">
                 <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-                  Olá, MICHEL!<br />
-                  <span className="text-emerald-600">{persona.welcomeTitle}</span>
+                  Olá, {persona.greeting}!<br />
+                  <span className={persona.accentClass}>{persona.welcomeTitle}</span>
                 </h2>
                 <p className="text-slate-500 dark:text-slate-400">{persona.subtitle}</p>
               </div>
