@@ -3474,8 +3474,34 @@ app.post("/api/rag/plan", async (req, res) => {
 
     console.log(`[RAG PLAN_API] Varredura completa. Carregou ${allChunks.length} chunks.`);
 
-    // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
-    const ragContext = allChunks
+    // 4. Dedup (mesmo conteúdo pode vir por filtros sobrepostos)
+    const seen = new Set<string>();
+    const dedupedChunks = allChunks.filter((c: any) => {
+      const key = `${c.title}::${(c.content || '').substring(0, 120)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // 5. TETO DE SEGURANÇA: sem limite, planos RPPS/INSS com leis integrais
+    // (LOM + Estatuto + EC) geravam contextos de centenas de milhares de tokens,
+    // estourando a cota de input/minuto de TODAS as chaves em uma única requisição.
+    // 300k chars ≈ ~85k tokens — comporta uma lei municipal integral com folga.
+    const MAX_RAG_CHARS = 300_000;
+    let accumulated = 0;
+    const cappedChunks: any[] = [];
+    for (const c of dedupedChunks) {
+      const size = (c.content || '').length + (c.title || '').length + 40;
+      if (accumulated + size > MAX_RAG_CHARS) break;
+      accumulated += size;
+      cappedChunks.push(c);
+    }
+    if (cappedChunks.length < dedupedChunks.length) {
+      console.warn(`[RAG PLAN_API] ⚠️ Teto de ${MAX_RAG_CHARS} chars atingido: ${cappedChunks.length}/${dedupedChunks.length} chunks mantidos (cota de input protegida).`);
+    }
+
+    // 6. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
+    const ragContext = cappedChunks
       .map((c: any) => `FONTE: ${c.title} [Recuperação Exata]\n${c.content}`)
       .join('\n\n---\n\n');
 
@@ -3483,7 +3509,7 @@ app.post("/api/rag/plan", async (req, res) => {
       ragContext,
       plan: curatedPlan,
       titlesConsidered: inventory.length,
-      chunksFound: (allChunks || []).length
+      chunksFound: (cappedChunks || []).length
     });
   } catch (error: any) {
     console.error("Error in /api/rag/plan:", error);
