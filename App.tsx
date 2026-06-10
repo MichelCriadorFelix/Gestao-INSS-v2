@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 // Commit triggering change (false positive)
 import { User, UserRole, AUTHORIZED_USERS } from './types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';
-import Dashboard from './Components/Dashboard'; 
-import SettingsModal from './Components/SettingsModal';
+
+// Lazy loading large sub-apps
+const Dashboard = lazy(() => import('./Components/Dashboard'));
+const SettingsModal = lazy(() => import('./Components/SettingsModal'));
+
 import { getDbConfig, supabase, DB_CONFIG_KEY } from './supabaseClient';
 import { safeSetLocalStorage } from './utils';
 
@@ -210,18 +213,20 @@ export default function App() {
         </div>
       )}
       {user ? (
-        <Dashboard 
-            user={user} 
-            onLogout={handleLogout} 
-            darkMode={darkMode} 
-            toggleDarkMode={toggleDarkMode} 
-            onOpenSettings={() => setIsSettingsOpen(true)} 
-            isCloudConfigured={isCloudConfigured} 
-            isSettingsOpen={isSettingsOpen} 
-            onCloseSettings={() => setIsSettingsOpen(false)} 
-            onSettingsSaved={handleSettingsSave} 
-            onRestoreBackup={handleRestoreBackup} 
-        />
+        <Suspense fallback={<div className="h-screen flex items-center justify-center bg-bordeaux-950 text-gold-500 font-serif">Iniciando Dashboard...</div>}>
+          <Dashboard 
+              user={user} 
+              onLogout={handleLogout} 
+              darkMode={darkMode} 
+              toggleDarkMode={toggleDarkMode} 
+              onOpenSettings={() => setIsSettingsOpen(true)} 
+              isCloudConfigured={isCloudConfigured} 
+              isSettingsOpen={isSettingsOpen} 
+              onCloseSettings={() => setIsSettingsOpen(false)} 
+              onSettingsSaved={handleSettingsSave} 
+              onRestoreBackup={handleRestoreBackup} 
+          />
+        </Suspense>
       ) : (
         <>
             <Login 
@@ -229,12 +234,14 @@ export default function App() {
                 onOpenSettings={() => setIsSettingsOpen(true)} 
                 isCloudConfigured={isCloudConfigured} 
             />
-            <SettingsModal 
-                isOpen={isSettingsOpen} 
-                onClose={() => setIsSettingsOpen(false)} 
-                onSave={handleSettingsSave} 
-                onRestoreBackup={handleRestoreBackup} 
-            />
+            <Suspense fallback={null}>
+              <SettingsModal 
+                  isOpen={isSettingsOpen} 
+                  onClose={() => setIsSettingsOpen(false)} 
+                  onSave={handleSettingsSave} 
+                  onRestoreBackup={handleRestoreBackup} 
+              />
+            </Suspense>
         </>
       )}
     </>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { 
   ScaleIcon, UserGroupIcon, BriefcaseIcon, CalculatorIcon, ArrowRightOnRectangleIcon, 
   ArrowPathRoundedSquareIcon, CloudIcon, BellIcon, Cog6ToothIcon, SunIcon, MoonIcon,
@@ -8,12 +8,26 @@ import {
   GlobeAltIcon, AcademicCapIcon, SparklesIcon, Bars3Icon, XMarkIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import Legislation from './Legislation';
-import Jurisprudence from './Jurisprudence';
+
+// Lazy load large view components to reduce initial bundle size
+const Legislation = lazy(() => import('./Legislation'));
+const Jurisprudence = lazy(() => import('./Jurisprudence'));
+const LaborCalc = lazy(() => import('../LaborCalc'));
+const SocialSecurityCalc = lazy(() => import('../SocialSecurityCalc'));
+const DrMichelFelix = lazy(() => import('./DrMichelFelix'));
+const DraLuanaCastro = lazy(() => import('./DraLuanaCastro'));
+const DrFelixECastro = lazy(() => import('./DrFelixECastro'));
+const SecFabriciaFelix = lazy(() => import('./SecFabriciaFelix'));
+const Agenda = lazy(() => import('./Agenda'));
+const PetitionEditor = lazy(() => import('./PetitionEditor'));
+const MeuINSS = lazy(() => import('./MeuINSS'));
+const KnowledgeBase = lazy(() => import('./KnowledgeBase'));
+const MarketingGenerator = lazy(() => import('./MarketingGenerator'));
+
 import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaEvent, DailyFocusState } from '../types';
-// data.ts removido — dados carregados exclusivamente do Supabase
-import LaborCalc, { CalculationRecord } from '../LaborCalc';
-import SocialSecurityCalc, { SocialSecurityData } from '../SocialSecurityCalc';
+import type { CalculationRecord } from '../LaborCalc';
+import type { SocialSecurityData } from '../SocialSecurityCalc';
+
 import LZString from 'lz-string';
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
@@ -35,15 +49,6 @@ import AgendaModal from './AgendaModal';
 import SettingsModal from './SettingsModal';
 import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
-import DrMichelFelix from './DrMichelFelix';
-import DraLuanaCastro from './DraLuanaCastro';
-import DrFelixECastro from './DrFelixECastro';
-import SecFabriciaFelix from './SecFabriciaFelix';
-import Agenda from './Agenda';
-import PetitionEditor from './PetitionEditor';
-import MeuINSS from './MeuINSS';
-import KnowledgeBase from './KnowledgeBase';
-import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
 export default function Dashboard({ 
@@ -1701,6 +1706,7 @@ export default function Dashboard({
         <main className="flex-1 overflow-y-auto p-2 lg:p-6 pb-24 lg:pb-6 flex flex-col" style={{WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain'}}>
              
              {/* CONTENT SWITCHER */}
+             <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-slate-400">Carregando módulo...</div>}>
              {currentView === 'dr_michel' ? (
                  <DrMichelFelix 
                     initialSessions={drMichelSessions} 
@@ -2258,6 +2264,7 @@ export default function Dashboard({
                     </div>
                  </>
              )}
+             </Suspense>
         </main>
 
         <RecordModal 
