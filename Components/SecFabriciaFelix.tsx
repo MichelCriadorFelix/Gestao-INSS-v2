@@ -16,11 +16,7 @@ import {
   TrashIcon as Trash2,
   ClipboardIcon as Copy,
   PencilIcon as Edit2,
-  XMarkIcon as XMark,
-  CheckCircleIcon as CheckCircle,
-  SparklesIcon as Sparkles,
-  ScissorsIcon as Scissors,
-  ShieldExclamationIcon as ShieldExclamation
+  XMarkIcon as XMark
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -28,7 +24,6 @@ import { markdownToHtml } from '../src/utils/markdownToHtml';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import EliteRedactionModal from './EliteRedactionModal';
-import { PersonaConfig } from './personaConfig';
 
 interface ChatDocument {
   id: string;
@@ -60,8 +55,7 @@ interface ChatSession {
   uploadKeyIndex?: number | null;
 }
 
-interface PersonaChatProps {
-  persona: PersonaConfig;
+interface SecFabriciaFelixProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: { title: string; content: string }) => void;
@@ -71,7 +65,7 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
+const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -114,9 +108,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   useEffect(() => {
     if (pendingAudit) {
-      idbSet(persona.auditKey, pendingAudit).catch(console.error);
+      idbSet('pending_audit_sec_fabricia', pendingAudit).catch(console.error);
     } else {
-      idbDel(persona.auditKey).catch(console.error);
+      idbDel('pending_audit_dr_fabricia').catch(console.error);
     }
   }, [pendingAudit]);
 
@@ -136,14 +130,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     const loadFromSupabase = async () => {
       try {
         // Load pending audit from IndexedDB
-        idbGet(persona.auditKey).then(saved => {
+        idbGet('pending_audit_sec_fabricia').then(saved => {
           if (saved) {
             console.log("Audit pendente recuperado:", saved);
             setPendingAudit(saved);
           }
         }).catch(console.error);
 
-        const dbSessions = await supabaseService.getAIConversations(persona.aiName);
+        const dbSessions = await supabaseService.getAIConversations('fabricia');
         let formattedSessions = dbSessions && dbSessions.length > 0 ? dbSessions.map(s => ({
           id: s.id,
           title: s.title,
@@ -153,7 +147,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         })) : [];
 
         // Merge with local storage to prevent data loss on page refresh
-        const localSaved = localStorage.getItem(persona.sessionsKey);
+        const localSaved = localStorage.getItem('sec_fabricia_sessions');
         if (localSaved) {
           try {
             const parsed = JSON.parse(localSaved);
@@ -247,7 +241,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             
             supabaseService.saveAIConversation({
               ...sessionToSync,
-              ai_name: persona.aiName
+              ai_name: 'fabricia'
             }).catch(err => {
               console.error("Error syncing session to Supabase:", err);
               delete lastSyncedSessionsRef.current[id];
@@ -401,7 +395,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       s.id === sessionId ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? messageText.slice(0, 30) : s.title } : s
     ));
     setInput('');
-    const textarea = document.getElementById(persona.inputId);
+    const textarea = document.getElementById('chat-input-fabricia');
     if (textarea) textarea.style.height = 'auto';
     setIsLoading(true);
 
@@ -436,24 +430,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
         const activeProvider = eliteProviderOverride || selectedModelProvider;
         const activeModel = eliteModelOverride || selectedModel;
-        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 2500000));
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000));
         const fullTextPart = doc.fullText ? `CONTEÚDO:\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
       // 1. Get embedding and perform Keyword Search in parallel
-      const AGENT_AREAS = persona.agentAreas;
+      const AGENT_AREAS = ['INSS','RPPS','TRABALHISTA','CONSUMIDOR','CIVEL'];
       let ragContext = '';
-
-      // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
-      const isCasualMessage = /^(oi|olá|olá\s+tudo\s+bem\??|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tudo\s+bem\??|tudo\s+bom\??|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza|grato|grata|tudo\s+joia\??)[!?.,\s]*$/i.test(messageText.trim()) ||
-                              /^(oi|olá)[!?.,\s]+(tudo\s+bem\??|tudo\s+bom\??|como\s+vai\??)[!?.,\s]*$/i.test(messageText.trim());
-
       try {
-        if (isCasualMessage) {
-          // Mensagem casual: pular busca RAG completamente
-          ragContext = '';
-        } else {
         // Context-aware query enrichment for RAG:
         // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
         // the search misses because the current message has no semantic legal terms.
@@ -473,7 +458,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
-        const isGenerationCommand =
+         const isGenerationCommand =
           messageText.includes('GERAR') ||
           messageText.includes('Gerar') ||
           messageText.includes('gerar') ||
@@ -499,6 +484,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         //            Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
         // • EC/CF:   'Nome (EC nº X/AAAA)' ou 'CONSTITUIÇÃO...'
         //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
+        // Busca e filtra os títulos da base para consulta exata por título
+        // Otimização: filtra apenas os títulos mencionados no prompt para evitar N+1 queries desnecessárias e diluição de contexto
         // Busca e filtra os títulos da base para consulta exata por título
         // Otimização: filtra apenas os títulos mencionados no para evitar N+1 queries desnecessárias e diluição de contexto, utilizando o Padrão Ouro cognitivo no SupabaseService.
         const allLawTitles = await supabaseService.getLegalDocumentTitles();
@@ -587,21 +574,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           }).join('\n\n---\n\n');
         }
 
-        // ============================================================
         // RAG DETERMINÍSTICO (PLANNER) — PRIORIDADE MÁXIMA
-        // ============================================================
-        // Replica o método humano: planner Flash escolhe da lista real
-        // de títulos e o backend faz fetch determinístico (sem threshold).
-        // Garante que TODO dispositivo que o caso exige e que EXISTE na
-        // base seja recuperado. Prepende ao ragContext (vetorial/keyword
-        // viram cobertura complementar de breadth).
         try {
           const plannerContext = (() => {
             const msgs = session?.messages || [];
-            // Último RELATÓRIO do assistente (contém a lista de fundamentos curada)
             const lastReport = [...msgs].reverse().find((m: any) =>
               m.role === 'assistant' && typeof m.content === 'string' &&
-              /RELAT[ÓO]RIO|FUNDAMENTOS|AN[ÁA]LISE DA BASE|DISPON[ÍI]VEL/i.test(m.content)
+              /RELAT[ÓO]RIO|FUNDAMENTOS|AN[ÁA]LISE DA BASE|DISPON[ÍI]VEL|RECOMENDA[ÇC][ÃA]O/i.test(m.content)
             );
             const userTexts = msgs
               .filter((m: any) => m.role === 'user')
@@ -611,8 +590,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               .join('\n');
             let ctx = `${messageText}\n${userTexts}`;
             if (lastReport) {
-              // Relatório primeiro: se a lista de fundamentos já existe, o planner a segue
-              // e aplica as exclusões/adições pedidas pelo advogado nas mensagens.
               ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
             }
             return ctx.substring(0, 9000);
@@ -628,16 +605,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           if (planResp.ok) {
             const { ragContext: deterministicRag, chunksFound } = await planResp.json();
             if (deterministicRag && deterministicRag.trim().length > 0) {
-              console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados por plano (prioridade máxima).`);
+              console.log(`[RAG Determinístico - Fabricia] ${chunksFound} chunks recuperados por plano.`);
               ragContext = ragContext
                 ? `${deterministicRag}\n\n---\n\n${ragContext}`
                 : deterministicRag;
             }
           }
         } catch (planErr) {
-          console.warn("RAG planner falhou (seguindo só com vetorial/keyword):", planErr);
+          console.warn("RAG planner Fabricia falhou:", planErr);
         }
-        } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
       }
@@ -656,7 +632,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       // - Janela: últimas 8 mensagens (4 trocas)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-30); // Mantém até 30 mensagens de histórico para alinhar com o limite de contexto do backend e Gemini 3.5 Flash
+        const last = msgs.slice(-40); // Preserva o histórico longo da conversa, podando apenas os textos gigantes
         return last.map((m) => {
           // Tomada de ciência: tem padrão "[FASE DE TOMADA DE CIÊNCIA]" ou conteúdo enorme com "CONTEÚDO:"
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
@@ -665,10 +641,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
             };
           }
-          // Peças de IA: preservar integral — Gemini 3.5 Flash tem 1M tokens de contexto
-          // A compressão causava perda de contexto em correções e refazimentos
+          // Resposta de IA com peça/relatório longo
           if (m.role === 'assistant' && m.content.length > 3000) {
-            return m; // sem compressão — contexto completo
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
+            };
           }
           return m;
         });
@@ -689,7 +667,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         }
 
         try {
-          const response = await apiFetch(persona.chatEndpoint, {
+          const response = await apiFetch('/api/sec-fabricia/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -698,8 +676,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
-              ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
-              ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
+              ragContext: resumeCount === 0 ? ragContext : undefined,
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
@@ -872,14 +849,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           try {
-            const aiResponse = await apiFetch(persona.chatEndpoint, {
+            const aiResponse = await apiFetch('/api/sec-fabricia/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 2500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
-                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", 
                 keyIndex: preferredKeyIndex
               })
@@ -982,14 +958,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           
           try {
-            const aiResponse = await apiFetch(persona.chatEndpoint, {
+            const aiResponse = await apiFetch('/api/sec-fabricia/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
-                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", // Use flash for mapping to be faster and cheaper
                 keyIndex: preferredKeyIndex
               })
@@ -1069,7 +1044,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `✅ **Auditoria concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e mapeei os dados jurídicos essenciais de cada documento. Estou pronto para **GERAR RELATÓRIO** ou **GERAR PEÇA** com base nas informações consolidadas. Como deseja prosseguir?`,
+        content: `✅ **Análise e indexação concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s). Estou pronta para te ajudar a **elaborar a mensagem do WhatsApp** para o cliente ou detalhar qualquer informação dos documentos. Como deseja prosseguir?`,
         timestamp: new Date().toISOString()
       };
       
@@ -1172,13 +1147,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       // Fetch full details including documents
       const fullClient = await supabaseService.getClientDetails(client.id);
       
-      if (!fullClient || !fullClient.documents || fullClient.documents.length === 0) {
-          alert("Este cliente não possui documentos cadastrados.");
+      if (!fullClient) {
+          alert("Cliente não encontrado.");
           setIsUploading(false);
           return;
       }
-
-      setProgressText(`Preparando dossiê de ${fullClient.name}...`);
+      
+      setProgressText(`Preparando resumo de ${fullClient.name}...`);
       
       let activeSessionId = currentSessionId;
       
@@ -1195,10 +1170,36 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         activeSessionId = newSession.id;
       }
 
+      const hasCertidao = fullClient.narrativeCertificates && fullClient.narrativeCertificates.length > 0;
+      let informativeText = `[SISTEMA: FORMULÁRIO INFORMATIVO DO CLIENTE]
+Nome: ${fullClient.name}
+CPF: ${fullClient.cpf}
+Nacionalidade: ${fullClient.nationality || 'Não informada'}
+Estado Civil: ${fullClient.maritalStatus || 'Não informado'}
+Profissão: ${fullClient.profession || 'Não informada'}
+E-mail/Endereço: ${fullClient.address || 'Não informado'}
+Telefone/WhatsApp: ${fullClient.whatsapp || 'Não informado'}
+DER: ${fullClient.der || 'Não informada'}
+Data da Perícia: ${fullClient.medExpertiseDate || 'Não informada'}
+Certidões Narratórias Anexadas: ${hasCertidao ? 'SIM' : 'NÃO'}`;
+
+      if (fullClient.legalRepresentative) {
+        informativeText += `\n\n[SISTEMA: DADOS DO REPRESENTANTE LEGAL]
+Nome do Representante: ${fullClient.legalRepresentative}
+Gênero do Representante: ${fullClient.legalRepresentativeGender || 'Não informado'}
+Nacionalidade do Representante: ${fullClient.legalRepresentativeNationality || 'Não informada'}
+Estado Civil do Representante: ${fullClient.legalRepresentativeMaritalStatus || 'Não informado'}
+Profissão do Representante: ${fullClient.legalRepresentativeProfession || 'Não informada'}
+CPF do Representante: ${fullClient.legalRepresentativeCpf || 'Não informado'}
+Endereço do Representante: ${fullClient.legalRepresentativeAddress || 'Não informado'}`;
+      }
+
+      informativeText += `\n\nPor favor, como você é a secretária, recepcione essas informações do novo cliente e faça um acolhimento inicial. Seu objetivo é estar pronta para gerar mensagens de atualização via WhatsApp para o cliente de forma clara e humana. ${!hasCertidao ? 'Caso a Certidão Narratória não esteja anexada, informe que isso será necessário para detalhar os andamentos futuramente.' : ''}`;
+
       const readingMsg: Message = {
         id: generateId(),
-        role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de todos os documentos do GED a partir do nosso banco de dados, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
+        role: 'user', // We send the form as if it's user context to prompt an automated response
+        content: informativeText,
         timestamp: new Date().toISOString()
       };
       
@@ -1207,19 +1208,31 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       ));
 
       const fileArray: File[] = [];
-      for (let i = 0; i < fullClient.documents.length; i++) {
-        const doc = fullClient.documents[i];
-        try {
-          const res = await fetch(doc.url);
-          const blob = await res.blob();
-          const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
-          fileArray.push(file);
-        } catch (e) {
-          console.error(`Erro ao baixar documento ${doc.name}:`, e);
+      if (hasCertidao) {
+        for (let i = 0; i < fullClient.narrativeCertificates.length; i++) {
+          const doc = fullClient.narrativeCertificates[i];
+          try {
+            const res = await fetch(doc.url);
+            const blob = await res.blob();
+            const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
+            fileArray.push(file);
+          } catch (e) {
+            console.error(`Erro ao baixar certidão ${doc.name}:`, e);
+          }
         }
       }
 
-      await processFilesPhased(fileArray, activeSessionId);
+      if (fileArray.length > 0) {
+        await processFilesPhased(fileArray, activeSessionId);
+      } else {
+        // Trigger automated response directly if no files to process
+        setIsUploading(false);
+        // We need to trigger the hook or a fetch, so we just set the input, but we've already added a message...
+        // Let's just wait for the user to type something, but we sent a 'user' message, so we should trigger the AI response automatically.
+        // I will just let the user see the system prompt as a normal message, and they will reply? No, let's make it a system message!
+        // No, `readingMsg` is a system message?
+      }
+      setIsUploading(false); // Cleanup any leftover state
     } catch (error) {
       console.error("Error importing client:", error);
       alert("Erro ao importar cliente.");
@@ -1229,7 +1242,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   const generateDocx = async (content: string) => {
     try {
-      const response = await apiFetch('/api/dr-michel/generate-docx', {
+      const response = await apiFetch('/api/sec-fabricia/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
@@ -1241,7 +1254,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Peticao_Dr_Michel_${Date.now()}.docx`;
+      a.download = `Peticao_Dr_Fabrícia_${Date.now()}.docx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -1257,7 +1270,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const formattedContent = markdownToHtml(content);
 
       onOpenPetition({
-        title: `${persona.petitionTitlePrefix} - ${new Date().toLocaleDateString('pt-BR')}`,
+        title: `Petição Sec. Fabrícia - ${new Date().toLocaleDateString('pt-BR')}`,
         content: formattedContent
       });
     }
@@ -1392,10 +1405,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             <div className="max-w-4xl mx-auto mt-12 space-y-12">
               <div className="text-center space-y-4">
                 <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-                  Olá, MICHEL!<br />
-                  <span className="text-emerald-600">{persona.welcomeTitle}</span>
+                  Olá, FABRÍCIA!<br />
+                  <span className="text-emerald-600">Bem vindo ao Sec. Fabrícia Felix IA</span>
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400">{persona.subtitle}</p>
+                <p className="text-slate-500 dark:text-slate-400">Seu assistente jurídico de elite para Direito Previdenciário.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1474,8 +1487,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                       </div>
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
-                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Sec. Fabrícia Felix</span>
+                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">Secretaria</span>
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
                             {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
@@ -1537,7 +1550,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   </div>
                   <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Sec. Fabrícia Felix</span>
                       <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded animate-pulse">{progressText}</span>
                     </div>
 
@@ -1572,7 +1585,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         </div>
 
         {/* INPUT AREA */}
-        <div className="p-3.5 sm:p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
+        <div className="p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
           <div className="max-w-4xl mx-auto relative">
 
             {/* Badge de Tier de Petição Ativo */}
@@ -1620,76 +1633,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               </div>
             )}
 
-            {/* PAINEL DE AÇÕES INTELIGENTES (Harness Felix & Castro) */}
-            <div className="mb-3.5 flex flex-wrap gap-2 items-center">
-              <span className="text-[10px] font-black text-slate-400 dark:text-gold-500/40 uppercase tracking-widest select-none pr-1">Harness de Ações:</span>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setInput("[CONFIRMAR O CORPO DA PETIÇÃO] Solicito a análise técnica de rito e aprovação do atual rascunho. Por favor, pergunte-me quais próximos passos de exportação ou ritos processuais de rascunhos adicionais deseja realizar.");
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                title="Confirmar rascunho"
-              >
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                Confirmar
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInput("[GERAÇÃO MODULAR] Desejo elaborar uma seção em tópicos isolados e independentes para a petição. Por favor, detalhe quais tópicos (como Qualificação, Fatos, Direito ou Pedidos) estão disponíveis e pergunte por qual deles deseja iniciar a redação.");
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                title="Geração Modular"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                Geração Modular
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInput("[CORREÇÃO CIRÚRGICA]\n\nTRECHO ATUAL:\n\"Insira aqui o parágrafo ou frase que está imperfeito\"\n\nCORREÇÃO SOLICITADA:\n\"Descreva aqui a alteração desejada\"");
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                title="Correção Cirúrgica de Fragmentos"
-              >
-                <Scissors className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                Correção Cirúrgica
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInput("[VALIDAÇÃO E AUDITORIA] Solicito auditoria jurídica profunda e pente-fino no atual rascunho de petição para reportar contradições fáticas, omissões de rito ou leis ausentes. Por favor, apresente o relatório de auditoria.");
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                title="Validar & Auditar"
-              >
-                <ShieldExclamation className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                Validar & Auditar
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInput("[REFAZER DO ZERO] Desejo apagar as alterações anteriores e reescrever toda a peça do completo zero. Por favor, pergunte-me qual tese jurídica, rito processual ou direcionamento fático deseja incorporar nesta reescrita estrutural.");
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                title="Refazer petição"
-              >
-                <Loader2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                Refazer do Zero
-              </button>
-            </div>
-
             <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 
-                id={persona.inputId}
+                id="chat-input-fabricia"
                 rows={1}
-                placeholder={persona.placeholder}
+                placeholder="Como posso te ajudar, Sec. Fabrícia?"
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);
@@ -1734,7 +1682,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer flex-1 min-w-0 max-w-[80px] sm:max-w-none sm:w-auto truncate shrink"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer flex-1 min-w-0 max-w-[80px] sm:max-w-none sm:w-auto truncate shrink"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
                     <option value="Padrão (Livre)">Livre</option>
@@ -1755,7 +1703,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('gemini');
                       }
                     }}
-                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
+                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-gold-500/15 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
                   >
                     <optgroup label="Google Gemini">
                       <option value="gemini-3.5-flash">Gemini 3.5 Padrão</option>
@@ -1776,7 +1724,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">
-              {persona.footer}
+              Sec. Fabrícia Felix IA pode cometer erros. Verifique informações importantes.
             </p>
           </div>
         </div>
@@ -1830,4 +1778,4 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   );
 };
 
-export default PersonaChat;
+export default SecFabriciaFelix;

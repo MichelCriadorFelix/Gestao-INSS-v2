@@ -34,7 +34,7 @@ export const MINIMUM_WAGE_HISTORY = [
     { date: '2023-01-01', value: 1302.00 }, // Jan
     { date: '2023-05-01', value: 1320.00 }, // May
     { date: '2024-01-01', value: 1412.00 },
-    { date: '2025-01-01', value: 1518.00 },
+    { date: '2025-01-01', value: 1515.00 },
     { date: '2026-01-01', value: 1621.00 }
 ];
 

@@ -10,9 +10,11 @@ import {
   ChevronRightIcon as ChevronRight, 
   ArrowDownTrayIcon as Download, 
   ArrowPathIcon as Loader2, 
+  UserIcon as User, 
   UsersIcon as Users,
   CpuChipIcon as Bot,
   ClockIcon as History, 
+  ChatBubbleLeftRightIcon as MessageSquare, 
   TrashIcon as Trash2,
   ClipboardIcon as Copy,
   PencilIcon as Edit2,
@@ -23,12 +25,14 @@ import {
   ShieldExclamationIcon as ShieldExclamation
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
+import { SocialSecurityData } from '../SocialSecurityCalc';
+import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
+import { safeSetLocalStorage } from '../utils';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import EliteRedactionModal from './EliteRedactionModal';
-import { PersonaConfig } from './personaConfig';
 
 interface ChatDocument {
   id: string;
@@ -60,8 +64,7 @@ interface ChatSession {
   uploadKeyIndex?: number | null;
 }
 
-interface PersonaChatProps {
-  persona: PersonaConfig;
+interface DrFelixECastroProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: { title: string; content: string }) => void;
@@ -71,7 +74,7 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
+const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -114,9 +117,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   useEffect(() => {
     if (pendingAudit) {
-      idbSet(persona.auditKey, pendingAudit).catch(console.error);
+      idbSet('pending_audit_dr_felix_castro', pendingAudit).catch(console.error);
     } else {
-      idbDel(persona.auditKey).catch(console.error);
+      idbDel('pending_audit_dr_felix_castro').catch(console.error);
     }
   }, [pendingAudit]);
 
@@ -136,14 +139,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     const loadFromSupabase = async () => {
       try {
         // Load pending audit from IndexedDB
-        idbGet(persona.auditKey).then(saved => {
+        idbGet('pending_audit_dr_felix_castro').then(saved => {
           if (saved) {
             console.log("Audit pendente recuperado:", saved);
             setPendingAudit(saved);
           }
         }).catch(console.error);
 
-        const dbSessions = await supabaseService.getAIConversations(persona.aiName);
+        const dbSessions = await supabaseService.getAIConversations('felix_castro');
         let formattedSessions = dbSessions && dbSessions.length > 0 ? dbSessions.map(s => ({
           id: s.id,
           title: s.title,
@@ -153,7 +156,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         })) : [];
 
         // Merge with local storage to prevent data loss on page refresh
-        const localSaved = localStorage.getItem(persona.sessionsKey);
+        const localSaved = localStorage.getItem('dr_felix_castro_sessions');
         if (localSaved) {
           try {
             const parsed = JSON.parse(localSaved);
@@ -247,7 +250,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             
             supabaseService.saveAIConversation({
               ...sessionToSync,
-              ai_name: persona.aiName
+              ai_name: 'felix_castro'
             }).catch(err => {
               console.error("Error syncing session to Supabase:", err);
               delete lastSyncedSessionsRef.current[id];
@@ -401,7 +404,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       s.id === sessionId ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? messageText.slice(0, 30) : s.title } : s
     ));
     setInput('');
-    const textarea = document.getElementById(persona.inputId);
+    const textarea = document.getElementById('chat-input-felix-castro');
     if (textarea) textarea.style.height = 'auto';
     setIsLoading(true);
 
@@ -436,24 +439,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
         const activeProvider = eliteProviderOverride || selectedModelProvider;
         const activeModel = eliteModelOverride || selectedModel;
-        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 2500000));
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000));
         const fullTextPart = doc.fullText ? `CONTEÚDO:\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
       // 1. Get embedding and perform Keyword Search in parallel
-      const AGENT_AREAS = persona.agentAreas;
+      const AGENT_AREAS = ['CONSUMIDOR','CIVEL','TRABALHISTA','INSS','RPPS'];
       let ragContext = '';
-
-      // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
-      const isCasualMessage = /^(oi|olá|olá\s+tudo\s+bem\??|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tudo\s+bem\??|tudo\s+bom\??|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza|grato|grata|tudo\s+joia\??)[!?.,\s]*$/i.test(messageText.trim()) ||
-                              /^(oi|olá)[!?.,\s]+(tudo\s+bem\??|tudo\s+bom\??|como\s+vai\??)[!?.,\s]*$/i.test(messageText.trim());
-
       try {
-        if (isCasualMessage) {
-          // Mensagem casual: pular busca RAG completamente
-          ragContext = '';
-        } else {
         // Context-aware query enrichment for RAG:
         // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
         // the search misses because the current message has no semantic legal terms.
@@ -471,8 +465,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           : messageText;
 
         // Se for comando de geração, enriquece a query com
-        // termos jurídicos previdenciários para forçar o RAG
-        // a recuperar as leis principais do RGPS
+        // termos jurídicos consumeristas e cíveis para forçar o RAG
+        // a recuperar as leis principais de CDC e Direito Civil
         const isGenerationCommand =
           messageText.includes('GERAR') ||
           messageText.includes('Gerar') ||
@@ -586,58 +580,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
-
-        // ============================================================
-        // RAG DETERMINÍSTICO (PLANNER) — PRIORIDADE MÁXIMA
-        // ============================================================
-        // Replica o método humano: planner Flash escolhe da lista real
-        // de títulos e o backend faz fetch determinístico (sem threshold).
-        // Garante que TODO dispositivo que o caso exige e que EXISTE na
-        // base seja recuperado. Prepende ao ragContext (vetorial/keyword
-        // viram cobertura complementar de breadth).
-        try {
-          const plannerContext = (() => {
-            const msgs = session?.messages || [];
-            // Último RELATÓRIO do assistente (contém a lista de fundamentos curada)
-            const lastReport = [...msgs].reverse().find((m: any) =>
-              m.role === 'assistant' && typeof m.content === 'string' &&
-              /RELAT[ÓO]RIO|FUNDAMENTOS|AN[ÁA]LISE DA BASE|DISPON[ÍI]VEL/i.test(m.content)
-            );
-            const userTexts = msgs
-              .filter((m: any) => m.role === 'user')
-              .map((m: any) => m.content)
-              .filter((c: string) => c && c.length > 20 && !c.startsWith('[SYSTEM'))
-              .slice(-6)
-              .join('\n');
-            let ctx = `${messageText}\n${userTexts}`;
-            if (lastReport) {
-              // Relatório primeiro: se a lista de fundamentos já existe, o planner a segue
-              // e aplica as exclusões/adições pedidas pelo advogado nas mensagens.
-              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
-            }
-            return ctx.substring(0, 9000);
-          })();
-
-          const planResp = await apiFetch('/api/rag/plan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caseContext: plannerContext, areas: AGENT_AREAS }),
-            signal: abortController.signal
-          });
-
-          if (planResp.ok) {
-            const { ragContext: deterministicRag, chunksFound } = await planResp.json();
-            if (deterministicRag && deterministicRag.trim().length > 0) {
-              console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados por plano (prioridade máxima).`);
-              ragContext = ragContext
-                ? `${deterministicRag}\n\n---\n\n${ragContext}`
-                : deterministicRag;
-            }
-          }
-        } catch (planErr) {
-          console.warn("RAG planner falhou (seguindo só com vetorial/keyword):", planErr);
-        }
-        } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
       }
@@ -689,7 +631,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         }
 
         try {
-          const response = await apiFetch(persona.chatEndpoint, {
+          const response = await apiFetch('/api/dr-felix-castro/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -698,7 +640,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
-              ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
               ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
@@ -872,14 +813,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           try {
-            const aiResponse = await apiFetch(persona.chatEndpoint, {
+            const aiResponse = await apiFetch('/api/dr-felix-castro/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 2500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
-                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", 
                 keyIndex: preferredKeyIndex
               })
@@ -982,14 +922,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           setProgressText(`Analisando conteúdo de ${file.name}...`);
           
           try {
-            const aiResponse = await apiFetch(persona.chatEndpoint, {
+            const aiResponse = await apiFetch('/api/dr-felix-castro/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento: ${file.name}. Extraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [{ fileUri: uploadData.fileUri, mimeType: uploadData.mimeType }],
-                ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
                 model: "gemini-3.5-flash", // Use flash for mapping to be faster and cheaper
                 keyIndex: preferredKeyIndex
               })
@@ -1257,7 +1196,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const formattedContent = markdownToHtml(content);
 
       onOpenPetition({
-        title: `${persona.petitionTitlePrefix} - ${new Date().toLocaleDateString('pt-BR')}`,
+        title: `Petição Dr. Felix e Castro - ${new Date().toLocaleDateString('pt-BR')}`,
         content: formattedContent
       });
     }
@@ -1393,9 +1332,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               <div className="text-center space-y-4">
                 <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
                   Olá, MICHEL!<br />
-                  <span className="text-emerald-600">{persona.welcomeTitle}</span>
+                  <span className="text-emerald-600">Bem vindo ao Dr. Felix e Castro IA</span>
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400">{persona.subtitle}</p>
+                <p className="text-slate-500 dark:text-slate-400">Seu assistente jurídico de elite para Direito do Consumidor e Direito Civil.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1474,7 +1413,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                       </div>
                       <div className="flex-1 min-w-0 space-y-2">
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Felix e Castro</span>
                           <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
                             {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -1537,7 +1476,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   </div>
                   <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">Dr. Felix e Castro</span>
                       <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded animate-pulse">{progressText}</span>
                     </div>
 
@@ -1572,7 +1511,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         </div>
 
         {/* INPUT AREA */}
-        <div className="p-3.5 sm:p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
+        <div className="p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
           <div className="max-w-4xl mx-auto relative">
 
             {/* Badge de Tier de Petição Ativo */}
@@ -1687,9 +1626,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
             <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
               <textarea 
-                id={persona.inputId}
+                id="chat-input-felix-castro"
                 rows={1}
-                placeholder={persona.placeholder}
+                placeholder="Como posso te ajudar, Dr. Felix e Castro?"
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);
@@ -1698,8 +1637,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 }}
                 className="w-full p-3 bg-transparent outline-none text-slate-800 dark:text-white resize-none min-h-[44px] max-h-[100px] overflow-y-auto text-sm"
               />
-              <div className="flex items-center justify-between gap-2 px-2 sm:px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0 flex-1 mr-1">
+              <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-gold-500/20">
+                <div className="flex items-center gap-2">
                   <input 
                     type="file" 
                     multiple 
@@ -1710,7 +1649,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
                     title="Anexar documentos (CNIS, PPP, etc.)"
                   >
                     {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
@@ -1718,12 +1657,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   <button 
                     onClick={() => setIsClientModalOpen(true)}
                     disabled={isUploading}
-                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
+                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
                     title="Importar Cliente (GED)"
                   >
                     <Users className="w-5 h-5" />
                   </button>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
                   <select
                     value={petitionLength}
                     onChange={(e) => {
@@ -1734,16 +1673,16 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('openrouter');
                       }
                     }}
-                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer flex-1 min-w-0 max-w-[80px] sm:max-w-none sm:w-auto truncate shrink"
+                    className="bg-transparent text-xs text-slate-500 font-medium focus:outline-none focus:ring-0 truncate w-40"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
                   >
-                    <option value="Padrão (Livre)">Livre</option>
-                    <option value="Mínimo 3000 palavras">3k pal.</option>
-                    <option value="Médio 4000 palavras">4k pal.</option>
-                    <option value="Máximo 5000 palavras">5k pal.</option>
-                    <option value="Premium 7000 palavras">7k pal.</option>
+                    <option value="Padrão (Livre)">Tamanho Livre (Padrão)</option>
+                    <option value="Mínimo 3000 palavras">Mínimo 3.000 palavras</option>
+                    <option value="Médio 4000 palavras">Médio 4.000 palavras</option>
+                    <option value="Máximo 5000 palavras">Máximo 5.000 palavras</option>
+                    <option value="Premium 7000 palavras">Premium 7.000 palavras (Somente OpenRouter)</option>
                   </select>
-                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60"></div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-bordeaux-900/60 mx-2"></div>
                   <select
                     value={selectedModel}
                     onChange={(e) => {
@@ -1755,28 +1694,28 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         setSelectedModelProvider('gemini');
                       }
                     }}
-                    className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
+                    className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
-                    <optgroup label="Google Gemini">
-                      <option value="gemini-3.5-flash">Gemini 3.5 Padrão</option>
+                    <optgroup label="Google Gemini · Gratuito (Padrão)">
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ⭐</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash · Padrão Ouro ⭐</option>
                     </optgroup>
-                    <optgroup label="OpenRouter">
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
+                    <optgroup label="OpenRouter · API Paga (Premium)">
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash · Raciocínio ⭐</option>
                     </optgroup>
                   </select>
                 </div>
                 <button 
                   onClick={() => handleSendMessage()}
                   disabled={!input.trim() || isLoading}
-                  className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
-                  title="Enviar mensagem"
+                  className="bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
                 >
                   <Send className="w-5 h-5" />
                 </button>
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">
-              {persona.footer}
+              Dr. Felix e Castro IA pode cometer erros. Verifique informações importantes.
             </p>
           </div>
         </div>
@@ -1830,4 +1769,4 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   );
 };
 
-export default PersonaChat;
+export default DrFelixECastro;

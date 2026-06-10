@@ -67,12 +67,12 @@ app.use("/api", (req, res, next) => {
 // File Upload Endpoint for Gemini File API
 const upload = multer({ dest: '/tmp/uploads/' });
 
-async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = MAX_RETRIES, forcedKeyIndex?: number): Promise<any> {
+async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, originalname: string, retries = 30, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
@@ -656,7 +656,7 @@ REGRAS DESTE MODO:
 1. DIRETO AO PONTO: Vá direto à resposta. Sem introduções longas, sem repetir a pergunta.
 2. FUNDAMENTADO (REGRA DE OURO): Use EXCLUSIVAMENTE a Base de Conhecimento (RAG). Cite o dispositivo legal exato — CDC, Código Civil, CPC ou CF/88 que conste no contexto enviado. Se NÃO estiver na base, informe que a fonte não foi encontrada e não responda com base em conhecimento externo para evitar alucinações.
 3. PRÁTICO: Termine sempre com a implicação prática para o caso concreto do advogado (competência, prazo, rito, risco).
-4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
+4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, potde ir além — mas sem enrolação.
 5. COMPETÊNCIA E RITO: Sempre que relevante, informe se o caso cabe no JEC (até 40 salários mínimos) ou Vara Cível, e as implicações práticas (advogado obrigatório acima de 20 SM no JEC, recursos, etc.).
 6. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis, artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel) ou Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento.
 7. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as posições do STJ, TJRJ e Turmas Recursais relevantes, indicando a tendência predominante.
@@ -671,14 +671,6 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[GERAÇÃO]";
   }
   if (msgLower.includes("[validação e auditoria]") || msgLower.includes("[validacao e auditoria]")) {
-    return "[DÚVIDA]";
-  }
-
-  // FAST-PATH: perguntas inequívocas não gastam uma chamada de modelo (latência e cota).
-  // Só se NÃO houver verbo de redação no texto.
-  const hasDraftVerb = /\b(gerar|gere|redig|elabor|fazer\s+(a\s+)?(pe[çc]a|peti[çc]|inicial|recurso)|montar\s+(a\s+)?pe[çc]a|escrever\s+(a\s+)?peti[çc])/i.test(safeMessage);
-  const looksLikeQuestion = /^(oi[,!\s]|ol[áa][,!\s])?\s*(quais|qual|como|o\s+que|oq|quando|onde|por\s*qu[eê]|pq|quem|existe|h[áa]\b|me\s+(explique|diga|fale|informe)|explique|d[úu]vida)/i.test(safeMessage.trim()) || /\?\s*$/.test(safeMessage.trim());
-  if (looksLikeQuestion && !hasDraftVerb && safeMessage.length < 1200) {
     return "[DÚVIDA]";
   }
 
@@ -880,7 +872,7 @@ const ELITE_REDACTION_MANUAL = `
 
 10. VALOR DA CAUSA E RMI (FIDELIDADE OBRIGATÓRIA):
     - PROIBIDO inventar Valor da Causa ou RMI.
-    - Sem dados: calcule com salário mínimo vigente (R$ 1.621,00 em 2026) e registre que é estimado, sujeito a liquidação. NUNCA use o placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
+    - Sem dados: calcule com salário mínimo vigente (R$ 1.518,00 em 2026) e registre que é estimado, sujeito a liquidação. NUNCA use o placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
     - Com dados: média de 100% das contribuições desde 07/1994 (EC 103/2019). Valor da Causa = parcelas vencidas + 12 vincendas.
     - PROIBIDO valores redondos sem base factual ("R$ 100.000,00", "R$ 150.000,00").
 
@@ -908,7 +900,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
+🔴 PROIBIDO inventar valores de Valor da Causa ou RMI com base em chutes. Se não houver dados salariais reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses entre DER e ajuizamento × SM) + 12 vincendas (12 × SM). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder "[VALOR A CALCULAR EM LIQUIDAÇÃO]".
 
 🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
 
@@ -1037,13 +1029,13 @@ QUANDO NÃO HÁ DADOS SALARIAIS (ou benefício é BPC/LOAS): use o salário mín
 
   1. Identifique a DER (data do requerimento administrativo) e a data de ajuizamento
   2. Calcule os meses vencidos: (data ajuizamento) − (DER) = N meses
-  3. Salário mínimo 2026: R$ 1.621,00
-  4. Parcelas vencidas = N × R$ 1.621,00
-  5. Parcelas vincendas = 12 × R$ 1.621,00 = R$ 19.452,00
-  6. Valor da Causa = parcelas vencidas + R$ 19.452,00
+  3. Salário mínimo 2026: R$ 1.518,00
+  4. Parcelas vencidas = N × R$ 1.518,00
+  5. Parcelas vincendas = 12 × R$ 1.518,00 = R$ 18.216,00
+  6. Valor da Causa = parcelas vencidas + R$ 18.216,00
 
 Detalhe a memória de cálculo no tópico "Valor da Causa" da peça, com a seguinte nota:
-"Valor estimado com base no salário mínimo vigente (R$ 1.621,00), por ausência de dados salariais precisos, sujeito a revisão em liquidação de sentença."
+"Valor estimado com base no salário mínimo vigente (R$ 1.518,00), por ausência de dados salariais precisos, sujeito a revisão em liquidação de sentença."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 5 — FLUXO DE TRABALHO (COMANDOS)
@@ -1610,7 +1602,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO recalcular, estimar, arredondar ou alterar QUALQUER valor da planilha de cálculos. O cálculo enviado é a única fonte de verdade. Transcreva os valores EXATOS — nem um centavo a mais ou a menos.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: os títulos descritivos do RAG abrangem fielmente suas variações usuais — ex.: 'Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943)' abrange 'CLT'; 'Constituição Federal (CF/1988)' abrange 'CF/88'. Quando o título do RAG representar a norma pedida, fundamente e cite seus artigos normalmente e NUNCA declare que tal norma está ausente do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Artigo, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -1898,7 +1890,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
 
 🔴 PROIBIDO incluir no texto da petição os termos: "RAG", "(RAG)", "[RAG]", "Base de Conhecimento", "Supabase", "Grounding", "OCR", "IA" ou qualquer referência tecnológica. A peça deve parecer 100% escrita por um advogado humano.
 
-🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: os títulos descritivos do RAG abrangem fielmente suas variações usuais — ex.: 'Código de Defesa do Consumidor (Lei nº 8.078/1990)' abrange 'CDC' ou 'Lei 8.078/90'; 'Código Civil (Lei nº 10.406/2002)' abrange 'CC' ou 'CC/02'; 'Código de Processo Civil (Lei nº 13.105/2015)' abrange 'CPC' ou 'CPC/15'. Quando o título do RAG representar a norma pedida, fundamente e cite seus artigos normalmente e NUNCA declare que tal norma está ausente do RAG!).
+🔴 FILTRO ANTI-ALUCINAÇÃO (REGRA DE OURO): É terminantemente proibido usar, citar, parafrasear, mencionar ou sugerir a aplicabilidade de QUALQUER Lei, Jurisprudência, Súmula, Decreto ou Tema que NÃO esteja explicitamente listado no contexto da BASE DE CONHECIMENTO (RAG) enviado. Fontes externas ou conhecimento prévio do modelo são expressamente proibidos. (Nota de mapeamento de títulos: se constar no RAG o título 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)', ele representa fielmente e abrange a 'Lei 8.213/91' ou 'Lei nº 8.213/91'. Se constar o título 'Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)', ele representa fielmente e abrange a 'LOAS' ou 'Lei 8.742/93'. Você deve fundamentar e citar seus artigos normalmente e NUNCA declare que tais leis estão ausentes do RAG!).
 
 🔴 OBRIGATORIEDADE DE CITAÇÃO DIRETA (ZERO PARÁFRASE): Toda citação de lei, súmula, jurisprudência, tema, decreto, etc., deve ser de forma alguma paráfrase (DEVE ser citação DIRETA em blockquote). Da mesma forma, quando for citar trechos dos documentos comprobatórios ou do OCR/PDF (como laudos ou relatórios), use exclusivamente citação direta do trecho exato, jamais paráfrase ou resumo.
 
@@ -2020,7 +2012,7 @@ COMPOSIÇÃO DO VALOR DA CAUSA EM AÇÕES CDC/CÍVEIS:
 4. Obrigação de Fazer/Não Fazer: estimar o proveito econômico.
 5. Valor da Causa = soma de todos os componentes.
 
-Se JEC: o valor da causa NÃO pode exceder 40 salários mínimos (40 × R$ 1.621,00 = R$ 64.840,00 em 2026). Se exceder, o advogado deve ser alertado para renunciar ao excedente ou ajuizar na Vara Cível.
+Se JEC: o valor da causa NÃO pode exceder 40 salários mínimos (40 × R$ 1.518,00 = R$ 60.720,00 em 2026). Se exceder, o advogado deve ser alertado para renunciar ao excedente ou ajuizar na Vara Cível.
 
 Detalhe a memória de cálculo no tópico "Valor da Causa" da peça.
 
@@ -2227,19 +2219,17 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 
 `;
 
-const MAX_RETRIES = 12; // Reduzido de 30: evita travar a UI por minutos em erro de cota
-
 // Logic for API Key Rotation (Round-Robin)
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
-  "gemini-3-flash-preview"
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-2.5-flash": "gemini-3.5-flash",
   "gemini-2.0-flash-exp": "gemini-3.5-flash",
   "gemini-1.5-flash-latest": "gemini-3.5-flash",
   "gemini-3-flash-preview": "gemini-3.5-flash"
@@ -2340,41 +2330,12 @@ function stripExpiredFileData(params: any): any {
   return cleaned;
 }
 
-
-/**
- * Prepara histórico para o caminho OpenRouter (DeepSeek: 163k tokens de contexto total).
- * Sem isso, sessões longas (peça de 7000 palavras + relatório no histórico) estouram
- * o contexto na geração Premium. Mensagens individuais > 24k chars são comprimidas
- * (início+fim preservados) e o total fica limitado a ~180k chars (~51k tokens),
- * priorizando as mensagens mais recentes.
- */
-function buildOrHistory(history: any[]): any[] {
-  const PER_MSG_CHARS = 24_000;
-  const TOTAL_CHARS = 180_000;
-  const msgs = (history || []).map((h: any) => ({
-    role: h.role === 'model' ? 'assistant' : h.role,
-    content: typeof h.content === 'string' && h.content.length > PER_MSG_CHARS
-      ? smartTruncate(h.content, PER_MSG_CHARS)
-      : h.content
-  }));
-  // Acumula do mais recente para o mais antigo até o teto total
-  let acc = 0;
-  const kept: any[] = [];
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const len = (msgs[i].content || '').length;
-    if (acc + len > TOTAL_CHARS && kept.length > 0) break;
-    acc += len;
-    kept.unshift(msgs[i]);
-  }
-  return kept;
-}
-
-async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, onStatus?: (msg: string) => void) {
+async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2458,43 +2419,39 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
              nextModelIndex++;
              nextFailures = 0;
              delay = 500;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+             console.log(`[Tentativa ${30 - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
          } else {
              delay = 500;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
+             console.log(`[Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
          }
       } else if (isEmpty) {
          delay = 1000;
-         console.log(`[Tentativa ${MAX_RETRIES - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
+         console.log(`[Tentativa ${30 - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
       } else {
          // 429/503: Retry logic
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
          // Switch model faster on quota errors if all keys are exhausted.
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+             console.log(`[Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
+             console.log(`[Tentativa ${30 - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+             console.log(`[Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
       }
       
-      if (onStatus) {
-        const motivo = errorMessage.includes('Quota') || errorMessage.includes('429') ? 'Cota da chave atual atingida' : (errorMessage.includes('503') || errorMessage.includes('overload') ? 'Servidor do Google sobrecarregado' : 'Erro temporário');
-        onStatus(`${motivo} — alternando chave de API (tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
-      }
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, onStatus);
+      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
     
     // Critical Failure
     if (retries === 0) {
-      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS.
+      throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS.
       Último modelo: ${currentModel}.
       Erro Original: ${errorMessage}.
       Chaves ativas: ${keys.length}.
@@ -2504,11 +2461,11 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   }
 }
 
-async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, onStatus?: (msg: string) => void): Promise<any> {
+async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (MAX_RETRIES - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2561,43 +2518,39 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              nextModelIndex++;
              nextFailures = 0;
              delay = 500;
-             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Erro de Requisição no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
          } else {
              delay = 500;
-             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo restrito. Rotacionando chaves/parâmetros...`);
          }
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Muitas falhas no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             console.log(`[Stream Tentativa ${MAX_RETRIES - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+             console.log(`[Stream Tentativa ${30 - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
          }
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      if (onStatus) {
-        const motivo = errorMessage.includes('Quota') || errorMessage.includes('429') ? 'Cota da chave atual atingida' : (errorMessage.includes('503') || errorMessage.includes('overload') ? 'Servidor do Google sobrecarregado' : 'Erro temporário');
-        onStatus(`${motivo} — alternando chave de API (tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
-      }
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, onStatus);
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
     }
     
     if (retries === 0) {
-      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
+      throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
     throw error;
   }
 }
 
-async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<number[]> {
+async function callGeminiEmbed(text: string, retries = 30): Promise<number[]> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -3519,34 +3472,8 @@ app.post("/api/rag/plan", async (req, res) => {
 
     console.log(`[RAG PLAN_API] Varredura completa. Carregou ${allChunks.length} chunks.`);
 
-    // 4. Dedup (mesmo conteúdo pode vir por filtros sobrepostos)
-    const seen = new Set<string>();
-    const dedupedChunks = allChunks.filter((c: any) => {
-      const key = `${c.title}::${(c.content || '').substring(0, 120)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    // 5. TETO DE SEGURANÇA: sem limite, planos RPPS/INSS com leis integrais
-    // (LOM + Estatuto + EC) geravam contextos de centenas de milhares de tokens,
-    // estourando a cota de input/minuto de TODAS as chaves em uma única requisição.
-    // 300k chars ≈ ~85k tokens — comporta uma lei municipal integral com folga.
-    const MAX_RAG_CHARS = 300_000;
-    let accumulated = 0;
-    const cappedChunks: any[] = [];
-    for (const c of dedupedChunks) {
-      const size = (c.content || '').length + (c.title || '').length + 40;
-      if (accumulated + size > MAX_RAG_CHARS) break;
-      accumulated += size;
-      cappedChunks.push(c);
-    }
-    if (cappedChunks.length < dedupedChunks.length) {
-      console.warn(`[RAG PLAN_API] ⚠️ Teto de ${MAX_RAG_CHARS} chars atingido: ${cappedChunks.length}/${dedupedChunks.length} chunks mantidos (cota de input protegida).`);
-    }
-
-    // 6. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
-    const ragContext = cappedChunks
+    // 4. Monta ragContext (agrupado por título, conteúdo idêntico para blockquote)
+    const ragContext = allChunks
       .map((c: any) => `FONTE: ${c.title} [Recuperação Exata]\n${c.content}`)
       .join('\n\n---\n\n');
 
@@ -3554,7 +3481,7 @@ app.post("/api/rag/plan", async (req, res) => {
       ragContext,
       plan: curatedPlan,
       titlesConsidered: inventory.length,
-      chunksFound: (cappedChunks || []).length
+      chunksFound: (allChunks || []).length
     });
   } catch (error: any) {
     console.error("Error in /api/rag/plan:", error);
@@ -3888,7 +3815,7 @@ REGRAS DE OURO:
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
+    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
     **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
     **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
@@ -4084,10 +4011,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro della seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
+          }
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -4125,8 +4056,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ...(thinkingConfig && { thinkingConfig }),
               tools
             } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -4620,7 +4550,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
 5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
 
-          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }, ...buildOrHistory(history)];
+          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
+          }
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -4673,8 +4607,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
               ]
             } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -5096,7 +5029,11 @@ REGRAS ABSOLUTAS:
 5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
 6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+          for (const h of history) {
+            const role = h.role === 'model' ? 'assistant' : h.role;
+            orMessages.push({ role, content: h.content });
+          }
 
           if (attempt > 1) {
             orMessages.push({ role: 'assistant', content: fullResponseText });
@@ -5134,8 +5071,7 @@ REGRAS ABSOLUTAS:
               ...(thinkingConfig && { thinkingConfig }),
               tools
             } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
+          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -5545,10 +5481,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.518,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.518,00) + 12 vincendas (R$ 18.216,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }];
+for (const h of history) {
+  const role = h.role === 'model' ? 'assistant' : h.role;
+  orMessages.push({ role, content: h.content });
+}
 orMessages.push({ role: "user", content: finalMessage });
 await callOpenRouterStream({
   model: model || "deepseek/deepseek-v4-flash",
@@ -5599,8 +5539,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
       ...(thinkingConfig && { thinkingConfig }),
       tools
     } as any
-  }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
-            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
+  }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
 
   let maxTokensHit = false;
   let attemptText = "";

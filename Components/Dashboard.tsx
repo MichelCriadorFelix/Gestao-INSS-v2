@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ScaleIcon, UserGroupIcon, BriefcaseIcon, CalculatorIcon, ArrowRightOnRectangleIcon, 
   ArrowPathRoundedSquareIcon, CloudIcon, BellIcon, Cog6ToothIcon, SunIcon, MoonIcon,
@@ -8,14 +8,12 @@ import {
   GlobeAltIcon, AcademicCapIcon, SparklesIcon, Bars3Icon, XMarkIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-const Legislation = lazy(() => import('./Legislation'));
-const Jurisprudence = lazy(() => import('./Jurisprudence'));
+import Legislation from './Legislation';
+import Jurisprudence from './Jurisprudence';
 import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaEvent, DailyFocusState } from '../types';
 // data.ts removido — dados carregados exclusivamente do Supabase
-const LaborCalc = lazy(() => import('../LaborCalc'));
-import type { CalculationRecord } from '../LaborCalc';
-const SocialSecurityCalc = lazy(() => import('../SocialSecurityCalc'));
-import type { SocialSecurityData } from '../SocialSecurityCalc';
+import LaborCalc, { CalculationRecord } from '../LaborCalc';
+import SocialSecurityCalc, { SocialSecurityData } from '../SocialSecurityCalc';
 import LZString from 'lz-string';
 import { initSupabase } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
@@ -37,13 +35,15 @@ import AgendaModal from './AgendaModal';
 import SettingsModal from './SettingsModal';
 import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
-const PersonaChat = lazy(() => import('./PersonaChat'));
-import { MICHEL_PERSONA, LUANA_PERSONA, FELIX_CASTRO_PERSONA, FABRICIA_PERSONA } from './personaConfig';
-const Agenda = lazy(() => import('./Agenda'));
-const PetitionEditor = lazy(() => import('./PetitionEditor'));
-const MeuINSS = lazy(() => import('./MeuINSS'));
-const KnowledgeBase = lazy(() => import('./KnowledgeBase'));
-const MarketingGenerator = lazy(() => import('./MarketingGenerator'));
+import DrMichelFelix from './DrMichelFelix';
+import DraLuanaCastro from './DraLuanaCastro';
+import DrFelixECastro from './DrFelixECastro';
+import SecFabriciaFelix from './SecFabriciaFelix';
+import Agenda from './Agenda';
+import PetitionEditor from './PetitionEditor';
+import MeuINSS from './MeuINSS';
+import KnowledgeBase from './KnowledgeBase';
+import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
 export default function Dashboard({ 
@@ -1701,38 +1701,29 @@ export default function Dashboard({
         <main className="flex-1 overflow-y-auto p-2 lg:p-6 pb-24 lg:pb-6 flex flex-col" style={{WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain'}}>
              
              {/* CONTENT SWITCHER */}
-             <Suspense fallback={<div className="flex flex-1 items-center justify-center py-20 text-slate-400 text-sm font-medium animate-pulse">Carregando módulo…</div>}>
              {currentView === 'dr_michel' ? (
-                 <PersonaChat 
-                    key="michel"
-                    persona={MICHEL_PERSONA}
+                 <DrMichelFelix 
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'dra_luana' ? (
-                 <PersonaChat 
-                    key="luana"
-                    persona={LUANA_PERSONA}
+                 <DraLuanaCastro 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'dr_felix_castro' ? (
-                 <PersonaChat 
-                    key="felix_castro"
-                    persona={FELIX_CASTRO_PERSONA}
+                 <DrFelixECastro 
                     initialSessions={drFelixCastroSessions} 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
                   />
              ) : currentView === 'sec_fabricia' ? (
-                 <PersonaChat 
-                    key="fabricia"
-                    persona={FABRICIA_PERSONA}
+                 <SecFabriciaFelix 
                     initialSessions={secFabriciaSessions} 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
@@ -2267,7 +2258,6 @@ export default function Dashboard({
                     </div>
                  </>
              )}
-             </Suspense>
         </main>
 
         <RecordModal 

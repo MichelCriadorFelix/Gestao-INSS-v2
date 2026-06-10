@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// Commit triggering change (false positive)
 import { User, UserRole, AUTHORIZED_USERS } from './types';
 import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from './data';
 import Login from './Components/Login';

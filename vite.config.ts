@@ -23,18 +23,6 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      },
-      build: {
-        rollupOptions: {
-          output: {
-            manualChunks: {
-              'vendor-react': ['react', 'react-dom'],
-              'vendor-ui': ['@heroicons/react/24/outline', '@heroicons/react/24/solid'],
-              'vendor-utils': ['date-fns', 'lz-string', 'idb-keyval'],
-              'vendor-supabase': ['@supabase/supabase-js'],
-            }
-          }
-        }
       }
     };
 });
