@@ -86,6 +86,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const serverStatusRef = React.useRef<string>('');
   const [pendingAudit, setPendingAudit] = useState<{
     fileIndex: number;
     pageIndex: number;
@@ -269,6 +270,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     let interval: NodeJS.Timeout;
     if (isLoading) {
       setProgress(0);
+      serverStatusRef.current = '';
       const startTime = Date.now();
       interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
@@ -298,7 +300,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         }
 
         setProgress(Math.min(Math.round(newProgress), 99));
-        setProgressText(newText);
+        setProgressText(serverStatusRef.current || newText);
       }, 1000);
     } else {
       setProgress(100);
@@ -769,6 +771,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     throw new Error("MAX_TOKENS_HIT");
                   }
                   if (data.heartbeat) continue;
+                  if (data.status) {
+                    // Status real do servidor (rotação de chave, cota, retentativa)
+                    serverStatusRef.current = String(data.status);
+                    setProgressText(serverStatusRef.current);
+                    continue;
+                  }
                   
                   if (data.text) {
                     fullText += data.text;

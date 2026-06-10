@@ -674,6 +674,14 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[DÚVIDA]";
   }
 
+  // FAST-PATH: perguntas inequívocas não gastam uma chamada de modelo (latência e cota).
+  // Só se NÃO houver verbo de redação no texto.
+  const hasDraftVerb = /\b(gerar|gere|redig|elabor|fazer\s+(a\s+)?(pe[çc]a|peti[çc]|inicial|recurso)|montar\s+(a\s+)?pe[çc]a|escrever\s+(a\s+)?peti[çc])/i.test(safeMessage);
+  const looksLikeQuestion = /^(oi[,!\s]|ol[áa][,!\s])?\s*(quais|qual|como|o\s+que|oq|quando|onde|por\s*qu[eê]|pq|quem|existe|h[áa]\b|me\s+(explique|diga|fale|informe)|explique|d[úu]vida)/i.test(safeMessage.trim()) || /\?\s*$/.test(safeMessage.trim());
+  if (looksLikeQuestion && !hasDraftVerb && safeMessage.length < 1200) {
+    return "[DÚVIDA]";
+  }
+
   try {
     const response = await callGemini({
       model: "gemini-3.5-flash",
@@ -2361,7 +2369,7 @@ function buildOrHistory(history: any[]): any[] {
   return kept;
 }
 
-async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
+async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, onStatus?: (msg: string) => void) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -2476,8 +2484,12 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
          }
       }
       
+      if (onStatus) {
+        const motivo = errorMessage.includes('Quota') || errorMessage.includes('429') ? 'Cota da chave atual atingida' : (errorMessage.includes('503') || errorMessage.includes('overload') ? 'Servidor do Google sobrecarregado' : 'Erro temporário');
+        onStatus(`${motivo} — alternando chave de API (tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
+      }
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
+      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, onStatus);
     }
     
     // Critical Failure
@@ -2492,7 +2504,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   }
 }
 
-async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
+async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, onStatus?: (msg: string) => void): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
@@ -2571,7 +2583,11 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
+      if (onStatus) {
+        const motivo = errorMessage.includes('Quota') || errorMessage.includes('429') ? 'Cota da chave atual atingida' : (errorMessage.includes('503') || errorMessage.includes('overload') ? 'Servidor do Google sobrecarregado' : 'Erro temporário');
+        onStatus(`${motivo} — alternando chave de API (tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES})...`);
+      }
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, onStatus);
     }
     
     if (retries === 0) {
@@ -4109,7 +4125,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ...(thinkingConfig && { thinkingConfig }),
               tools
             } as any
-          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
+            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -4656,7 +4673,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
               ]
             } as any
-          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
+            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -5116,7 +5134,8 @@ REGRAS ABSOLUTAS:
               ...(thinkingConfig && { thinkingConfig }),
               tools
             } as any
-          }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
+            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -5580,7 +5599,8 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
       ...(thinkingConfig && { thinkingConfig }),
       tools
     } as any
-  }, 30, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+  }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined,
+            (statusMsg: string) => { try { res.write(`data: ${JSON.stringify({ status: statusMsg })}\n\n`); } catch {} });
 
   let maxTokensHit = false;
   let attemptText = "";
