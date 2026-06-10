@@ -2224,9 +2224,7 @@ let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
-  "gemini-3.5-flash",
-  "gemini-3-flash-preview",
-  "gemini-2.5-flash"
+  "gemini-3.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
@@ -2451,6 +2449,9 @@ async function callGemini(params: any, retries = 30, modelIndex = 0, failuresOnC
     
     // Critical Failure
     if (retries === 0) {
+      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
+        throw new Error(`⚠️ LIMITE DE COTA ATINGIDO: O plano gratuito do Gemini (Free Tier) tem um limite de requisições por minuto. Como você está enviando documentos ou conversas extremamente grandes, a cota de tokens (1 milhão por minuto) se esgota rapidamente.\n\nPor favor, AGUARDE 1 MINUTO e envie sua requisição novamente, ou limpe o histórico/documentos para não reenviar os mesmos dados longos repetidas vezes.`);
+      }
       throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS.
       Último modelo: ${currentModel}.
       Erro Original: ${errorMessage}.
@@ -2544,6 +2545,9 @@ async function callGeminiStream(params: any, retries = 30, modelIndex = 0, failu
     }
     
     if (retries === 0) {
+      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
+        throw new Error(`⚠️ LIMITE DE COTA ATINGIDO: O plano gratuito do Gemini (Free Tier) tem um limite de requisições por minuto. Como você está enviando documentos ou conversas extremamente grandes, a cota de tokens (1 milhão por minuto) se esgota rapidamente.\n\nPor favor, AGUARDE 1 MINUTO e envie sua requisição novamente, ou limpe o histórico/documentos.`);
+      }
       throw new Error(`FALHA CRÍTICA APÓS 30 TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
     throw error;
@@ -3564,7 +3568,7 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
     const response = await callGemini({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3.5-flash',
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
     });
