@@ -89,6 +89,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const statusRef = useRef<string>('');
   const [pendingAudit, setPendingAudit] = useState<{
     fileIndex: number;
     pageIndex: number;
@@ -301,11 +302,12 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
         }
 
         setProgress(Math.min(Math.round(newProgress), 99));
-        setProgressText(newText);
+        if (!statusRef.current) setProgressText(newText);
       }, 1000);
     } else {
       setProgress(100);
       setTimeout(() => setProgress(0), 1000);
+      statusRef.current = '';
     }
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -445,7 +447,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       }).join('\n\n---\n\n') || '';
 
       // 1. Get embedding and perform Keyword Search in parallel
-      const AGENT_AREAS = ['INSS','RPPS','CIVEL','TRABALHISTA','CONSUMIDOR'];
+      const AGENT_AREAS = ['INSS','RPPS'];
       let ragContext = '';
       try {
         // Context-aware query enrichment for RAG:
@@ -710,6 +712,11 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     throw new Error("MAX_TOKENS_HIT");
                   }
                   if (data.heartbeat) continue;
+                  if (data.status) {
+                    statusRef.current = data.status;
+                    setProgressText(data.status);
+                    continue;
+                  }
                   
                   if (data.text) {
                     fullText += data.text;
@@ -1042,6 +1049,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       setTimeout(() => {
         setProgress(0);
         setProgressText('');
+        statusRef.current = '';
       }, 3000);
     }
   };

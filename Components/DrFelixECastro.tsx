@@ -89,6 +89,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const statusRef = useRef<string>('');
   const [pendingAudit, setPendingAudit] = useState<{
     fileIndex: number;
     pageIndex: number;
@@ -301,11 +302,12 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
         }
 
         setProgress(Math.min(Math.round(newProgress), 99));
-        setProgressText(newText);
+        if (!statusRef.current) setProgressText(newText);
       }, 1000);
     } else {
       setProgress(100);
       setTimeout(() => setProgress(0), 1000);
+      statusRef.current = '';
     }
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -710,6 +712,11 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
                     throw new Error("MAX_TOKENS_HIT");
                   }
                   if (data.heartbeat) continue;
+                  if (data.status) {
+                    statusRef.current = data.status;
+                    setProgressText(data.status);
+                    continue;
+                  }
                   
                   if (data.text) {
                     fullText += data.text;
@@ -1042,6 +1049,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
       setTimeout(() => {
         setProgress(0);
         setProgressText('');
+        statusRef.current = '';
       }, 3000);
     }
   };

@@ -83,6 +83,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
   const [editTitle, setEditTitle] = useState('');
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const statusRef = useRef<string>('');
   const [pendingAudit, setPendingAudit] = useState<{
     fileIndex: number;
     pageIndex: number;
@@ -295,11 +296,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         }
 
         setProgress(Math.min(Math.round(newProgress), 99));
-        setProgressText(newText);
+        if (!statusRef.current) setProgressText(newText);
       }, 1000);
     } else {
       setProgress(100);
       setTimeout(() => setProgress(0), 1000);
+      statusRef.current = '';
     }
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -438,7 +440,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       }).join('\n\n---\n\n') || '';
 
       // 1. Get embedding and perform Keyword Search in parallel
-      const AGENT_AREAS = ['TRABALHISTA','CIVEL','CONSUMIDOR','INSS','RPPS'];
+      const AGENT_AREAS = ['TRABALHISTA'];
       let ragContext = '';
 
       // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
@@ -726,8 +728,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                       throw new Error("MAX_TOKENS_HIT");
                     }
                     if (data.heartbeat) continue;
-
-                    if (data.text) {
+                  if (data.status) {
+                    statusRef.current = data.status;
+                    setProgressText(data.status);
+                    continue;
+                  }
+                  
+                  if (data.text) {
                       fullText += data.text;
                       setStreamingMessage(fullText);
                     }
@@ -1064,6 +1071,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       setTimeout(() => {
         setProgress(0);
         setProgressText('');
+        statusRef.current = '';
       }, 3000);
     }
   };
