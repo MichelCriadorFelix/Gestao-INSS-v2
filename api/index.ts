@@ -3785,6 +3785,17 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
     const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message);
 
+    // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
+    if (modelProvider !== 'openrouter') {
+      if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dr.Michel] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+      } else {
+        model = "gemini-3.5-flash";
+        console.log("[Dr.Michel] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+      }
+    }
+
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
 
@@ -4284,6 +4295,17 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                                  message.includes("GERAR PEÇA");
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
+    // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
+    if (modelProvider !== 'openrouter') {
+      if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dra.Luana] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+      } else {
+        model = "gemini-3.5-flash";
+        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+      }
+    }
+
     let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
 
     // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
@@ -4851,6 +4873,17 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
     // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
     const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message);
+
+    // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
+    if (modelProvider !== 'openrouter') {
+      if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dr.FelixCastro] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+      } else {
+        model = "gemini-3.5-flash";
+        console.log("[Dr.FelixCastro] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+      }
+    }
 
     let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
     let temperature = 0.2;
@@ -5443,6 +5476,17 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     // e mantém tokens em 600 (breve) em vez de 4096.
     // Se o usuário pedir para gerar peça, o system prompt redireciona para Dr. Michel/Luana.
     const isGenerationRequest = false; // Fabrícia não gera petições
+
+    // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
+    if (modelProvider !== 'openrouter') {
+      if (isStorageRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Sec.Fabricia] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+      } else {
+        model = "gemini-3.5-flash";
+        console.log("[Sec.Fabricia] 🧠 Atendimento ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+      }
+    }
 
     // Fabrícia deve ser BREVE por padrão (1-200 palavras)
     let maxOutputTokens = 600;
