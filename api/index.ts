@@ -72,7 +72,7 @@ async function uploadFileToGeminiWithRetry(filePath: string, mimetype: string, o
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
 
@@ -2262,7 +2262,7 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 `;
 
 // Logic for API Key Rotation (Round-Robin)
-const MAX_RETRIES = 12;
+const MAX_RETRIES = 30;
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
@@ -2378,7 +2378,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
   // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2475,16 +2475,16 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
          // Switch model faster on quota errors if all keys are exhausted.
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Cota esgotada no modelo ${currentModel} após tentar todas as chaves. Trocando modelo...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota esgotada no modelo ${currentModel} após tentar múltiplos projetos. Trocando modelo...`);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
              console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Cota/Sobrecarga no modelo ${currentModel}. Rotacionando chave...`);
+             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
          }
       }
       
@@ -2511,7 +2511,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const keyToUseIndex = (forcedKeyIndex !== undefined && (30 - retries) === 0) ? forcedKeyIndex : currentKeyIndex;
+  const keyToUseIndex = (forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex;
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2572,16 +2572,16 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       } else {
          delay = errorMessage.includes('503') ? 3000 : 2000;
          
-         if (errorMessage.includes('Quota exceeded') && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
-             const msg3 = `[Tentativa ${MAX_RETRIES - retries}] Cota esgotada no ${currentModel} (todas chaves). Trocando modelo...`; console.log(msg3); if(onStatus) onStatus(msg3);
+             const msg3 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota esgotada no ${currentModel} após tentar múltiplos projetos. Trocando modelo...`; console.log(msg3); if(onStatus) onStatus(msg3);
          } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
              nextFailures = 0;
              const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
-             const msg5 = `[Tentativa ${MAX_RETRIES - retries}] Limite da chave atual atingido. Alternando chave e retentando...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
