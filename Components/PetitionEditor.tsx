@@ -514,18 +514,19 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     extensions: [
       StarterKit.configure({
         paragraph: false,
-        bulletList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
-        orderedList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
       }),
       CustomParagraph,
-      BulletList,
-      OrderedList,
+      BulletList.configure({
+        keepMarks: true,
+        keepAttributes: false,
+      }),
+      OrderedList.configure({
+        keepMarks: true,
+        keepAttributes: false,
+      }),
       ListItem,
       Underline,
       TextAlign.configure({
@@ -561,8 +562,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }, []);
 
   useEffect(() => {
-    if (editor) {
-      editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
+    if (!editor || editor.isDestroyed) return;
+    try {
+      if (editor.view && editor.view.dom) {
+        editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
+      }
+    } catch (e) {
+      // Editor view may not be mounted yet
     }
   }, [topBottomMargin, leftRightMargin, editor]);
 
