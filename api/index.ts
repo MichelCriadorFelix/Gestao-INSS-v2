@@ -2262,7 +2262,7 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 `;
 
 // Logic for API Key Rotation (Round-Robin)
-const MAX_RETRIES = 30;
+const MAX_RETRIES = 15;
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
@@ -3787,9 +3787,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) {
+      if ((isStorageRequest || isReportRequest) && !isGenerationRequest) {
         model = "gemini-3-flash-preview";
-        console.log("[Dr.Michel] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+        console.log("[Dr.Michel] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dr.Michel] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -4090,6 +4090,7 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
+        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -4297,9 +4298,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) {
+      if ((isStorageRequest || isReportRequestLuana) && !isGenerationRequest) {
         model = "gemini-3-flash-preview";
-        console.log("[Dra.Luana] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+        console.log("[Dra.Luana] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -4649,6 +4650,7 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokensLuana > 200_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
+        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokensLuana > 0 ? totalInputTokensLuana/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -4876,9 +4878,9 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) {
+      if ((isStorageRequest || isReportRequest) && !isGenerationRequest) {
         model = "gemini-3-flash-preview";
-        console.log("[Dr.FelixCastro] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+        console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dr.FelixCastro] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -5148,6 +5150,7 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
+        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -5481,7 +5484,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     if (modelProvider !== 'openrouter') {
       if (isStorageRequest) {
         model = "gemini-3-flash-preview";
-        console.log("[Sec.Fabricia] ⚖️ Fase de tomada de ciência/OCR detectada. Forçando o uso de 'gemini-3-flash-preview' no backend para economizar cota.");
+        console.log("[Sec.Fabricia] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Sec.Fabricia] 🧠 Atendimento ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -5681,6 +5684,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input acima de 200k tokens — uso muito intenso.`);
+        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
 while (!isFinished && attempt < MAX_ATTEMPTS) {

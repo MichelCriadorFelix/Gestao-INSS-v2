@@ -674,7 +674,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: currentMessage,
-              documentContext: docSummaries,
+              documentContext: resumeCount === 0 ? docSummaries : undefined, // Economia: documento já está no history (fullText) nas retomadas
               history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
