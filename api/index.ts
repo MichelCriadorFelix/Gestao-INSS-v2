@@ -2511,7 +2511,10 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const keyToUseIndex = (forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex;
+  // CACHE: requisições com cachedContent ficam FIXAS na chave que criou o cache
+  // (caches são por projeto). Retries reusam a mesma chave em vez de rotacionar.
+  const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
+  const keyToUseIndex = cachePinned ? forcedKeyIndex : ((forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex);
   const apiKey = keys[keyToUseIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -2535,6 +2538,11 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
     const errorMessage = error.message || errorStr;
     
+    // CACHE: se a falha é do cache (expirado/não encontrado/incompatível), aborta
+    // imediatamente com sinal específico — o endpoint avisa o cliente para reenviar.
+    if (params?.config?.cachedContent && (errorMessage.includes('CachedContent') || /cached?\s*content/i.test(errorMessage) || errorMessage.includes('NOT_FOUND') || errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT'))) {
+      throw new Error('CACHE_INVALID');
+    }
     const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
@@ -3749,6 +3757,39 @@ app.get("/api/bcdata/inpc", async (req, res) => {
   }
 });
 
+// ====================================================================
+// CONTEXT CACHING (economia de ~75% nos tokens do documento por sessão)
+// O documento grande é cacheado UMA vez no Gemini (TTL 1h); as mensagens
+// seguintes referenciam o cache em vez de reenviar o texto. O cache é
+// vinculado à chave/projeto que o criou — por isso o keyIndex é fixado.
+// Falhas aqui NUNCA quebram o fluxo: o app segue sem cache normalmente.
+// ====================================================================
+app.post("/api/cache/create", async (req, res) => {
+  try {
+    const { documentText, keyIndex } = req.body;
+    if (!documentText || documentText.length < 30000) {
+      return res.json({ cacheName: null, reason: "documento pequeno — cache desnecessário" });
+    }
+    const keys = getApiKeys();
+    if (keys.length === 0) return res.json({ cacheName: null, reason: "sem chaves" });
+    const idx = (keyIndex !== undefined && keyIndex !== null) ? (parseInt(String(keyIndex)) % keys.length) : 0;
+    const ai = new GoogleGenAI({ apiKey: keys[idx] });
+    const cache = await ai.caches.create({
+      model: 'gemini-3.5-flash',
+      config: {
+        contents: [{ role: 'user', parts: [{ text: "DOCUMENTOS DO CASO (ÍNTEGRA PARA CONSULTA E CITAÇÃO LITERAL):\n\n" + documentText }] }],
+        ttl: '3600s',
+        displayName: `doc-cache-${Date.now()}`
+      }
+    });
+    console.log(`[CACHE] 💾 Criado ${cache.name} na chave ${idx} (~${Math.round(documentText.length/3.5/1000)}k tokens, TTL 1h)`);
+    res.json({ cacheName: cache.name, keyIndex: idx, expiresAt: Date.now() + 3500 * 1000 });
+  } catch (e: any) {
+    console.warn("[CACHE] Falha ao criar cache (app segue sem cache):", e.message);
+    res.json({ cacheName: null, reason: e.message });
+  }
+});
+
 app.post("/api/dr-michel/chat", async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -3757,7 +3798,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
@@ -3862,7 +3903,25 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    if (documentContext) {
+    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
+    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
+    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    let activeDocCache: string | null = null;
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      try {
+        const cacheKeys = getApiKeys();
+        const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
+        const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
+        await aiCacheCheck.caches.get({ name: cachedContent });
+        activeDocCache = cachedContent;
+        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+      } catch (cacheErr: any) {
+        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
+      }
+    }
+
+    if (documentContext && !activeDocCache) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
@@ -4140,17 +4199,22 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           fullResponseText += attemptText;
           maxTokensHit = orResult.maxTokensHit;
         } else {
+          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+          const streamContents = activeDocCache
+            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+            : currentContents;
+          const pinnedKey = activeDocCache
+            ? (parseInt(String(cacheKeyIndex)))
+            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          const streamConfig: any = activeDocCache
+            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
           const responseStream = await callGeminiStream({
             model: model || "gemini-3-flash-preview",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools
-            } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+            contents: streamContents,
+            config: streamConfig
+          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -4237,6 +4301,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       clearInterval(heartbeat);
       (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -4248,6 +4316,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     clearInterval(heartbeat);
     (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -4265,7 +4337,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
@@ -4405,7 +4477,25 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    if (documentContext) {
+    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
+    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
+    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    let activeDocCache: string | null = null;
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      try {
+        const cacheKeys = getApiKeys();
+        const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
+        const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
+        await aiCacheCheck.caches.get({ name: cachedContent });
+        activeDocCache = cachedContent;
+        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+      } catch (cacheErr: any) {
+        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
+      }
+    }
+
+    if (documentContext && !activeDocCache) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
@@ -4707,23 +4797,28 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           fullResponseText += attemptText;
           maxTokensHit = orResult.maxTokensHit;
         } else {
-          const responseStream = await callGeminiStream({
-            model: model || "gemini-3-flash-preview",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens: maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools: tools,
-              safetySettings: [
+          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+          const streamContents = activeDocCache
+            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+            : currentContents;
+          const pinnedKey = activeDocCache
+            ? (parseInt(String(cacheKeyIndex)))
+            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          const luanaSafety = [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
                 { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-              ]
-            } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+              ];
+          const streamConfig: any = activeDocCache
+            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), safetySettings: luanaSafety, cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools, safetySettings: luanaSafety };
+          const responseStream = await callGeminiStream({
+            model: model || "gemini-3-flash-preview",
+            contents: streamContents,
+            config: streamConfig
+          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -4814,6 +4909,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       clearInterval(heartbeat);
       console.error("Stream error (Dra. Luana):", streamError);
       
+      if (streamError.message === 'CACHE_INVALID') {
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, error: '💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.' })}\n\n`); } catch {}
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
       const errorMessage = streamError.message || "Erro durante a geração do texto.";
       
       (() => {
@@ -4847,7 +4947,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
@@ -4951,7 +5051,25 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    if (documentContext) {
+    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
+    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
+    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    let activeDocCache: string | null = null;
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      try {
+        const cacheKeys = getApiKeys();
+        const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
+        const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
+        await aiCacheCheck.caches.get({ name: cachedContent });
+        activeDocCache = cachedContent;
+        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+      } catch (cacheErr: any) {
+        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
+      }
+    }
+
+    if (documentContext && !activeDocCache) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
@@ -5199,17 +5317,22 @@ REGRAS ABSOLUTAS:
           fullResponseText += attemptText;
           maxTokensHit = orResult.maxTokensHit;
         } else {
+          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+          const streamContents = activeDocCache
+            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+            : currentContents;
+          const pinnedKey = activeDocCache
+            ? (parseInt(String(cacheKeyIndex)))
+            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+          const streamConfig: any = activeDocCache
+            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
           const responseStream = await callGeminiStream({
             model: model || "gemini-3-flash-preview",
-            contents: currentContents,
-            config: {
-              systemInstruction: selectedSystemPrompt,
-              temperature: finalTemperature,
-              maxOutputTokens,
-              ...(thinkingConfig && { thinkingConfig }),
-              tools
-            } as any
-          }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+            contents: streamContents,
+            config: streamConfig
+          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
           for await (const chunk of responseStream) {
             let text = "";
@@ -5295,6 +5418,10 @@ REGRAS ABSOLUTAS:
       clearInterval(heartbeat);
       (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -5306,6 +5433,10 @@ REGRAS ABSOLUTAS:
     clearInterval(heartbeat);
     (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -5459,7 +5590,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
     // ROTEAMENTO AUTOMÁTICO — Premium 7000 palavras força DeepSeek V4 Flash via OpenRouter
@@ -5510,7 +5641,25 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const availableForContext = inputBudget - reservedTokens;
     const maxDocCtxChars = Math.floor(availableForContext * 0.80 * 3.5);
 
-    if (documentContext) {
+    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
+    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
+    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    let activeDocCache: string | null = null;
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      try {
+        const cacheKeys = getApiKeys();
+        const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
+        const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
+        await aiCacheCheck.caches.get({ name: cachedContent });
+        activeDocCache = cachedContent;
+        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+      } catch (cacheErr: any) {
+        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
+      }
+    }
+
+    if (documentContext && !activeDocCache) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO/DOCUMENTOS ANEXADOS]\n${compressed}`;
@@ -5689,17 +5838,21 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
 while (!isFinished && attempt < MAX_ATTEMPTS) {
   attempt++;
+  // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config leva cachedContent.
+  const streamContents = activeDocCache
+    ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+    : currentContents;
+  const streamConfig: any = activeDocCache
+    ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
+    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
+  const pinnedKey = activeDocCache
+    ? (parseInt(String(cacheKeyIndex)))
+    : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
   const responseStream = await callGeminiStream({
     model: model || "gemini-3-flash-preview",
-    contents: currentContents,
-    config: {
-      systemInstruction: selectedSystemPrompt,
-      temperature: finalTemperature,
-      maxOutputTokens,
-      ...(thinkingConfig && { thinkingConfig }),
-      tools
-    } as any
-  }, MAX_RETRIES, 0, 0, keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+    contents: streamContents,
+    config: streamConfig
+  }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
   let maxTokensHit = false;
   let attemptText = "";
@@ -5784,6 +5937,10 @@ res.end();
 clearInterval(heartbeat);
 (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -5795,6 +5952,10 @@ res.end();
     clearInterval(heartbeat);
     (() => {
     let _errStr = err.message ;
+    if (_errStr === 'CACHE_INVALID') {
+      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+    }
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }

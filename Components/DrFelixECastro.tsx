@@ -62,6 +62,10 @@ interface ChatSession {
   messages: Message[];
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
+  cacheName?: string | null;      // CONTEXT CACHING: nome do cache do documento no Gemini
+  cacheKeyIndex?: number | null;  // chave de API que criou o cache (caches são por projeto)
+  cacheExpiresAt?: number | null; // epoch ms — TTL de 1h
+  cacheDisabled?: boolean;        // true se a criação falhou (não retenta a cada msg)
 }
 
 interface DrFelixECastroProps {
@@ -446,6 +450,40 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
+      // ============================================================
+      // CONTEXT CACHING (economia ~75% nos tokens do documento)
+      // Documento grande vira cache no Gemini (1x por sessão, TTL 1h).
+      // Qualquer falha aqui é silenciosa: o app segue enviando o texto
+      // completo como sempre (o backend só omite o doc se o cache valer).
+      // ============================================================
+      let docCacheName: string | null | undefined = session?.cacheName;
+      let docCacheKeyIndex: number | null | undefined = session?.cacheKeyIndex;
+      const cacheStillValid = docCacheName && session?.cacheExpiresAt && session.cacheExpiresAt > Date.now() + 60_000;
+      if (!cacheStillValid) { docCacheName = null; docCacheKeyIndex = null; }
+      const activeProviderForCache = eliteProviderOverride || selectedModelProvider;
+      if (!docCacheName && !session?.cacheDisabled && activeProviderForCache !== 'openrouter' && docSummaries && docSummaries.length > 30000) {
+        try {
+          const cacheResp = await apiFetch('/api/cache/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentText: docSummaries, keyIndex: session?.uploadKeyIndex })
+          });
+          const cacheData = await cacheResp.json();
+          if (cacheData.cacheName) {
+            docCacheName = cacheData.cacheName;
+            docCacheKeyIndex = cacheData.keyIndex;
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: cacheData.cacheName, cacheKeyIndex: cacheData.keyIndex, cacheExpiresAt: cacheData.expiresAt } : s));
+            console.log(`[CACHE] 💾 Documento cacheado (${cacheData.cacheName}) — próximas mensagens ~75% mais baratas.`);
+          } else {
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheDisabled: true } : s));
+            console.log('[CACHE] Cache indisponível, seguindo com texto completo:', cacheData.reason);
+          }
+        } catch (e) {
+          console.warn('[CACHE] Falha ao criar cache (seguindo normalmente):', e);
+        }
+      }
+
+
       // 1. Get embedding and perform Keyword Search in parallel
       const AGENT_AREAS = ['CONSUMIDOR','CIVEL','TRABALHISTA','INSS','RPPS'];
       let ragContext = '';
@@ -643,6 +681,8 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
+              cachedContent: docCacheName || undefined,
+              cacheKeyIndex: docCacheName ? docCacheKeyIndex : undefined,
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
@@ -712,6 +752,11 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
                     throw new Error("MAX_TOKENS_HIT");
                   }
                   if (data.heartbeat) continue;
+                  if (data.cacheInvalid) {
+                    // Cache expirou: limpa para recriar no próximo envio
+                    docCacheName = null;
+                    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: null, cacheExpiresAt: 0 } : s));
+                  }
                   if (data.status) {
                     statusRef.current = data.status;
                     setProgressText(data.status);
