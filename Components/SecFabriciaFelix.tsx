@@ -109,6 +109,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
   const sessionsRef = useRef(sessions);
   const pendingSyncRef = useRef<Set<string>>(new Set());
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncAtRef = useRef<number>(0); // SUPABASE-FIRST: momento do último sync (para o max-wait)
   const lastSyncedSessionsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
@@ -233,8 +234,16 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
-      
+
+      // SUPABASE-FIRST (max-wait): o debounce de 1,5s reiniciava a cada chunk do
+      // streaming, então NADA era salvo no Supabase durante gerações longas.
+      // Agora, se o último sync foi há mais de 10s, salva IMEDIATAMENTE —
+      // o progresso da peça vai para o banco a cada ~10s mesmo durante o stream.
+      const elapsedSinceSync = Date.now() - lastSyncAtRef.current;
+      const syncDelay = elapsedSinceSync > 10_000 ? 0 : 1500;
+
       syncTimeoutRef.current = setTimeout(() => {
+        lastSyncAtRef.current = Date.now();
         const idsToSync = Array.from(pendingSyncRef.current);
         pendingSyncRef.current.clear();
 
@@ -254,7 +263,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             });
           }
         });
-      }, 1500);
+      }, syncDelay);
     }
   }, [sanitizedSessions]);
 
