@@ -752,6 +752,10 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
                     throw new Error("MAX_TOKENS_HIT");
                   }
                   if (data.heartbeat) continue;
+                  if (data.cacheRenewedUntil) {
+                    // TTL deslizante: o backend renovou o cache por +1h nesta mensagem
+                    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheExpiresAt: data.cacheRenewedUntil } : s));
+                  }
                   if (data.cacheInvalid) {
                     // Cache expirou: limpa para recriar no próximo envio
                     docCacheName = null;

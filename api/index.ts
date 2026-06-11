@@ -3912,9 +3912,12 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        await aiCacheCheck.caches.get({ name: cachedContent });
+        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
+        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
+        await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
-        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
+        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
       } catch (cacheErr: any) {
         console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
@@ -4486,9 +4489,12 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        await aiCacheCheck.caches.get({ name: cachedContent });
+        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
+        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
+        await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
-        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
+        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
       } catch (cacheErr: any) {
         console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
@@ -5060,9 +5066,12 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        await aiCacheCheck.caches.get({ name: cachedContent });
+        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
+        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
+        await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
-        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
+        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
       } catch (cacheErr: any) {
         console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
@@ -5650,9 +5659,12 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        await aiCacheCheck.caches.get({ name: cachedContent });
+        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
+        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
+        await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
-        console.log(`[CACHE] 💾 Cache válido (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
+        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
       } catch (cacheErr: any) {
         console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
