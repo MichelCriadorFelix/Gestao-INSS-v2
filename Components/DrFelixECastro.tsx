@@ -66,6 +66,7 @@ interface ChatSession {
   cacheKeyIndex?: number | null;  // chave de API que criou o cache (caches são por projeto)
   cacheExpiresAt?: number | null; // epoch ms — TTL de 1h
   cacheDisabled?: boolean;        // true se a criação falhou (não retenta a cada msg)
+  cacheDocsLen?: number;          // fingerprint dos docs cacheados — docs mudaram => cache inválido
 }
 
 interface DrFelixECastroProps {
@@ -467,7 +468,11 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
       // ============================================================
       let docCacheName: string | null | undefined = session?.cacheName;
       let docCacheKeyIndex: number | null | undefined = session?.cacheKeyIndex;
-      const cacheStillValid = docCacheName && session?.cacheExpiresAt && session.cacheExpiresAt > Date.now() + 60_000;
+      // FINGERPRINT: se os documentos da sessão mudaram (ex.: dossiê de OUTRO cliente
+      // importado na mesma conversa), o cache antigo apontaria para docs VELHOS e o
+      // modelo misturaria casos. Docs diferentes => cache morto, recria na hora.
+      const cacheDocsMatch = session?.cacheDocsLen === (docSummaries?.length || 0);
+      const cacheStillValid = docCacheName && cacheDocsMatch && session?.cacheExpiresAt && session.cacheExpiresAt > Date.now() + 60_000;
       if (!cacheStillValid) { docCacheName = null; docCacheKeyIndex = null; }
       const activeProviderForCache = eliteProviderOverride || selectedModelProvider;
       if (!docCacheName && !session?.cacheDisabled && activeProviderForCache !== 'openrouter' && docSummaries && docSummaries.length > 30000) {
@@ -481,7 +486,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
           if (cacheData.cacheName) {
             docCacheName = cacheData.cacheName;
             docCacheKeyIndex = cacheData.keyIndex;
-            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: cacheData.cacheName, cacheKeyIndex: cacheData.keyIndex, cacheExpiresAt: cacheData.expiresAt } : s));
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: cacheData.cacheName, cacheKeyIndex: cacheData.keyIndex, cacheExpiresAt: cacheData.expiresAt, cacheDocsLen: (docSummaries?.length || 0), cacheDisabled: false } : s));
             console.log(`[CACHE] 💾 Documento cacheado (${cacheData.cacheName}) — próximas mensagens ~75% mais baratas.`);
           } else {
             setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheDisabled: true } : s));

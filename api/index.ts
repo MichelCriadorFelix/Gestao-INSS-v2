@@ -674,6 +674,15 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[DÚVIDA]";
   }
 
+  // FIX-RELATÓRIO: pedido de relatório NUNCA é geração de peça. Sem esta checagem,
+  // o verbo "gerar" em "GERAR RELATÓRIO" roteava para a redação de petição.
+  const mentionsReport = /relat[óo]rio/i.test(msgLower);
+  const mentionsPiece = /(pe[çc]a|peti[çc][ãa]o|recurso|inicial|contesta[çc][ãa]o|embargos|agravo|apela[çc][ãa]o)/i.test(msgLower);
+  if (mentionsReport && !mentionsPiece) {
+    console.log("[Detector de Intenção] Fast-path: RELATÓRIO detectado -> [DÚVIDA] (rota de relatório)");
+    return "[DÚVIDA]";
+  }
+
   // Fast-path para perguntas simples (economia de IA)
   const isQuestion = 
     /^(quais|qual|como|o que|quando|onde|por que|pq|quem|existe|há|me explique|me diga|me fale|explique|dúvida)/i.test(msgLower.trim()) ||
@@ -3824,11 +3833,11 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     // FIX#9: usar regex precisa em vez de includes("GERAR") simples
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
     // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message);
+    const isGenerationRequest = (isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)) && !isReportRequest; // FIX-RELATÓRIO: relatório jamais dispara peça
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if ((isStorageRequest || isReportRequest) && !isGenerationRequest) {
+      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
         model = "gemini-3-flash-preview";
         console.log("[Dr.Michel] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
@@ -4367,13 +4376,13 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                              message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
                              message.includes("Enviei os seguintes documentos");
     
-    const isGenerationRequest = isGenerationIntent || 
-                                 message.includes("GERAR PEÇA");
+    const isGenerationRequest = (isGenerationIntent || 
+                                 message.includes("GERAR PEÇA")) && !isReportRequestLuana; // FIX-RELATÓRIO
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if ((isStorageRequest || isReportRequestLuana) && !isGenerationRequest) {
+      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
         model = "gemini-3-flash-preview";
         console.log("[Dra.Luana] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {
@@ -4980,11 +4989,11 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     // FIX#9: usar regex precisa em vez de includes("GERAR") simples
     // Evita ativar em "não gerar ainda", "antes de gerar", etc.
     // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
-    const isGenerationRequest = isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message);
+    const isGenerationRequest = (isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)) && !isReportRequest; // FIX-RELATÓRIO: relatório jamais dispara peça
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if ((isStorageRequest || isReportRequest) && !isGenerationRequest) {
+      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
         model = "gemini-3-flash-preview";
         console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
       } else {

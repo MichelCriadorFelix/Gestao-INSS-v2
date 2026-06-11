@@ -72,7 +72,8 @@ export const supabaseService = {
       .from('ai_conversations')
       .select('*')
       .eq('lawyer_type', aiName)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .limit(20); // PERF: payload de carga inicial; conversas antigas permanecem no banco
       
     if (error) {
       console.error('Error fetching AI conversations from Supabase:', error);
