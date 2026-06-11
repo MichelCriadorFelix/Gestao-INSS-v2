@@ -3991,7 +3991,13 @@ REGRAS DE OURO:
     if (history.length > 30) history = history.slice(-30);
 
     // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequest ? `
+    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
+    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
+    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
+    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
+    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
+    ` : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
     Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
@@ -4476,7 +4482,7 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
       console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
       selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag && !ragContext) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
+    } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequestLuana) {
       console.log("Modo Dra. Luana Dúvida Ativado (Consultora Trabalhista)");
       selectedSystemPrompt = DRA_LUANA_DUVIDA_PROMPT + getCurrentDateContext();
     } else {
@@ -4571,7 +4577,13 @@ REGRAS DE OURO:
     if (history.length > 30) history = history.slice(-30);
 
     // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequestLuana ? `
+    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
+    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
+    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
+    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
+    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
+    ` : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
     Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários.
@@ -5150,7 +5162,13 @@ REGRAS DE OURO:
     // Previne edge cases extremos sem sacrificar contexto normal
     if (history.length > 30) history = history.slice(-30);
 
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequest ? `
+    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
+    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
+    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
+    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
+    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
+    ` : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
     Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
