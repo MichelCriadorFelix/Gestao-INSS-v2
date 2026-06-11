@@ -761,9 +761,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Let the columns take necessary space but distribute them using * 
-            // We use '*' but limit the table width implicitly by the page layout
-            node.table.widths = Array(colCount).fill('*');
+            // Limit table width to the page layout but distribute columns based on required auto content instead of evenly forcing '*' string
+            node.table.widths = Array(colCount).fill('auto');
             node.layout = {
               hLineWidth: function () { return 1; },
               vLineWidth: function () { return 1; },
@@ -793,6 +792,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.table.body.forEach((row: any[]) => {
               row.forEach((cell: any) => {
                 if (cell && typeof cell === 'object') {
+                  // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
+                  delete cell.noWrap;
                   if (cell.stack) applyIndent(cell.stack, isBlockquote, true);
                   if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true);
                 }
