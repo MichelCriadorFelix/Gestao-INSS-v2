@@ -1222,7 +1222,8 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       for (let i = 0; i < fullClient.documents.length; i++) {
         const doc = fullClient.documents[i];
         try {
-          const res = await fetch(doc.url);
+          // BUCKET PRIVADO: o GED baixa via URL assinada (URLs antigas são convertidas)
+          const res = await fetch(await supabaseService.resolveStorageUrl(doc.url));
           const blob = await res.blob();
           const file = new File([blob], doc.name, { type: doc.type || 'application/pdf' });
           fileArray.push(file);
