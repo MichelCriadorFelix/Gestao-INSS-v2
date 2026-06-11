@@ -108,7 +108,10 @@
   }
 }
 
-/* Hide Vercel Toolbar and feedback elements */
+.prose table td,
+.prose table th {
+  white-space: nowrap;
+}
 #vercel-live-feedback,
 .__vercel-toolbar,
 .vercel-toolbar,
