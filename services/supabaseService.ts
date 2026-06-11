@@ -1390,7 +1390,7 @@ export const supabaseService = {
       if (error.message.includes('bucket not found') || error.message.includes('does not exist')) {
         console.log(`Bucket ${bucket} não encontrado, tentando criar...`);
         try {
-          const { error: createError } = await supabase.storage.createBucket(bucket, { public: true });
+          const { error: createError } = await supabase.storage.createBucket(bucket, { public: !['client-documents','ged-auditoria'].includes(bucket) });
           if (createError) {
             console.error('Erro ao criar bucket:', createError);
             throw new Error(`O bucket "${bucket}" não existe e não pôde ser criado automaticamente. Por favor, crie-o manualmente no console do Supabase.`);
@@ -1408,5 +1408,45 @@ export const supabaseService = {
     // Retorna a URL pública
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
     return publicUrl;
+  },
+
+  // ====================================================================
+  // BUCKETS PRIVADOS (Etapa 3 do plano de segurança)
+  // As URLs públicas continuam GRAVADAS no banco como identificador
+  // estável (codificam bucket + caminho). Na hora de USAR (baixar,
+  // exibir, enviar ao backend), este resolvedor converte a URL antiga
+  // em uma URL ASSINADA temporária (1h) para buckets privados.
+  // FAIL-OPEN: qualquer erro devolve a URL original — com os buckets
+  // ainda públicos, nada muda; depois de privados, só URLs assinadas
+  // funcionam e o resolvedor é o caminho oficial.
+  // ====================================================================
+  PRIVATE_BUCKETS: ['client-documents', 'ged-auditoria'] as string[],
+
+  async resolveStorageUrl(url: string | null | undefined, expiresInSeconds: number = 3600): Promise<string> {
+    if (!url || typeof url !== 'string' || !url.startsWith('http')) return url || '';
+    const supabase = getSupabase();
+    if (!supabase) return url;
+    try {
+      // Formato: {SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}
+      const marker = '/storage/v1/object/public/';
+      const idx = url.indexOf(marker);
+      if (idx === -1) return url; // não é URL de storage público — devolve como está
+      const rest = url.substring(idx + marker.length);
+      const slash = rest.indexOf('/');
+      if (slash === -1) return url;
+      const bucket = rest.substring(0, slash);
+      // Caminho pode conter querystring — remover
+      const path = decodeURIComponent(rest.substring(slash + 1).split('?')[0]);
+      if (!this.PRIVATE_BUCKETS.includes(bucket)) return url; // bucket público de verdade (logos/marketing)
+      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
+      if (error || !data?.signedUrl) {
+        console.warn('[Storage] Falha ao assinar URL, usando original:', error?.message);
+        return url;
+      }
+      return data.signedUrl;
+    } catch (e) {
+      console.warn('[Storage] Erro no resolvedor de URL assinada, usando original:', e);
+      return url;
+    }
   }
 };

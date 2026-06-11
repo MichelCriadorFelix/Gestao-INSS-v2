@@ -11,6 +11,8 @@ import { supabaseService } from '../services/supabaseService';
 
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
+        // BUCKETS PRIVADOS: converte URL pública gravada no banco em URL assinada (1h)
+        docUrl = await supabaseService.resolveStorageUrl(docUrl);
         let downloadUrl = docUrl;
         let isObjectURL = false;
         
@@ -239,7 +241,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       // 1. Download document if it's a URL
       let file: File;
       if (doc.url.startsWith('http')) {
-        const response = await fetch(doc.url);
+        const fetchableUrl = await supabaseService.resolveStorageUrl(doc.url);
+        const response = await fetch(fetchableUrl);
         const blob = await response.body ? await response.blob() : null;
         if (!blob) throw new Error("Falha ao baixar arquivo para compressão.");
         file = new File([blob], doc.name, { type: doc.type });

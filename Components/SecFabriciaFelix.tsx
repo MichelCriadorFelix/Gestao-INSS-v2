@@ -969,12 +969,14 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
             
             if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
+            // BUCKETS PRIVADOS: o backend precisa BAIXAR este arquivo — envia URL assinada (1h)
+            const fetchableStorageUrl = await supabaseService.resolveStorageUrl(storageUrl);
   
             const urlResponse = await apiFetch('/api/upload-from-url', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                url: storageUrl,
+                url: fetchableStorageUrl,
                 mimeType: file.type,
                 fileName: file.name,
                 keyIndex: preferredKeyIndex
