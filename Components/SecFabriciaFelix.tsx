@@ -465,6 +465,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
       const cacheDocsMatch = session?.cacheDocsLen === (docSummaries?.length || 0);
       const cacheStillValid = docCacheName && cacheDocsMatch && session?.cacheExpiresAt && session.cacheExpiresAt > Date.now() + 60_000;
       if (!cacheStillValid) { docCacheName = null; docCacheKeyIndex = null; }
+      let cacheFailedMidRun = false; // cache morreu durante a geração => retomadas reenviam o documento
       const activeProviderForCache = eliteProviderOverride || selectedModelProvider;
       if (!docCacheName && !session?.cacheDisabled && activeProviderForCache !== 'openrouter' && docSummaries && docSummaries.length > 30000) {
         try {
@@ -726,7 +727,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: currentMessage,
-              documentContext: resumeCount === 0 ? docSummaries : undefined, // Economia: documento já está no history (fullText) nas retomadas
+              documentContext: (resumeCount === 0 || cacheFailedMidRun) ? docSummaries : undefined, // Economia nas retomadas; se o cache morreu em voo, reenvia o doc
               history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
@@ -809,6 +810,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
                   if (data.cacheInvalid) {
                     // Cache expirou: limpa para recriar no próximo envio
                     docCacheName = null;
+                    cacheFailedMidRun = true;
                     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: null, cacheExpiresAt: 0 } : s));
                   }
                   if (data.status) {

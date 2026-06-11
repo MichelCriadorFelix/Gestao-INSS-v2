@@ -97,6 +97,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false); // UX: feedback visível durante o upload de anexos
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certidaoFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,6 +105,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       const files = e.target.files;
       if (!files || files.length === 0) return;
 
+      setIsAttaching(true); // mostra "Enviando..." imediatamente
       const newDocs: ScannedDocument[] = [];
       const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
       const clientId = formData.id || 'temp';
@@ -151,6 +153,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           }
       }
 
+      setIsAttaching(false);
       if (newDocs.length > 0) {
           const updatedDocs = [...(formData.narrativeCertificates || []), ...newDocs];
           const updatedFormData = { ...formData, narrativeCertificates: updatedDocs };
@@ -348,11 +351,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                return;
           }
 
-          const documentsToProcess = docsToProcess.map(doc => ({
-              url: doc.url,
+          // BUCKET PRIVADO: o backend baixa estes arquivos — envia URLs assinadas
+          const documentsToProcess = await Promise.all(docsToProcess.map(async doc => ({
+              url: await supabaseService.resolveStorageUrl(doc.url),
               mimeType: doc.type,
               name: doc.name
-          }));
+          })));
 
           const ocrRes = await fetch('/api/ocr-unified', {
                method: 'POST',
@@ -429,6 +433,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       const files = e.target.files;
       if (!files || files.length === 0) return;
 
+      setIsAttaching(true); // mostra "Enviando..." imediatamente
       const newDocs: ScannedDocument[] = [];
       const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
       const clientId = formData.id || 'temp';
@@ -476,6 +481,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           }
       }
 
+      setIsAttaching(false);
       if (newDocs.length > 0) {
           const updatedDocs = [...(formData.documents || []), ...newDocs];
           const updatedFormData = { ...formData, documents: updatedDocs };
@@ -1168,6 +1174,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
                             </button>
+                            {isAttaching && (
+                                <span className="flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                    Enviando arquivo(s)... aguarde
+                                </span>
+                            )}
                             <button 
                                 onClick={handleUnifiedOCR}
                                 disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
@@ -1378,6 +1390,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
                             </button>
+                            {isAttaching && (
+                                <span className="flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                    Enviando arquivo(s)... aguarde
+                                </span>
+                            )}
                         </div>
                     </div>
 

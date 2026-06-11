@@ -2569,6 +2569,22 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       return callGeminiStream(paramsWithoutFiles, 1, modelIndex, 0, forcedKeyIndex);
     }
 
+    // CACHE + COTA: requisição fixada na chave do cache NÃO pode rotacionar (o cache
+    // só existe nela). Sobrecarga aqui = cota por MINUTO: espera 30s para o reset e
+    // tenta a MESMA chave (até 4 esperas). Persistindo, mata o cache (CACHE_INVALID)
+    // para o fluxo voltar ao caminho normal com rotação e documento completo.
+    if (cachePinned && isOverloaded && retries > 0) {
+      const pinnedWaits = MAX_RETRIES - retries;
+      if (pinnedWaits >= 4) {
+        console.warn('[CACHE] Cota persistente na chave do cache após 4 esperas — abandonando o cache.');
+        throw new Error('CACHE_INVALID');
+      }
+      const msgPin = `[Cache] Cota por minuto da chave do cache atingida. Aguardando 30s pelo reset (espera ${pinnedWaits + 1}/4)...`;
+      console.log(msgPin); if (onStatus) onStatus(msgPin);
+      await new Promise(resolve => setTimeout(resolve, 30_000));
+      return callGeminiStream(params, retries - 1, modelIndex, failuresOnCurrentModel, forcedKeyIndex, onStatus);
+    }
+
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
       if (!isBadRequest) currentKeyIndex++;
       
@@ -3916,7 +3932,7 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
     // Se inválido/expirado, avisa o cliente e segue com o texto completo.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
@@ -4130,9 +4146,12 @@ ${message}`;
     if (isGenerationRequest) {
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" }; // Máximo raciocínio para petições
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if (isReportRequest) {
       maxOutputTokens = 8192;
-      thinkingConfig = { thinkingLevel: "low" }; // Velocidade para armazenamento/relatório
+      thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
+    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+      maxOutputTokens = 8192;
+      thinkingConfig = { thinkingLevel: "low" }; // Velocidade para armazenamento/ciência
     }
 
     if (modelProvider === 'openrouter') {
@@ -4493,7 +4512,7 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
     // Se inválido/expirado, avisa o cliente e segue com o texto completo.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
@@ -4725,7 +4744,10 @@ ${message}`;
     if (isGenerationRequest) {
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" };
-    } else if (isReportRequestLuana || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if (isReportRequestLuana) {
+      maxOutputTokens = 8192;
+      thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
+    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingLevel: "low" };
     }
@@ -5070,7 +5092,7 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
     // Se inválido/expirado, avisa o cliente e segue com o texto completo.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
@@ -5244,7 +5266,10 @@ ${message}`;
     if (isGenerationRequest) {
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" };
-    } else if (isReportRequest || (message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if (isReportRequest) {
+      maxOutputTokens = 8192;
+      thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
+    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
       thinkingConfig = { thinkingLevel: "low" };
     }
@@ -5663,7 +5688,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
     // Se inválido/expirado, avisa o cliente e segue com o texto completo.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
