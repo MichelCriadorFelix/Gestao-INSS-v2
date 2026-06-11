@@ -721,7 +721,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       removeFontProperty(pdfMakeContent);
 
       // Apply text-indent to paragraphs
-      const applyIndent = (nodes: any[], inBlockquote = false, inTable = false) => {
+      const applyIndent = (nodes: any[], inBlockquote = false, inTable = false, isSmallTable = false) => {
         if (!Array.isArray(nodes)) return;
         nodes.forEach(node => {
           if (!node || typeof node !== 'object') return;
@@ -740,7 +740,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.listStyle = undefined;
             node.list = undefined;
             if (inTable) {
-              node.alignment = 'left';
+              if (isSmallTable) {
+                // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
+                node.alignment = node.alignment || 'center';
+                node.noWrap = true; // Avoid splitting names to next line in signatures
+              } else {
+                node.alignment = 'left';
+              }
               node.leadingIndent = 0;
               node.fontSize = 10; // Reduce font size inside tables to avoid overflow
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
@@ -789,18 +795,24 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.margin = [0, 12, 0, 12];
           }
 
-          if (node.stack) applyIndent(node.stack, isBlockquote, isTable);
-          if (node.text && Array.isArray(node.text)) applyIndent(node.text, isBlockquote, isTable);
-          if (node.ul) applyIndent(node.ul, isBlockquote, isTable);
-          if (node.ol) applyIndent(node.ol, isBlockquote, isTable);
+          if (node.stack) applyIndent(node.stack, isBlockquote, isTable, isSmallTable);
+          if (node.text && Array.isArray(node.text)) applyIndent(node.text, isBlockquote, isTable, isSmallTable);
+          if (node.ul) applyIndent(node.ul, isBlockquote, isTable, isSmallTable);
+          if (node.ol) applyIndent(node.ol, isBlockquote, isTable, isSmallTable);
           if (node.table && node.table.body) {
+            const colCount = node.table.body[0]?.length || 0;
             node.table.body.forEach((row: any[]) => {
               row.forEach((cell: any) => {
                 if (cell && typeof cell === 'object') {
-                  // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
-                  delete cell.noWrap;
-                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true);
-                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true);
+                  if (colCount > 3) {
+                    // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
+                    delete cell.noWrap;
+                  } else {
+                    // For small tables like signatures, ensure noWrap so it fits exactly on a single line!
+                    cell.noWrap = true;
+                  }
+                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true, colCount <= 3);
+                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true, colCount <= 3);
                 }
               });
             });
