@@ -2714,9 +2714,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         max_tokens: params.max_tokens || 16383,
         stream: true,
         include_reasoning: true, 
-        reasoning_effort: params.thinkingConfig?.thinkingLevel === "high" ? "high"
-          : params.thinkingConfig?.thinkingLevel === "low" ? "low"
-          : "medium"
+        reasoning_effort: "high"
       })
     });
 
@@ -3991,13 +3989,7 @@ REGRAS DE OURO:
     if (history.length > 30) history = history.slice(-30);
 
     // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequest ? `
-    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
-    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
-    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
-    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
-    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
-    ` : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
     Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
@@ -4245,8 +4237,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             ? (parseInt(String(cacheKeyIndex)))
             : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
           const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
+            ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
           const responseStream = await callGeminiStream({
             model: model || "gemini-3-flash-preview",
             contents: streamContents,
@@ -4482,7 +4474,7 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
       console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
       selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag && !ragContext) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequestLuana) {
+    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
       console.log("Modo Dra. Luana Dúvida Ativado (Consultora Trabalhista)");
       selectedSystemPrompt = DRA_LUANA_DUVIDA_PROMPT + getCurrentDateContext();
     } else {
@@ -4577,13 +4569,7 @@ REGRAS DE OURO:
     if (history.length > 30) history = history.slice(-30);
 
     // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequestLuana ? `
-    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
-    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
-    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
-    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
-    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
-    ` : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
     Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários.
@@ -4861,8 +4847,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
               ];
           const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), safetySettings: luanaSafety, cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools, safetySettings: luanaSafety };
+            ? { temperature: finalTemperature, maxOutputTokens, safetySettings: luanaSafety, cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: luanaSafety };
           const responseStream = await callGeminiStream({
             model: model || "gemini-3-flash-preview",
             contents: streamContents,
@@ -5162,13 +5148,7 @@ REGRAS DE OURO:
     // Previne edge cases extremos sem sacrificar contexto normal
     if (history.length > 30) history = history.slice(-30);
 
-    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : isReportRequest ? `
-    [LEMBRETE TÉCNICO — RELATÓRIO DE ANÁLISE JURÍDICA]
-    Você está elaborando o RELATÓRIO DE ANÁLISE JURÍDICA completo do caso.
-    Siga INTEGRALMENTE a estrutura de relatório prevista nas suas instruções (TODAS as seções, incluindo Status da Leitura Documental, Resumo dos Fatos, Provas, Divergências, ADVOGADO DO DIABO, Análise de Requisitos, Princípios, Estratégia, Recomendação de Extensão, CURADORIA DE FUNDAMENTAÇÃO com a base de conhecimento, Perguntas ao Advogado e Documentos Analisados).
-    O relatório deve ser DENSO e COMPLETO — não há limite de brevidade; NUNCA resuma nem omita seções.
-    PROIBIDO inventar artigos, súmulas, jurisprudências, fatos ou valores: use exclusivamente os dados reais dos autos e a base de conhecimento fornecida.
-    ` : intent === "[DÚVIDA]" ? `
+    const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
     [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
     Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
@@ -5387,8 +5367,8 @@ REGRAS ABSOLUTAS:
             ? (parseInt(String(cacheKeyIndex)))
             : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
           const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
+            ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
+            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
           const responseStream = await callGeminiStream({
             model: model || "gemini-3-flash-preview",
             contents: streamContents,
@@ -5907,8 +5887,8 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
     : currentContents;
   const streamConfig: any = activeDocCache
-    ? { temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), cachedContent: activeDocCache }
-    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, ...(thinkingConfig && { thinkingConfig }), tools };
+    ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
+    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
   const pinnedKey = activeDocCache
     ? (parseInt(String(cacheKeyIndex)))
     : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
