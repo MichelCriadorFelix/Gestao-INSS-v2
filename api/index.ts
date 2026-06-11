@@ -3871,7 +3871,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag && !ragContext) ragContext = "";
-    } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
+    } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequest) {
       selectedSystemPrompt = DR_MICHEL_DUVIDA_PROMPT + getCurrentDateContext();
     }
 
@@ -5033,7 +5033,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag && !ragContext) ragContext = "";
-    } else if ((intent === "[DÚVIDA]" || isReportRequest) && !isGenerationRequest) {
+    } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequest) {
       selectedSystemPrompt = DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
     }
 
