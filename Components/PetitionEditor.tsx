@@ -761,8 +761,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Limit table width to the page layout but distribute columns based on required auto content instead of evenly forcing '*' string
-            node.table.widths = Array(colCount).fill('auto');
+            // Small tables (like signature blocks with <= 3 columns) should span page margin-to-margin ('*')
+            // while larger tables (like contribution/vínculo tables with many columns) use 'auto' to fit without overflow
+            if (colCount <= 3) {
+              node.table.widths = Array(colCount).fill('*');
+            } else {
+              node.table.widths = Array(colCount).fill('auto');
+            }
             node.layout = {
               hLineWidth: function () { return 1; },
               vLineWidth: function () { return 1; },
