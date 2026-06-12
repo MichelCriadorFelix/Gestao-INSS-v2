@@ -2611,7 +2611,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              nextFailures = 0;
              const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
-             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Erro original: ${errorMessage.substring(0, 50)}... Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
