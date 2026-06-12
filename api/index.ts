@@ -2296,12 +2296,22 @@ function getEffectiveModel(modelName?: string): string {
 function getApiKeys() {
   const keys: string[] = [];
 
-  // 1. A rotação é exclusivamente entre as chaves da API do Google com o nome API_KEY_1 (compatível com lista separada por vírgulas)
-  if (process.env.API_KEY_1) {
-    keys.push(...process.env.API_KEY_1.split(',').map(k => k.trim()).filter(Boolean));
-  } else if (process.env.GEMINI_API_KEY) {
-    // Fallback básico caso API_KEY_1 não esteja preenchida
-    keys.push(process.env.GEMINI_API_KEY);
+  // Suporta chaves individuais configuradas sequencialmente na Vercel: API_KEY_1, API_KEY_2, etc. (até 30)
+  // e mantém a retrocompatibilidade se API_KEY_1 for uma lista separada por vírgula.
+  for (let i = 1; i <= 30; i++) {
+    const keyVal = process.env[`API_KEY_${i}`];
+    if (keyVal) {
+      if (i === 1 && keyVal.includes(',')) {
+        keys.push(...keyVal.split(',').map(k => k.trim()).filter(Boolean));
+      } else {
+        keys.push(keyVal.trim());
+      }
+    }
+  }
+
+  // Fallback se nenhuma chave API_KEY_X foi encontrada
+  if (keys.length === 0 && process.env.GEMINI_API_KEY) {
+    keys.push(process.env.GEMINI_API_KEY.trim());
   }
   
   const uniqueKeys = [...new Set(keys)]; // Remove duplicatas
@@ -2479,7 +2489,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
              console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
              const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
-             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
+             const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
+             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
          }
       }
       
@@ -2607,7 +2618,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
              const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
-             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
+             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
