@@ -644,6 +644,47 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
+
+        // RAG DETERMINÍSTICO (PLANNER) — PRIORIDADE MÁXIMA
+        try {
+          const plannerContext = (() => {
+            const msgs = session?.messages || [];
+            const lastReport = [...msgs].reverse().find((m: any) =>
+              m.role === 'assistant' && typeof m.content === 'string' &&
+              /RELAT[ÓO]RIO|FUNDAMENTOS|AN[ÁA]LISE DA BASE|DISPON[ÍI]VEL|RECOMENDA[ÇC][ÃA]O/i.test(m.content)
+            );
+            const userTexts = msgs
+              .filter((m: any) => m.role === 'user')
+              .map((m: any) => m.content)
+              .filter((c: string) => c && c.length > 20 && !c.startsWith('[SYSTEM'))
+              .slice(-6)
+              .join('\n');
+            let ctx = `${messageText}\n${userTexts}`;
+            if (lastReport) {
+              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
+            }
+            return ctx.substring(0, 9000);
+          })();
+
+          const planResp = await apiFetch('/api/rag/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caseContext: plannerContext, areas: AGENT_AREAS }),
+            signal: abortController.signal
+          });
+
+          if (planResp.ok) {
+            const { ragContext: deterministicRag, chunksFound } = await planResp.json();
+            if (deterministicRag && deterministicRag.trim().length > 0) {
+              console.log(`[RAG Determinístico - DrFelix] ${chunksFound} chunks recuperados por plano.`);
+              ragContext = ragContext
+                ? `${deterministicRag}\n\n---\n\n${ragContext}`
+                : deterministicRag;
+            }
+          }
+        } catch (planErr) {
+          console.warn("RAG planner Dr.Felix e Castro falhou:", planErr);
+        }
         } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
