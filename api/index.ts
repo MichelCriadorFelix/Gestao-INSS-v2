@@ -1619,9 +1619,6 @@ SCHEMA:
       "startDate": "YYYY-MM-DD",
       "endDate": "YYYY-MM-DD",
       "indicators": ["IEAN", "PEMPREG"],
-      "sc": [
-        { "month": "MM/YYYY", "value": 1500.00, "indicators": [] }
-      ],
       "isConcomitant": false,
       "isBenefit": false // true se for benefício por incapacidade
     }
@@ -1631,9 +1628,9 @@ SCHEMA:
 
 REGRAS CRÍTICAS:
 1. Datas no formato YYYY-MM-DD para 'startDate' e 'endDate'.
-2. 'value' deve ser NÚMERO (float), não string. Ex: 1500.50 (não "R$ 1.500,50").
-3. Se não houver data fim, deixe null ou string vazia.
-4. Extraia TODOS os salários de contribuição (sc) disponíveis.
+2. Se não houver data fim, deixe null ou string vazia.
+3. NÃO inclua os salários de contribuição (sc) no JSON — eles são extraídos localmente pelo sistema. Retorne APENAS os metadados de cada vínculo (seq, nit, code, origin, type, datas, indicators, isBenefit, isConcomitant). Isso é essencial para a velocidade da análise.
+4. EXTRAIA TODOS OS VÍNCULOS, do primeiro ao último Seq., sem pular nenhum.
 5. EXTRAIA BENEFÍCIOS POR INCAPACIDADE: Identifique períodos de auxílio-doença (B31, B91) ou aposentadoria por invalidez (B32, B92) e marque como 'isBenefit: true'.
 `;
 

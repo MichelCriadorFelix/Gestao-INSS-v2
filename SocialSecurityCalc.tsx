@@ -726,7 +726,50 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         return Math.random().toString(36).substring(2) + Date.now().toString(36);
     };
 
-    const analyzeCNISWithAI = async (text: string): Promise<Partial<SocialSecurityData> | null> => {
+    // Extrai os salários de contribuição (SC) localmente, por regex determinístico,
+    // agrupados pelo número de sequência (Seq.) do vínculo no extrato CNIS.
+    // A IA retorna apenas os METADADOS dos vínculos; os salários vêm daqui —
+    // mais rápido (sem gerar milhares de tokens) e sem risco de truncamento.
+    const extractScBySeq = (content: string): Map<number, { month: string; value: number; indicators: string[] }[]> => {
+        const map = new Map<number, { month: string; value: number; indicators: string[] }[]>();
+        if (!content) return map;
+
+        // Mesmo padrão de início de vínculo usado pelo parser local:
+        // Seq. + (NIT ou CNPJ ou CEI)
+        const bondStartRegex = /\b(\d+)\s+(?=\d{3}\.\d{5}\.\d{2}-\d|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{2}\.\d{3}\.\d{5}\/\d{2})/g;
+        const starts: { index: number; seq: number }[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = bondStartRegex.exec(content)) !== null) {
+            starts.push({ index: m.index, seq: parseInt(m[1], 10) });
+        }
+
+        // Indicador deve começar com LETRA — senão o grupo opcional engole o mês
+        // seguinte quando várias remunerações estão na mesma linha (bug do parser legado)
+        const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z][A-Z0-9-]*))?/g;
+
+        starts.forEach((s, i) => {
+            const endIndex = starts[i + 1]?.index ?? content.length;
+            const block = content.substring(s.index, endIndex);
+            const sc: { month: string; value: number; indicators: string[] }[] = [];
+            let rm: RegExpExecArray | null;
+            remunRegex.lastIndex = 0;
+            while ((rm = remunRegex.exec(block)) !== null) {
+                const value = parseFloat(rm[2].replace(/\./g, '').replace(',', '.'));
+                if (!isNaN(value)) sc.push({ month: rm[1], value, indicators: rm[3] ? [rm[3]] : [] });
+            }
+            sc.sort((a, b) => {
+                const [ma, ya] = a.month.split('/').map(Number);
+                const [mb, yb] = b.month.split('/').map(Number);
+                return (ya * 12 + ma) - (yb * 12 + mb);
+            });
+            // Se o mesmo seq aparecer 2x (quebra de página), concatena
+            const existing = map.get(s.seq);
+            if (existing) { map.set(s.seq, existing.concat(sc)); } else { map.set(s.seq, sc); }
+        });
+        return map;
+    };
+
+    const analyzeCNISWithAI = async (text: string, fullTextForSc?: string): Promise<Partial<SocialSecurityData> | null> => {
         try {
             const response = await apiFetch('/api/analyze-cnis', {
                 method: 'POST',
@@ -761,16 +804,25 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 return null;
             }
 
+            // Extrai os SC localmente do texto COMPLETO (sem truncamento de 300k)
+            const localScMap = extractScBySeq(fullTextForSc || text);
+
             const mappedBonds: CNISBond[] = (aiData.bonds || []).map((b: any) => {
                 // AI returns YYYY-MM-DD. We MUST keep it as YYYY-MM-DD for <input type="date">
                 let startDate = b.startDate || '';
                 let endDate = b.endDate || '';
                 
-                const sc = (b.sc || []).map((s: any) => ({ 
+                // Prioridade: SC extraído localmente (determinístico, texto integral).
+                // Fallback: SC da IA, caso o regex local não encontre nada para o seq.
+                const localSc = (typeof b.seq === 'number' || typeof b.seq === 'string')
+                    ? (localScMap.get(Number(b.seq)) || [])
+                    : [];
+                const aiSc = (b.sc || []).map((s: any) => ({ 
                     month: s.month, 
                     value: typeof s.value === 'number' ? s.value : parseFloat(String(s.value).replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0,
                     indicators: s.indicators || []
                 }));
+                const sc = localSc.length > 0 ? localSc : aiSc;
 
                 // Post-Processing: Infer dates if missing
                 if (!startDate && sc.length > 0) {
@@ -903,7 +955,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 );
             }
             
-            const aiResult = await analyzeCNISWithAI(truncatedText);
+            const aiResult = await analyzeCNISWithAI(truncatedText, fullText);
             
             if (aiResult) {
                 setData(prev => ({
@@ -1726,7 +1778,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const sc: { month: string; value: number, indicators?: string[] }[] = [];
             // Regex for MM/YYYY followed by Value
             // Value can be "1.234,56"
-            const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z0-9-]+))?/g;
+            // FIX: indicador deve começar com LETRA — antes, [A-Z0-9-]+ engolia o mês
+            // seguinte em remunerações na mesma linha, perdendo competências alternadas
+            const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z][A-Z0-9-]*))?/g;
             
             let remunMatch;
             // We search in the whole block
