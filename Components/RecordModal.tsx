@@ -15,7 +15,14 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
         docUrl = await supabaseService.resolveStorageUrl(docUrl);
         let downloadUrl = docUrl;
         let isObjectURL = false;
+        let finalDocName = docName || 'documento.pdf';
         
+        // Identificar se é PDF, imagem ou texto de antemão por url ou nome
+        let isPdf = finalDocName.toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
+        let isPng = finalDocName.toLowerCase().endsWith('.png') || docUrl.toLowerCase().includes('.png') || docUrl.startsWith('data:image/png');
+        let isJpg = finalDocName.toLowerCase().endsWith('.jpg') || finalDocName.toLowerCase().endsWith('.jpeg') || docUrl.toLowerCase().includes('.jpg') || docUrl.toLowerCase().includes('.jpeg') || docUrl.startsWith('data:image/jpeg');
+        let isTxt = finalDocName.toLowerCase().endsWith('.txt') || docUrl.toLowerCase().includes('.txt') || docUrl.startsWith('data:text/plain');
+
         if (docUrl.startsWith('data:')) {
             // Fix for sometimes malformed or very long base64 strings
             const parts = docUrl.split('base64,');
@@ -26,6 +33,11 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
                     mimeType = headerPart.substring(5);
                 }
                 
+                if (mimeType.toLowerCase().includes('pdf') || mimeType === 'application/pdf') isPdf = true;
+                if (mimeType.toLowerCase().includes('png') || mimeType === 'image/png') isPng = true;
+                if (mimeType.toLowerCase().includes('jpeg') || mimeType.toLowerCase().includes('jpg') || mimeType === 'image/jpeg') isJpg = true;
+                if (mimeType.toLowerCase().includes('plain') || mimeType === 'text/plain') isTxt = true;
+
                 // Remove any invalid characters (spaces, newlines, etc)
                 const safeBase64 = parts[1].replace(/[^A-Za-z0-9+/=]/g, '');
                 
@@ -45,6 +57,12 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
                     const response = await fetch(docUrl);
                     if (!response.ok) throw new Error("Network error with data URI");
                     const blob = await response.blob();
+                    
+                    if (blob.type.toLowerCase().includes('pdf') || blob.type === 'application/pdf') isPdf = true;
+                    if (blob.type.toLowerCase().includes('png') || blob.type === 'image/png') isPng = true;
+                    if (blob.type.toLowerCase().includes('jpeg') || blob.type.toLowerCase().includes('jpg') || blob.type === 'image/jpeg') isJpg = true;
+                    if (blob.type.toLowerCase().includes('plain') || blob.type === 'text/plain') isTxt = true;
+
                     downloadUrl = window.URL.createObjectURL(blob);
                     isObjectURL = true;
                 }
@@ -53,13 +71,30 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
             const response = await fetch(docUrl);
             if (!response.ok) throw new Error("Network error fetching url");
             const blob = await response.blob();
+            
+            if (blob.type.toLowerCase().includes('pdf') || blob.type === 'application/pdf') isPdf = true;
+            if (blob.type.toLowerCase().includes('png') || blob.type === 'image/png') isPng = true;
+            if (blob.type.toLowerCase().includes('jpeg') || blob.type.toLowerCase().includes('jpg') || blob.type === 'image/jpeg') isJpg = true;
+            if (blob.type.toLowerCase().includes('plain') || blob.type === 'text/plain') isTxt = true;
+
             downloadUrl = window.URL.createObjectURL(blob);
             isObjectURL = true;
         }
 
+        // Aplicar extensão correta se faltar no filename original
+        if (isPdf && !finalDocName.toLowerCase().endsWith('.pdf')) {
+            finalDocName = finalDocName + '.pdf';
+        } else if (isPng && !finalDocName.toLowerCase().endsWith('.png')) {
+            finalDocName = finalDocName + '.png';
+        } else if (isJpg && !finalDocName.toLowerCase().endsWith('.jpg') && !finalDocName.toLowerCase().endsWith('.jpeg')) {
+            finalDocName = finalDocName + '.jpg';
+        } else if (isTxt && !finalDocName.toLowerCase().endsWith('.txt')) {
+            finalDocName = finalDocName + '.txt';
+        }
+
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = docName || 'documento.pdf';
+        link.download = finalDocName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -73,9 +108,15 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
         
         // Ultimate fallback
         try {
+            let finalDocName = docName || 'documento.pdf';
+            const isPdf = finalDocName.toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf');
+            if (isPdf && !finalDocName.toLowerCase().endsWith('.pdf')) {
+                finalDocName = finalDocName + '.pdf';
+            }
+            
             const link = document.createElement('a');
             link.href = docUrl;
-            link.download = docName || 'documento.pdf';
+            link.download = finalDocName;
             link.target = '_blank';
             document.body.appendChild(link);
             link.click();

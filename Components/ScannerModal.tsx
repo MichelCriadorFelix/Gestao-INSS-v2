@@ -254,9 +254,12 @@ const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose, onSave }) 
 
             const pdfBase64 = pdf.output('datauristring');
             
+            const rawName = docType || 'Documento Digitalizado';
+            const cleanName = rawName.toLowerCase().endsWith('.pdf') ? rawName : `${rawName}.pdf`;
+
             const newDoc: ScannedDocument = {
                 id: Math.random().toString(36).substr(2, 9),
-                name: docType || 'Documento Digitalizado',
+                name: cleanName,
                 type: 'application/pdf',
                 url: pdfBase64,
                 date: new Date().toLocaleDateString('pt-BR')

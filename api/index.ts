@@ -2286,8 +2286,8 @@ const MODEL_MAPPING: Record<string, string> = {
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return MODEL_HIERARCHY[0];
-  if (modelName === "gemini-3.5-flash") return "gemini-3.5-flash";
-  if (modelName === "gemini-3.5-flash") return "gemini-3.5-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-1.5-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-1.5-flash";
   if (modelName.includes('deepseek')) return modelName;
   return MODEL_MAPPING[modelName] || modelName;
 }
@@ -2600,7 +2600,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              const msg2 = `[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo. Fallback restrito. Rotacionando chaves...`; console.log(msg2); if(onStatus) onStatus(msg2);
          }
       } else {
-         delay = errorMessage.includes('503') ? 3000 : 2000;
+         delay = 100; // FAST FALLBACK to skip exhausted keys rapidly
          
          if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
@@ -2611,7 +2611,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              nextFailures = 0;
              const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
-             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Erro original: ${errorMessage.substring(0, 50)}... Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando instantaneamente para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
@@ -2620,8 +2620,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     }
     
     if (retries === 0) {
-      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
-        throw new Error(`⚠️ LIMITE DE COTA ATINGIDO: O plano gratuito do Gemini (Free Tier) tem um limite de requisições por minuto. Como você está enviando documentos ou conversas extremamente grandes, a cota de tokens (1 milhão por minuto) se esgota rapidamente.\n\nPor favor, AGUARDE 1 MINUTO e envie sua requisição novamente, ou limpe o histórico/documentos.`);
+      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        throw new Error(`ALL_KEYS_EXHAUSTEDTED: ${errorMessage}`);
       }
       throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
@@ -3818,6 +3818,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
+    let currentContents: any[] = [];
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
@@ -4172,7 +4173,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      const currentContents = [...contents];
+      currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
@@ -4333,6 +4334,24 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       res.end();
     } catch (err: any) {
       clearInterval(heartbeat);
+      if (err.message && err.message.includes("ALL_KEYS_EXHAUSTEDTED") && process.env.OPENROUTER_API_KEY) {
+        console.warn("[Auto-Fallback] Cota do Google esgotada! Trocando para OpenRouter.");
+        try { res.write(`data: ${JSON.stringify({ status: "[Auto-Fallback] Cota gratuita (Free Tier) esgotada em todas as 15 contas. Tentando via Servidor de Backup Pago (OpenRouter)..." })}\n\n`); } catch {}
+        const fallbackParams = {
+           model: "deepseek/deepseek-chat",
+           messages: activeDocCache ? [{ role: 'user', content: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA:\n\n" + selectedSystemPrompt }, ...currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text }))] : currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text })),
+           temperature: finalTemperature, max_tokens: maxOutputTokens
+        };
+        try {
+          const orResult = await callOpenRouterStream(fallbackParams, res, true);
+          if (orResult.maxTokensHit) {
+            try { res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`); } catch {}
+          }
+        } catch (orErr: any) {
+          try { res.write(`data: ${JSON.stringify({ error: "OpenRouter Falhou: " + orErr.message })}\n\n`); } catch {}
+        }
+        return;
+      }
       (() => {
     let _errStr = err.message ;
     if (_errStr === 'CACHE_INVALID') {
@@ -4371,6 +4390,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
+    let currentContents: any[] = [];
     let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
@@ -4777,7 +4797,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      const currentContents = [...contents];
+      currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
@@ -4995,6 +5015,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
 
   try {
+    let currentContents: any[] = [];
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
@@ -5306,7 +5327,7 @@ ${message}`;
       let isFinished = false;
       let attempt = 0;
       let fullResponseText = "";
-      const currentContents = [...contents];
+      currentContents = [...contents];
       let finalMaxTokensHit = false;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       let targetInstruction = "";
@@ -5478,6 +5499,24 @@ REGRAS ABSOLUTAS:
       res.end();
     } catch (err: any) {
       clearInterval(heartbeat);
+      if (err.message && err.message.includes("ALL_KEYS_EXHAUSTEDTED") && process.env.OPENROUTER_API_KEY) {
+        console.warn("[Auto-Fallback] Cota do Google esgotada! Trocando para OpenRouter.");
+        try { res.write(`data: ${JSON.stringify({ status: "[Auto-Fallback] Cota gratuita (Free Tier) esgotada em todas as 15 contas. Tentando via Servidor de Backup Pago (OpenRouter)..." })}\n\n`); } catch {}
+        const fallbackParams = {
+           model: "deepseek/deepseek-chat",
+           messages: activeDocCache ? [{ role: 'user', content: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA:\n\n" + selectedSystemPrompt }, ...currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text }))] : currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text })),
+           temperature: finalTemperature, max_tokens: maxOutputTokens
+        };
+        try {
+          const orResult = await callOpenRouterStream(fallbackParams, res, true);
+          if (orResult.maxTokensHit) {
+            try { res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`); } catch {}
+          }
+        } catch (orErr: any) {
+          try { res.write(`data: ${JSON.stringify({ error: "OpenRouter Falhou: " + orErr.message })}\n\n`); } catch {}
+        }
+        return;
+      }
       (() => {
     let _errStr = err.message ;
     if (_errStr === 'CACHE_INVALID') {
