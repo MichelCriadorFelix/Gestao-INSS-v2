@@ -60,7 +60,7 @@ const getCurrentDateContext = () => {
 
 // Apply authentication to all /api routes except health and config
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/config" || req.path === "/rag/plan" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
+  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
   authenticate(req, res, next);
 });
 
@@ -6136,7 +6136,7 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
   try {
     const { adminKey, batchOffset = 0 } = req.body || {};
 
-    if (adminKey !== (process.env.ADMIN_KEY || "felix-castro-rechunk-2026")) {
+    if (!process.env.ADMIN_KEY || adminKey !== process.env.ADMIN_KEY) {
       send({ error: "Não autorizado." });
       return res.end();
     }
@@ -6275,7 +6275,7 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
 
   try {
     const { adminKey } = req.body || {};
-    if (adminKey !== (process.env.ADMIN_KEY || "felix-castro-rechunk-2026")) {
+    if (!process.env.ADMIN_KEY || adminKey !== process.env.ADMIN_KEY) {
       send({ error: "Não autorizado" });
       return res.end();
     }
