@@ -788,6 +788,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
                     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: null, cacheExpiresAt: 0 } : s));
                   }
                   if (data.status) {
+                    console.log(`[Backend Status] ${data.status}`);
                     statusRef.current = data.status;
                     setProgressText(data.status);
                     continue;

@@ -814,6 +814,7 @@ const SecFabriciaFelix: React.FC<SecFabriciaFelixProps> = ({ initialSessions, on
                     setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, cacheName: null, cacheExpiresAt: 0 } : s));
                   }
                   if (data.status) {
+                    console.log(`[Backend Status] ${data.status}`);
                     statusRef.current = data.status;
                     setProgressText(data.status);
                     continue;
