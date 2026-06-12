@@ -923,12 +923,12 @@ export const supabaseService = {
 
           const filterVariants: string[] = [];
           const addV = (n: string) => {
-            filterVariants.push(`content.ilike.%Art. ${n}.%`); // "Art. 1.829." ponto final
-            filterVariants.push(`content.ilike.%Art. ${n} %`); // "Art. 725 P" espaço
-            filterVariants.push(`content.ilike.%Art. ${n},%`); // "Art. 15,"
-            filterVariants.push(`content.ilike.%Art. ${n}-%`); // "Art. 19-E"
-            filterVariants.push(`content.ilike.%§ ${n}%`);
-            filterVariants.push(`content.ilike.%§ ${n}º%`);
+            filterVariants.push(`content.ilike."%Art. ${n}.%"`); // "Art. 1.829." ponto final
+            filterVariants.push(`content.ilike."%Art. ${n} %"`); // "Art. 725 P" espaço
+            filterVariants.push(`content.ilike."%Art. ${n},%"`); // "Art. 15,"
+            filterVariants.push(`content.ilike."%Art. ${n}-%"`); // "Art. 19-E"
+            filterVariants.push(`content.ilike."%§ ${n}%"`);
+            filterVariants.push(`content.ilike."%§ ${n}º%"`);
           };
 
           addV(num);
@@ -961,7 +961,7 @@ export const supabaseService = {
       }
 
       if (keywords.length > 0) {
-        const filters = keywords.map(kw => `content.ilike.%${kw}%`);
+        const filters = keywords.map(kw => `content.ilike."%${kw}%"`);
         const batchSize = 10;
         for (let i = 0; i < filters.length; i += batchSize) {
           const filterSlice = filters.slice(i, i + batchSize).join(',');
@@ -1089,7 +1089,7 @@ export const supabaseService = {
       if (escapedTerm.length < 2) return;
       
       if (filter) filter += ',';
-      filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
+      filter += `content.ilike."%${escapedTerm}%",metadata->>title.ilike."%${escapedTerm}%"`;
     });
 
     if (!filter) return [];
