@@ -43,6 +43,27 @@ const styles = `
     margin-top: 1.5rem !important;
     margin-bottom: 1rem !important;
   }
+  .ProseMirror table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 1.5rem 0 !important;
+    overflow: hidden;
+  }
+  .ProseMirror td, .ProseMirror th {
+    min-width: 1rem;
+    border: 1px solid #c8a96180 !important;
+    padding: 8px 12px !important;
+    vertical-align: middle;
+    box-sizing: border-box;
+    position: relative;
+    text-align: inherit;
+  }
+  .ProseMirror th {
+    font-weight: bold;
+    background-color: rgba(201, 169, 97, 0.05);
+  }
   @media print {
     @page {
       margin: 2cm;
@@ -767,8 +788,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Use 'auto' for all tables to ensure content fits without forced wrapping
-            node.table.widths = Array(colCount).fill('auto');
+            // Use '*' to ensure all tables stretch to fill the page width from margin to margin
+            node.table.widths = Array(colCount).fill('*');
             
             // For signature tables (<= 3 columns), center the table by adding padding margins if possible
             // or rely on auto alignment.
