@@ -2297,21 +2297,20 @@ function getApiKeys() {
   const keys: string[] = [];
 
   // Suporta chaves individuais configuradas sequencialmente na Vercel: API_KEY_1, API_KEY_2, etc. (até 30)
-  // e mantém a retrocompatibilidade se API_KEY_1 for uma lista separada por vírgula.
+  // e também suporta se a variável for uma lista separada por vírgulas ou quebras de linha (newlines/carriage returns).
   for (let i = 1; i <= 30; i++) {
     const keyVal = process.env[`API_KEY_${i}`];
     if (keyVal) {
-      if (i === 1 && keyVal.includes(',')) {
-        keys.push(...keyVal.split(',').map(k => k.trim()).filter(Boolean));
-      } else {
-        keys.push(keyVal.trim());
-      }
+      // Divide por quebras de linha, vírgulas, ponto e vírgula ou qualquer caractere de espaçamento
+      const parts = keyVal.split(/[\s,;\n\r]+/).map(k => k.trim()).filter(Boolean);
+      keys.push(...parts);
     }
   }
 
   // Fallback se nenhuma chave API_KEY_X foi encontrada
   if (keys.length === 0 && process.env.GEMINI_API_KEY) {
-    keys.push(process.env.GEMINI_API_KEY.trim());
+    const parts = process.env.GEMINI_API_KEY.split(/[\s,;\n\r]+/).map(k => k.trim()).filter(Boolean);
+    keys.push(...parts);
   }
   
   const uniqueKeys = [...new Set(keys)]; // Remove duplicatas
@@ -2319,7 +2318,7 @@ function getApiKeys() {
   
   // Log detalhado para diagnóstico no console da Vercel
   if (process.env.NODE_ENV === 'production') {
-    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keys.length} chaves potenciais.`);
+    console.log(`[AUTH] Detecção de Chaves: Encontradas ${keys.length} chaves potenciais após parsing avançado.`);
     console.log(`[AUTH] Total de chaves únicas carregadas: ${uniqueKeys.length}. Chaves operacionais: ${filteredValidKeys.length}.`);
   }
   
@@ -2490,7 +2489,15 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
          } else {
              const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
              const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
-             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
+             let errorReason = 'sobrecarga/cota';
+             if (isInvalidKey) errorReason = 'chave inválida';
+             else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
+             else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
+             else if (isNotFound) errorReason = 'modelo não encontrado (404)';
+             else if (isEmpty) errorReason = 'resposta vazia';
+             
+             const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
+             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`);
          }
       }
       
@@ -2619,7 +2626,14 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
          } else {
              const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
              const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
-             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             let errorReason = 'sobrecarga/cota';
+             if (isInvalidKey) errorReason = 'chave inválida';
+             else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
+             else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
+             else if (isNotFound) errorReason = 'modelo não encontrado (404)';
+             
+             const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
+             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
@@ -3534,20 +3548,20 @@ app.post("/api/rag/plan", async (req, res) => {
             const semPonto = num.replace(/\./g, '');
             const comPonto = /^\d{4}$/.test(semPonto) ? `${semPonto.slice(0, 1)}.${semPonto.slice(1)}` : null;
             
-            filters.push(`content.ilike.%Art. ${num}.%`);
-            filters.push(`content.ilike.%Art. ${num} %`);
-            filters.push(`content.ilike.%Art. ${num},%`);
-            filters.push(`content.ilike.%Art. ${num}-%`);
-            filters.push(`content.ilike.%§ ${num}%`);
-            filters.push(`content.ilike.%§ ${num}º%`);
+            filters.push(`content.ilike."%Art. ${num}.%"`);
+            filters.push(`content.ilike."%Art. ${num} %"`);
+            filters.push(`content.ilike."%Art. ${num},%"`);
+            filters.push(`content.ilike."%Art. ${num}-%"`);
+            filters.push(`content.ilike."%§ ${num}%"`);
+            filters.push(`content.ilike."%§ ${num}º%"`);
             
             if (semPonto !== num) {
-              filters.push(`content.ilike.%Art. ${semPonto}.%`);
-              filters.push(`content.ilike.%Art. ${semPonto} %`);
+              filters.push(`content.ilike."%Art. ${semPonto}.%"`);
+              filters.push(`content.ilike."%Art. ${semPonto} %"`);
             }
             if (comPonto && comPonto !== num) {
-              filters.push(`content.ilike.%Art. ${comPonto}.%`);
-              filters.push(`content.ilike.%Art. ${comPonto} %`);
+              filters.push(`content.ilike."%Art. ${comPonto}.%"`);
+              filters.push(`content.ilike."%Art. ${comPonto} %"`);
             }
           }
           query = query.or(filters.join(','));
