@@ -65,6 +65,8 @@ export interface SocialSecurityData {
     // New flags for benefit analysis
     isTeacher?: boolean;
     isPcd?: boolean;
+    pcdGrau?: 'leve' | 'moderada' | 'grave'; // LC 142/2013
+    isAccidentRelated?: boolean; // Incapacidade decorrente de acidente de trabalho (coef. 100%)
     
     // Custom Minimum Wage
     customMinWage?: number;
@@ -2024,6 +2026,29 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                 />
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pessoa com Deficiência (PCD)</span>
+                            </label>
+                            {data.isPcd && (
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Grau (LC 142/2013):</span>
+                                    <select
+                                        value={data.pcdGrau || 'leve'}
+                                        onChange={e => setData(prev => ({ ...prev, pcdGrau: e.target.value as 'leve' | 'moderada' | 'grave' }))}
+                                        className="text-sm rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:ring-indigo-500"
+                                    >
+                                        <option value="leve">Leve (33M/28F)</option>
+                                        <option value="moderada">Moderada (29M/24F)</option>
+                                        <option value="grave">Grave (25M/20F)</option>
+                                    </select>
+                                </div>
+                            )}
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={data.isAccidentRelated || false}
+                                    onChange={e => setData(prev => ({ ...prev, isAccidentRelated: e.target.checked }))}
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Incapacidade Acidentária (acidente/doença do trabalho — coef. 100%)</span>
                             </label>
                         </div>
                     </div>
