@@ -2274,20 +2274,21 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
-  "gemini-3.5-flash"
+  "gemini-3-flash-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
   "gemini-2.0-flash-exp": "gemini-3.5-flash",
   "gemini-1.5-flash-latest": "gemini-3.5-flash",
   "gemini-3.5-flash": "gemini-3.5-flash",
+  "gemini-3-flash-preview": "gemini-3-flash-preview",
   "gemini-2.5-flash": "gemini-3.5-flash"
 };
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return MODEL_HIERARCHY[0];
-  if (modelName.includes('3.5-flash')) return "gemini-1.5-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-1.5-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
   if (modelName.includes('deepseek')) return modelName;
   return MODEL_MAPPING[modelName] || modelName;
 }
@@ -3835,12 +3836,16 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3.5-flash";
-        console.log("[Dr.Michel] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
+      const reqModel = req.body.model;
+      if (reqModel && (reqModel === 'gemini-3-flash-preview' || reqModel === 'gemini-3.5-flash')) {
+        model = reqModel;
+        console.log(`[Dr.Michel] Usando modelo solicitado explicitamente: ${model}`);
+      } else if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado. Usando 'gemini-3-flash-preview' por padrão para processamento e leitura.");
       } else {
         model = "gemini-3.5-flash";
-        console.log("[Dr.Michel] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+        console.log("[Dr.Michel] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.5-flash' por padrão.");
       }
     }
 
@@ -4392,12 +4397,16 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3.5-flash";
-        console.log("[Dra.Luana] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
+      const reqModel = req.body.model;
+      if (reqModel && (reqModel === 'gemini-3-flash-preview' || reqModel === 'gemini-3.5-flash')) {
+        model = reqModel;
+        console.log(`[Dra.Luana] Usando modelo solicitado explicitamente: ${model}`);
+      } else if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3-flash-preview' por padrão para processamento e leitura.");
       } else {
         model = "gemini-3.5-flash";
-        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.5-flash' por padrão.");
       }
     }
 
@@ -5015,12 +5024,16 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3.5-flash";
-        console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
+      const reqModel = req.body.model;
+      if (reqModel && (reqModel === 'gemini-3-flash-preview' || reqModel === 'gemini-3.5-flash')) {
+        model = reqModel;
+        console.log(`[Dr.FelixCastro] Usando modelo solicitado explicitamente: ${model}`);
+      } else if (isStorageRequest && !isGenerationRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado. Usando 'gemini-3-flash-preview' por padrão para processamento e leitura.");
       } else {
         model = "gemini-3.5-flash";
-        console.log("[Dr.FelixCastro] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+        console.log("[Dr.FelixCastro] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.5-flash' por padrão.");
       }
     }
 
@@ -5664,12 +5677,16 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
-      if (isStorageRequest) {
-        model = "gemini-3.5-flash";
-        console.log("[Sec.Fabricia] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
+      const reqModel = req.body.model;
+      if (reqModel && (reqModel === 'gemini-3-flash-preview' || reqModel === 'gemini-3.5-flash')) {
+        model = reqModel;
+        console.log(`[Sec.Fabricia] Usando modelo solicitado explicitamente: ${model}`);
+      } else if (isStorageRequest) {
+        model = "gemini-3-flash-preview";
+        console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado. Usando 'gemini-3-flash-preview' por padrão para processamento e leitura.");
       } else {
         model = "gemini-3.5-flash";
-        console.log("[Sec.Fabricia] 🧠 Atendimento ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
+        console.log("[Sec.Fabricia] 🧠 Atendimento ou chat geral detectado. Usando 'gemini-3.5-flash' por padrão.");
       }
     }
 
