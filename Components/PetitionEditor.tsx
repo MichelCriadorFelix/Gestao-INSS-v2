@@ -767,13 +767,11 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Small tables (like signature blocks with <= 3 columns) should span page margin-to-margin ('*')
-            // while larger tables (like contribution/vínculo tables with many columns) use 'auto' to fit without overflow
-            if (colCount <= 3) {
-              node.table.widths = Array(colCount).fill('*');
-            } else {
-              node.table.widths = Array(colCount).fill('auto');
-            }
+            // Use 'auto' for all tables to ensure content fits without forced wrapping
+            node.table.widths = Array(colCount).fill('auto');
+            
+            // For signature tables (<= 3 columns), center the table by adding padding margins if possible
+            // or rely on auto alignment.
             node.layout = {
               hLineWidth: function () { return 1; },
               vLineWidth: function () { return 1; },
@@ -784,6 +782,12 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               paddingTop: function () { return 4; },
               paddingBottom: function () { return 4; },
             };
+            
+            // To center the table itself in pdfMake when using 'auto' widths,
+            // alignment: 'center' on the table node sometimes works depending on the pdfmake version
+            if (colCount <= 3) {
+              node.alignment = 'center';
+            }
           }
 
           if (node.nodeName === 'IMG' || node.image) {

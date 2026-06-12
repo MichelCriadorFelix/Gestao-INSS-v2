@@ -3874,6 +3874,14 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
+    if (isReportRequest) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE RELATÓRIO / ANÁLISE DE CASO]
+O usuário solicitou um relatório ou análise do caso. Você DEVE elaborar um relatório denso e minucioso, não abrevie nem economize palavras.
+OBRIGATÓRIO: Crie uma seção específica voltada à "FUNDAMENTAÇÃO JURÍDICA E MAPEAMENTO (RAG)". 
+Nesta seção, você DEVE analisar a [BASE DE CONHECIMENTO (RAG)] enviada e listar as leis, súmulas e jurisprudências que se aplicam a favor ou contra as pretensões do cliente. Cite-as textualmente usando blockquote (>) e explique a aderência ao caso.
+O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO do que será usado na petição. Se não citar o RAG, a análise falhará.`;
+    }
+
     // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
     if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
       selectedSystemPrompt += `\n\n[DIRETRIZ DE GERAÇÃO MODULAR]
@@ -4142,7 +4150,7 @@ ${message}`;
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" }; // Máximo raciocínio para petições
     } else if (isReportRequest) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
     } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
@@ -4471,7 +4479,7 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
       console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
       selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
       if (!req.body.forceRag && !ragContext) ragContext = "";
-    } else if (intent === "[DÚVIDA]" && !isGenerationRequest) {
+    } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequestLuana) {
       console.log("Modo Dra. Luana Dúvida Ativado (Consultora Trabalhista)");
       selectedSystemPrompt = DRA_LUANA_DUVIDA_PROMPT + getCurrentDateContext();
     } else {
@@ -4481,6 +4489,14 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     if (isGenerationRequest) {
       console.log("Injetando Manual de Redação de Elite - Dra. Luana");
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
+    }
+
+    if (isReportRequestLuana) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE RELATÓRIO / ANÁLISE DE CASO]
+O usuário solicitou um relatório ou análise do caso. Você DEVE elaborar um relatório denso e minucioso, não abrevie nem economize palavras.
+OBRIGATÓRIO: Crie uma seção específica voltada à "FUNDAMENTAÇÃO JURÍDICA E MAPEAMENTO (RAG)". 
+Nesta seção, você DEVE analisar a [BASE DE CONHECIMENTO (RAG)] enviada e listar as leis, súmulas (TST) e jurisprudências que se aplicam a favor ou contra as pretensões do cliente. Cite-as textualmente usando blockquote (>) e explique a aderência ao caso.
+O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO do que será usado na petição. Se não citar o RAG, a análise falhará.`;
     }
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
@@ -4740,7 +4756,7 @@ ${message}`;
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" };
     } else if (isReportRequestLuana) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
     } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
@@ -5036,6 +5052,14 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       selectedSystemPrompt += "\n" + ELITE_REDACTION_MANUAL;
     }
 
+    if (isReportRequest) {
+      selectedSystemPrompt += `\n\n[DIRETRIZ DE RELATÓRIO / ANÁLISE DE CASO]
+O usuário solicitou um relatório ou análise do caso. Você DEVE elaborar um relatório denso e minucioso, não abrevie nem economize palavras.
+OBRIGATÓRIO: Crie uma seção específica voltada à "FUNDAMENTAÇÃO JURÍDICA E MAPEAMENTO (RAG)". 
+Nesta seção, você DEVE analisar a [BASE DE CONHECIMENTO (RAG)] enviada e listar as leis, súmulas e jurisprudências que se aplicam a favor ou contra as pretensões do cliente. Cite-as textualmente usando blockquote (>) e explique a aderência ao caso.
+O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO do que será usado na petição. Se não citar o RAG, a análise falhará.`;
+    }
+
     // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
     if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
       selectedSystemPrompt += `\n\n[DIRETRIZ DE GERAÇÃO MODULAR]
@@ -5262,7 +5286,7 @@ ${message}`;
       maxOutputTokens = 18000;
       thinkingConfig = { thinkingLevel: "high" };
     } else if (isReportRequest) {
-      maxOutputTokens = 8192;
+      maxOutputTokens = 16383;
       thinkingConfig = { thinkingLevel: "medium" }; // Raciocínio médio: relatório denso e fiel
     } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
       maxOutputTokens = 8192;
