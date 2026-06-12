@@ -33,3 +33,4 @@ dist-ssr
 *.backup_restaurado
 *.backup
 *.bak
+*.backup_restored
