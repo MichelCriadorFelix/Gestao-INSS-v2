@@ -502,7 +502,16 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
       // 1. Get embedding and perform Keyword Search in parallel
       const AGENT_AREAS = ['CONSUMIDOR','CIVEL','TRABALHISTA','INSS','RPPS'];
       let ragContext = '';
+
+      // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
+      const isCasualMessage = /^(oi|olá|olá\s+tudo\s+bem\??|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tudo\s+bem\??|tudo\s+bom\??|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza|grato|grata|tudo\s+joia\??)[!?.,\s]*$/i.test(messageText.trim()) ||
+                              /^(oi|olá)[!?.,\s]+(tudo\s+bem\??|tudo\s+bom\??|como\s+vai\??)[!?.,\s]*$/i.test(messageText.trim());
+
       try {
+        if (isCasualMessage) {
+          // Mensagem casual: pular busca RAG completamente
+          ragContext = '';
+        } else {
         // Context-aware query enrichment for RAG:
         // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
         // the search misses because the current message has no semantic legal terms.
@@ -635,6 +644,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
             return `${title}${r.content}`;
           }).join('\n\n---\n\n');
         }
+        } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
       }
