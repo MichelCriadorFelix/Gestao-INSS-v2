@@ -795,7 +795,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               node.table.widths = Array(colCount).fill('*');
               node.alignment = 'center';
             } else {
-              // Larger tables (colCount > 3): Dynamically allocate widths to prevent overflow.
+              // Larger tables (colCount > 3): Dynamically allocate widths proportionally to prevent overflow.
               const colTextLengths = Array(colCount).fill(0);
               node.table.body.forEach((row: any[]) => {
                 if (row && Array.isArray(row)) {
@@ -827,19 +827,28 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 }
               });
 
-              // Find the index of the column with the maximum content length
-              const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
-              
-              const widths = Array(colCount).fill('auto');
-              widths[maxLenIdx] = '*';
-              
-              // Also check if any other column is significant and has long text, can also be '*' if needed, but keep a balance
-              let starsUsed = 1;
-              for (let i = 0; i < colCount; i++) {
-                if (i !== maxLenIdx && colTextLengths[i] > 18 && starsUsed < 2) {
-                  widths[i] = '*';
-                  starsUsed++;
-                }
+              // Total available horizontal width in points (595.27pt - 50pt left margin - 50pt right margin = 495.27pt)
+              const totalTableWidth = 495;
+              // Guarantee a solid minWidth per column so content is never squished to 0 or 10pt (avoiding long columns)
+              const minWidth = Math.max(35, Math.floor(250 / colCount)); 
+              const totalMinAllocated = minWidth * colCount;
+              const remainingWidth = totalTableWidth - totalMinAllocated;
+
+              const sumTextLengths = colTextLengths.reduce((sum, len) => sum + len, 0);
+              const widths = Array(colCount).fill(0);
+
+              if (sumTextLengths === 0) {
+                // If table is empty, divide equally 
+                const equalWidth = Math.floor(totalTableWidth / colCount);
+                widths.forEach((_, idx) => {
+                  widths[idx] = equalWidth;
+                });
+              } else {
+                colTextLengths.forEach((len, idx) => {
+                  const prop = len / sumTextLengths;
+                  // Proportional allocation of the remaining space over the minimum column width
+                  widths[idx] = Math.floor(minWidth + (prop * remainingWidth));
+                });
               }
               node.table.widths = widths;
             }

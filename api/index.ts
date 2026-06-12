@@ -2149,7 +2149,7 @@ Para cada argumento jurídico:
 2. A NORMA: o dispositivo legal exato que garante o direito.
 3. A APLICAÇÃO: como a norma incide sobre o fato concreto.
 
-Não use a expressão genérica 'nos termos da lei'. Sempre identifique o artigo e a lei pelo número. Se o texto do artigo estiver na Base de Conhecimento (RAG), transcreva-o IDÊNTICO em blockquote (>), sem alterar uma vírgula sequer. NUNCA parafrase texto de lei — isso é falsificação de fonte jurídica.
+Não use a expressão genérica 'nos termos da lei'. Sempre identifique o artigo e a lei pelo número. Se o texto do artigo estiver na Base de Conhecimento (RAG), transcreva-o IDÊNTICO em blockquote (>), sem alterar uma vírgula sequer. NUNCA parafraseie texto de lei — isso é falsificação de fonte jurídica.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOCO 9 — BASE LEGAL DE REFERÊNCIA
@@ -2192,7 +2192,7 @@ ESTRUTURA OBRIGATÓRIA PARA AÇÃO CONSUMERISTA (DANO MORAL + MATERIAL + OBRIGA�
     IV.5. Do Dano Material / Repetição de Indébito: Art. 42, parágrafo único do CDC (quando aplicável).
     IV.6. Da Obrigação de Fazer/Não Fazer: Art. 84 do CDC (quando aplicável).
 - V. DA TUTELA DE URGÊNCIA: Fumus boni iuris e Periculum in mora (Art. 300 CPC). Especificar a medida concreta (suspensão de cobrança, retirada de negativação, restabelecimento de serviço, etc.).
-- VI. DOS PEDIDOS (OBRIGATÓRIO NUMERAR COM LETRAS: a), b), c)...):
+- VI. DOS PEDIDOS (OBRIGATÓRIO NUMERAR WITH LETRAS: a), b), c)...):
     ATENÇÃO: CADA PEDIDO DEVE SER DETALHADO (3-5 LINHAS MÍNIMO).
     a) Gratuidade de Justiça (quando aplicável);
     b) Tutela de Urgência (detalhar a medida e prazo);
@@ -2324,8 +2324,6 @@ function getApiKeys() {
   return filteredValidKeys.length > 0 ? filteredValidKeys : uniqueKeys;
 }
 
-
-
 /**
  * FIX#8: Remove mensagens consecutivas do mesmo papel do histórico.
  * A Gemini API exige alternância estrita user/model.
@@ -2366,13 +2364,13 @@ function stripExpiredFileData(params: any): any {
   return cleaned;
 }
 
-async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number) {
+async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  // Select key: use forcedKeyIndex ONLY on the first try. If it fails, fallback to rotation.
-  const keyToUseIndex = (forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex;
-  const apiKey = keys[keyToUseIndex % keys.length];
+  // Determina o índice da chave para esta tentativa
+  const activeKeyIndex = forcedKeyIndex !== undefined ? forcedKeyIndex : currentKeyIndex;
+  const apiKey = keys[activeKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
   // Select model from hierarchy or use the requested model on first try
@@ -2439,11 +2437,14 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
-      return callGemini(paramsWithoutFiles, 1, modelIndex, 0, forcedKeyIndex);
+      return callGemini(paramsWithoutFiles, 1, modelIndex, 0, activeKeyIndex);
     }
     
     if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
-      if (!isBadRequest) currentKeyIndex++; // Rotate key for auth/quota errors, but for 400 we might want to stay on key but switch model or config
+      const nextKeyIdx = (activeKeyIndex + 1) % keys.length;
+      if (!isBadRequest) {
+        currentKeyIndex = nextKeyIdx;
+      }
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
@@ -2458,7 +2459,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
              console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
          } else {
              delay = 500;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves/parâmetros...`);
+             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves...`);
          }
       } else if (isEmpty) {
          delay = 1000;
@@ -2477,12 +2478,13 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
              nextFailures = 0;
              console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
          } else {
-             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
+             const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
+             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`);
          }
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex);
+      return callGemini(params, retries - 1, nextModelIndex, nextFailures, nextKeyIdx);
     }
     
     // Critical Failure
@@ -2507,8 +2509,10 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   // CACHE: requisições com cachedContent ficam FIXAS na chave que criou o cache
   // (caches são por projeto). Retries reusam a mesma chave em vez de rotacionar.
   const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
-  const keyToUseIndex = cachePinned ? forcedKeyIndex : ((forcedKeyIndex !== undefined && retries === MAX_RETRIES) ? forcedKeyIndex : currentKeyIndex);
-  const apiKey = keys[keyToUseIndex % keys.length];
+  
+  // Determina qual chave usar
+  const activeKeyIndex = cachePinned ? forcedKeyIndex : (forcedKeyIndex !== undefined ? forcedKeyIndex : currentKeyIndex);
+  const apiKey = keys[activeKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
   const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
@@ -2550,7 +2554,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
-      return callGeminiStream(paramsWithoutFiles, 1, modelIndex, 0, forcedKeyIndex);
+      return callGeminiStream(paramsWithoutFiles, 1, modelIndex, 0, activeKeyIndex, onStatus);
     }
 
     // CACHE + COTA: requisição fixada na chave do cache NÃO pode rotacionar (o cache
@@ -2566,11 +2570,14 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       const msgPin = `[Cache] Cota por minuto da chave do cache atingida. Aguardando 30s pelo reset (espera ${pinnedWaits + 1}/4)...`;
       console.log(msgPin); if (onStatus) onStatus(msgPin);
       await new Promise(resolve => setTimeout(resolve, 30_000));
-      return callGeminiStream(params, retries - 1, modelIndex, failuresOnCurrentModel, forcedKeyIndex, onStatus);
+      return callGeminiStream(params, retries - 1, modelIndex, failuresOnCurrentModel, activeKeyIndex, onStatus);
     }
 
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
-      if (!isBadRequest) currentKeyIndex++;
+      const nextKeyIdx = (activeKeyIndex + 1) % keys.length;
+      if (!isBadRequest) {
+        currentKeyIndex = nextKeyIdx;
+      }
       
       let nextModelIndex = modelIndex;
       let nextFailures = failuresOnCurrentModel + 1;
@@ -2587,7 +2594,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              const msg2 = `[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo. Fallback restrito. Rotacionando chaves...`; console.log(msg2); if(onStatus) onStatus(msg2);
          }
       } else {
-         delay = 100; // FAST FALLBACK to skip exhausted keys rapidly
+         // Ajustamos para 1200ms para permitir a respiração e transmissão síncrona
+         delay = 1200; 
          
          if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
              nextModelIndex++;
@@ -2598,12 +2606,13 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
              nextFailures = 0;
              const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
-             const currentKeyDisplayIndex = (keyToUseIndex % keys.length) + 1; const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando instantaneamente para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
+             const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
+             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Limite de cota/sobrecarga da chave ${currentKeyDisplayIndex}/${keys.length} atingido. Rotacionando para a próxima chave (outro projeto/email)...`; console.log(msg5); if(onStatus) onStatus(msg5);
          }
       }
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, forcedKeyIndex, onStatus);
+      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, nextKeyIdx, onStatus);
     }
     
     if (retries === 0) {
