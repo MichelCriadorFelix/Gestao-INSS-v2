@@ -2295,26 +2295,12 @@ function getEffectiveModel(modelName?: string): string {
 function getApiKeys() {
   const keys: string[] = [];
 
-  // 1. Prioritize API_KEY_1 (supports comma-separated list of keys)
+  // 1. A rotação é exclusivamente entre as chaves da API do Google com o nome API_KEY_1 (compatível com lista separada por vírgulas)
   if (process.env.API_KEY_1) {
     keys.push(...process.env.API_KEY_1.split(',').map(k => k.trim()).filter(Boolean));
-  }
-
-  // 2. Get all OTHER API keys
-  const envKeys = Object.keys(process.env);
-  const keyVars = envKeys.filter(k => 
-    (k.startsWith('API_KEY_') && k !== 'API_KEY_1') || 
-    k.startsWith('GEMINI_API_KEY_')
-  );
-  
-  keys.push(...keyVars.map(k => process.env[k]).filter(Boolean) as string[]);
-  
-  // 3. Adiciona a chave padrão se existir
-  if (process.env.GEMINI_API_KEY) keys.push(process.env.GEMINI_API_KEY);
-  
-  // 4. Adiciona chaves da lista GEMINI_KEYS se existir
-  if (process.env.GEMINI_KEYS) {
-    keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(Boolean));
+  } else if (process.env.GEMINI_API_KEY) {
+    // Fallback básico caso API_KEY_1 não esteja preenchida
+    keys.push(process.env.GEMINI_API_KEY);
   }
   
   const uniqueKeys = [...new Set(keys)]; // Remove duplicatas
@@ -2621,7 +2607,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     
     if (retries === 0) {
       if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-        throw new Error(`ALL_KEYS_EXHAUSTEDTED: ${errorMessage}`);
+        throw new Error(`ALL_KEYS_EXHAUSTED: ${errorMessage}`);
       }
       throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
     }
@@ -4334,24 +4320,6 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       res.end();
     } catch (err: any) {
       clearInterval(heartbeat);
-      if (err.message && err.message.includes("ALL_KEYS_EXHAUSTEDTED") && process.env.OPENROUTER_API_KEY) {
-        console.warn("[Auto-Fallback] Cota do Google esgotada! Trocando para OpenRouter.");
-        try { res.write(`data: ${JSON.stringify({ status: "[Auto-Fallback] Cota gratuita (Free Tier) esgotada em todas as 15 contas. Tentando via Servidor de Backup Pago (OpenRouter)..." })}\n\n`); } catch {}
-        const fallbackParams = {
-           model: "deepseek/deepseek-chat",
-           messages: activeDocCache ? [{ role: 'user', content: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA:\n\n" + selectedSystemPrompt }, ...currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text }))] : currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text })),
-           temperature: finalTemperature, max_tokens: maxOutputTokens
-        };
-        try {
-          const orResult = await callOpenRouterStream(fallbackParams, res, true);
-          if (orResult.maxTokensHit) {
-            try { res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`); } catch {}
-          }
-        } catch (orErr: any) {
-          try { res.write(`data: ${JSON.stringify({ error: "OpenRouter Falhou: " + orErr.message })}\n\n`); } catch {}
-        }
-        return;
-      }
       (() => {
     let _errStr = err.message ;
     if (_errStr === 'CACHE_INVALID') {
@@ -5499,24 +5467,6 @@ REGRAS ABSOLUTAS:
       res.end();
     } catch (err: any) {
       clearInterval(heartbeat);
-      if (err.message && err.message.includes("ALL_KEYS_EXHAUSTEDTED") && process.env.OPENROUTER_API_KEY) {
-        console.warn("[Auto-Fallback] Cota do Google esgotada! Trocando para OpenRouter.");
-        try { res.write(`data: ${JSON.stringify({ status: "[Auto-Fallback] Cota gratuita (Free Tier) esgotada em todas as 15 contas. Tentando via Servidor de Backup Pago (OpenRouter)..." })}\n\n`); } catch {}
-        const fallbackParams = {
-           model: "deepseek/deepseek-chat",
-           messages: activeDocCache ? [{ role: 'user', content: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA:\n\n" + selectedSystemPrompt }, ...currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text }))] : currentContents.map((c: any) => ({ role: c.role === 'model' ? 'assistant' : 'user', content: c.parts[0].text })),
-           temperature: finalTemperature, max_tokens: maxOutputTokens
-        };
-        try {
-          const orResult = await callOpenRouterStream(fallbackParams, res, true);
-          if (orResult.maxTokensHit) {
-            try { res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`); } catch {}
-          }
-        } catch (orErr: any) {
-          try { res.write(`data: ${JSON.stringify({ error: "OpenRouter Falhou: " + orErr.message })}\n\n`); } catch {}
-        }
-        return;
-      }
       (() => {
     let _errStr = err.message ;
     if (_errStr === 'CACHE_INVALID') {
