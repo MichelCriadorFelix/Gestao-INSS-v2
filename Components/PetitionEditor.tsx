@@ -765,11 +765,12 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
                 node.alignment = node.alignment || 'center';
                 node.noWrap = true; // Avoid splitting names to next line in signatures
+                node.fontSize = 10;
               } else {
                 node.alignment = 'left';
+                node.fontSize = 9; // Reduce to 9pt in larger tables to ensure clean, organized fit
               }
               node.leadingIndent = 0;
-              node.fontSize = 10; // Reduce font size inside tables to avoid overflow
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
             } else {
               const isCenterOrRight = node.alignment === 'center' || node.alignment === 'right';
@@ -788,8 +789,60 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Use '*' to ensure all tables stretch to fill the page width from margin to margin
-            node.table.widths = Array(colCount).fill('*');
+            
+            if (colCount <= 3) {
+              // Signatures and small tables: stretch equally across margin to margin
+              node.table.widths = Array(colCount).fill('*');
+              node.alignment = 'center';
+            } else {
+              // Larger tables (colCount > 3): Dynamically allocate widths to prevent overflow.
+              const colTextLengths = Array(colCount).fill(0);
+              node.table.body.forEach((row: any[]) => {
+                if (row && Array.isArray(row)) {
+                  row.forEach((cell: any, colIdx: number) => {
+                    if (cell && colIdx < colCount) {
+                      let textLen = 0;
+                      const getLength = (c: any) => {
+                        if (!c) return;
+                        if (typeof c === 'string') {
+                          textLen += c.trim().length;
+                        } else if (typeof c.text === 'string') {
+                          textLen += c.text.trim().length;
+                        } else if (Array.isArray(c.text)) {
+                          c.text.forEach(getLength);
+                        } else if (Array.isArray(c.stack)) {
+                          c.stack.forEach(getLength);
+                        } else if (c.stack && typeof c.stack === 'object') {
+                          getLength(c.stack);
+                        } else if (c.text && typeof c.text === 'object') {
+                          getLength(c.text);
+                        }
+                      };
+                      getLength(cell);
+                      if (textLen > colTextLengths[colIdx]) {
+                        colTextLengths[colIdx] = textLen;
+                      }
+                    }
+                  });
+                }
+              });
+
+              // Find the index of the column with the maximum content length
+              const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
+              
+              const widths = Array(colCount).fill('auto');
+              widths[maxLenIdx] = '*';
+              
+              // Also check if any other column is significant and has long text, can also be '*' if needed, but keep a balance
+              let starsUsed = 1;
+              for (let i = 0; i < colCount; i++) {
+                if (i !== maxLenIdx && colTextLengths[i] > 18 && starsUsed < 2) {
+                  widths[i] = '*';
+                  starsUsed++;
+                }
+              }
+              node.table.widths = widths;
+            }
             
             // For signature tables (<= 3 columns), center the table by adding padding margins if possible
             // or rely on auto alignment.
@@ -803,12 +856,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               paddingTop: function () { return 4; },
               paddingBottom: function () { return 4; },
             };
-            
-            // To center the table itself in pdfMake when using 'auto' widths,
-            // alignment: 'center' on the table node sometimes works depending on the pdfmake version
-            if (colCount <= 3) {
-              node.alignment = 'center';
-            }
           }
 
           if (node.nodeName === 'IMG' || node.image) {
