@@ -2274,20 +2274,20 @@ const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
   "gemini-3.5-flash",
-  "gemini-3-flash-preview"
+  "gemini-3.5-flash"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
   "gemini-2.0-flash-exp": "gemini-3.5-flash",
   "gemini-1.5-flash-latest": "gemini-3.5-flash",
-  "gemini-3-flash-preview": "gemini-3-flash-preview",
+  "gemini-3.5-flash": "gemini-3.5-flash",
   "gemini-2.5-flash": "gemini-3.5-flash"
 };
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return MODEL_HIERARCHY[0];
   if (modelName === "gemini-3.5-flash") return "gemini-3.5-flash";
-  if (modelName === "gemini-3-flash-preview") return "gemini-3-flash-preview";
+  if (modelName === "gemini-3.5-flash") return "gemini-3.5-flash";
   if (modelName.includes('deepseek')) return modelName;
   return MODEL_MAPPING[modelName] || modelName;
 }
@@ -3849,8 +3849,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
       if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3-flash-preview";
-        console.log("[Dr.Michel] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
+        model = "gemini-3.5-flash";
+        console.log("[Dr.Michel] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dr.Michel] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -4179,7 +4179,7 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
@@ -4245,7 +4245,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
             : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3-flash-preview",
+            model: model || "gemini-3.5-flash",
             contents: streamContents,
             config: streamConfig
           }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
@@ -4405,8 +4405,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
       if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3-flash-preview";
-        console.log("[Dra.Luana] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
+        model = "gemini-3.5-flash";
+        console.log("[Dra.Luana] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -4784,7 +4784,7 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokensLuana > 200_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
@@ -4863,7 +4863,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             ? { temperature: finalTemperature, maxOutputTokens, safetySettings: luanaSafety, cachedContent: activeDocCache }
             : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: luanaSafety };
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3-flash-preview",
+            model: model || "gemini-3.5-flash",
             contents: streamContents,
             config: streamConfig
           }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
@@ -5027,8 +5027,8 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
       if (isStorageRequest && !isGenerationRequest) { // REVERT Item 3: relatório de volta ao 3.5 (qualidade jurídica > economia)
-        model = "gemini-3-flash-preview";
-        console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
+        model = "gemini-3.5-flash";
+        console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Dr.FelixCastro] 🧠 Peça, relatório, auditoria ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -5326,7 +5326,7 @@ ${message}`;
       const MAX_ATTEMPTS = 3;
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
@@ -5391,7 +5391,7 @@ REGRAS ABSOLUTAS:
             ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
             : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
           const responseStream = await callGeminiStream({
-            model: model || "gemini-3-flash-preview",
+            model: model || "gemini-3.5-flash",
             contents: streamContents,
             config: streamConfig
           }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
@@ -5676,8 +5676,8 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
       if (isStorageRequest) {
-        model = "gemini-3-flash-preview";
-        console.log("[Sec.Fabricia] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3-flash-preview' para economizar cota.");
+        model = "gemini-3.5-flash";
+        console.log("[Sec.Fabricia] ⚖️ Ciência/OCR ou Relatório detectado. Usando 'gemini-3.5-flash' para economizar cota.");
       } else {
         model = "gemini-3.5-flash";
         console.log("[Sec.Fabricia] 🧠 Atendimento ou chat geral detectado. Forçando o uso de 'gemini-3.5-flash' no backend para inteligência superior.");
@@ -5894,7 +5894,7 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3-flash-preview'}`);
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input acima de 200k tokens — uso muito intenso.`);
@@ -5914,7 +5914,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     ? (parseInt(String(cacheKeyIndex)))
     : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
   const responseStream = await callGeminiStream({
-    model: model || "gemini-3-flash-preview",
+    model: model || "gemini-3.5-flash",
     contents: streamContents,
     config: streamConfig
   }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });

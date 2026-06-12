@@ -1783,7 +1783,7 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-emerald-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini · Gratuito (Padrão)">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash Preview ⭐</option>
+                      <option value="gemini-3.5-flash">Gemini 3 Flash Preview ⭐</option>
                       <option value="gemini-3.5-flash">Gemini 3.5 Flash · Padrão Ouro ⭐</option>
                     </optgroup>
                     <optgroup label="OpenRouter · API Paga (Premium)">
