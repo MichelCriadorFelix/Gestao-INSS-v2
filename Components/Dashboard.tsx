@@ -17,6 +17,8 @@ const SocialSecurityCalc = lazy(() => import('../SocialSecurityCalc'));
 const DrMichelFelix = lazy(() => import('./DrMichelFelix'));
 const DraLuanaCastro = lazy(() => import('./DraLuanaCastro'));
 const DrFelixECastro = lazy(() => import('./DrFelixECastro'));
+const PersonaChat = lazy(() => import('./PersonaChat'));
+import { MICHEL_PERSONA } from './personaConfig';
 const SecFabriciaFelix = lazy(() => import('./SecFabriciaFelix'));
 const Agenda = lazy(() => import('./Agenda'));
 const PetitionEditor = lazy(() => import('./PetitionEditor'));
@@ -1708,7 +1710,8 @@ export default function Dashboard({
              {/* CONTENT SWITCHER */}
              <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-slate-400">Carregando módulo...</div>}>
              {currentView === 'dr_michel' ? (
-                 <DrMichelFelix 
+                 <PersonaChat 
+                    persona={MICHEL_PERSONA}
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}

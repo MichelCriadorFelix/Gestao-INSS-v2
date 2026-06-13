@@ -445,13 +445,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const AGENT_AREAS = persona.agentAreas;
       let ragContext = '';
 
-      // Detectar mensagens casuais para evitar busca RAG desnecessária (apenas se for puramente um cumprimento/confirmação isolado)
-      const isCasualMessage = /^(oi|olá|olá\s+tudo\s+bem\??|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tudo\s+bem\??|tudo\s+bom\??|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza|grato|grata|tudo\s+joia\??)[!?.,\s]*$/i.test(messageText.trim()) ||
-                              /^(oi|olá)[!?.,\s]+(tudo\s+bem\??|tudo\s+bom\??|como\s+vai\??)[!?.,\s]*$/i.test(messageText.trim());
+      // FASE B1: Determinar se enviaremos RAG
+      const isReportOrPeca = messageText.includes('[FASE DE GERAÇÃO]') || messageText.includes('[FASE DE TOMADA DE CIÊNCIA]') || /gerar|corrigir|peça|relatório|audita/i.test(messageText);
+      const isLegalDoubt = /\b(lei|artigo|súmula|jurisprudência|tema|STJ|STF|TNU|enunciado|o que diz|qual.*norma|fundament)/i.test(messageText);
+      const shouldSendRag = isReportOrPeca || isLegalDoubt;
 
       try {
-        if (isCasualMessage) {
-          // Mensagem casual: pular busca RAG completamente
+        if (!shouldSendRag) {
+          // Pular busca RAG completamente se não for peça, relatório ou dúvida
           ragContext = '';
         } else {
         // Context-aware query enrichment for RAG:
@@ -656,20 +657,30 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       // - Janela: últimas 8 mensagens (4 trocas)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-30); // Mantém até 30 mensagens de histórico para alinhar com o limite de contexto do backend e Gemini 3.5 Flash
+        const last = msgs.slice(-40); // FASE C: Expanded history to 40 messages for deep traceability
         return last.map((m) => {
           // Tomada de ciência: tem padrão "[FASE DE TOMADA DE CIÊNCIA]" ou conteúdo enorme com "CONTEÚDO:"
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
             return {
               ...m,
-              content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
+              content: m.content.substring(0, 500) + '... \n[NOTA DO SISTEMA: Documento oprimido no histórico para economizar tokens. O documento na íntegra continua anexado silenciosamente na raiz da sessão, sendo processado nos bastidores em "documentContext".]'
             };
           }
-          // Peças de IA: preservar integral — Gemini 3.5 Flash tem 1M tokens de contexto
-          // A compressão causava perda de contexto em correções e refazimentos
-          if (m.role === 'assistant' && m.content.length > 3000) {
-            return m; // sem compressão — contexto completo
+          if (m.role === 'assistant' && m.content.length > 5000) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '... \n[NOTA DO SISTEMA: Resposta longa comprimida no histórico para economizar tokens.]'
+            };
           }
+
+          // FASE C: Compressão Inteligente Progressiva
+          if (m.role === 'assistant' && m.content.length > 3000) {
+            return {
+              ...m,
+              content: m.content.substring(0, 800) + '... \n[NOTA: Resposta anterior arquivada pelo limite de memória, use comandos claros para buscar algo específico nela.]'
+            };
+          }
+
           return m;
         });
       };
@@ -699,7 +710,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
-              ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
+              ragContext: (shouldSendRag || resumeCount > 0) ? ragContext : undefined, // FASE B2: Só envia se pertinente, mantém no resume
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
@@ -783,7 +794,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         } catch (readError: any) {
           // Não retomar se a peça já está completa (tem Pede Deferimento + OAB)
           const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
-          if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+          const isQuotaError = readError.message?.includes('429') || readError.message?.includes('RESOURCE_EXHAUSTED') || readError.message?.includes('exceede');
+          // 429 = cota da API esgotada: insistir só piora. Para imediatamente com aviso claro.
+          if (isQuotaError) {
+            fullText += '\n\n[⚠️ Limite da API atingido (free tier). Aguarde alguns minutos antes de tentar novamente, ou troque de chave nas configurações.]';
+            isFinished = true;
+          } else if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
             // Auto-resume gracefully
             console.log(`Auto-resuming after interruption (Attempt ${resumeCount + 1})...`);
             resumeCount++;
