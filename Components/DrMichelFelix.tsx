@@ -1188,7 +1188,7 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
       if (friendlyError.includes("429") || friendlyError.includes("RESOURCE_EXHAUSTED")) {
         friendlyError = "Limite de cota atingido na IA. Todas as chaves foram tentadas. Por favor, aguarde alguns segundos e clique em 'Retomar Auditoria'.";
       } else if (friendlyError.includes("Bucket not found") || friendlyError.toLowerCase().includes("bucket")) {
-        friendlyError = "O Bucket 'ged-auditoria' não existe no seu Supabase Storage. Para conseguirmos enviar este arquivo grande, acesse seu painel Supabase > Storage > New Bucket > e crie um public bucket com o nome 'ged-auditoria'.";
+        friendlyError = "O Bucket 'ged-auditoria' privativo não foi encontrado. Acesse o Supabase > Storage > New Bucket > e crie um bucket PRIVADO (sem public) com o nome 'ged-auditoria'. O GED é mantido seguro.";
       } else if (friendlyError.includes("PAYLOAD_TOO_LARGE") || friendlyError.includes("Too Large") || friendlyError.includes("413")) {
         friendlyError = "O arquivo é muito grande. Estamos tentando via Storage, mas o Google ainda encontrou limites. Tente comprimir o PDF para menos de 20MB.";
       }
