@@ -2927,9 +2927,26 @@ app.post("/api/rag/plan", async (req, res) => {
     console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
     
     // Choose active Supabase client based on client DB config (if present) to stay in sync with custom DB settings
-    const activeSupabase = (dbConfig && dbConfig.url && dbConfig.key)
+    let activeSupabase = (dbConfig && dbConfig.url && dbConfig.key)
       ? createClient(dbConfig.url, dbConfig.key)
       : supabaseAdmin;
+
+    // Check if custom Supabase connection actually has legal_documents with rows, else fallback to standard project's supabaseAdmin
+    if (activeSupabase !== supabaseAdmin) {
+      try {
+        const { data, error } = await activeSupabase
+          .from('legal_documents')
+          .select('id')
+          .limit(1);
+        if (error || !data || data.length === 0) {
+          console.log("[RAG PLAN_API] Custom database has empty or missing legal_documents. Falling back to supabaseAdmin.");
+          activeSupabase = supabaseAdmin;
+        }
+      } catch (err) {
+        console.warn("[RAG PLAN_API] Error checking custom database legal_documents. Falling back to supabaseAdmin:", err);
+        activeSupabase = supabaseAdmin;
+      }
+    }
 
     if (!caseContext || String(caseContext).trim().length < 10) {
       console.warn("[RAG PLAN_API] Contexto do caso ausente ou insignificante.");

@@ -1,7 +1,46 @@
-import { supabase } from '../supabaseClient';
+import { supabase, getSystemSupabase } from '../supabaseClient';
 import LZString from 'lz-string';
 
 const getSupabase = () => supabase;
+
+let cachedUseSystemForLegal: boolean | null = null;
+
+const getLegalClient = async () => {
+  const primary = getSupabase();
+  if (!primary) {
+    return getSystemSupabase();
+  }
+  
+  if (typeof window !== 'undefined') {
+    const dbConfig = localStorage.getItem('inss_db_config');
+    if (!dbConfig) {
+      return primary;
+    }
+  }
+
+  if (cachedUseSystemForLegal !== null) {
+    return cachedUseSystemForLegal ? (getSystemSupabase() || primary) : primary;
+  }
+
+  try {
+    const { data, error } = await primary
+      .from('legal_documents')
+      .select('id')
+      .limit(1);
+
+    if (error || !data || data.length === 0) {
+      console.warn("[RAG] Custom database lacks legal_documents or is empty. Using central system DB for RAG queries.");
+      cachedUseSystemForLegal = true;
+      return getSystemSupabase() || primary;
+    } else {
+      cachedUseSystemForLegal = false;
+      return primary;
+    }
+  } catch (e) {
+    cachedUseSystemForLegal = true;
+    return getSystemSupabase() || primary;
+  }
+};
 
 export interface Message {
   id: string;
@@ -722,7 +761,7 @@ export const supabaseService = {
 
   // RAG (Retrieval-Augmented Generation)
   async saveLegalDocuments(chunks: { content: string, metadata: any, embedding: number[] }[]) {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return null;
     
     const { data, error } = await supabase
@@ -737,7 +776,7 @@ export const supabaseService = {
   },
 
   async searchLegalDocuments(embedding: number[], matchThreshold = 0.25, matchCount = 5): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return [];
     
     const { data, error } = await supabase
@@ -766,7 +805,7 @@ export const supabaseService = {
   ): Promise<Array<{id: number, content: string,
     metadata: any, similarity: number,
     is_single_chunk: boolean | null}>> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return [];
 
     let areaData: any[] = [];
@@ -842,7 +881,7 @@ export const supabaseService = {
   },
 
   async searchByTitles(titles: string[], chunksPerTitle = 15, query?: string): Promise<any[]> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase || titles.length === 0) return [];
 
     const results: any[] = [];
@@ -1052,7 +1091,7 @@ export const supabaseService = {
   },
 
   async keywordSearchLegalDocuments(query: string, matchCount = 15) {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return [];
     
     // Extract potential legal identifiers (e.g., IN 128, Art. 482, Lei 8.213)
@@ -1109,7 +1148,7 @@ export const supabaseService = {
 
   // Busca documentos maiores que minChars — usado para rechunking no browser
   async getLargeDocuments(minChars: number = 8000, batchLimit: number = 1): Promise<Array<{id: number, content: string, metadata: any}>> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return [];
     const { data, error } = await supabase
       .rpc('get_large_legal_documents', { min_chars: minChars, batch_limit: batchLimit, batch_offset: 0 });
@@ -1118,7 +1157,7 @@ export const supabaseService = {
   },
 
   async countLargeDocuments(minChars: number = 8000): Promise<number> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return 0;
     const { data, error } = await supabase
       .rpc('count_large_legal_documents', { min_chars: minChars });
@@ -1128,7 +1167,7 @@ export const supabaseService = {
 
   // Atualiza o embedding de um chunk específico (usado no reembedding pós-rechunking SQL)
   async updateEmbedding(id: number, embedding: number[]) {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return;
     const { error } = await supabase
       .from('legal_documents')
@@ -1139,7 +1178,7 @@ export const supabaseService = {
 
   // Busca 1 chunk sem embedding para processar
   async getOneChunkNeedingEmbedding(): Promise<{id: number, content: string, metadata: any} | null> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return null;
     const { data, error } = await supabase.rpc('get_one_chunk_needing_embedding');
     if (error) throw error;
@@ -1148,7 +1187,7 @@ export const supabaseService = {
 
   // Conta chunks sem embedding
   async countChunksNeedingEmbedding(): Promise<number> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return 0;
     const { data, error } = await supabase.rpc('count_chunks_needing_embedding');
     if (error) throw error;
@@ -1157,7 +1196,7 @@ export const supabaseService = {
 
   // Divide UM documento grande em sub-chunks via SQL (sem embedding — rápido)
   async splitOneLargeDocument(): Promise<{done: boolean, titulo?: string, chars?: number, chunks_gerados?: number, message?: string}> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) throw new Error('Supabase não disponível');
     const { data, error } = await supabase.rpc('split_one_large_document', {
       max_chunk_chars: 2500,
@@ -1169,14 +1208,14 @@ export const supabaseService = {
   },
 
   async deleteLegalDocumentById(id: number) {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return;
     const { error } = await supabase.from('legal_documents').delete().eq('id', id);
     if (error) throw error;
   },
 
   async deleteLegalDocumentByTitle(title: string) {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return null;
     
     // We use the JSON operator ->> to query inside the metadata JSONB column
@@ -1192,7 +1231,7 @@ export const supabaseService = {
   },
 
   async getLegalDocumentTitles(): Promise<string[]> {
-    const supabase = getSupabase();
+    const supabase = await getLegalClient();
     if (!supabase) return [];
     
     let allData: any[] = [];

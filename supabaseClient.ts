@@ -82,6 +82,28 @@ export const getDbConfig = () => {
   // Função legada para manter compatibilidade com componentes antigos
   export const initSupabase = () => supabase;
 
+  export const getSystemSupabase = () => {
+      try {
+          const envUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
+          const envKey = getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('ANON_KEY_SUPABASE');
+
+          const finalUrl = (isValidUrl(envUrl) && envKey) ? envUrl : (isValidUrl(GLOBAL_SUPABASE_URL) ? GLOBAL_SUPABASE_URL : null);
+          const finalKey = (isValidUrl(envUrl) && envKey) ? envKey : (GLOBAL_SUPABASE_KEY || null);
+
+          if (!finalUrl || !finalKey) return null;
+
+          return createClient(finalUrl, finalKey, {
+              auth: {
+                  persistSession: false,
+                  autoRefreshToken: false
+              }
+          });
+      } catch (e) {
+          console.error("Erro ao inicializar cliente Supabase do sistema:", e);
+          return null;
+      }
+  };
+
 /**
  * Valida a conexão com o Supabase tentando buscar um registro simples.
  * Útil para diagnosticar erros de "Falha ao buscar" (CORS ou Projeto Pausado).
