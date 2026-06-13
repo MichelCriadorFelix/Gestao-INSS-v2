@@ -638,9 +638,21 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               .join('\n');
             let ctx = `${messageText}\n${userTexts}`;
             if (lastReport) {
-              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
+              // CORREÇÃO DA DESCONEXÃO RELATÓRIO→PEÇA: o corte fixo em 4.500 chars
+              // decapitava a seção de CURADORIA DE FUNDAMENTAÇÃO (Bloco X), que costuma
+              // ficar no fim de relatórios densos (>8.000 chars). Sem ela, o curador e a
+              // peça perdiam a lista de fundamentos aprovados e improvisavam. Agora
+              // extraímos PRIORITARIAMENTE o bloco de curadoria e o preservamos íntegro.
+              const reportFull = String(lastReport.content);
+              const curadoriaMatch = reportFull.match(/(?:CURADORIA\s+DE\s+FUNDAMENTA[ÇC][ÃA]O|FUNDAMENTA[ÇC][ÃA]O\s+JUR[ÍI]DICA|N[ÚU]CLEO\s+ESSENCIAL)[\s\S]*/i);
+              const curadoria = curadoriaMatch ? curadoriaMatch[0].substring(0, 6000) : '';
+              const cabeca = reportFull.substring(0, 3500);
+              const reportForPlan = curadoria
+                ? `${cabeca}\n\n[...]\n\n[CURADORIA DE FUNDAMENTAÇÃO — LISTA APROVADA, USE EXATAMENTE ESTES FUNDAMENTOS]\n${curadoria}`
+                : reportFull.substring(0, 9000);
+              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${reportForPlan}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
             }
-            return ctx.substring(0, 9000);
+            return ctx.substring(0, 13000);
           })();
 
           const planResp = await apiFetch('/api/rag/plan', {

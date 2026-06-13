@@ -1255,7 +1255,16 @@ export const supabaseService = {
     if (prevKeywords.some(kw => normQuery.includes(kw))) {
       allLawTitles.forEach(t => {
         const nt = t.toLowerCase();
-        if (nt.includes('8.213') || nt.includes('3.048') || nt.includes('8.742') || nt.includes('8.212') || nt.includes('instrucao normativa') || nt.includes('pres/inss') || nt.includes('sumula') || nt.includes('tema')) {
+        // ATENÇÃO: 'sumula' e 'tema' foram REMOVIDOS deste despejo conceitual.
+        // Antes, qualquer caso previdenciário arrastava TODAS as ~24 súmulas/temas da
+        // base como "título exato" (relevância máxima), poluindo o relatório com súmulas
+        // inaplicáveis (75, 88, 89, 48, Tema 979 etc.) e afogando o núcleo (Arts. 42/59,
+        // Súmula 47). As súmulas/temas PERTINENTES já entram por dois caminhos corretos:
+        //   (1) o curador determinístico /api/rag/plan, que seleciona por tese; e
+        //   (2) o "Filtro Geral inteligente" abaixo, que casa súmula/tema por número
+        //       quando o advogado a menciona explicitamente na query.
+        // Aqui ficam apenas as LEIS/DECRETOS/INs base do RGPS/assistencial.
+        if (nt.includes('8.213') || nt.includes('3.048') || nt.includes('8.742') || nt.includes('8.212') || nt.includes('instrucao normativa') || nt.includes('pres/inss')) {
           matchedByConcept.add(t);
         }
       });
