@@ -3143,10 +3143,14 @@ app.post("/api/rag/plan", async (req, res) => {
           } else {
             const currentArts = new Set(item.artigos || []);
             articles.forEach(art => currentArts.add(art));
-            return {
-              ...item,
-              artigos: Array.from(currentArts)
-            };
+            // Artigos específicos do núcleo PREVALECEM: remove a marca 'integral' que o
+            // planner de IA possa ter posto. Antes, um item marcado integral pelo planner
+            // mantinha integral=true após o merge, fazendo a busca ignorar os artigos
+            // (42/59) e tratar a lei como integral — e o limite de chunks descartava o
+            // núcleo. Agora o filtro por artigo é respeitado.
+            const merged: any = { ...item, artigos: Array.from(currentArts) };
+            delete merged.integral;
+            return merged;
           }
         }
         return item;
@@ -3569,43 +3573,40 @@ app.post("/api/rag/plan", async (req, res) => {
       const batch = curatedPlan.slice(i, i + batchSize);
       
       const promises = batch.map(async (planItem: any) => {
-        let query = supabaseAdmin
+        // Busca TODOS os chunks do título (a lei/súmula). O filtro por artigo é feito
+        // em JavaScript abaixo — NÃO via .or() do PostgREST.
+        // MOTIVO: o .or() com `content.ilike."%Art. 42.%"` é frágil — o PostgREST usa
+        // vírgula como separador de condições, e valores contendo '.' , ',' e aspas
+        // quebravam o parsing, fazendo a busca por artigo falhar silenciosamente e
+        // retornar chunks errados (ex.: trazia Art. 28 em vez de 42/59). Resultado: o
+        // núcleo (Arts. 42/59) era reportado como "ausente na base" mesmo existindo.
+        const { data, error } = await supabaseAdmin
           .from('legal_documents')
           .select('id, content, metadata')
-          .eq('metadata->>title', planItem.titulo);
-          
-        if (!planItem.integral && planItem.artigos && planItem.artigos.length > 0) {
-          const filters = [];
-          for (const num of planItem.artigos) {
-            const semPonto = num.replace(/\./g, '');
-            const comPonto = /^\d{4}$/.test(semPonto) ? `${semPonto.slice(0, 1)}.${semPonto.slice(1)}` : null;
-            
-            filters.push(`content.ilike."%Art. ${num}.%"`);
-            filters.push(`content.ilike."%Art. ${num} %"`);
-            filters.push(`content.ilike."%Art. ${num},%"`);
-            filters.push(`content.ilike."%Art. ${num}-%"`);
-            filters.push(`content.ilike."%§ ${num}%"`);
-            filters.push(`content.ilike."%§ ${num}º%"`);
-            
-            if (semPonto !== num) {
-              filters.push(`content.ilike."%Art. ${semPonto}.%"`);
-              filters.push(`content.ilike."%Art. ${semPonto} %"`);
-            }
-            if (comPonto && comPonto !== num) {
-              filters.push(`content.ilike."%Art. ${comPonto}.%"`);
-              filters.push(`content.ilike."%Art. ${comPonto} %"`);
-            }
-          }
-          query = query.or(filters.join(','));
-        }
-        
-        // Execute sem limite (ou limite alto) para garantir q não perde artigo
-        const { data, error } = await query.limit(200); 
+          .eq('metadata->>title', planItem.titulo)
+          .limit(200);
         if (error) {
            console.error("Error fetching doc in PLAN:", error);
            return [];
         }
-        return (data || []).map(d => ({
+        let rows = data || [];
+
+        // Se o item pede artigos específicos (núcleo da tese), filtra em JS de forma
+        // determinística. Casa "Art. 42", "Art. 42.", "Art. 42,", "Art. 42-", "Art. 42 "
+        // e parágrafos "§ 42", tolerando o número colado a ponto/vírgula/espaço/fim.
+        if (!planItem.integral && Array.isArray(planItem.artigos) && planItem.artigos.length > 0) {
+          const artRegexes = planItem.artigos.map((numRaw: string) => {
+            const num = String(numRaw).trim();
+            const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // (?:[^\d]|$) garante que "42" não case dentro de "428" ou "420"
+            return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${esc}(?:[^0-9]|$)`, 'i');
+          });
+          rows = rows.filter((d: any) =>
+            artRegexes.some((re: RegExp) => re.test(d.content || ''))
+          );
+        }
+
+        return rows.map((d: any) => ({
           title: planItem.titulo,
           content: d.content
         }));
