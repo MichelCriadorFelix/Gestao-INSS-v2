@@ -2923,10 +2923,30 @@ Se nada se aplicar, responda [].`;
 
 app.post("/api/rag/plan", async (req, res) => {
   try {
-    const { caseContext, areas } = req.body;
+    const { caseContext, areas, dbConfig } = req.body;
     console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
+    
+    // Choose active Supabase client based on client DB config (if present) to stay in sync with custom DB settings
+    const activeSupabase = (dbConfig && dbConfig.url && dbConfig.key)
+      ? createClient(dbConfig.url, dbConfig.key)
+      : supabaseAdmin;
+
     if (!caseContext || String(caseContext).trim().length < 10) {
-      return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
+      console.warn("[RAG PLAN_API] Contexto do caso ausente ou insignificante.");
+      return res.json({
+        ragContext: "",
+        plan: [],
+        titlesConsidered: 0,
+        chunksFound: 0,
+        diagnostico: {
+          motivo: "Contexto de caso ausente ou curto (< 10 caracteres)",
+          caseContextLength: caseContext?.length || 0,
+          areasRecebidas: areas,
+          inventarioTamanho: 0,
+          leiDeBeneficiosNoInventario: false,
+          sumula47NoInventario: false
+        }
+      });
     }
 
     console.log("[RAG PLAN_API] 1. Carregando inventário de metadados da base...");
@@ -2936,12 +2956,13 @@ app.post("/api/rag/plan", async (req, res) => {
     let hasMore = true;
 
     while (hasMore) {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await activeSupabase
         .from('legal_documents')
         .select('metadata')
         .range(page * pageSize, (page + 1) * pageSize - 1);
         
       if (error) {
+        console.error("[RAG PLAN_API ERROR] Falha ao carregar metadados do Supabase:", error);
         throw error;
       }
       
@@ -2956,6 +2977,8 @@ app.post("/api/rag/plan", async (req, res) => {
         hasMore = false;
       }
     }
+
+    console.log(`[RAG PLAN_API] Metadados carregados. Total de linhas lidas: ${rows.length}`);
 
     const areaSet = Array.isArray(areas) && areas.length > 0 ? new Set(areas) : null;
     const titleAreas = new Map<string, Set<string>>();
@@ -2974,8 +2997,26 @@ app.post("/api/rag/plan", async (req, res) => {
         inventory.push(t);
       }
     }
+    
+    console.log(`[RAG PLAN_API] Inventário mapeado de acordo com as áreas: ${inventory.length} títulos de ${titleAreas.size} totais disponíveis.`);
+
     if (inventory.length === 0) {
-      return res.json({ ragContext: "", plan: [], titlesConsidered: 0 });
+      console.warn("[RAG PLAN_API] Nenhum título do inventário passou no filtro de áreas.");
+      return res.json({
+        ragContext: "",
+        plan: [],
+        titlesConsidered: 0,
+        chunksFound: 0,
+        diagnostico: {
+          motivo: "Inventário filtrado resultou em lista vazia. Verifique se existem documentos na tabela legal_documents cadastrados para estas áreas.",
+          areasRecebidas: areas,
+          inventarioTamanho: 0,
+          totalTabelasDisponiveis: titleAreas.size,
+          titulosDisponiveisSemFiltro: Array.from(titleAreas.keys()).slice(0, 10),
+          leiDeBeneficiosNoInventario: false,
+          sumula47NoInventario: false
+        }
+      });
     }
 
     // 2. PLANNER — Flash escolhe da lista (grounding)
@@ -3566,7 +3607,24 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     if (curatedPlan.length === 0) {
-      return res.json({ ragContext: "", plan: [], titlesConsidered: inventory.length });
+      console.warn("[RAG PLAN_API] O planejador não selecionou nenhum documento do inventário.");
+      return res.json({
+        ragContext: "",
+        plan: [],
+        titlesConsidered: inventory.length,
+        chunksFound: 0,
+        diagnostico: {
+          motivo: "Nenhum documento/lei pôde ser curado ou selecionado pelo planejador para este caso.",
+          areasRecebidas: areas,
+          inventarioTamanho: inventory.length,
+          radarLeiDeBeneficios: inventory.includes('Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'),
+          radarSumula47: inventory.includes('SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais'),
+          plannerCru: __diagPlannerRaw,
+          plannerResolvido: __diagPlannerResolved,
+          plannerTitulosNaoResolvidos: __diagUnresolved,
+          planoFinal: []
+        }
+      });
     }
 
     // 3. FETCH DETERMINÍSTICO via Aplicação (Substituindo RPC para evitar limitação oculta)
@@ -3587,7 +3645,7 @@ app.post("/api/rag/plan", async (req, res) => {
         // quebravam o parsing, fazendo a busca por artigo falhar silenciosamente e
         // retornar chunks errados (ex.: trazia Art. 28 em vez de 42/59). Resultado: o
         // núcleo (Arts. 42/59) era reportado como "ausente na base" mesmo existindo.
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await activeSupabase
           .from('legal_documents')
           .select('id, content, metadata')
           .eq('metadata->>title', planItem.titulo)
@@ -3712,7 +3770,16 @@ app.post("/api/rag/plan", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Error in /api/rag/plan:", error);
-    res.status(500).json({ error: error.message || "Failed to plan RAG", ragContext: "" });
+    res.status(500).json({
+      error: error.message || "Failed to plan RAG",
+      ragContext: "",
+      chunksFound: 0,
+      diagnostico: {
+        success: false,
+        error: error.message || "Failed to plan RAG",
+        stack: error.stack
+      }
+    });
   }
 });
 

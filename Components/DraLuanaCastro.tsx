@@ -26,6 +26,7 @@ import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
 import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
+import { getDbConfig } from '../supabaseClient';
 import EliteRedactionModal from './EliteRedactionModal';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
 
@@ -658,7 +659,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
           const planResp = await apiFetch('/api/rag/plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caseContext: plannerContext, areas: AGENT_AREAS }),
+            body: JSON.stringify({ 
+              caseContext: plannerContext, 
+              areas: AGENT_AREAS,
+              dbConfig: getDbConfig()
+            }),
             signal: abortController.signal
           });
 

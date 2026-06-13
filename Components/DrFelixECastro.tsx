@@ -26,7 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { SocialSecurityData } from '../SocialSecurityCalc';
-import { initSupabase } from '../supabaseClient';
+import { initSupabase, getDbConfig } from '../supabaseClient';
 import { supabaseService } from '../services/supabaseService';
 import { safeSetLocalStorage } from '../utils';
 import { markdownToHtml } from '../src/utils/markdownToHtml';
@@ -685,7 +685,11 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
           const planResp = await apiFetch('/api/rag/plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caseContext: plannerContext, areas: AGENT_AREAS }),
+            body: JSON.stringify({ 
+              caseContext: plannerContext, 
+              areas: AGENT_AREAS,
+              dbConfig: getDbConfig()
+            }),
             signal: abortController.signal
           });
 
