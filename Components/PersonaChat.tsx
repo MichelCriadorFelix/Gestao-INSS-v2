@@ -397,6 +397,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       timestamp: new Date().toISOString()
     };
 
+    console.log("===============================================================================");
+    console.log(`[CHAT START] 💬 Iniciando envio de mensagem para a Persona: ${persona.displayName}`);
+    console.log(`[CHAT DETAIL] Mensagem original: "${messageText.substring(0, 100)}${messageText.length > 100 ? '...' : ''}"`);
+    console.log(`[CHAT CONFIG] Provedor Selecionado: ${eliteProviderOverride || selectedModelProvider}`);
+    console.log(`[CHAT CONFIG] Modelo Selecionado: ${eliteModelOverride || selectedModel}`);
+    console.log("===============================================================================");
+
     setSessions(prev => prev.map(s => 
       s.id === sessionId ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? messageText.slice(0, 30) : s.title } : s
     ));
@@ -413,6 +420,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           history: sessions.find(s => s.id === sessionId)?.messages || [],
           images: images || []
       }).length;
+
+      console.log(`[CHAT SIZE] Tamanho aproximado do payload inicial: ${(payloadSize / 1024).toFixed(2)} KB.`);
 
       // If payload is > 4MB (Vercel serverless limit is 4.5MB), warn user
       if (payloadSize > 4000000) {
@@ -441,6 +450,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
+      console.log(`[DOCUMENTS] Documentos anexados na sessão: ${session?.documents?.length || 0}. Comprimento total do texto: ${docSummaries.length} caracteres.`);
+
       // 1. Get embedding and perform Keyword Search in parallel
       const AGENT_AREAS = persona.agentAreas;
       let ragContext = '';
@@ -449,6 +460,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const isReportOrPeca = messageText.includes('[FASE DE GERAÇÃO]') || messageText.includes('[FASE DE TOMADA DE CIÊNCIA]') || /gerar|corrigir|peça|relatório|audita/i.test(messageText);
       const isLegalDoubt = /\b(lei|artigo|súmula|jurisprudência|tema|STJ|STF|TNU|enunciado|o que diz|qual.*norma|fundament)/i.test(messageText);
       const shouldSendRag = isReportOrPeca || isLegalDoubt;
+
+      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isReportOrPeca: ${isReportOrPeca}, isLegalDoubt: ${isLegalDoubt})`);
 
       try {
         if (!shouldSendRag) {
@@ -471,6 +484,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           ? `${messageText} ${lastFewUserTexts}`.substring(0, 1500)
           : messageText;
 
+        console.log(`[RAG QUERY ENRICHMENT] Query enriquecida para RAG: "${enrichedQueryText.substring(0, 200)}..."`);
+
         // Se for comando de geração, enriquece a query com
         // termos jurídicos previdenciários para forçar o RAG
         // a recuperar as leis principais do RGPS
@@ -484,26 +499,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         // Qualquer lei, súmula ou jurisprudência adicionada
         // futuramente será encontrada automaticamente,
         // desde que o título siga os padrões da base:
-        //
-        // PADRÕES VÁLIDOS (conforme base atual):
-        // • Leis:    'Nome Descritivo (Lei nº X/AAAA)'
-        //            Ex: 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'
-        // • Decretos:'Nome Descritivo (Decreto nº X/AAAA)'
-        //            Ex: 'Regulamento da Previdência Social (Decreto nº 3.048/1999)'
-        // • IN/Port: 'INSTRUÇÃO NORMATIVA ÓRGÃO Nº X, DE DATA'
-        //            Ex: 'INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022'
-        // • Súmulas: 'SÚMULA X TRIBUNAL' ou 'Súmula n. X do TRIBUNAL'
-        //            Ex: 'SÚMULA 75 TNU' / 'Súmula n. 416 do STJ'
-        // • Temas:   'Tema X/TRIBUNAL — Descrição curta'
-        //            Ex: 'Tema 1.030/STJ — Renúncia ao Excedente do Teto do JEF'
-        // • Jurisp.: 'JURISPRUDÊNCIA ASSUNTO EM MAIÚSCULAS'
-        //            Ex: 'JURISPRUDÊNCIA COPEIRO HOSPITALAR APOSENTADORIA ESPECIAL'
-        // • EC/CF:   'Nome (EC nº X/AAAA)' ou 'CONSTITUIÇÃO...'
-        //            Ex: 'Reforma da Previdência (EC nº 103/2019)'
-        // Busca e filtra os títulos da base para consulta exata por título
-        // Otimização: filtra apenas os títulos mencionados no para evitar N+1 queries desnecessárias e diluição de contexto, utilizando o Padrão Ouro cognitivo no SupabaseService.
         const allLawTitles = await supabaseService.getLegalDocumentTitles();
         const allTitles = supabaseService.filterLawTitles(allLawTitles, enrichedQueryText);
+
+        console.log(`[RAG LITERAL MATCH] Filtro de títulos encontrou:`, allTitles);
 
         // Se for comando de geração com contexto semântico fraco,
         // injeta os termos jurídicos do caso extraídos do histórico
@@ -520,6 +519,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           ragQuery = (ragQuery + ' ' + allSessionText).substring(0, 1500);
         }
 
+        console.log(`[RAG RETRIEVAL] Efetuando buscas Vetoriais e Palavras-chave com a query: "${ragQuery.substring(0, 150)}..."`);
+
         const [embedResponse, keywordResults] = await Promise.all([
           apiFetch('/api/rag/embed', {
             method: 'POST',
@@ -534,12 +535,17 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           ? await supabaseService.searchByTitles(allTitles, 15, enrichedQueryText)
           : [];
 
+        console.log(`[RAG RESULTS] Palavras-chave: ${keywordResults.length} docs, Busca exata de Títulos: ${titleResults.length} docs.`);
+
         if (embedResponse.ok) {
           const { embedding } = await embedResponse.json();
           if (embedding && embedding.length > 0) {
+            console.log(`[RAG EMBED] Obtidos embeddings com sucesso. Tamanho do vetor: ${embedding.length}. Buscando no banco...`);
             // Threshold 0.25 e máximo 30 resultados para ampla cobertura de buscas por área e retrocompatibilidade de legados
             const vectorResults = await supabaseService
               .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.25, 30);
+
+            console.log(`[RAG DB AREA] Buscas vetoriais por área retornaram: ${vectorResults.length} docs.`);
 
             // Merge sem duplicatas, priorizando vetorial
             const seen = new Set<number>();
@@ -566,6 +572,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               }
             });
 
+            console.log(`[RAG MERGE] Total unificado após dedup: ${merged.length} documentos fundamentais.`);
+
             if (merged.length > 0) {
               // Injeta título + score para o modelo saber a relevância
               ragContext = merged.map((r: any) => {
@@ -580,6 +588,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             }
           }
         } else if (keywordResults.length > 0) {
+          console.warn(`[RAG EMBED ERROR] Falha ao obter embeddings de vetor. Revertendo apenas para correspondências de palavra-chave.`);
           ragContext = keywordResults.map((r: any) => {
             const title = r.metadata?.title 
               ? `FONTE: ${r.metadata.title} [Keyword Match]\n` 
@@ -591,11 +600,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         // ============================================================
         // RAG DETERMINÍSTICO (PLANNER) — PRIORIDADE MÁXIMA
         // ============================================================
-        // Replica o método humano: planner Flash escolhe da lista real
-        // de títulos e o backend faz fetch determinístico (sem threshold).
-        // Garante que TODO dispositivo que o caso exige e que EXISTE na
-        // base seja recuperado. Prepende ao ragContext (vetorial/keyword
-        // viram cobertura complementar de breadth).
         try {
           const plannerContext = (() => {
             const msgs = session?.messages || [];
@@ -624,6 +628,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             return ctx.substring(0, 13000);
           })();
 
+          console.log(`[RAG PLANNER] Solicitando plano determinístico para o contexto (Tamanho: ${plannerContext.length} chars).`);
+
           const planResp = await apiFetch('/api/rag/plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -634,14 +640,18 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           if (planResp.ok) {
             const planJson = await planResp.json();
             const { ragContext: deterministicRag, chunksFound, diagnostico } = planJson;
-            console.log('═══ DIAGNÓSTICO RAG ═══');
+            console.log('═══ DIAGNÓSTICO RAG CHAT PLANNER ═══');
             console.log('[RAG] diagnóstico completo:', diagnostico);
             if (deterministicRag && deterministicRag.trim().length > 0) {
-              console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados por plano (prioridade máxima).`);
+              console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados com sucesso por plano determinístico.`);
               ragContext = ragContext
                 ? `${deterministicRag}\n\n---\n\n${ragContext}`
                 : deterministicRag;
+            } else {
+              console.log(`[RAG Determinístico] Nenhum chunk específico exigido pelo planner.`);
             }
+          } else {
+            console.warn(`[RAG PLANNER ERROR] Erro na resposta do Planner: status ${planResp.status}`);
           }
         } catch (planErr) {
           console.warn("RAG planner falhou (seguindo só com vetorial/keyword):", planErr);
@@ -653,16 +663,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       // ============================================================
       // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
-      // ============================================================
-      // Comprime mensagens longas que apenas inflam o contexto sem
-      // agregar valor para a resposta atual. O compilado completo
-      // já está no documentContext, separadamente.
-      //
-      // Regras:
-      // - Tomada de ciência (TXT/OCR injetado) → 500 chars + marcador
-      // - Respostas de IA com peça/relatório longo (>3000 chars) → 500 chars + marcador
-      // - Mensagens curtas (correções, dúvidas, comandos) → intactas
-      // - Janela: últimas 8 mensagens (4 trocas)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
         const last = msgs.slice(-40); // FASE C: Expanded history to 40 messages for deep traceability
@@ -694,6 +694,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       };
 
       const compressedHistory = compressHistory(session?.messages || []);
+      console.log(`[HISTORY COMPRESSION] Histórico filtrado de mensagens de ${session?.messages?.length || 0} para ${compressedHistory.length} após compressão.`);
 
       let fullText = '';
       let isFinished = false;
@@ -705,7 +706,23 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         if (resumeCount > 0) {
           const anchor = fullText.slice(-400).replace(/\n/g, ' ');
           currentMessage = `(GERAÇÃO INTERROMPIDA — CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, SEM RECOMEÇAR. Última linha gerada: "${anchor}")`;
+          console.log(`[STREAM RESUME] Solicitando autocomplementação de geração na tentativa ${resumeCount}. Âncora de continuação: "${anchor.substring(0, 100)}..."`);
         }
+
+        const fetchPayload = {
+          message: currentMessage,
+          documentContext: docSummaries ? `${docSummaries.substring(0, 500)}... [Truncated for Console log, real length: ${docSummaries.length}]` : null,
+          historyCount: resumeCount === 0 ? compressedHistory.length : 'resumed',
+          imagesCount: resumeCount === 0 ? (images || []).length : 0,
+          filesCount: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).length || 0) : 0,
+          modelProvider: eliteProviderOverride || selectedModelProvider,
+          model: eliteModelOverride || selectedModel,
+          petitionLength,
+          sessionId: session?.id,
+          ragContextLength: ragContext ? ragContext.length : 0
+        };
+
+        console.log(`[HTTP POST CHAT] Chamando endpoint: ${persona.chatEndpoint}. Payload:`, fetchPayload);
 
         try {
           const response = await apiFetch(persona.chatEndpoint, {
@@ -729,9 +746,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             signal: abortController.signal
           });
 
+          console.log(`[HTTP RESPONSE STATUS] HTTP status: ${response.status} ${response.statusText}`);
+
           if (!response.ok) {
             if (resumeCount === 0) {
               const errorText = await response.text();
+              console.error(`[HTTP ERROR DETAIL] Resposta de erro do servidor: ${errorText}`);
               let errorMessage = 'Falha na resposta da IA';
               try {
                 const errorData = JSON.parse(errorText);
@@ -756,9 +776,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           
           if (reader) {
             let buffer = '';
+            console.log("[SSE STREAM] Conexão SSE estabelicida com sucesso. Baixando stream de dados...");
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
+                console.log("[SSE STREAM END] Stream de leitura de dados finalizado.");
                 isFinished = true;
                 break;
               }
@@ -771,6 +793,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 if (line.startsWith('data: ')) {
                   const dataStr = line.slice(6);
                   if (dataStr === '[DONE]') {
+                    console.log("[SSE STREAM EVENT] Recebido sinal de término [DONE]");
                     isFinished = true;
                     continue;
                   }
@@ -782,12 +805,19 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     continue;
                   }
                   
-                  if (data.error) throw new Error(data.error);
+                  if (data.error) {
+                    console.error("[SSE STREAM ERROR]", data.error);
+                    throw new Error(data.error);
+                  }
                   if (data.max_tokens) {
+                    console.warn("[SSE LIMIT] Limite de tokens de saída excedido (max_tokens_hit). Solicitando retomada automática de escrita...");
                     isFinished = false; // We need to resume
                     throw new Error("MAX_TOKENS_HIT");
                   }
-                  if (data.heartbeat) continue;
+                  if (data.heartbeat) {
+                    console.log("[SSE HEARTBEAT] Servidor enviou sinal de atividade.");
+                    continue;
+                  }
                   
                   if (data.text) {
                     fullText += data.text;
@@ -797,12 +827,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               }
             }
           } else {
+            console.warn("[SSE READER FAILED] Driver de leitura do body não pôde ser instanciado.");
             isFinished = true;
           }
         } catch (readError: any) {
           // Não retomar se a peça já está completa (tem Pede Deferimento + OAB)
           const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
           const isQuotaError = readError.message?.includes('429') || readError.message?.includes('RESOURCE_EXHAUSTED') || readError.message?.includes('exceede');
+          console.warn(`[STREAM EXCEPTION HANDLER] Capturado durante streaming: "${readError.message}". IsComplete? ${isComplete}. Quota? ${isQuotaError}`);
           // 429 = cota da API esgotada: insistir só piora. Para imediatamente com aviso claro.
           if (isQuotaError) {
             fullText += '\n\n[⚠️ Limite da API atingido (free tier). Aguarde alguns minutos antes de tentar novamente, ou troque de chave nas configurações.]';
@@ -820,6 +852,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           }
         }
       }
+
+      console.log(`[GENERATION COMPLETED] Texto final gerado com sucesso! Comprimento total: ${fullText.length} caracteres.`);
 
       setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
