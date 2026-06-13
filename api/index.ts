@@ -4236,7 +4236,6 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
-        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -4868,7 +4867,6 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokensLuana > 200_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
-        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokensLuana > 0 ? totalInputTokensLuana/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -5435,7 +5433,6 @@ ${message}`;
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
-        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
       while (!isFinished && attempt < MAX_ATTEMPTS) {
@@ -6007,7 +6004,6 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
       // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input acima de 200k tokens — uso muito intenso.`);
-        try { res.write(`data: ${JSON.stringify({ status: `⚠️ Conversa grande (~${Math.round(totalInputTokens > 0 ? totalInputTokens/1000 : 0)}k tokens). Após gerar a peça, considere iniciar nova conversa para economizar cota.` })}\n\n`); } catch {}
       }
 
 while (!isFinished && attempt < MAX_ATTEMPTS) {
