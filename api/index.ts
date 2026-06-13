@@ -666,6 +666,12 @@ ESTILO: Advogado sênior respondendo a colega de escritório. Tom técnico, dire
 async function detectUserIntent(message: string): Promise<string> {
   const safeMessage = message || "";
   const msgLower = safeMessage.toLowerCase();
+
+  // PRIORIDADE MÁXIMA: comando explícito de relatório (botão ou texto) → nunca peça
+  if (/^gerar\s+relat[óo]rio/i.test(safeMessage.trim()) || /\[gerar\s+relat[óo]rio\]/i.test(msgLower)) {
+    console.log("[Detector] Comando explícito GERAR RELATÓRIO → [DÚVIDA] (rota relatório)");
+    return "[DÚVIDA]";
+  }
   
   if (msgLower.includes("[geração modular]") || msgLower.includes("[geracao modular]") || msgLower.includes("[correção cirúrgica]") || msgLower.includes("[correcao cirurgica]")) {
     return "[GERAÇÃO]";
@@ -3864,10 +3870,12 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
-    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
-    const isGenerationRequest = (isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)) && !isReportRequest; // FIX-RELATÓRIO: relatório jamais dispara peça
+    // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
+    // Prioridade sobre qualquer classificação de intenção por IA.
+    const isGenerationRequest = !isReportRequest && (
+      isGenerationIntent ||
+      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+    );
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
@@ -3985,7 +3993,21 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
       if (compressed.length < originalDocSize) {
         console.log(`[Dr.Michel] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS]
+
+⚠️ INSTRUÇÃO DE LEITURA OBRIGATÓRIA (NÃO IGNORE):
+Este bloco contém o COMPILADO INTEGRAL de TODOS os documentos do caso, um após o outro.
+NÃO é uma amostra. NÃO leia apenas o início. O documento pode conter dezenas de peças
+(petições, laudos, exames, CNIS, contratos, comprovantes) em sequência.
+
+PROTOCOLO DE LEITURA EXAUSTIVA:
+1. ANTES de qualquer análise, varra o documento do PRIMEIRO ao ÚLTIMO caractere.
+2. Identifique e enumere CADA documento distinto encontrado (tipo, emissor, data, página se houver).
+3. Só então produza a análise, cobrindo TODOS os documentos enumerados — nenhum pode ser omitido.
+4. Se você mencionar "2 documentos" mas o compilado contiver mais, você FALHOU na leitura. Releia.
+
+[INÍCIO DO COMPILADO]
+${compressed}`;
     }
 
     if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
@@ -4027,6 +4049,10 @@ REGRAS DE OURO:
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
     ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
+    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
+    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
+    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
+    O número de documentos na seção 12 deve refletir a totalidade do compilado.
     Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
     - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
@@ -4426,8 +4452,12 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                              message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
                              message.includes("Enviei os seguintes documentos");
     
-    const isGenerationRequest = (isGenerationIntent || 
-                                 message.includes("GERAR PEÇA")) && !isReportRequestLuana; // FIX-RELATÓRIO
+    // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
+    // Prioridade sobre qualquer classificação de intenção por IA.
+    const isGenerationRequest = !isReportRequestLuana && (
+      isGenerationIntent ||
+      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+    );
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
@@ -4578,7 +4608,21 @@ O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO 
       if (compressed.length < originalDocSize) {
         console.log(`[Dra.Luana] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars (${Math.round(estimateTokens(compressed)/1000)}k tokens)`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS]
+
+⚠️ INSTRUÇÃO DE LEITURA OBRIGATÓRIA (NÃO IGNORE):
+Este bloco contém o COMPILADO INTEGRAL de TODOS os documentos do caso, um após o outro.
+NÃO é uma amostra. NÃO leia apenas o início. O documento pode conter dezenas de peças
+(petições, laudos, exames, CNIS, contratos, comprovantes) em sequência.
+
+PROTOCOLO DE LEITURA EXAUSTIVA:
+1. ANTES de qualquer análise, varra o documento do PRIMEIRO ao ÚLTIMO caractere.
+2. Identifique e enumere CADA documento distinto encontrado (tipo, emissor, data, página se houver).
+3. Só então produza a análise, cobrindo TODOS os documentos enumerados — nenhum pode ser omitido.
+4. Se você mencionar "2 documentos" mas o compilado contiver mais, você FALHOU na leitura. Releia.
+
+[INÍCIO DO COMPILADO]
+${compressed}`;
     }
 
     if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
@@ -4622,6 +4666,10 @@ REGRAS DE OURO:
     Informe sempre o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
     ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
+    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
+    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
+    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
+    O número de documentos na seção 12 deve refletir a totalidade do compilado.
     Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
     **PROIBIÇÃO DE REPETIÇÃO E TERMOS DE IA:** Jamais repita os mesmos pedidos ou tópicos no final da peça. É TERMINANTEMENTE PROIBIDO incluir as strings "RAG", "Base de Conhecimento", "Local OCR" ou referências ao sistema de IA no corpo da petição.
     **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista para cada tipo de ação trabalhista, o software será rejeitado. O tópico "Resumo da Demanda" deve ser um texto narrativo e não uma tabela.
@@ -5052,10 +5100,12 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
-    // FIX#9: usar regex precisa em vez de includes("GERAR") simples
-    // Evita ativar em "não gerar ainda", "antes de gerar", etc.
-    // FIX#9b: RELATÓRIO removido — tratado separadamente por isReportRequest (evita conflito de tokens e tools)
-    const isGenerationRequest = (isGenerationIntent || /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)) && !isReportRequest; // FIX-RELATÓRIO: relatório jamais dispara peça
+    // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
+    // Prioridade sobre qualquer classificação de intenção por IA.
+    const isGenerationRequest = !isReportRequest && (
+      isGenerationIntent ||
+      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+    );
 
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
@@ -5171,7 +5221,21 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
       if (compressed.length < originalDocSize) {
         console.log(`[Dr.FelixCastro] documentContext comprimido: ${originalDocSize} → ${compressed.length} chars`);
       }
-      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS (USO OBRIGATÓRIO PARA ANÁLISE PROFUNDA)]\n${compressed}`;
+      selectedSystemPrompt += `\n\n[CONTEXTO DO PROCESSO INTEGRAL - TEXTO EXTRAÍDO DA BASE DE DADOS]
+
+⚠️ INSTRUÇÃO DE LEITURA OBRIGATÓRIA (NÃO IGNORE):
+Este bloco contém o COMPILADO INTEGRAL de TODOS os documentos do caso, um após o outro.
+NÃO é uma amostra. NÃO leia apenas o início. O documento pode conter dezenas de peças
+(petições, laudos, exames, CNIS, contratos, comprovantes) em sequência.
+
+PROTOCOLO DE LEITURA EXAUSTIVA:
+1. ANTES de qualquer análise, varra o documento do PRIMEIRO ao ÚLTIMO caractere.
+2. Identifique e enumere CADA documento distinto encontrado (tipo, emissor, data, página se houver).
+3. Só então produza a análise, cobrindo TODOS os documentos enumerados — nenhum pode ser omitido.
+4. Se você mencionar "2 documentos" mas o compilado contiver mais, você FALHOU na leitura. Releia.
+
+[INÍCIO DO COMPILADO]
+${compressed}`;
     }
 
     if ((customLaws && Array.isArray(customLaws) && customLaws.length > 0)) {
@@ -5212,6 +5276,10 @@ REGRAS DE OURO:
     PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
     ` : `
     [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
+    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
+    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
+    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
+    O número de documentos na seção 12 deve refletir a totalidade do compilado.
     Dr. Felix e Castro, você é um advogado combativo. Você DEVE extrair dados REAIS.
     **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito do CONSUMIDOR e/ou Direito CIVIL. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019) ou Direito do Trabalho (Horas Extras, FGTS, Verbas Rescisórias, Reintegração). Isso é inaceitável.
     **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Calcule com os dados disponíveis. Se faltar dado, estime com transparência e registre como estimativa.

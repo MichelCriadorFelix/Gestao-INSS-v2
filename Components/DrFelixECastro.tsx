@@ -476,7 +476,11 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
       if (!cacheStillValid) { docCacheName = null; docCacheKeyIndex = null; }
       let cacheFailedMidRun = false; // cache morreu durante a geração => retomadas reenviam o documento
       const activeProviderForCache = eliteProviderOverride || selectedModelProvider;
-      if (!docCacheName && !session?.cacheDisabled && activeProviderForCache !== 'openrouter' && docSummaries && docSummaries.length > 30000) {
+      // CACHE DESATIVADO: context caching exige tier pago do Gemini (free tier tem limit=0).
+      // Mantido o código de leitura por segurança, mas a criação foi removida para
+      // eliminar o erro 429 recorrente e economizar 1 request por conversa.
+      const CACHE_ENABLED = false;
+      if (CACHE_ENABLED && !docCacheName && !session?.cacheDisabled && activeProviderForCache !== 'openrouter' && docSummaries && docSummaries.length > 30000) {
         try {
           const cacheResp = await apiFetch('/api/cache/create', {
             method: 'POST',
@@ -869,7 +873,12 @@ const DrFelixECastro: React.FC<DrFelixECastroProps> = ({ initialSessions, onSave
         } catch (readError: any) {
           // Não retomar se a peça já está completa (tem Pede Deferimento + OAB)
           const isComplete = /pede\s+deferimento/i.test(fullText) && /oab\s*\/?\s*[a-z]{2}\s*\d{3,6}/i.test(fullText.slice(-2000));
-          if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+          const isQuotaError = readError.message?.includes('429') || readError.message?.includes('RESOURCE_EXHAUSTED') || readError.message?.includes('exceede');
+          // 429 = cota da API esgotada: insistir só piora. Para imediatamente com aviso claro.
+          if (isQuotaError) {
+            fullText += '\n\n[⚠️ Limite da API atingido (free tier). Aguarde alguns minutos antes de tentar novamente, ou troque de chave nas configurações.]';
+            isFinished = true;
+          } else if (!isComplete && resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
             // Auto-resume gracefully
             console.log(`Auto-resuming after interruption (Attempt ${resumeCount + 1})...`);
             resumeCount++;
