@@ -4328,8 +4328,9 @@ ${message}`;
         let maxTokensHit = false;
         let attemptText = "";
 
-        if (modelProvider === 'openrouter') {
-          const orSystemPrompt = selectedSystemPrompt + `
+        try {
+          if (modelProvider === 'openrouter') {
+            const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
@@ -4342,69 +4343,91 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+            const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 
-          if (attempt > 1) {
-            orMessages.push({ role: 'assistant', content: fullResponseText });
-            const anchor = fullResponseText.slice(-600);
-            orMessages.push({
-              role: 'user',
-              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
-            });
-          } else {
-            orMessages.push({ role: "user", content: finalMessage });
-          }
-
-          const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v4-flash",
-            messages: orMessages,
-            temperature: finalTemperature,
-            max_tokens: maxOutputTokens || 18000,
-            provider: {
-              data_collection: false,
-              require_reasoning: true
+            if (attempt > 1) {
+              orMessages.push({ role: 'assistant', content: fullResponseText });
+              const anchor = fullResponseText.slice(-600);
+              orMessages.push({
+                role: 'user',
+                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+              });
+            } else {
+              orMessages.push({ role: "user", content: finalMessage });
             }
-          }, res, false);
 
-          attemptText = orResult.fullText;
-          fullResponseText += attemptText;
-          maxTokensHit = orResult.maxTokensHit;
-        } else {
-          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
-          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
-          const streamContents = activeDocCache
-            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
-            : currentContents;
-          const pinnedKey = activeDocCache
-            ? (parseInt(String(cacheKeyIndex)))
-            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-          const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
-          const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
-            contents: streamContents,
-            config: streamConfig
-          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+            const orResult = await callOpenRouterStream({
+              model: model || "deepseek/deepseek-v4-flash",
+              messages: orMessages,
+              temperature: finalTemperature,
+              max_tokens: maxOutputTokens || 18000,
+              provider: {
+                data_collection: false,
+                require_reasoning: true
+              }
+            }, res, false);
 
-          for await (const chunk of responseStream) {
-            let text = "";
-            try { text = chunk.text || ""; } catch(e) {}
+            attemptText = orResult.fullText;
+            fullResponseText += attemptText;
+            maxTokensHit = orResult.maxTokensHit;
+          } else {
+            // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+            // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+            const streamContents = activeDocCache
+              ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+              : currentContents;
+            const pinnedKey = activeDocCache
+              ? (parseInt(String(cacheKeyIndex)))
+              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+            const streamConfig: any = activeDocCache
+              ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
+            const responseStream = await callGeminiStream({
+              model: model || "gemini-3.5-flash",
+              contents: streamContents,
+              config: streamConfig
+            }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
-            if (chunk.candidates && chunk.candidates.length > 0) {
-              const candidate = chunk.candidates[0];
-              if (candidate.finishReason === 'MAX_TOKENS') {
-                maxTokensHit = true;
-              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+            for await (const chunk of responseStream) {
+              let text = "";
+              try { text = chunk.text || ""; } catch(e) {}
+
+              if (chunk.candidates && chunk.candidates.length > 0) {
+                const candidate = chunk.candidates[0];
+                if (candidate.finishReason === 'MAX_TOKENS') {
+                  maxTokensHit = true;
+                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+                }
+              }
+
+              if (text) {
+                attemptText += text;
+                fullResponseText += text;
+                res.write(`data: ${JSON.stringify({ text })}\n\n`);
               }
             }
-
-            if (text) {
-              attemptText += text;
-              fullResponseText += text;
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          }
+        } catch (streamError: any) {
+          console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dr. Michel:`, streamError.message);
+          const keys = getApiKeys();
+          
+          if (attemptText.length > 100) {
+            // Conseguimos extrair uma parte decente do texto, podemos tentar rotacionar chave e continuar
+            res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
+            maxTokensHit = true; // Força fluxo de continuação automática
+          } else {
+            // Falhou muito no início, vamos re-tentar esse exato número do ciclo com a próxima chave
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            }
+            console.log(`[STREAM FAIL] Falha no início do ciclo ${attempt}. Tentando novamente mesma etapa com chave rotacionada para o index ${currentKeyIndex}.`);
+            attempt--; // decrementa para re-tentar esse exato ciclo no próximo loop
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            continue;
           }
         }
 
@@ -4959,102 +4982,123 @@ ${message}`;
         let maxTokensHit = false;
         let attemptText = "";
 
-        if (modelProvider === 'openrouter') {
-          const orSystemPromptLuana = selectedSystemPrompt + `
+        try {
+          if (modelProvider === 'openrouter') {
+            const orSystemPromptLuana = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER — DRA. LUANA CASTRO]
 Você está gerando uma peça jurídica trabalhista para o escritório Felix & Castro Advocacia.
 REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado.
 2. CITAÇÕES COM RECUO: Toda súmula, artigo ou ementa deve ser transcrita em blockquote (>).
-3. SÚMULAS NOS PEDIDOS: PROIBIDO transcrever súmulas dentro da seção de Pedidos.
+3. SÚMULAS NOS PEDIDOS: PROIDIDO transcrever súmulas dentro da seção de Pedidos.
 4. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
 5. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]" ou qualquer tag de sistema no texto.`;
 
-          const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }, ...buildOrHistory(history)];
+            const orMessages: any[] = [{ role: 'system', content: selectedSystemPrompt }, ...buildOrHistory(history)];
 
-          if (attempt > 1) {
-            orMessages.push({ role: 'assistant', content: fullResponseText });
-            const anchor = fullResponseText.slice(-600);
-            orMessages.push({
-              role: 'user',
-              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
-            });
-          } else {
-            const userContent: any[] = [];
-            if (images && images.length > 0) {
-              userContent.push({ type: "text", text: finalMessage });
-              images.forEach((img: string) => {
-                userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+            if (attempt > 1) {
+              orMessages.push({ role: 'assistant', content: fullResponseText });
+              const anchor = fullResponseText.slice(-600);
+              orMessages.push({
+                role: 'user',
+                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
               });
-            }
-            orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
-          }
-
-          const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
-
-          const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v4-flash",
-            messages: orMessagesFinal,
-            temperature: finalTemperature,
-            max_tokens: maxOutputTokens || 18000,
-            provider: {
-              data_collection: false,
-              require_reasoning: true
-            }
-          }, res, false);
-
-          attemptText = orResult.fullText;
-          fullResponseText += attemptText;
-          maxTokensHit = orResult.maxTokensHit;
-        } else {
-          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
-          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
-          const streamContents = activeDocCache
-            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
-            : currentContents;
-          const pinnedKey = activeDocCache
-            ? (parseInt(String(cacheKeyIndex)))
-            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-          const luanaSafety = [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-              ];
-          const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, safetySettings: luanaSafety, cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: luanaSafety };
-          const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
-            contents: streamContents,
-            config: streamConfig
-          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
-
-          for await (const chunk of responseStream) {
-            let text = "";
-            try {
-              text = chunk.text || "";
-            } catch (e) {
-              // ignore
+            } else {
+              const userContent: any[] = [];
+              if (images && images.length > 0) {
+                userContent.push({ type: "text", text: finalMessage });
+                images.forEach((img: string) => {
+                  userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${img}` } });
+                });
+              }
+              orMessages.push({ role: "user", content: userContent.length > 0 ? userContent : finalMessage });
             }
 
-            if (chunk.candidates && chunk.candidates.length > 0) {
-              const candidate = chunk.candidates[0];
-              if (candidate.finishReason === 'MAX_TOKENS') {
-                maxTokensHit = true;
-              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
-              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+            const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
+
+            const orResult = await callOpenRouterStream({
+              model: model || "deepseek/deepseek-v4-flash",
+              messages: orMessagesFinal,
+              temperature: finalTemperature,
+              max_tokens: maxOutputTokens || 18000,
+              provider: {
+                data_collection: false,
+                require_reasoning: true
+              }
+            }, res, false);
+
+            attemptText = orResult.fullText;
+            fullResponseText += attemptText;
+            maxTokensHit = orResult.maxTokensHit;
+          } else {
+            // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+            // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+            const streamContents = activeDocCache
+              ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+              : currentContents;
+            const pinnedKey = activeDocCache
+              ? (parseInt(String(cacheKeyIndex)))
+              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+            const luanaSafety = [
+                  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ];
+            const streamConfig: any = activeDocCache
+              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: luanaSafety, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: luanaSafety };
+            const responseStream = await callGeminiStream({
+              model: model || "gemini-3.5-flash",
+              contents: streamContents,
+              config: streamConfig
+            }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+
+            for await (const chunk of responseStream) {
+              let text = "";
+              try {
+                text = chunk.text || "";
+              } catch (e) {
+                // ignore
+              }
+
+              if (chunk.candidates && chunk.candidates.length > 0) {
+                const candidate = chunk.candidates[0];
+                if (candidate.finishReason === 'MAX_TOKENS') {
+                  maxTokensHit = true;
+                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+                }
+              }
+
+              if (text) {
+                attemptText += text;
+                fullResponseText += text;
+                res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
               }
             }
-
-            if (text) {
-              attemptText += text;
-              fullResponseText += text;
-              res.write(`data: ${JSON.stringify({ text: text })}\n\n`);
+          }
+        } catch (streamError: any) {
+          console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dra. Luana:`, streamError.message);
+          const keys = getApiKeys();
+          
+          if (attemptText.length > 100) {
+            res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
+            maxTokensHit = true;
+          } else {
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            }
+            console.log(`[STREAM FAIL] Falha no início do ciclo ${attempt}. Tentando novamente mesma etapa com chave rotacionada para o index ${currentKeyIndex}.`);
+            attempt--;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            continue;
           }
         }
 
@@ -5525,8 +5569,9 @@ ${message}`;
         let maxTokensHit = false;
         let attemptText = "";
 
-        if (modelProvider === 'openrouter') {
-          const orSystemPrompt = selectedSystemPrompt + `
+        try {
+          if (modelProvider === 'openrouter') {
+            const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
 Você está gerando uma peça jurídica de Direito do Consumidor ou Direito Civil para o escritório Felix & Castro Advocacia.
@@ -5538,69 +5583,89 @@ REGRAS ABSOLUTAS:
 5. VALOR DA CAUSA: Nunca invente. Calcule com os dados disponíveis.
 6. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" no texto final.`;
 
-          const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+            const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 
-          if (attempt > 1) {
-            orMessages.push({ role: 'assistant', content: fullResponseText });
-            const anchor = fullResponseText.slice(-600);
-            orMessages.push({
-              role: 'user',
-              content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
-            });
-          } else {
-            orMessages.push({ role: "user", content: finalMessage });
-          }
-
-          const orResult = await callOpenRouterStream({
-            model: model || "deepseek/deepseek-v4-flash",
-            messages: orMessages,
-            temperature: finalTemperature,
-            max_tokens: maxOutputTokens || 18000,
-            provider: {
-              data_collection: false,
-              require_reasoning: true
+            if (attempt > 1) {
+              orMessages.push({ role: 'assistant', content: fullResponseText });
+              const anchor = fullResponseText.slice(-600);
+              orMessages.push({
+                role: 'user',
+                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+              });
+            } else {
+              orMessages.push({ role: "user", content: finalMessage });
             }
-          }, res, false);
 
-          attemptText = orResult.fullText;
-          fullResponseText += attemptText;
-          maxTokensHit = orResult.maxTokensHit;
-        } else {
-          // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
-          // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
-          const streamContents = activeDocCache
-            ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
-            : currentContents;
-          const pinnedKey = activeDocCache
-            ? (parseInt(String(cacheKeyIndex)))
-            : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-          const streamConfig: any = activeDocCache
-            ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
-            : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
-          const responseStream = await callGeminiStream({
-            model: model || "gemini-3.5-flash",
-            contents: streamContents,
-            config: streamConfig
-          }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+            const orResult = await callOpenRouterStream({
+              model: model || "deepseek/deepseek-v4-flash",
+              messages: orMessages,
+              temperature: finalTemperature,
+              max_tokens: maxOutputTokens || 18000,
+              provider: {
+                data_collection: false,
+                require_reasoning: true
+              }
+            }, res, false);
 
-          for await (const chunk of responseStream) {
-            let text = "";
-            try { text = chunk.text || ""; } catch(e) {}
+            attemptText = orResult.fullText;
+            fullResponseText += attemptText;
+            maxTokensHit = orResult.maxTokensHit;
+          } else {
+            // CACHE: com cache ativo, o prompt do sistema vai como 1º turno e o config
+            // leva cachedContent (a API não aceita systemInstruction/tools junto do cache).
+            const streamContents = activeDocCache
+              ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
+              : currentContents;
+            const pinnedKey = activeDocCache
+              ? (parseInt(String(cacheKeyIndex)))
+              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+            const streamConfig: any = activeDocCache
+              ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
+            const responseStream = await callGeminiStream({
+              model: model || "gemini-3.5-flash",
+              contents: streamContents,
+              config: streamConfig
+            }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
-            if (chunk.candidates && chunk.candidates.length > 0) {
-              const candidate = chunk.candidates[0];
-              if (candidate.finishReason === 'MAX_TOKENS') {
-                maxTokensHit = true;
-              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+            for await (const chunk of responseStream) {
+              let text = "";
+              try { text = chunk.text || ""; } catch(e) {}
+
+              if (chunk.candidates && chunk.candidates.length > 0) {
+                const candidate = chunk.candidates[0];
+                if (candidate.finishReason === 'MAX_TOKENS') {
+                  maxTokensHit = true;
+                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+                }
+              }
+
+              if (text) {
+                attemptText += text;
+                fullResponseText += text;
+                res.write(`data: ${JSON.stringify({ text })}\n\n`);
               }
             }
-
-            if (text) {
-              attemptText += text;
-              fullResponseText += text;
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          }
+        } catch (streamError: any) {
+          console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dr. Felix Castro:`, streamError.message);
+          const keys = getApiKeys();
+          
+          if (attemptText.length > 100) {
+            res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
+            maxTokensHit = true;
+          } else {
+            if (keys.length > 0) {
+              currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            }
+            console.log(`[STREAM FAIL] Falha no início do ciclo ${attempt}. Tentando novamente mesma etapa com chave rotacionada para o index ${currentKeyIndex}.`);
+            attempt--;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            continue;
           }
         }
 
@@ -6103,31 +6168,54 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
   const pinnedKey = activeDocCache
     ? (parseInt(String(cacheKeyIndex)))
     : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
-  const responseStream = await callGeminiStream({
-    model: model || "gemini-3.5-flash",
-    contents: streamContents,
-    config: streamConfig
-  }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
 
   let maxTokensHit = false;
   let attemptText = "";
-  for await (const chunk of responseStream) {
-    let text = "";
-    try { text = chunk.text || ""; } catch(e) {}
 
-    if (chunk.candidates && chunk.candidates.length > 0) {
-      const candidate = chunk.candidates[0];
-      if (candidate.finishReason === 'MAX_TOKENS') {
-                maxTokensHit = true;
-              } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
-              }
+  try {
+    const responseStream = await callGeminiStream({
+      model: model || "gemini-3.5-flash",
+      contents: streamContents,
+      config: streamConfig
+    }, MAX_RETRIES, 0, 0, pinnedKey, (msg) => { res.write(`data: ${JSON.stringify({ status: msg })}\n\n`); });
+
+    for await (const chunk of responseStream) {
+      let text = "";
+      try { text = chunk.text || ""; } catch(e) {}
+
+      if (chunk.candidates && chunk.candidates.length > 0) {
+        const candidate = chunk.candidates[0];
+        if (candidate.finishReason === 'MAX_TOKENS') {
+                  maxTokensHit = true;
+                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
+                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
+                }
+      }
+
+      if (text) {
+        attemptText += text;
+        fullResponseText += text;
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
     }
-
-    if (text) {
-      attemptText += text;
-      fullResponseText += text;
-      res.write(`data: ${JSON.stringify({ text })}\n\n`);
+  } catch (streamError: any) {
+    console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Sec. Fabricia:`, streamError.message);
+    const keys = getApiKeys();
+    
+    if (attemptText.length > 100) {
+      res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
+      if (keys.length > 0) {
+        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+      }
+      maxTokensHit = true;
+    } else {
+      if (keys.length > 0) {
+        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+      }
+      console.log(`[STREAM FAIL] Falha no início do ciclo ${attempt}. Tentando novamente mesma etapa com chave rotacionada para o index ${currentKeyIndex}.`);
+      attempt--;
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      continue;
     }
   }
 

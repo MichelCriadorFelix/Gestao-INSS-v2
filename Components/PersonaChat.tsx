@@ -612,11 +612,16 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               .join('\n');
             let ctx = `${messageText}\n${userTexts}`;
             if (lastReport) {
-              // Relatório primeiro: se a lista de fundamentos já existe, o planner a segue
-              // e aplica as exclusões/adições pedidas pelo advogado nas mensagens.
-              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${String(lastReport.content).substring(0, 4500)}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
+              const reportFull = String(lastReport.content);
+              const curadoriaMatch = reportFull.match(/(?:CURADORIA\s+DE\s+FUNDAMENTA[ÇC][ÃA]O|FUNDAMENTA[ÇC][ÃA]O\s+JUR[ÍI]DICA|N[ÚU]CLEO\s+ESSENCIAL)[\s\S]*/i);
+              const curadoria = curadoriaMatch ? curadoriaMatch[0].substring(0, 6000) : '';
+              const cabeca = reportFull.substring(0, 3500);
+              const reportForPlan = curadoria
+                ? `${cabeca}\n\n[...]\n\n[CURADORIA DE FUNDAMENTAÇÃO — LISTA APROVADA, USE EXATAMENTE ESTES FUNDAMENTOS]\n${curadoria}`
+                : reportFull.substring(0, 9000);
+              ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${reportForPlan}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
             }
-            return ctx.substring(0, 9000);
+            return ctx.substring(0, 13000);
           })();
 
           const planResp = await apiFetch('/api/rag/plan', {
@@ -627,7 +632,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           });
 
           if (planResp.ok) {
-            const { ragContext: deterministicRag, chunksFound } = await planResp.json();
+            const planJson = await planResp.json();
+            const { ragContext: deterministicRag, chunksFound, diagnostico } = planJson;
+            console.log('═══ DIAGNÓSTICO RAG ═══');
+            console.log('[RAG] diagnóstico completo:', diagnostico);
             if (deterministicRag && deterministicRag.trim().length > 0) {
               console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados por plano (prioridade máxima).`);
               ragContext = ragContext
