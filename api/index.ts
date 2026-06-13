@@ -800,8 +800,11 @@ function estimateTokens(text: string): number {
  */
 function smartTruncate(text: string, maxChars: number): string {
   if (!text || text.length <= maxChars) return text;
-  const headSize = Math.floor(maxChars * 0.55);
-  const tailSize = Math.floor(maxChars * 0.40);
+  // A fatia inicial é maior (72%) porque o ragContext já vem priorizado: o núcleo da tese
+  // (artigos específicos, súmula central) é montado no TOPO pelo /api/rag/plan. Preservar
+  // mais do começo protege esse núcleo; o fim (20%) mantém fontes complementares.
+  const headSize = Math.floor(maxChars * 0.72);
+  const tailSize = Math.floor(maxChars * 0.20);
   return text.substring(0, headSize)
     + `\n\n[... ${text.length - headSize - tailSize} caracteres omitidos automaticamente para caber no orçamento de tokens ...]\n\n`
     + text.substring(text.length - tailSize);
@@ -3616,7 +3619,20 @@ app.post("/api/rag/plan", async (req, res) => {
 
     console.log(`[RAG PLAN_API] Varredura completa. Carregou ${allChunks.length} chunks.`);
 
-    // 4. Monta e Deduplica ragContext (teto de 300.000 caracteres)
+    // 4. Monta e Deduplica ragContext
+    // CORREÇÃO CRÍTICA DE PRIORIZAÇÃO: o ragContext era montado na ordem do curatedPlan
+    // (planner de IA primeiro, núcleo determinístico depois) e leis marcadas como
+    // "integral" (ex.: Lei 8.213 = 81 chunks ≈ 200k chars) inflavam o contexto. No chat,
+    // o smartTruncate preserva começo+fim e descarta o MEIO — exatamente onde caíam os
+    // artigos-núcleo (Arts. 42/59, Súmula 47), fazendo o modelo reportá-los como "ausentes".
+    // Agora: (a) chunks de TÍTULOS COM ARTIGOS ESPECÍFICOS (o núcleo da tese) vão PRIMEIRO e
+    // são protegidos; (b) cada título INTEGRAL é limitado a um nº de chunks para não monopolizar.
+    const titulosComArtigos = new Set(
+      curatedPlan.filter((p: any) => !p.integral && Array.isArray(p.artigos) && p.artigos.length > 0)
+                 .map((p: any) => p.titulo)
+    );
+    const MAX_CHUNKS_POR_TITULO_INTEGRAL = 12; // ~30k chars por lei ampla, evita monopólio do orçamento
+
     const uniqueChunks = new Map<string, any>();
     for (const c of allChunks) {
       const signature = c.title + '|' + (c.content || '').substring(0, 120);
@@ -3625,7 +3641,21 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     }
 
-    const parsedChunks = Array.from(uniqueChunks.values());
+    // Particiona: núcleo (artigos específicos) tem prioridade absoluta; demais entram depois.
+    const allUnique = Array.from(uniqueChunks.values());
+    const nucleoChunks = allUnique.filter((c: any) => titulosComArtigos.has(c.title));
+    const integralChunksRaw = allUnique.filter((c: any) => !titulosComArtigos.has(c.title));
+
+    // Limita chunks por título integral para não estourar o orçamento com uma lei só.
+    const integralCount = new Map<string, number>();
+    const integralChunks: any[] = [];
+    for (const c of integralChunksRaw) {
+      const n = (integralCount.get(c.title) || 0) + 1;
+      integralCount.set(c.title, n);
+      if (n <= MAX_CHUNKS_POR_TITULO_INTEGRAL) integralChunks.push(c);
+    }
+
+    const parsedChunks = [...nucleoChunks, ...integralChunks];
     let ragContext = '';
     const RAG_CHAR_LIMIT = 300000;
 
@@ -3641,6 +3671,7 @@ app.post("/api/rag/plan", async (req, res) => {
       }
       ragContext += (ragContext ? '\n\n---\n\n' : '') + piece;
     }
+    console.log(`[RAG PLAN_API] Montagem: ${nucleoChunks.length} chunks-núcleo (prioritários) + ${integralChunks.length} chunks complementares.`);
 
     res.json({
       ragContext,
