@@ -944,12 +944,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             const storageUrl = await supabaseService.uploadFile('ged-auditoria', `temp/${Date.now()}_${sanitizedFileName}`, file);
             
             if (!storageUrl) throw new Error("Falha ao fazer upload temporário para o Storage.");
+            
+            // Resolve to signed URL because the bucket is private
+            const signedUrl = await supabaseService.resolveStorageUrl(storageUrl);
   
             const urlResponse = await apiFetch('/api/upload-from-url', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                url: storageUrl,
+                url: signedUrl,
                 mimeType: file.type,
                 fileName: file.name,
                 keyIndex: preferredKeyIndex

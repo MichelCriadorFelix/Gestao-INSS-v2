@@ -1388,7 +1388,15 @@ export const supabaseService = {
 
     if (error) {
       // Se o erro for que o bucket não existe, tenta criar (pode falhar se não for admin)
-      if (error.message.includes('bucket not found') || error.message.includes('does not exist')) {
+      if (
+        error.message.includes('bucket not found') || 
+        error.message.includes('does not exist') || 
+        error.message.includes('The resource was not found') ||
+        error.message.includes('not found') ||
+        error.message.includes('Bucket') ||
+        error.statusCode === '404' ||
+        error.status === 404
+      ) {
         console.log(`Bucket ${bucket} não encontrado, tentando criar...`);
         try {
           const { error: createError } = await supabase.storage.createBucket(bucket, { public: !['client-documents','ged-auditoria'].includes(bucket) });
@@ -1442,6 +1450,12 @@ export const supabaseService = {
       const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
       if (error || !data?.signedUrl) {
         console.warn('[Storage] Falha ao assinar URL, usando original:', error?.message);
+        
+        // Se a assinatura falhou porque o bucket não existe, exibe alerta amigável
+        if (error?.message?.includes('bucket') || error?.message?.includes('not found')) {
+            console.error(`O bucket privado '${bucket}' não pôde assinar a URL. Certifique-se que o bucket foi criado.`);
+        }
+        
         return url;
       }
       return data.signedUrl;
