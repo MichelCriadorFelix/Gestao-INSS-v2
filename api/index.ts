@@ -3320,19 +3320,35 @@ app.post("/api/rag/plan", async (req, res) => {
       // 1a. Benefícios por Incapacidade
       const isDisabilityCase = /incapacidade|aux[íi]lio[- s]doen[çc]a|invalidez|aposentadoria por incapacidade|aux[íi]lio[- s]acidente|t[uú]nel do carpo|fibromialgia|laudo|per[íi]cia|perito/i.test(contextStr);
       if (isDisabilityCase) {
+        // NÚCLEO ESSENCIAL — auxílio por incapacidade temporária (Art. 59) e
+        // aposentadoria por incapacidade permanente (Art. 42). Esse núcleo NUNCA pode faltar.
         injectIntoPlan("Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)", ["42", "59", "86"]);
+        // Súmula 47 TNU: reconhecida a incapacidade parcial, o juízo deve analisar as
+        // condições pessoais e sociais (idade, profissão, escolaridade) do segurado. É a
+        // regra consolidada central de qualquer ação de benefício por incapacidade e
+        // estava ausente do curador determinístico — por isso a IA a omitia no relatório.
+        injectIntoPlan("SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais", [], true);
         
         if (/reintegraç|trabalho|per[íi]odo/i.test(contextStr)) {
           injectIntoPlan("TEMA 1.013 STJ — PREVIDENCIÁRIO — Trabalho durante aguardo de benefício por incapacidade", [], true);
         }
-        if (/acidente|sequela|limitaç/i.test(contextStr)) {
+        // Súmula 88/89 só são pertinentes em caso ACIDENTÁRIO (auxílio-acidente).
+        // Antes disparava com "limitaç" — palavra genérica que poluía casos de
+        // auxílio-doença/invalidez comuns. Restrito a acidente/sequela real.
+        if (/acidente|sequela/i.test(contextStr)) {
           injectIntoPlan("SÚMULA 88 TNU — PREVIDENCIÁRIO — Auxílio-acidente e limitação leve para atividade habitual", [], true);
           injectIntoPlan("SÚMULA 89 TNU — PREVIDENCIÁRIO — Auxílio-acidente e ausência de redução da capacidade laborativa", [], true);
         }
       }
 
       // 1b. LOAS / BPC
-      const isLOASCase = /loas|bpc|miserabilidade|assistencial|benef[íi]cio assistencial|defici[êe]ncia|baixa renda/i.test(contextStr);
+      // ATENÇÃO: "deficiência" foi REMOVIDO deste gatilho. A condição de PcD (ex.: cartão
+      // DETRAN, CID de fibromialgia) NÃO transforma um pedido de benefício por incapacidade
+      // (RGPS, segurado com qualidade) em pedido assistencial (BPC). O bloco BPC só deve
+      // disparar diante de termo inequivocamente assistencial. Antes, "deficiência" arrastava
+      // as Súmulas 48/79/80 e o RE 567985 para dentro de casos de auxílio-doença/invalidez —
+      // poluindo a curadoria. BPC e benefício por incapacidade são teses mutuamente excludentes.
+      const isLOASCase = /loas|bpc|miserabilidade|assistencial|benef[íi]cio assistencial|baixa renda|amparo social/i.test(contextStr);
       if (isLOASCase) {
         injectIntoPlan("Lei Orgânica da Assistência Social - LOAS (Lei nº 8.742/1993)", ["20", "21"]);
         injectIntoPlan("Regulamento do BPC/LOAS (Decreto nº 6.214/2007)", [], true);
@@ -3354,7 +3370,13 @@ app.post("/api/rag/plan", async (req, res) => {
       }
 
       // 1j. Aposentadoria da Pessoa com Deficiência (PcD - LC 142/2013 e regras de conversão)
-      const isPcDCase = /pcd|defici[êe]ncia|deficiente|lc\s*142|lei\s+complementar\s*(?:nº\s*)?142/i.test(contextStr);
+      // A LC 142 rege a APOSENTADORIA POR TEMPO/IDADE da pessoa com deficiência — tese distinta
+      // do benefício por incapacidade. "deficiência" sozinho não basta (senão todo caso de PcD
+      // incapaz puxaria LC142 indevidamente). Exige menção a LC 142 ou ao binômio
+      // deficiência + aposentadoria por tempo/conversão. Suprimido quando o caso é
+      // claramente de incapacidade (auxílio-doença/invalidez), por serem teses excludentes.
+      const mentionsPcDAposentadoria = /lc\s*142|lei\s+complementar\s*(?:nº\s*)?142|aposentadoria\s+(?:da|de)\s+pessoa\s+com\s+defici[êe]ncia|aposentadoria\s+pcd|convers[ãa]o\s+de\s+tempo\s+(?:especial\s+)?(?:de\s+)?defici/i.test(contextStr);
+      const isPcDCase = mentionsPcDAposentadoria && !isDisabilityCase;
       if (isPcDCase) {
         injectIntoPlan("LEI COMPLEMENTAR Nº 142, DE 8 DE MAIO DE 2013", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
         injectIntoPlan("Regulamento da Previdência Social (Decreto nº 3.048/1999)", ["70-A", "70-B", "70-C", "70-D", "70-E", "70-F", "70-G", "70-H", "70-I"]);
@@ -3405,7 +3427,12 @@ app.post("/api/rag/plan", async (req, res) => {
       }
 
       // 1g. Recolhimento do empregador / CTPS
-      if (/recolhimento|recolher|contribuiç[ãoãe]es\s+do\s+empregador|ctps|carteira\s+de\s+trabalho|v[íi]nculo/i.test(contextStr)) {
+      // Restrito a casos onde HÁ controvérsia sobre recolhimento ou reconhecimento de vínculo.
+      // "vínculo" sozinho é palavra ubíqua (todo CNIS tem vínculos) e arrastava a Súmula 75
+      // para casos onde a carência/tempo já é pacífica (ex.: benefício por incapacidade com
+      // carência preenchida). Exige termo que indique disputa: falta de recolhimento, vínculo
+      // não reconhecido/anotado, ou prova de tempo por CTPS.
+      if (/recolhimento|recolher|contribuiç[ãoãe]es\s+do\s+empregador|aus[êe]ncia\s+de\s+recolhimento|v[íi]nculo\s+n[ãa]o\s+reconhecid|reconhecimento\s+de\s+v[íi]nculo|anotaç[ãa]o\s+(?:na\s+|em\s+)?ctps|ctps\s+como\s+prova|prova\s+de\s+tempo/i.test(contextStr)) {
         injectIntoPlan("JURISPRUDÊNCIA TRF — PREVIDENCIÁRIO — Responsabilidade do empregador pelo recolhimento de contribuições", [], true);
         injectIntoPlan("SÚMULA 75 TNU — PREVIDENCIÁRIO — CTPS como prova de tempo de serviço", [], true);
       }
