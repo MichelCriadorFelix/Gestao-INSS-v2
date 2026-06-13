@@ -690,7 +690,28 @@ const DrMichelFelix: React.FC<DrMichelFelixProps> = ({ initialSessions, onSaveSe
           });
 
           if (planResp.ok) {
-            const { ragContext: deterministicRag, chunksFound } = await planResp.json();
+            const planJson = await planResp.json();
+            const { ragContext: deterministicRag, chunksFound, diagnostico } = planJson;
+            // [DIAGNÓSTICO F12] — visível no Console do navegador para depurar o RAG
+            console.log('%c═══════ DIAGNÓSTICO RAG (Dr. Michel) ═══════', 'color:#6B1A1F;font-weight:bold');
+            if (diagnostico) {
+              console.log('[RAG] Áreas enviadas:', diagnostico.areasRecebidas);
+              console.log('[RAG] Inventário (qtd títulos):', diagnostico.inventarioTamanho);
+              console.log('[RAG] Lei 8.213 está no inventário?', diagnostico.leiDeBeneficiosNoInventario);
+              console.log('[RAG] Súmula 47 está no inventário?', diagnostico.sumula47NoInventario);
+              console.log('[RAG] Plano CRU do planner de IA:', diagnostico.plannerCru);
+              console.log('[RAG] Títulos que o planner pediu mas NÃO resolveram:', diagnostico.plannerTitulosNaoResolvidos);
+              console.log('[RAG] PLANO FINAL (após injeções determinísticas):', diagnostico.planoFinal);
+              console.log('[RAG] Chunks recuperados por título:', diagnostico.chunksPorTitulo);
+              console.log('[RAG] Tamanho do ragContext (chars):', diagnostico.ragContextTamanho);
+              console.log('[RAG] ✅ ragContext contém "Art. 42"?', diagnostico.ragContemArt42);
+              console.log('[RAG] ✅ ragContext contém "Art. 59"?', diagnostico.ragContemArt59);
+              console.log('[RAG] ✅ ragContext contém Súmula 47?', diagnostico.ragContemSumula47);
+              console.log('[RAG] Primeiros 300 chars do ragContext:', diagnostico.ragPrimeiros300);
+            } else {
+              console.warn('[RAG] Endpoint não retornou diagnóstico — deploy pode estar desatualizado.');
+            }
+            console.log('%c════════════════════════════════════════════', 'color:#6B1A1F;font-weight:bold');
             if (deterministicRag && deterministicRag.trim().length > 0) {
               console.log(`[RAG Determinístico - DrMichel] ${chunksFound} chunks recuperados por plano.`);
               ragContext = ragContext

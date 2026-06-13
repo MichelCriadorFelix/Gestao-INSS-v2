@@ -3126,6 +3126,13 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     });
 
+    // [DIAGNÓSTICO] snapshots para depuração via F12 — plano cru da IA e títulos não resolvidos
+    const __diagPlannerRaw = JSON.parse(JSON.stringify(plan || []));
+    const __diagPlannerResolved = JSON.parse(JSON.stringify(curatedPlan));
+    const __diagUnresolved = (plan || [])
+      .filter((it: any) => it && typeof it.titulo === 'string' && !resolveTitle(it.titulo, false))
+      .map((it: any) => it.titulo);
+
     // COGNITIVE SAFETY-NET: Se o caso tratar de qualquer especialidade (Cível, Consumidor, Trabalhista, Previdenciário), nós garantimos que as leis basilares, decretos e súmulas são injetados no plano de RAG.
     const contextStr = String(caseContext).toLowerCase();
 
@@ -3674,11 +3681,34 @@ app.post("/api/rag/plan", async (req, res) => {
     }
     console.log(`[RAG PLAN_API] Montagem: ${nucleoChunks.length} chunks-núcleo (prioritários) + ${integralChunks.length} chunks complementares.`);
 
+    // [DIAGNÓSTICO] contagem de chunks por título e checagem do núcleo no ragContext
+    const chunksPorTitulo: Record<string, number> = {};
+    for (const c of allChunks) {
+      chunksPorTitulo[c.title] = (chunksPorTitulo[c.title] || 0) + 1;
+    }
+    const ragTem = (needle: string) => ragContext.includes(needle);
+
     res.json({
       ragContext,
       plan: curatedPlan,
       titlesConsidered: inventory.length,
-      chunksFound: (allChunks || []).length
+      chunksFound: (allChunks || []).length,
+      diagnostico: {
+        areasRecebidas: areas,
+        inventarioTamanho: inventory.length,
+        leiDeBeneficiosNoInventario: inventory.includes('Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'),
+        sumula47NoInventario: inventory.includes('SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais'),
+        plannerCru: __diagPlannerRaw,
+        plannerResolvido: __diagPlannerResolved,
+        plannerTitulosNaoResolvidos: __diagUnresolved,
+        planoFinal: curatedPlan,
+        chunksPorTitulo,
+        ragContextTamanho: ragContext.length,
+        ragContemArt42: ragTem('Art. 42'),
+        ragContemArt59: ragTem('Art. 59'),
+        ragContemSumula47: ragTem('condições pessoais') || ragTem('Súmula 47') || ragTem('SÚMULA 47'),
+        ragPrimeiros300: ragContext.substring(0, 300)
+      }
     });
   } catch (error: any) {
     console.error("Error in /api/rag/plan:", error);
