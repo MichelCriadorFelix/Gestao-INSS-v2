@@ -2528,8 +2528,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   // (caches são por projeto). Retries reusam a mesma chave em vez de rotacionar.
   const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
   
-  // Determina qual chave usar
-  const activeKeyIndex = cachePinned ? forcedKeyIndex : (forcedKeyIndex !== undefined ? forcedKeyIndex : currentKeyIndex);
+  // Determina qual chave usar. Se não há cache, o forcedKeyIndex vale apenas para a primeira tentativa.
+  const activeKeyIndex = cachePinned ? forcedKeyIndex : (forcedKeyIndex !== undefined && retries === MAX_RETRIES ? forcedKeyIndex : currentKeyIndex);
   const apiKey = keys[activeKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
@@ -3596,7 +3596,7 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     }
 
-    let parsedChunks = Array.from(uniqueChunks.values());
+    const parsedChunks = Array.from(uniqueChunks.values());
     let ragContext = '';
     const RAG_CHAR_LIMIT = 300000;
 
@@ -3950,8 +3950,8 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     
     // Dynamic Distribution
-    let ratioDoc = documentContext ? 0.60 : 0;
-    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    const ratioDoc = documentContext ? 0.60 : 0;
+    const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
     let ratioRag = 1.0 - ratioDoc - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
     
@@ -4543,8 +4543,8 @@ O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO 
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     
     // Dynamic Distribution
-    let ratioDoc = documentContext ? 0.60 : 0;
-    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    const ratioDoc = documentContext ? 0.60 : 0;
+    const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
     let ratioRag = 1.0 - ratioDoc - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
     
@@ -5136,8 +5136,8 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const availableForContext = inputBudget - reservedTokens;
     
     // Dynamic Distribution
-    let ratioDoc = documentContext ? 0.60 : 0;
-    let ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
+    const ratioDoc = documentContext ? 0.60 : 0;
+    const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
     let ratioRag = 1.0 - ratioDoc - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35;
 

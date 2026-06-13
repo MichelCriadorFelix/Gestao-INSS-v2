@@ -347,7 +347,7 @@ const calculateFgtsExact = (start: Date, end: Date, history: LaborData['salaryHi
     const s = new Date(start); s.setHours(0,0,0,0);
     const e = new Date(end); e.setHours(0,0,0,0);
     
-    let current = new Date(s.getFullYear(), s.getMonth(), 1);
+    const current = new Date(s.getFullYear(), s.getMonth(), 1);
     
     while (current <= e) {
         const year = current.getFullYear();
@@ -412,7 +412,7 @@ const calculateBenefitExact = (
     const s = new Date(start); s.setHours(0,0,0,0);
     const e = new Date(end); e.setHours(0,0,0,0);
     
-    let current = new Date(s.getFullYear(), s.getMonth(), 1);
+    const current = new Date(s.getFullYear(), s.getMonth(), 1);
     
     while (current <= e) {
         const year = current.getFullYear();
@@ -686,7 +686,7 @@ const calculateLaborResults = (calcData: LaborData) => {
         // devidas férias proporcionais (período aquisitivo incompleto)
         if (end && calcData.claimVacationProportional && start && calcData.terminationReason !== 'justa_causa') {
             // Determine start of current vesting period (anniversary of start date)
-            let vestingStart = new Date(start);
+            const vestingStart = new Date(start);
             vestingStart.setFullYear(end.getFullYear());
             
             // If anniversary in current year is after end date, then the vesting period started last year
@@ -783,7 +783,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                         // Usually "Prorrogação" means it went past 05:00. If user puts 07:00, it's 2 hours.
                         // If user puts 04:00, it's not extended.
                         
-                        let diffMinutes = (endHour * 60 + endMin) - (5 * 60);
+                        const diffMinutes = (endHour * 60 + endMin) - (5 * 60);
                         
                         // Handle case where shift goes into next day but user inputs time like "07:00"
                         // Assuming the input is the end time of the shift.

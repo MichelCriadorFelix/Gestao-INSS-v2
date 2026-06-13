@@ -101,7 +101,7 @@ export const calculateTimeForPeriod = (
     let totalAdjustedDays = 0;
     
     // 2. Iterate Day by Day
-    let current = new Date(minDateMs);
+    const current = new Date(minDateMs);
     const maxDate = new Date(maxDateMs);
     
     // Limit to 100 years
@@ -231,7 +231,7 @@ export const calculateRMI = (
                     
                     // 1. Find End Factor (Month prior to DER)
                     const [derY, derM] = der!.split('-').map(Number);
-                    let targetEndDate = new Date(derY, derM - 1, 1);
+                    const targetEndDate = new Date(derY, derM - 1, 1);
                     targetEndDate.setMonth(targetEndDate.getMonth() - 1);
                     
                     // Get latest available index in map
@@ -290,7 +290,7 @@ export const calculateRMI = (
         });
     });
 
-    let allSalaries = Array.from(groupedSalaries.values());
+    const allSalaries = Array.from(groupedSalaries.values());
 
     if (allSalaries.length === 0) return { rmi: 0, rmiDetails: undefined };
 
@@ -521,8 +521,8 @@ export const checkInsuredQuality = (bonds: CNISBond[], der: string): { hasQualit
         if (b.sc.length > 0) {
              b.sc.forEach(s => uniqueMonths.add(s.month));
         } else if (b.startDate && b.endDate) {
-             let start = parseDateLocal(b.startDate);
-             let end = parseDateLocal(b.endDate);
+             const start = parseDateLocal(b.startDate);
+             const end = parseDateLocal(b.endDate);
              let safety = 0;
              while(start <= end && safety < 1200) {
                  uniqueMonths.add(`${start.getMonth()+1}/${start.getFullYear()}`);
@@ -605,7 +605,7 @@ export const calculateCarencia = (bonds: CNISBond[], targetDate: string, allBond
         // If it's a benefit, it must be intercalated
         if (bond.isBenefit && !isBondIntercalated(bond, allBonds)) return;
         
-        let current = new Date(start.getFullYear(), start.getMonth(), 1);
+        const current = new Date(start.getFullYear(), start.getMonth(), 1);
         const last = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), 1);
         
         while (current <= last) {
@@ -639,13 +639,13 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const totalCarencia = calculateCarencia(data.bonds, der, data.bonds);
 
     // Normaliza meses e dias antes de somar para evitar overflow
-    let totalMonths = age.months + timeTotal.months;
-    let extraYearsFromMonths = Math.floor(totalMonths / 12);
-    let remainingMonths = totalMonths % 12;
+    const totalMonths = age.months + timeTotal.months;
+    const extraYearsFromMonths = Math.floor(totalMonths / 12);
+    const remainingMonths = totalMonths % 12;
 
-    let totalDaysRaw = age.days + timeTotal.days;
-    let extraYearsFromDays = Math.floor(totalDaysRaw / 365);
-    let remainingDays = totalDaysRaw % 365;
+    const totalDaysRaw = age.days + timeTotal.days;
+    const extraYearsFromDays = Math.floor(totalDaysRaw / 365);
+    const remainingDays = totalDaysRaw % 365;
 
     const points = (age.years + timeTotal.years + 
                     extraYearsFromMonths + extraYearsFromDays) +
@@ -664,13 +664,13 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const timeAtReformTotal = calculateTimeForPeriod(data.bonds, reformDate, data.gender);
     const ageAtReform = calculateAge(data.birthDate, reformDate);
     // Normaliza meses e dias antes de somar para evitar overflow
-    let totalMonthsAtReform = ageAtReform.months + timeAtReformTotal.months;
-    let extraYearsFromMonthsAtReform = Math.floor(totalMonthsAtReform / 12);
-    let remainingMonthsAtReform = totalMonthsAtReform % 12;
+    const totalMonthsAtReform = ageAtReform.months + timeAtReformTotal.months;
+    const extraYearsFromMonthsAtReform = Math.floor(totalMonthsAtReform / 12);
+    const remainingMonthsAtReform = totalMonthsAtReform % 12;
 
-    let totalDaysRawAtReform = ageAtReform.days + timeAtReformTotal.days;
-    let extraYearsFromDaysAtReform = Math.floor(totalDaysRawAtReform / 365);
-    let remainingDaysAtReform = totalDaysRawAtReform % 365;
+    const totalDaysRawAtReform = ageAtReform.days + timeAtReformTotal.days;
+    const extraYearsFromDaysAtReform = Math.floor(totalDaysRawAtReform / 365);
+    const remainingDaysAtReform = totalDaysRawAtReform % 365;
 
     const pointsAtReform = (ageAtReform.years + timeAtReformTotal.years + 
                             extraYearsFromMonthsAtReform + extraYearsFromDaysAtReform) + 

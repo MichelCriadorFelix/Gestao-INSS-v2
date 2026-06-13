@@ -667,18 +667,34 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-30); // Mantém até 30 mensagens de histórico para alinhar com o limite de contexto do backend e Gemini 3.5 Flash
-        return last.map((m) => {
+        const last = msgs.slice(-40); // Como a compressão resolve o limite, expandimos para garantir rastreabilidade
+
+        // Fase C1: Identificar saídas longas do assistant
+        const longAssistantMessageIndices = last
+          .map((m, idx) => (m.role === 'assistant' && m.content.length > 3000 ? idx : -1))
+          .filter(idx => idx !== -1);
+        const latestLongMessageIndex = longAssistantMessageIndices.length > 0 
+          ? longAssistantMessageIndices[longAssistantMessageIndices.length - 1] 
+          : -1;
+
+        return last.map((m, idx) => {
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
             return {
               ...m,
               content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
             };
           }
-          // Peças de IA: preservar integral — Gemini 3.5 Flash tem 1M tokens de contexto
-          // A compressão causava perda de contexto em correções e refazimentos
+          // Fase C1: Compressão progressiva das versões antigas da peça para poupar tokens
           if (m.role === 'assistant' && m.content.length > 3000) {
-            return m; // sem compressão — contexto completo
+            if (idx === latestLongMessageIndex) {
+              return m; // Mantém a última (mais recente) íntegra para contexto das refações
+            } else {
+              const wordCount = m.content.split(/\s+/).length;
+              return { 
+                ...m, 
+                content: `[Versão anterior gerada — ${wordCount} palavras, substituída pela versão mais recente. Histórico completo na interface.]` 
+              };
+            }
           }
           return m;
         });
@@ -690,6 +706,11 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       let isFinished = false;
       let resumeCount = 0;
       const MAX_RESUMES = 3;
+
+      // FASE B1: Determinar se enviaremos RAG
+      const isReportOrPeca = messageText.includes('[FASE DE GERAÇÃO]') || messageText.includes('[FASE DE TOMADA DE CIÊNCIA]') || /gerar|corrigir|peça|relatório|audita/i.test(messageText);
+      const isLegalDoubt = /\b(lei|artigo|súmula|jurisprudência|tema|STJ|STF|TNU|enunciado|o que diz|qual.*norma|fundament)/i.test(messageText);
+      const shouldSendRag = isReportOrPeca || isLegalDoubt;
 
       while (!isFinished && resumeCount <= MAX_RESUMES) {
         let currentMessage = messageText;
@@ -709,14 +730,14 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               minWage: localStorage.getItem('app_min_wage') || '1621.00',
-              ragContext: ragContext, // FIX-A: RAG sempre enviado em todos os ciclos de continuação
+              ragContext: (shouldSendRag || resumeCount > 0) ? ragContext : undefined, // FASE B2: Só envia se pertinente, mantém no resume
               cachedContent: docCacheName || undefined,
               cacheKeyIndex: docCacheName ? docCacheKeyIndex : undefined,
               customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
               petitionLength,
-              keyIndex: session?.uploadKeyIndex,
+              keyIndex: (session?.documents?.filter(d => d.fileUri).length || 0) > 0 ? session?.uploadKeyIndex : undefined, // FASE A2: Liberar chave sem file
               sessionId: session?.id
             }),
             signal: abortController.signal

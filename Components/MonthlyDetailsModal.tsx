@@ -51,7 +51,7 @@ const MonthlyDetailsModal: React.FC<MonthlyDetailsModalProps> = ({ isOpen, onClo
                 const pMonth = parseInt(parts[1]) - 1; 
 
                 if ((year === 0 || pYear === year) && pMonth >= 0 && pMonth < 12) {
-                    let amount = payment.amount;
+                    const amount = payment.amount;
                     let displayAmount = amount;
 
                     // Apply Split Logic
