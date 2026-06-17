@@ -718,7 +718,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             if (deterministicRag && deterministicRag.trim().length > 0) {
               console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados com sucesso por plano determinístico.`);
               ragContext = ragContext
-                ? `${deterministicRag}\n\n---\n\n${ragContext}`
+                ? `${ragContext}\n\n---\n\n${deterministicRag}`
                 : deterministicRag;
             } else {
               console.log(`[RAG Determinístico] Nenhum chunk específico exigido pelo planner.`);

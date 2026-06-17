@@ -921,9 +921,11 @@ function estimateTokens(text: string): number {
 function smartTruncate(text: string, maxChars: number): string {
   if (!text || text.length <= maxChars) return text;
   
-  // A fatia inicial é maior (72%) porque o ragContext já vem priorizado: o núcleo da tese
-  // (artigos específicos, súmula central) é montado no TOPO pelo /api/rag/plan. Preservar
-  // mais do começo protege esse núcleo; o fim (20%) mantém fontes complementares.
+  // A fatia inicial é maior (72%) porque o ragContext chega com os resultados
+  // mais relevantes no TOPO (artigos específicos da query do usuário, buscas
+  // vetoriais, e keyword — nessa ordem). O planner determinístico é APENDADO
+  // ao final como contexto suplementar. Preservar mais do começo protege os
+  // artigos que o usuário pediu; o fim (20%) mantém parte do planner.
   const headSize = Math.floor(maxChars * 0.72);
   const tailSize = Math.floor(maxChars * 0.20);
   return text.substring(0, headSize)
