@@ -3001,7 +3001,7 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 
   try {
     const result = await ai.models.embedContent({
-      model: 'gemini-embedding-exp-03-07',
+      model: 'gemini-embedding-001',
       contents: [text],
       config: {
         outputDimensionality: 768
