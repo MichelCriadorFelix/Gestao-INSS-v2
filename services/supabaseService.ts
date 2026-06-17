@@ -763,10 +763,15 @@ export const supabaseService = {
   async saveLegalDocuments(chunks: { content: string, metadata: any, embedding: number[] }[]) {
     const supabase = await getLegalClient();
     if (!supabase) return null;
-    
+
+    const rows = chunks.map(c => ({
+      ...c,
+      areas_juridicas: Array.isArray(c.metadata?.areas) ? c.metadata.areas : []
+    }));
+
     const { data, error } = await supabase
       .from('legal_documents')
-      .insert(chunks);
+      .insert(rows);
       
     if (error) {
       console.error('Error saving legal documents to Supabase:', error);
