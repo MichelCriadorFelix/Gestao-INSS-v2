@@ -968,6 +968,7 @@ export const supabaseService = {
             filterVariants.push(`content.ilike."%Art. ${n}-%"`); // "Art. 19-E"
             filterVariants.push(`content.ilike."%Art. ${n}º%"`); // "Art. 9º" ordinal (CLT, CC, CPC)
             filterVariants.push(`content.ilike."%Art. ${n}°%"`); // "Art. 9°" grau (variante)
+            filterVariants.push(`content.ilike."%Art. ${n}o %"`); // "Art. 9o " ordinal com 'o' minúsculo
             filterVariants.push(`content.ilike."%§ ${n}%"`);
             filterVariants.push(`content.ilike."%§ ${n}º%"`);
           };
