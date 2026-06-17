@@ -11,8 +11,8 @@ export const DB_CONFIG_KEY = 'inss_db_config';
 // ------------------------------------------------------------------
 // CONFIGURAÇÃO GLOBAL DO BANCO DE DADOS (AUTO-CONFIG)
 // ------------------------------------------------------------------
-const GLOBAL_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
-const GLOBAL_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
+const GLOBAL_SUPABASE_URL = "";
+const GLOBAL_SUPABASE_KEY = "";
 
 const getEnvVar = (key: string): string | undefined => {
     try {
@@ -41,8 +41,8 @@ export const getDbConfig = () => {
     const stored = localStorage.getItem(DB_CONFIG_KEY);
     if (stored) return JSON.parse(stored);
 
-    const envUrl = getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY');
+    const envUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
+    const envKey = getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('ANON_KEY_SUPABASE');
 
     if (isValidUrl(envUrl) && envKey) {
         return { url: envUrl as string, key: envKey, isEnv: true };

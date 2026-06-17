@@ -11,20 +11,23 @@ const getCurrentDateContext = () => {
 const getGeminiKeys = () => {
   const keys: string[] = [];
   
-  // 1. Check for GEMINI_KEYS (comma separated)
-  if (process.env.GEMINI_KEYS) {
-    keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(k => k));
+  // 1. Check for API_KEY_1 (supports comma-separated list of keys)
+  if (process.env.API_KEY_1) {
+    keys.push(...process.env.API_KEY_1.split(',').map(k => k.trim()).filter(k => k));
   }
   
-  // 2. Check for individual API_KEY_X variables (1 to 20)
-  for (let i = 1; i <= 20; i++) {
+  // 2. Check for individual API_KEY_X variables (2 to 20)
+  for (let i = 2; i <= 20; i++) {
     const key = process.env[`API_KEY_${i}`];
     if (key) keys.push(key.trim());
   }
   
-  // 3. Fallback to GEMINI_API_KEY
+  // 3. Fallback to GEMINI_API_KEY or GEMINI_KEYS
   if (process.env.GEMINI_API_KEY) {
     keys.push(process.env.GEMINI_API_KEY.trim());
+  }
+  if (process.env.GEMINI_KEYS) {
+    keys.push(...process.env.GEMINI_KEYS.split(',').map(k => k.trim()).filter(k => k));
   }
   
   // Remove duplicates

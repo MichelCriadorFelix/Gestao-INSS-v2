@@ -11,10 +11,12 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import Legislation from './Legislation';
 import Jurisprudence from './Jurisprudence';
 import { DashboardProps, ClientRecord, ContractRecord, NotificationItem, AgendaEvent, DailyFocusState } from '../types';
-import { INITIAL_DATA, INITIAL_CONTRACTS_LIST } from '../data';
+// data.ts removido — dados carregados exclusivamente do Supabase
 import LaborCalc, { CalculationRecord } from '../LaborCalc';
 import SocialSecurityCalc, { SocialSecurityData } from '../SocialSecurityCalc';
 import LZString from 'lz-string';
+import { initSupabase } from '../supabaseClient';
+import { supabaseService } from '../services/supabaseService';
 
 export interface SocialSecurityCalculationRecord {
     id: string;
@@ -22,10 +24,7 @@ export interface SocialSecurityCalculationRecord {
     clientName: string;
     data: SocialSecurityData;
 }
-
-import { initSupabase } from '../supabaseClient';
-import { supabaseService } from '../services/supabaseService';
-import { isUrgentDate, formatCurrency, parseDate } from '../utils';
+import { isUrgentDate, formatCurrency, parseDate, isOverdueDate } from '../utils';
 import { parseISO, differenceInDays, startOfDay, format } from 'date-fns';
 import StatsCards from './StatsCards';
 import ReferralModal from './ReferralModal';
@@ -45,7 +44,7 @@ import KnowledgeBase from './KnowledgeBase';
 import MarketingGenerator from './MarketingGenerator';
 import { safeSetLocalStorage } from '../utils';
 
-const Dashboard: React.FC<DashboardProps> = ({ 
+export default function Dashboard({ 
   user, 
   onLogout, 
   darkMode, 
@@ -56,9 +55,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   onCloseSettings,
   onSettingsSaved,
   onRestoreBackup
-}) => {
+}: DashboardProps) {
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
+
+  const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
+    setClientFilter(filter);
+    setCurrentPage(1);
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [records, setRecords] = useState<ClientRecord[]>([]);
@@ -227,60 +231,38 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'clients'
+                    table: 'clients_v2'
                 },
+                async (_payload: any) => {
+                    try {
+                        const updated = await supabaseService.getClients();
+                        setRecords(updated);
+                    } catch (e) {
+                        console.error('Realtime clients_v2 error', e);
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'clients' },
                 (payload: any) => {
-                     if (payload.new && payload.new.data) {
-                         if (payload.new.id === 1) {
-                             let newData = payload.new.data;
-                             if (typeof newData === 'string') {
-                                 try {
-                                     const decompressed = LZString.decompressFromUTF16(newData);
-                                     newData = decompressed ? JSON.parse(decompressed) : JSON.parse(newData);
-                                 } catch (e) {
-                                     console.error("Failed to decompress realtime clients data", e);
-                                 }
-                             }
-                             if (Array.isArray(newData)) {
-                                 setRecords(newData);
-                                 safeSetLocalStorage('inss_records', JSON.stringify(newData));
-                             }
-                         } else if (payload.new.id === 2) {
-                             let newData = payload.new.data;
-                             if (typeof newData === 'string') {
-                                 try {
-                                     const decompressed = LZString.decompressFromUTF16(newData);
-                                     newData = decompressed ? JSON.parse(decompressed) : JSON.parse(newData);
-                                 } catch (e) {
-                                     console.error("Failed to decompress realtime contracts data", e);
-                                 }
-                             }
-                             if (Array.isArray(newData)) {
-                                 setContracts(newData);
-                                 safeSetLocalStorage('inss_contracts', JSON.stringify(newData));
-                             }
-                         } else if (payload.new.id === 7) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setAgendaEvents(payload.new.data);
-                                 safeSetLocalStorage('agenda_events', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 8) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setResolvedAlerts(payload.new.data);
-                                 safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 9) {
-                             if (Array.isArray(payload.new.data)) {
-                                 setCustomLaws(payload.new.data);
-                                 safeSetLocalStorage('custom_laws', JSON.stringify(payload.new.data));
-                             }
-                         } else if (payload.new.id === 10) {
-                             if (payload.new.data) {
-                                 setDailyFocusState(payload.new.data);
-                                 safeSetLocalStorage('daily_focus_state', JSON.stringify(payload.new.data));
-                             }
-                         }
-                     }
+                    if (payload.new?.id === 8 && Array.isArray(payload.new?.data)) {
+                        setResolvedAlerts(payload.new.data);
+                        safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(payload.new.data));
+                    }
+                    if (payload.new?.id === 7) {
+                        let newAgenda = payload.new.data;
+                        if (typeof newAgenda === 'string') {
+                            try {
+                                const d = LZString.decompressFromUTF16(newAgenda);
+                                newAgenda = d ? JSON.parse(d) : JSON.parse(newAgenda);
+                            } catch(e) {}
+                        }
+                        if (Array.isArray(newAgenda)) {
+                            setAgendaEvents(newAgenda);
+                            safeSetLocalStorage('agenda_events', JSON.stringify(newAgenda));
+                        }
+                    }
                 }
             )
             // Removed ai_conversations subscription to prevent read loops and high I/O
@@ -573,29 +555,54 @@ const Dashboard: React.FC<DashboardProps> = ({
                   return;
               }
           } else if (type === 'agenda') {
-              setAgendaEvents(newData);
-              safeSetLocalStorage('agenda_events', JSON.stringify(newData));
               if (supabase) {
+                  // Proteção: busca o estado atual do Supabase antes de salvar
+                  // para nunca sobrescrever com array vazio
+                  if (newData.length === 0) {
+                      const { data: current } = await supabase
+                          .from('clients').select('data').eq('id', 7).maybeSingle();
+                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                          setIsSyncing(false);
+                          return; // Não sobrescreve dados existentes com array vazio
+                      }
+                  }
                   const error = await upsertWithRetry({ id: 7, data: newData });
                   if (error) {
                       console.error("Sync error (Agenda):", error);
                       setSaveError("Erro de sincronização (Agenda).");
+                  } else {
+                      setAgendaEvents(newData);
+                      safeSetLocalStorage('agenda_events', JSON.stringify(newData));
                   }
                   setIsSyncing(false);
                   return;
               }
+              setAgendaEvents(newData);
+              safeSetLocalStorage('agenda_events', JSON.stringify(newData));
           } else if (type === 'resolved_alerts') {
-              setResolvedAlerts(newData);
-              safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
               if (supabase) {
+                  // Proteção: nunca sobrescreve alertas resolvidos com array vazio
+                  if (newData.length === 0) {
+                      const { data: current } = await supabase
+                          .from('clients').select('data').eq('id', 8).maybeSingle();
+                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                          setIsSyncing(false);
+                          return; // Não sobrescreve dados existentes com array vazio
+                      }
+                  }
                   const error = await upsertWithRetry({ id: 8, data: newData });
                   if (error) {
                       console.error("Sync error (Resolved Alerts):", error);
                       setSaveError("Erro de sincronização (Alertas).");
+                  } else {
+                      setResolvedAlerts(newData);
+                      safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
                   }
                   setIsSyncing(false);
                   return;
               }
+              setResolvedAlerts(newData);
+              safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData));
           } else if (type === 'daily_focus') {
               setDailyFocusState(newData[0]);
               safeSetLocalStorage('daily_focus_state', JSON.stringify(newData[0]));
@@ -1231,7 +1238,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             if (clientFilter === 'archived') {
                 filterMatch = !!r.isArchived;
             } else if (clientFilter === 'referral') {
-                filterMatch = !!r.isReferral;
+                filterMatch = !!r.isReferral && !r.isArchived;
             } else {
                 filterMatch = !r.isArchived && !r.isReferral;
             }
@@ -1317,14 +1324,21 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Helper for Date Cells with Alerts
   const renderDateCell = (dateStr: string, recordId?: string, suffix?: string) => {
-      const urgent = isUrgentDate(dateStr);
+      const overdue = isOverdueDate(dateStr);
+      const urgent = !overdue && isUrgentDate(dateStr);
       const isResolved = recordId && suffix ? resolvedAlerts.includes(recordId + suffix) : false;
+      const showAsOverdue = overdue && !isResolved;
       const showAsUrgent = urgent && !isResolved;
 
       return (
           <td className="px-4 py-3">
-              <div className={`flex items-center gap-1.5 ${showAsUrgent ? 'text-red-600 dark:text-red-400 font-bold' : isResolved ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'dark:text-slate-400'}`}>
-                  {showAsUrgent && <ExclamationTriangleIcon className="h-4 w-4 animate-pulse" />}
+              <div className={`flex items-center gap-1.5 ${
+                showAsOverdue ? 'text-red-700 dark:text-red-400 font-bold' :
+                showAsUrgent ? 'text-orange-500 dark:text-orange-400 font-semibold' :
+                isResolved ? 'text-emerald-600 dark:text-emerald-400 font-medium' :
+                'dark:text-slate-400'}`}>
+                  {showAsOverdue && <ExclamationTriangleIcon className="h-4 w-4 animate-pulse" />}
+                  {showAsUrgent && <ExclamationTriangleIcon className="h-4 w-4" />}
                   {isResolved && <CheckIcon className="h-4 w-4" />}
                   {dateStr || '-'}
               </div>
@@ -1411,16 +1425,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                    onClick={() => handleViewChange('clients')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'clients' ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <UserGroupIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Clientes</span>
+                   <UserGroupIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Clientes</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('contracts')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'contracts' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BriefcaseIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Contratos & Fin.</span>
+                   <BriefcaseIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Contratos & Fin.</span>
                </button>
 
                 {/* NOVO MENU: CÁLCULOS */}
@@ -1429,7 +1443,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'labor_calc' ? 'bg-emerald-600 shadow-lg shadow-emerald-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Calc. Trabalhista</span>
+                   <span className="font-medium">Calc. Trabalhista</span>
                </button>
 
                <button 
@@ -1437,7 +1451,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dra_luana' ? 'bg-pink-600 shadow-lg shadow-pink-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Dra. Luana Castro (IA)</span>
+                   <span className="font-medium">Dra. Luana Castro (IA)</span>
                </button>
 
                <button 
@@ -1445,7 +1459,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'social_calc' ? 'bg-orange-600 shadow-lg shadow-orange-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <CalculatorIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Calc. Previdenciária</span>
+                   <span className="font-medium">Calc. Previdenciária</span>
                </button>
 
                <button 
@@ -1453,68 +1467,68 @@ const Dashboard: React.FC<DashboardProps> = ({
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'dr_michel' ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
                    <StarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Dr. Michel Felix (IA)</span>
+                   <span className="font-medium">Dr. Michel Felix (IA)</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('agenda')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'agenda' ? 'bg-slate-600 shadow-lg shadow-slate-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <CalendarIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Agenda</span>
+                   <CalendarIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Agenda</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('petition_editor')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'petition_editor' ? 'bg-blue-600 shadow-lg shadow-blue-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <PencilSquareIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Editor de Petições</span>
+                   <PencilSquareIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Editor de Petições</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('legislation')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'legislation' ? 'bg-teal-600 shadow-lg shadow-teal-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <BookOpenIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Legislação</span>
+                   <BookOpenIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Legislação</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('jurisprudence')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'jurisprudence' ? 'bg-cyan-600 shadow-lg shadow-cyan-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <ScaleIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Jurisprudência</span>
+                   <ScaleIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Jurisprudência</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('meu_inss')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'meu_inss' ? 'bg-amber-600 shadow-lg shadow-amber-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <GlobeAltIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium">Meu INSS</span>
+                   <GlobeAltIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium">Meu INSS</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('knowledge_base')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'knowledge_base' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <AcademicCapIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium whitespace-nowrap">Base de Conhecimento</span>
+                   <AcademicCapIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Base de Conhecimento</span>
                </button>
 
                <button 
                    onClick={() => handleViewChange('marketing')}
                    className={`w-full flex items-center p-3 rounded-xl transition-all duration-200 group ${currentView === 'marketing' ? 'bg-rose-600 shadow-lg shadow-rose-500/30' : 'hover:bg-slate-800 text-slate-400 hover:text-white'}`}
                >
-                   <SparklesIcon className="h-6 w-6 lg:mr-3" />
-                   <span className="hidden lg:block font-medium whitespace-nowrap">Marketing Jurídico</span>
+                   <SparklesIcon className="h-6 w-6 mr-3" />
+                   <span className="font-medium whitespace-nowrap">Marketing Jurídico</span>
                </button>
            </div>
            
            <div className="p-4 border-t border-slate-800">
-               <div className="flex items-center justify-center lg:justify-start gap-3">
+               <div className="flex items-center justify-start gap-3">
                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
                        {user.firstName[0]}
                    </div>
@@ -1523,15 +1537,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                        <p className="text-[10px] text-slate-400">{user.role}</p>
                    </div>
                </div>
-               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-center lg:justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
-                   <ArrowRightOnRectangleIcon className="h-5 w-5 lg:mr-2" />
-                   <span className="hidden lg:block text-xs font-bold uppercase">Sair</span>
+               <button onClick={onLogout} className="mt-4 w-full flex items-center justify-start p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition">
+                   <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
+                   <span className="text-xs font-bold uppercase">Sair</span>
                </button>
            </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
         {/* Navbar (Top) */}
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center justify-between px-4 lg:px-6 z-30">
              <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
@@ -1589,7 +1603,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-2 lg:p-6 scroll-smooth flex flex-col">
+        <main className="flex-1 overflow-y-auto p-2 lg:p-6 pb-24 lg:pb-6 flex flex-col" style={{WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain'}}>
              
              {/* CONTENT SWITCHER */}
              {currentView === 'dr_michel' ? (
@@ -1597,12 +1611,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
                   />
              ) : currentView === 'dra_luana' ? (
                  <DraLuanaCastro 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
+                    customLaws={customLaws}
                   />
              ) : currentView === 'legislation' ? (
                   <Legislation customLaws={customLaws} onSaveCustomLaws={handleSaveCustomLaws} />
@@ -1666,21 +1682,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                          {/* Toggle Tabs */}
                          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl w-fit">
                             <button 
-                                onClick={() => setClientFilter('active')} 
+                                onClick={() => handleClientFilterChange('active')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'active' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <UserGroupIcon className="h-4 w-4" />
                                 Ativos
                             </button>
                             <button 
-                                onClick={() => setClientFilter('referral')} 
+                                onClick={() => handleClientFilterChange('referral')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'referral' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <StarIcon className="h-4 w-4" />
                                 Indicações
                             </button>
                             <button 
-                                onClick={() => setClientFilter('archived')} 
+                                onClick={() => handleClientFilterChange('archived')} 
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${clientFilter === 'archived' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                             >
                                 <ArchiveBoxIcon className="h-4 w-4" />
@@ -1698,7 +1714,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 placeholder={clientFilter === 'archived' ? "Buscar em arquivados..." : "Buscar cliente por nome ou CPF..."}
                                 className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-primary-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 />
                             </div>
                             {clientFilter === 'active' && (
@@ -1722,9 +1738,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     </div>
 
-                    {/* Clients Table */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-                        <div className="overflow-x-auto">
+                    {/* Clients Table / Cards */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                        {/* Desktop Table (Visible only on md screens and up) */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
@@ -1778,7 +1795,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                         )}
                                                     </button>
                                                 </td>
-                                                <td className="px-4 py-3 font-semibold dark:text-slate-200">{record.name}</td>
+                                                <td className="px-4 py-3 font-semibold dark:text-slate-200 uppercase">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{record.name}</span>
+                                                        {record.whatsapp && (
+                                                            <a
+                                                                href={`https://wa.me/${(() => { const n = record.whatsapp.replace(/\D/g, ''); return n.startsWith('55') ? n : '55' + n; })()}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                title={`Abrir WhatsApp: ${record.whatsapp}`}
+                                                                className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/60 transition shadow-sm"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                                                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                                                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.855L.057 23.882l6.186-1.453A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.032-1.388l-.361-.214-3.732.877.944-3.618-.235-.372A9.808 9.808 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+                                                                </svg>
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">
                                                     <div className="flex items-center gap-2">
                                                         <span>{record.cpf}</span>
@@ -1854,7 +1889,88 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationControls />
+
+                        {/* Mobile Cards (Visible only on screens below md) */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto">
+                             {paginatedList.length === 0 ? (
+                                 <div className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                                     Nenhum cliente encontrado {clientFilter === 'archived' ? 'nos arquivos' : ''}.
+                                 </div>
+                             ) : paginatedList.map((record: any) => (
+                                 <div key={record.id} className="p-4 space-y-4">
+                                     <div className="flex justify-between items-start">
+                                         <div className="flex items-center gap-3">
+                                             <button onClick={(e) => toggleDailyAttention(record.id, e)}>
+                                                 {record.isUrgentAttention ? (
+                                                     <StarIconSolid className="h-6 w-6 text-red-500" />
+                                                 ) : record.isDailyAttention ? (
+                                                     <StarIconSolid className="h-6 w-6 text-yellow-400" />
+                                                 ) : (
+                                                     <StarIcon className="h-6 w-6 text-slate-300" />
+                                                 )}
+                                             </button>
+                                             <div>
+                                                 <div className="font-bold text-slate-900 dark:text-white uppercase flex items-center gap-2">
+                                                     {record.name}
+                                                     {record.whatsapp && (
+                                                         <a href={`https://wa.me/${(() => { const n = record.whatsapp.replace(/\D/g, ''); return n.startsWith('55') ? n : '55' + n; })()}`} target="_blank" rel="noopener noreferrer" className="text-green-500">
+                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                                                 <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.855L.057 23.882l6.186-1.453A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.032-1.388l-.361-.214-3.732.877.944-3.618-.235-.372A9.808 9.808 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+                                                             </svg>
+                                                         </a>
+                                                     )}
+                                                 </div>
+                                                 <div className="text-xs text-slate-500 font-mono tracking-wider">{record.cpf}</div>
+                                             </div>
+                                         </div>
+                                         <div className="flex gap-2">
+                                             <button onClick={() => handleEditClient(record)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                                                 <PencilSquareIcon className="h-5 w-5" />
+                                             </button>
+                                             <button onClick={() => handleClientDelete(record.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                                                 <TrashIcon className="h-5 w-5" />
+                                             </button>
+                                         </div>
+                                     </div>
+
+                                     <div className="grid grid-cols-2 gap-3 text-[10px] font-bold uppercase text-slate-400">
+                                         <div>
+                                             <p className="mb-1">Senha</p>
+                                             <p className="text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-1.5 rounded">{record.password}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">Tipo</p>
+                                             <p className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded border border-blue-100 dark:border-blue-800">{record.type || 'N/D'}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">DER</p>
+                                             <p className="text-slate-700 dark:text-slate-300">{record.der || '-'}</p>
+                                         </div>
+                                         <div>
+                                             <p className="mb-1">Dcb</p>
+                                             <p className="text-slate-700 dark:text-slate-300">{record.dcbDate || '-'}</p>
+                                         </div>
+                                     </div>
+                                      
+                                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-50 dark:border-slate-800/50">
+                                         {record.medExpertiseDate && (
+                                             <div className="px-2 py-1 bg-primary-50 dark:bg-primary-900/10 text-primary-600 dark:text-primary-400 rounded text-[9px] font-bold border border-primary-100 dark:border-primary-800">
+                                                 P. Médica: {record.medExpertiseDate}
+                                             </div>
+                                         )}
+                                         {record.socialExpertiseDate && (
+                                             <div className="px-2 py-1 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold border border-indigo-100 dark:border-indigo-800">
+                                                 P. Social: {record.socialExpertiseDate}
+                                             </div>
+                                         )}
+                                     </div>
+                                 </div>
+                             ))}
+                        </div>
+                        <div className="mt-auto">
+                            <PaginationControls />
+                        </div>
                     </div>
                  </>
              ) : currentView === 'jurisprudence' ? (
@@ -1879,7 +1995,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 placeholder="Buscar contrato por nome ou CPF..."
                                 className="pl-11 pr-4 py-3 w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             />
                         </div>
                         <div className="flex items-center gap-2">
@@ -1901,8 +2017,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-                        <div className="overflow-x-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col">
+                        {/* Desktop Table */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
                                 <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
@@ -1963,7 +2080,72 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationControls />
+
+                        {/* Mobile Cards */}
+                        <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                             {paginatedList.length === 0 ? (
+                                 <div className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                                     Nenhum contrato encontrado.
+                                 </div>
+                             ) : paginatedList.map((contract: any) => {
+                                 const totalPaid = (contract.payments || []).reduce((sum: number, p: any) => p.isPaid ? sum + p.amount : sum, 0);
+                                 const totalFee = Number(contract.totalFee) || 0;
+                                 const percentPaid = totalFee > 0 ? (totalPaid / totalFee) * 100 : 0;
+                                 
+                                 return (
+                                     <div key={contract.id} className="p-4 space-y-3">
+                                         <div className="flex justify-between items-start">
+                                             <div>
+                                                 <div className="font-bold text-slate-900 dark:text-white uppercase truncate">
+                                                     {contract.firstName} {contract.lastName}
+                                                 </div>
+                                                 <div className="text-xs text-slate-500 font-mono tracking-wider">{contract.cpf}</div>
+                                             </div>
+                                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold border 
+                                                 ${contract.status === 'Concluído' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                                   contract.status === 'Em Andamento' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                                                   'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                 {contract.status}
+                                             </span>
+                                         </div>
+
+                                         <div className="flex justify-between items-center text-xs">
+                                             <div className="text-slate-600 dark:text-slate-400 font-medium italic">{contract.serviceType}</div>
+                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
+                                                 {contract.lawyer === 'Michel' ? 'Michel' : 'Luana'}
+                                             </span>
+                                         </div>
+
+                                         <div className="space-y-1">
+                                             <div className="flex justify-between text-[10px] items-center mb-1">
+                                                 <span className="text-slate-500">Valor Total: <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalFee)}</span></span>
+                                                 <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
+                                             </div>
+                                             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                 <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
+                                             </div>
+                                         </div>
+
+                                         <div className="flex justify-between items-center pt-2">
+                                             <div className="text-[10px] text-slate-500">
+                                                 Sinal/Pago: <span className="font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(totalPaid)}</span>
+                                             </div>
+                                             <div className="flex gap-2">
+                                                 <button onClick={() => { setCurrentContract(contract); setIsContractModalOpen(true); }} className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                                                     <PencilSquareIcon className="h-4 w-4" />
+                                                 </button>
+                                                 <button onClick={() => handleContractDelete(contract.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+                                                     <TrashIcon className="h-4 w-4" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 );
+                             })}
+                        </div>
+                        <div className="mt-auto">
+                            <PaginationControls />
+                        </div>
                     </div>
                  </>
              )}
@@ -1982,7 +2164,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             onClose={() => setIsContractModalOpen(false)} 
             onSave={handleSaveContract}
             initialData={currentContract}
-            clients={records}
+            clients={records.filter(r => !r.isArchived)}
         />
         
         <SettingsModal 
@@ -2019,6 +2201,4 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

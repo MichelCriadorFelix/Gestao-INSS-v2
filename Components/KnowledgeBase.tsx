@@ -13,6 +13,7 @@ export default function KnowledgeBase() {
   const [existingDocs, setExistingDocs] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
 
   const suggestedLaws = [
     "Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)",
@@ -142,7 +143,8 @@ export default function KnowledgeBase() {
             sourceUrl,
             dateAdded: new Date().toISOString()
           },
-          embedding
+          embedding,
+          areas_juridicas: selectedAreas.length > 0 ? selectedAreas : ['previdenciario', 'trabalhista', 'civil']
         });
         
         // Save in batches of 10 to avoid losing everything if it fails halfway
@@ -217,9 +219,41 @@ export default function KnowledgeBase() {
               type="text"
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="Ex: http://www.planalto.gov.br/ccivil_03/leis/l8213cons.htm"
+              placeholder="Ex: https://www.planalto.gov.br/ccivil_03/leis/l8213cons.htm"
               className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 dark:text-slate-100"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Áreas Jurídicas *</label>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Selecione todas as áreas aplicáveis (pode ser mais de uma)</p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { value: 'previdenciario', label: 'Previdenciária — RGPS/INSS' },
+                { value: 'trabalhista', label: 'Trabalhista' },
+                { value: 'civil', label: 'Consumidor / CDC' },
+              ].map(area => (
+                <label key={area.value} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all ${
+                  selectedAreas.includes(area.value)
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-300'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedAreas.includes(area.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAreas(prev => [...prev, area.value]);
+                      } else {
+                        setSelectedAreas(prev => prev.filter(a => a !== area.value));
+                      }
+                    }}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium">{area.label}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div>

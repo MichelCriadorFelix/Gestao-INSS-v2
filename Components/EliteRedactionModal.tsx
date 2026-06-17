@@ -50,7 +50,7 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
           </button>
           
           <button 
-            onClick={() => onConfirm('openrouter', isEliteSelected ? currentModel : 'deepseek/deepseek-v3.2')}
+            onClick={() => onConfirm('openrouter', isEliteSelected ? currentModel : 'deepseek/deepseek-v4-flash')}
             className={`w-full text-left p-4 rounded-xl border transition-all group relative overflow-hidden ${isEliteSelected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
           >
             <div className="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">

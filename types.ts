@@ -22,6 +22,9 @@ export interface AgendaEvent {
   resolvedBy?: string;
   resolutionNote?: string;
   isVirtual?: boolean;
+  gender?: 'M' | 'F';
+  extraInstructions?: string;
+  benefitType?: 'incapacidade' | 'bpc';
 }
 
 export interface Petition {
@@ -57,6 +60,9 @@ export interface ClientRecord {
   legalRepresentativeMaritalStatus?: string;
   legalRepresentativeProfession?: string;
   legalRepresentativeAddress?: string;
+  legalRepresentativeNationality?: string;
+  whatsapp?: string;
+  gender?: 'M' | 'F';
 
   isDailyAttention?: boolean;
   isUrgentAttention?: boolean;
@@ -67,6 +73,7 @@ export interface ClientRecord {
   totalFee?: number;
   documents?: ScannedDocument[];
   documentCount?: number;
+  petitionCount?: number;
   petitions?: Petition[];
 }
 
@@ -140,6 +147,8 @@ export interface ContractRecord {
   installmentsCount?: number; // Novo campo para quantidade de parcelas
   payments: PaymentEntry[];
   createdAt: string;
+  concludedAt?: string;
+  lawyerSplit?: number;
 }
 
 // --- Interfaces de Componentes (Movidas do App.tsx) ---

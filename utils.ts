@@ -33,18 +33,22 @@ export const addDays = (date: Date, days: number): Date => {
 export const isUrgentDate = (dateStr: string): boolean => {
   const date = parseDate(dateStr);
   if (!date) return false;
-  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
-
-  const diffTime = target.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  // Alerta se estiver vencido ou nos próximos 15 dias
+  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   return diffDays <= 15;
+};
+
+export const isOverdueDate = (dateStr: string): boolean => {
+  const date = parseDate(dateStr);
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return target.getTime() < today.getTime();
 };
 
 export const formatCurrency = (value: number) => {

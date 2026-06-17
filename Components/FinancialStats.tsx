@@ -54,10 +54,9 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
             const responsible = c.lawyer;
             
             // Valor Total de Concluídos (Baseado no ano do primeiro pagamento)
-            if (c.status === 'Concluído' && c.payments && c.payments.length > 0) {
-                const sortedPayments = [...c.payments].sort((a, b) => a.date.localeCompare(b.date));
-                const firstPaymentDate = sortedPayments[0].date;
-                const conclusionYear = parseInt(firstPaymentDate.split('-')[0]);
+            if (c.status === 'Concluído') {
+                const conclusionDateStr = c.concludedAt || c.createdAt;
+                const conclusionYear = conclusionDateStr ? parseInt(conclusionDateStr.split('-')[0]) : currentYear;
                 
                 if (selectedYear === 0 || conclusionYear === selectedYear) {
                     totalConcludedValue += Number(c.totalFee || 0);
@@ -78,12 +77,13 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                     const amount = Number(p.amount);
                     totalPortfolio += amount;
                     
+                    const split = (c.lawyerSplit ?? 60) / 100;
                     if (responsible === 'Michel') {
-                        michelPortfolio += amount * 0.6;
-                        luanaPortfolio += amount * 0.4;
+                        michelPortfolio += amount * split;
+                        luanaPortfolio += amount * (1 - split);
                     } else if (responsible === 'Luana') {
-                        luanaPortfolio += amount * 0.6;
-                        michelPortfolio += amount * 0.4;
+                        luanaPortfolio += amount * split;
+                        michelPortfolio += amount * (1 - split);
                     }
                 }
             });
@@ -105,12 +105,13 @@ const FinancialStats = ({ contracts }: { contracts: ContractRecord[] }) => {
                     const amount = Number(p.amount);
                     yearlyIncome += amount;
                     
+                    const splitR = (c.lawyerSplit ?? 60) / 100;
                     if (responsible === 'Michel') {
-                        michelIncome += amount * 0.6;
-                        luanaIncome += amount * 0.4;
+                        michelIncome += amount * splitR;
+                        luanaIncome += amount * (1 - splitR);
                     } else if (responsible === 'Luana') {
-                        luanaPortfolio += amount * 0.6;
-                        michelIncome += amount * 0.4;
+                        luanaIncome += amount * splitR;
+                        michelIncome += amount * (1 - splitR);
                     }
                 }
             });

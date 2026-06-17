@@ -169,16 +169,129 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
     }
   };
 
+  const getPericiaMsgTemplate = (
+    event: AgendaEvent,
+    client: ClientRecord | undefined
+  ): string => {
+    const gender = event.gender || (client?.gender) || 'M';
+    const benefitType = event.benefitType || 'incapacidade';
+    const isFem = gender === 'F';
+    const isBpc = benefitType === 'bpc';
+    const isSocial = event.type === 'perícia' && event.description?.toLowerCase().includes('social');
+
+    const dateFormatted = event.date
+      ? event.date.split('-').reverse().join('/')
+      : '[DATA]';
+    const hora = event.time || '[HORA]';
+    const local = event.location || '[LOCAL]';
+    const nome = event.clientName || client?.name || '';
+    const extra = event.extraInstructions?.trim() || '';
+
+    const pronoun = isFem ? 'a senhora' : 'o senhor';
+    const pronoun2 = isFem ? 'da senhora' : 'do senhor';
+    const pronoun3 = isFem ? 'sozinha' : 'sozinho';
+    const vestuario = isFem
+      ? 'Roupa simples, do dia a dia. *Não use:* maquiagem, unhas postiças, cabelo elaborado, brincos chamativos, cordão, pulseira ou perfume forte.'
+      : 'Roupa simples, do dia a dia. *Não use:* cordão, relógio, anel, pulseira ou qualquer acessório.';
+    const tipoEvento = isSocial ? 'Avaliação Social' : 'Perícia Médica';
+    const perito = isSocial ? 'assistente social' : 'perito';
+
+    let docs = '';
+    if (isSocial && isBpc) {
+      docs = `*Documentos ${isFem ? 'da requerente' : 'do requerente'} (originais):*\n` +
+        `✅ RG e CPF\n` +
+        `✅ Comprovante de residência atualizado\n` +
+        `✅ Laudos e exames organizados por tipo e data\n\n` +
+        `*⚠️ MUITO IMPORTANTE — Documentos de TODOS que moram na casa:*\n` +
+        `✅ RG e CPF de cada morador\n` +
+        `✅ Comprovante de renda de cada um (holerite, extrato ou declaração)\n` +
+        `✅ Certidão de nascimento dos menores\n` +
+        `✅ Se houver idoso ou deficiente na casa, documentos deles também\n\n` +
+        `💡 *Importante:* Bolsa Família e BPC de outro morador *não entram* no cálculo de renda — isso é lei.`;
+    } else {
+      docs = `Organize assim, nessa ordem:\n` +
+        `1️⃣ Laudo médico com o CID (diagnóstico) — *esse vem primeiro*\n` +
+        `2️⃣ Outros laudos médicos (do mais antigo ao mais recente)\n` +
+        `3️⃣ Exames de imagem (ressonância, tomografia, raio-x)\n` +
+        `4️⃣ Exames laboratoriais\n` +
+        `5️⃣ Receitas médicas\n` +
+        `6️⃣ RG e CPF originais`;
+    }
+
+    const respostas = isSocial
+      ? `✅ Fale somente sobre as limitações, dificuldades e dependência de terceiros ${isFem ? 'da senhora' : 'do senhor'}.\n` +
+        `✅ Sobre renda: informe somente o que cada morador *efetivamente recebe* todo mês. Não omita, não invente.\n` +
+        `⚠️ Se perguntarem com quem mora: informe o nome e grau de parentesco de cada um.\n` +
+        `⚠️ Se perguntarem o que ${pronoun} faz no dia a dia: fale somente das dificuldades e dependência.\n` +
+        `❌ Não mencione melhorias na saúde ou na situação financeira.\n` +
+        `❌ Responda somente o que for perguntado.`
+      : `✅ Fale *somente sobre as limitações e dificuldades* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de trabalhar.\n` +
+        `❌ *Não mencione nenhuma melhora*, mesmo que em algum dia se sinta um pouco melhor. O que vale é o pior dia.\n` +
+        `⚠️ *Se o ${perito} perguntar "consegue andar?"* — não diga "consigo, mas com dificuldade." Diga: *"Tenho muita dificuldade, sinto muita dor, preciso parar bastante."* Sempre pela limitação.\n` +
+        `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3}, o que precisa de ajuda.`;
+
+    const acomp = isSocial
+      ? `Leve um acompanhante. ⚠️ *Atenção:* a ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} e da situação real da família — sem inventar e sem omitir renda.`
+      : `Leve um acompanhante de confiança. ⚠️ *Atenção:* o ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} — nunca de melhorias.\n\nO acompanhante também deve estar com roupa simples${isFem ? ', sem maquiagem' : ''}, sem acessórios, sem perfume forte.`;
+
+    const postura = isSocial
+      ? `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Responda com clareza e objetividade. Não discuta nem questione a ${perito} durante a avaliação.`
+      : `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não discuta com o ${perito}, mesmo que ele pareça indiferente — isso é normal. Se tiver dificuldade para sentar, se mover ou ficar em pé, demonstre naturalmente, sem forçar e sem exagerar.`;
+
+    return `*FELIX E CASTRO ADVOCACIA*\n` +
+      `*${tipoEvento}${nome ? ' — ' + nome : ''} — Leia com atenção!*\n\n` +
+      `📅 Data: ${dateFormatted}\n` +
+      `🕐 Horário: ${hora} *(chegue com 30 min de antecedência)*\n` +
+      `📍 Local: ${local}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📁 *DOCUMENTOS — leve TUDO no original*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${docs}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${isFem ? '👗' : '👔'} *VESTIMENTA — muito importante*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${vestuario} O ${perito} observa tudo — aparência simples é fundamental.\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 *ACOMPANHANTE*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${acomp}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🗣️ *COMO RESPONDER ${isSocial ? 'À ASSISTENTE SOCIAL' : 'AO PERITO'}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${respostas}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏛️ *POSTURA NA ${isSocial ? 'AVALIAÇÃO' : 'PERÍCIA'}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${postura}\n` +
+      (extra ? `\n━━━━━━━━━━━━━━━━━━━━━━\n📌 *INSTRUÇÕES ESPECÍFICAS*\n━━━━━━━━━━━━━━━━━━━━━━\n${extra}\n` : '') +
+      `\nQualquer dúvida, fale comigo antes da perícia. 🤝\n` +
+      `*Felix e Castro Advocacia Previdenciária*`;
+  };
+
   const handleConfirmResolution = (note: string) => {
     if (!eventToResolve) return;
     
-    onSaveEvent({
+    const resolvedEvent = {
       ...eventToResolve,
-      status: 'resolved',
+      status: 'resolved' as const,
       resolvedAt: new Date().toISOString(),
       resolvedBy: `${user.firstName} ${user.lastName}`,
       resolutionNote: note
-    });
+    };
+
+    onSaveEvent(resolvedEvent);
+
+    // Ao resolver qualquer evento vinculado a um cliente,
+    // muda o contrato de Pendente para Em Andamento automaticamente
+    if (resolvedEvent.clientId && onUpdateContractStatus && contracts) {
+        const linked = contracts.find(c =>
+            c.clientId === resolvedEvent.clientId &&
+            c.status === 'Pendente'
+        );
+        if (linked) {
+            onUpdateContractStatus(linked.id, 'Em Andamento');
+        }
+    }
     
     setIsResolutionModalOpen(false);
     setEventToResolve(null);
@@ -430,6 +543,29 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                             </div>
                           )}
 
+                          {/* Botão WhatsApp para Perícias */}
+                          {event.type === 'perícia' && event.clientId && (() => {
+                            const client = clients.find(c => c.id === event.clientId);
+                            if (!client?.whatsapp) return null;
+                            const wn = client.whatsapp.replace(/\D/g, '');
+                            const whatsapp = wn.startsWith('55') ? wn : '55' + wn;
+                            const msg = getPericiaMsgTemplate(event, client);
+                            const encoded = encodeURIComponent(msg);
+                            return (
+                              <a
+                                href={`https://wa.me/${whatsapp}?text=${encoded}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                  <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.855L.057 23.882l6.186-1.453A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.032-1.388l-.361-.214-3.732.877.944-3.618-.235-.372A9.808 9.808 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+                                </svg>
+                                Enviar Orientações da Perícia
+                              </a>
+                            );
+                          })()}
                           {isResolved && event.resolutionNote && (
                             <div className="mt-3 bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
                               <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
@@ -563,6 +699,55 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                     className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none"
                   />
                 </div>
+
+                {/* Campos extras para Perícia */}
+                {formData.type === 'perícia' && (
+                  <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-900/10 rounded-xl border border-purple-100 dark:border-purple-800/30">
+                    <p className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Configurações da Perícia (WhatsApp)</p>
+                    
+                    {/* Gênero */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Gênero do Cliente</label>
+                      <div className="flex gap-2">
+                        <button type="button"
+                          onClick={() => setFormData({ ...formData, gender: 'M' })}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'M' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                        >👨 Masculino</button>
+                        <button type="button"
+                          onClick={() => setFormData({ ...formData, gender: 'F' })}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'F' ? 'bg-pink-500 text-white border-pink-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                        >👩 Feminino</button>
+                      </div>
+                    </div>
+
+                    {/* Tipo de Benefício */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipo de Benefício</label>
+                      <div className="flex gap-2">
+                        <button type="button"
+                          onClick={() => setFormData({ ...formData, benefitType: 'incapacidade' })}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'incapacidade' || !formData.benefitType ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                        >🏥 Incapacidade</button>
+                        <button type="button"
+                          onClick={() => setFormData({ ...formData, benefitType: 'bpc' })}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'bpc' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                        >📋 BPC/LOAS</button>
+                      </div>
+                    </div>
+
+                    {/* Instruções Específicas */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Instruções Específicas do Caso</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Ex: Não tome remédio que diminui a dor no dia da perícia. Leve a muleta. Informe que tem crise X vezes por semana..."
+                        value={formData.extraInstructions || ''}
+                        onChange={(e) => setFormData({ ...formData, extraInstructions: e.target.value })}
+                        className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2 mt-4">
                   <button 

@@ -60,12 +60,13 @@ interface DraLuanaCastroProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: { title: string; content: string }) => void;
+  customLaws?: any[];
 }
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition }) => {
+const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -425,53 +426,144 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const abortController = new AbortController();
       const timeoutId = setTimeout(() => {
         abortController.abort();
-      }, 300000); // 300 seconds
+      }, 750000); // 750 seconds — alinhado com maxDuration 800s da Vercel
 
-      // 1. Get embedding for the user's message (include recent history for context)
-      let ragContext = '';
-      try {
-        const currentSession = sessions.find(s => s.id === sessionId);
-        const recentHistory = currentSession?.messages.slice(-2) || [];
-        const contextText = recentHistory.map(m => m.content).join('\n') + '\n' + messageText;
-
-        const embedResponse = await apiFetch('/api/rag/embed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: contextText }),
-          signal: abortController.signal
-        });
-        if (embedResponse.ok) {
-          const { embedding } = await embedResponse.json();
-          if (embedding && embedding.length > 0) {
-            // 2. Query Supabase (threshold 0.75 and max 5 results to save tokens on irrelevant queries)
-            const results = await supabaseService.searchLegalDocuments(embedding, 0.75, 5);
-            if (results && results.length > 0) {
-              ragContext = results.map((r: any) => r.content).join('\n\n---\n\n');
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("RAG search failed, continuing without context:", err);
-      }
-
-      // Prepare context from documents
       const session = sessionsRef.current.find(s => s.id === sessionId);
       const docSummaries = session?.documents?.map(doc => {
         const header = `DOCUMENTO: ${doc.name}\n`;
-        const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA (CIÊNCIA INTEGRAL DE TODAS AS PÁGINAS):\n${doc.summary}\n\n` : '';
+        const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA:\n${doc.summary}\n\n` : '';
         
-        // If we have a fileUri, we don't need to send the full text as the AI will have access to the file directly
+        // Se temos um arquivo na nuvem que o back-end vai processar, enviar menos texto para poupar RAG
         if (doc.fileUri) {
           return `${header}${summaryPart}[Arquivo presente na Base de Dados Nativa (GED) ou Storage]`;
         }
 
-        // Optimized for Speed: Use File API whenever possible, avoid sending huge strings
         const activeProvider = eliteProviderOverride || selectedModelProvider;
         const activeModel = eliteModelOverride || selectedModel;
-        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000)); // Limit claude to ~12k tokens input
-        const fullTextPart = doc.fullText ? `CONTEÚDO INTEGRAL (OCR/TEXTO):\n${doc.fullText.substring(0, textLimit)}` : '';
+        const textLimit = doc.fileUri ? 1000 : (activeModel?.includes('claude') ? 50000 : (activeProvider === 'openrouter' ? 150000 : 500000));
+        const fullTextPart = doc.fullText ? `CONTEÚDO:\n${doc.fullText.substring(0, textLimit)}` : '';
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
+
+      // 1. Get embedding and perform Keyword Search in parallel
+      let ragContext = '';
+
+      // Detectar mensagens casuais para evitar busca RAG desnecessária
+      const isCasualMessage = /^(oi|olá|bom dia|boa tarde|boa noite|obrigad|tudo bem|tudo bom|ok|certo|entendido|perfeito|sim|não|valeu|vlw|blz|beleza)/i.test(messageText.trim()) && messageText.trim().length < 60;
+
+      try {
+        if (isCasualMessage) {
+          // Mensagem casual: pular busca RAG completamente
+          ragContext = '';
+        } else {
+        // Se for comando de geração, enriquece a query com
+        // termos jurídicos trabalhistas para forçar o RAG
+        // a recuperar as leis principais da CLT
+        const isGenerationCommand =
+          messageText.includes('GERAR') ||
+          messageText.includes('Gerar');
+
+        // Busca TODOS os títulos da base dinamicamente.
+        // Documentos futuros são captados automaticamente
+        // desde que sigam os padrões de nomenclatura da base.
+        const allTitles = isGenerationCommand
+          ? await supabaseService.getAllLegalDocumentTitles()
+          : [];
+
+        const ragQuery = messageText.substring(0, 400);
+
+        const [embedResponse, keywordResults] = await Promise.all([
+          apiFetch('/api/rag/embed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: ragQuery }),
+            signal: abortController.signal
+          }),
+          supabaseService.keywordSearchLegalDocuments(messageText, 5)
+        ]);
+
+        const titleResults = allTitles.length > 0
+          ? await supabaseService.searchByTitles(allTitles, 5)
+          : [];
+
+        if (embedResponse.ok) {
+          const { embedding } = await embedResponse.json();
+          if (embedding && embedding.length > 0) {
+            const vectorResults = await supabaseService
+              .searchLegalDocuments(embedding, 0.60, 25, 'trabalhista');
+
+            // Merge sem duplicatas, priorizando vetorial
+            const seen = new Set<number>();
+            const merged: any[] = [];
+            
+            // Título exato primeiro (relevância máxima garantida)
+            titleResults.forEach((r: any) => {
+              seen.add(r.id);
+              merged.push({ ...r, source: 'title_exact' });
+            });
+
+            // Vetorial primeiro (mais relevante)
+            vectorResults.forEach((r: any) => {
+              seen.add(r.id);
+              merged.push({ ...r, source: 'vector' });
+            });
+            // Keyword depois (complementar)
+            keywordResults.forEach((r: any) => {
+              if (!seen.has(r.id)) {
+                seen.add(r.id);
+                merged.push({ ...r, source: 'keyword' });
+              }
+            });
+
+            if (merged.length > 0) {
+              // Injeta título + score para o modelo saber a relevância
+              ragContext = merged.map((r: any) => {
+                const score = r.similarity 
+                  ? ` [Score: ${(r.similarity * 100).toFixed(0)}%]`
+                  : ' [Keyword Match]';
+                const title = r.metadata?.title 
+                  ? `FONTE: ${r.metadata.title}${score}\n` 
+                  : '';
+                return `${title}${r.content}`;
+              }).join('\n\n---\n\n');
+            }
+          }
+        } else if (keywordResults.length > 0) {
+          ragContext = keywordResults.map((r: any) => {
+            const title = r.metadata?.title 
+              ? `FONTE: ${r.metadata.title} [Keyword Match]\n` 
+              : '';
+            return `${title}${r.content}`;
+          }).join('\n\n---\n\n');
+        }
+        } // fecha bloco else (não-casual)
+      } catch (err) {
+        console.warn("RAG search failed:", err);
+      }
+
+      // ============================================================
+      // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
+      // ============================================================
+      const compressHistory = (msgs: Message[]): Message[] => {
+        const last = msgs.slice(-8);
+        return last.map((m) => {
+          if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Compilado/documento completo disponível no documentContext desta requisição — conteúdo integral preservado ...]'
+            };
+          }
+          if (m.role === 'assistant' && m.content.length > 3000) {
+            return {
+              ...m,
+              content: m.content.substring(0, 500) + '\n\n[... Peça/Relatório completo gerado anteriormente — conteúdo integral disponível no Editor de Petições. Foque APENAS na nova solicitação do usuário ...]'
+            };
+          }
+          return m;
+        });
+      };
+
+      const compressedHistory = compressHistory(session?.messages || []);
 
       const response = await apiFetch('/api/dra-luana/chat', {
         method: 'POST',
@@ -479,11 +571,12 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         body: JSON.stringify({
           message: messageText,
           documentContext: docSummaries,
-          history: session?.messages || [],
+          history: compressedHistory,
           images: images || [],
           files: session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || [],
           minWage: localStorage.getItem('app_min_wage') || '1621.00',
           ragContext,
+          customLaws,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
           keyIndex: session?.uploadKeyIndex
@@ -554,7 +647,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
         } catch (readError: any) {
           if (readError.name === 'AbortError') {
             console.log('Stream aborted after 300 seconds');
-            fullText += '\n\n[Aviso: Tempo limite de 5 minutos atingido. Geração pausada. Digite "continue" para prosseguir.]';
+            fullText += '\n\n[Aviso: Tempo limite atingido. Geração pausada. Digite "continue" para prosseguir.]';
           } else {
             throw readError;
           }
@@ -638,7 +731,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 20000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
+                message: `[FASE DE TOMADA DE CIÊNCIA] Realize a auditoria detalhada e integral deste documento (TXT/OCR): ${file.name}.\n\nCONTEÚDO:\n${fullTextContent.substring(0, 500000)}\n\nExtraia nomes de partes, datas, CPFs, CIDs, valores e fatos cruciais. Responda seguindo o protocolo: "✅ Ciência tomada de [Nome do Arquivo]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."`,
                 history: [],
                 files: [],
                 minWage: localStorage.getItem('app_min_wage') || '1621.00',
@@ -828,7 +921,7 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `Tomei ciência integral de todos os arquivos enviados usando a nova API de Arquivos. O processo foi mapeado e estou pronto para gerar a petição ou relatório com base em todas as informações consolidadas. O que deseja fazer agora?`,
+        content: `✅ **Auditoria concluída.** Tomei ciência integral de todos os ${fileArray.length} arquivo(s) enviado(s) e mapeei os dados trabalhistas essenciais de cada documento. Estou pronta para **GERAR RELATÓRIO** ou **GERAR PEÇA** com base nas informações consolidadas. Como deseja prosseguir?`,
         timestamp: new Date().toISOString()
       };
       
@@ -1377,12 +1470,13 @@ const DraLuanaCastro: React.FC<DraLuanaCastroProps> = ({ initialSessions, onSave
                     className="bg-transparent text-[10px] font-bold text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-rose-600 transition-colors max-w-[150px]"
                   >
                     <optgroup label="Google Gemini (100% Gratuito e Ilimitado)">
-                      <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (2 Milhões de Tokens - Alta Complexidade)</option>
                       <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (1 Milhão de Tokens - Ultra Rápido)</option>
                     </optgroup>
                     <optgroup label="OpenRouter (API Paga / Recarga Necessária)">
+                      <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro — OpenRouter ($2/$12 por 1M tokens — Peças Complexas)</option>
                       <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 (Anthropic)</option>
                       <option value="deepseek/deepseek-v3.2">DeepSeek V3.2</option>
+                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4 Flash</option>
                       <option value="qwen/qwen3.6-plus">Qwen 3.6 Plus</option>
                       <option value="qwen/qwen3-max-thinking">Qwen 3 Max Thinking</option>
                       <option value="qwen/qwen-plus">Qwen Plus (Qwen)</option>

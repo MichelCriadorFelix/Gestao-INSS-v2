@@ -82,8 +82,43 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 
+// Standard Font AFM Files for pdfmake
+import Courier from 'pdfkit/js/data/Courier.afm?raw';
+import CourierBold from 'pdfkit/js/data/Courier-Bold.afm?raw';
+import CourierOblique from 'pdfkit/js/data/Courier-Oblique.afm?raw';
+import CourierBoldOblique from 'pdfkit/js/data/Courier-BoldOblique.afm?raw';
+
+import Helvetica from 'pdfkit/js/data/Helvetica.afm?raw';
+import HelveticaBold from 'pdfkit/js/data/Helvetica-Bold.afm?raw';
+import HelveticaOblique from 'pdfkit/js/data/Helvetica-Oblique.afm?raw';
+import HelveticaBoldOblique from 'pdfkit/js/data/Helvetica-BoldOblique.afm?raw';
+
+import TimesRoman from 'pdfkit/js/data/Times-Roman.afm?raw';
+import TimesBold from 'pdfkit/js/data/Times-Bold.afm?raw';
+import TimesItalic from 'pdfkit/js/data/Times-Italic.afm?raw';
+import TimesBoldItalic from 'pdfkit/js/data/Times-BoldItalic.afm?raw';
+
+// Register standard fonts in pdfMake
+const standardVfs = {
+  'data/Courier.afm': btoa(Courier),
+  'data/Courier-Bold.afm': btoa(CourierBold),
+  'data/Courier-Oblique.afm': btoa(CourierOblique),
+  'data/Courier-BoldOblique.afm': btoa(CourierBoldOblique),
+  
+  'data/Helvetica.afm': btoa(Helvetica),
+  'data/Helvetica-Bold.afm': btoa(HelveticaBold),
+  'data/Helvetica-Oblique.afm': btoa(HelveticaOblique),
+  'data/Helvetica-BoldOblique.afm': btoa(HelveticaBoldOblique),
+  
+  'data/Times-Roman.afm': btoa(TimesRoman),
+  'data/Times-Bold.afm': btoa(TimesBold),
+  'data/Times-Italic.afm': btoa(TimesItalic),
+  'data/Times-BoldItalic.afm': btoa(TimesBoldItalic),
+};
+
 const vfsFonts = (pdfFonts as any).pdfMake ? (pdfFonts as any).pdfMake.vfs : (pdfFonts as any).vfs;
-(pdfMake as any).vfs = vfsFonts || {};
+(pdfMake as any).addVirtualFileSystem({ ...(vfsFonts || {}), ...standardVfs });
+
 import { ClientRecord, Petition } from '../types';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 import { supabaseService } from '../services/supabaseService';
@@ -190,6 +225,9 @@ const PDF_FONT_CONFIGS: Record<string, any> = {
     bolditalics: 'Courier-BoldOblique',
   },
 };
+
+// Ensure pdfMake knows about all fonts globally for the default createPdf
+(pdfMake as any).addFonts(PDF_FONT_CONFIGS);
 
 const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initialPetition, initialClientId, onSavePetition }) => {
   const [title, setTitle] = useState(initialPetition?.title || 'NOVA PETIÇÃO SEM TÍTULO');
@@ -617,8 +655,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           ol: { margin: [0, 12, 0, 12] },
           li: { fontSize: 12, lineHeight: 1.5 },
           table: { margin: [0, 12, 0, 12] },
-          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0] },
-          td: { margin: [0, 0, 0, 0] },
+          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0], fontSize: 10 },
+          td: { margin: [0, 0, 0, 0], fontSize: 10 },
         }
       });
 
@@ -657,7 +695,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             if (inTable) {
               node.alignment = 'left';
               node.leadingIndent = 0;
-              node.bold = true;
+              node.fontSize = 10; // Reduce font size inside tables to avoid overflow
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
             } else {
               const isCenterOrRight = node.alignment === 'center' || node.alignment === 'right';
@@ -676,6 +714,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
+            // Let the columns take necessary space but distribute them using * 
+            // We use '*' but limit the table width implicitly by the page layout
             node.table.widths = Array(colCount).fill('*');
             node.layout = {
               hLineWidth: function () { return 1; },
@@ -768,7 +808,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       const pdfFontsConfig: Record<string, any> = { ...PDF_FONT_CONFIGS };
 
-      (pdfMake as any).createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${title}.pdf`);
+      (pdfMake as any).createPdf(docDefinition).download(`${title}.pdf`);
       setIsSaving(false);
 
     } catch (error: any) {
@@ -1097,8 +1137,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             </select>
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
-
-            <ToolbarButton
+            <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive('bold')}
               icon={<Bold className="w-4 h-4" />}
@@ -1222,7 +1261,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           {/* Editor Content */}
           <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
-            <div
+            <style>{`.ProseMirror * { font-family: ${FONT_OPTIONS.find(f => f.value === selectedFont)?.css || 'inherit'} !important; }`}</style>
+            <div 
               className="relative print:shadow-none print:w-full print:max-w-none print:block"
               style={{ fontFamily: FONT_OPTIONS.find(f => f.value === selectedFont)?.css }}
             >

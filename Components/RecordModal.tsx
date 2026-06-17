@@ -798,13 +798,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     { label: "Nacionalidade", name: "nationality", type: "text", width: "third" },
     { label: "Estado Civil", name: "maritalStatus", type: "select", width: "third", options: ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] },
     { label: "Profissão", name: "profession", type: "text", width: "third" },
-    { label: "CPF", name: "cpf", type: "text", width: "half" },
-    { label: "Senha INSS", name: "password", type: "text", width: "half" },
+    { label: "Gênero", name: "gender", type: "select", width: "third", options: ["M", "F"] },
+    { label: "CPF", name: "cpf", type: "text", width: "third" },
+    { label: "Senha INSS", name: "password", type: "text", width: "third" },
+    { label: "WhatsApp", name: "whatsapp", type: "text", placeholder: "55219XXXXXXXX", width: "third" },
     { label: "Endereço Completo", name: "address", type: "text", width: "full" },
     
     // CAMPOS DO REPRESENTANTE LEGAL (Expandidos)
     { label: "Rep. Legal - Nome", name: "legalRepresentative", type: "text", width: "full" },
     { label: "Rep. Legal - CPF", name: "legalRepresentativeCpf", type: "text", width: "half" },
+    { label: "Rep. Legal - Nacionalidade", name: "legalRepresentativeNationality", type: "text", width: "half" },
     { label: "Rep. Legal - Est. Civil", name: "legalRepresentativeMaritalStatus", type: "select", width: "half", options: ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] },
     { label: "Rep. Legal - Profissão", name: "legalRepresentativeProfession", type: "text", width: "half" },
     { label: "Rep. Legal - Endereço Completo (c/ CEP)", name: "legalRepresentativeAddress", type: "text", width: "full" },

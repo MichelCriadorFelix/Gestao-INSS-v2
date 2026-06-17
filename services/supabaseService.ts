@@ -443,6 +443,8 @@ export const supabaseService = {
       legal_representative_marital_status: client.legalRepresentativeMaritalStatus,
       legal_representative_profession: client.legalRepresentativeProfession,
       legal_representative_address: client.legalRepresentativeAddress,
+      whatsapp: client.whatsapp,
+      legal_representative_nationality: client.legalRepresentativeNationality,
       is_daily_attention: !!client.isDailyAttention,
       is_urgent_attention: !!client.isUrgentAttention,
       is_archived: !!client.isArchived,
@@ -458,7 +460,7 @@ export const supabaseService = {
       record.petitions = client.petitions;
     }
 
-    console.log('Salvando cliente no Supabase:', record);
+    console.log('Salvando cliente no Supabase:', record.id);
 
     const { data, error } = await supabase
       .from('clients_v2')
@@ -478,7 +480,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, documents, petitions');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, legal_representative, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -507,6 +509,8 @@ export const supabaseService = {
       legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
       legalRepresentativeProfession: c.legal_representative_profession,
       legalRepresentativeAddress: c.legal_representative_address,
+      whatsapp: c.whatsapp,
+      legalRepresentativeNationality: c.legal_representative_nationality,
       isDailyAttention: c.is_daily_attention,
       isUrgentAttention: c.is_urgent_attention,
       isArchived: c.is_archived,
@@ -514,9 +518,9 @@ export const supabaseService = {
       referrerName: c.referrer_name,
       referrerPercentage: c.referrer_percentage,
       totalFee: c.total_fee,
-      documents: c.documents || [],
-      documentCount: (c.documents || []).length,
-      petitionCount: (c.petitions || []).length
+      documents: [],
+      documentCount: 0,
+      petitionCount: 0
     }));
   },
 
@@ -559,6 +563,8 @@ export const supabaseService = {
       legalRepresentativeMaritalStatus: data.legal_representative_marital_status,
       legalRepresentativeProfession: data.legal_representative_profession,
       legalRepresentativeAddress: data.legal_representative_address,
+      whatsapp: data.whatsapp,
+      legalRepresentativeNationality: data.legal_representative_nationality,
       isDailyAttention: data.is_daily_attention,
       isUrgentAttention: data.is_urgent_attention,
       isArchived: data.is_archived,
@@ -604,7 +610,9 @@ export const supabaseService = {
       payment_method: contract.paymentMethod || 'Parcelado',
       installments_count: contract.installmentsCount || 0,
       payments: contract.payments || [],
-      created_at: contract.createdAt || new Date().toISOString()
+      created_at: contract.createdAt || new Date().toISOString(),
+      concluded_at: contract.concludedAt || null,
+      lawyer_split: contract.lawyerSplit ?? 60
     };
 
     const { data, error } = await supabase
@@ -644,7 +652,9 @@ export const supabaseService = {
       paymentMethod: c.payment_method,
       installmentsCount: c.installments_count,
       payments: c.payments,
-      createdAt: c.created_at
+      createdAt: c.created_at,
+      concludedAt: c.concluded_at,
+      lawyerSplit: c.lawyer_split ?? 60
     }));
   },
 
@@ -715,19 +725,102 @@ export const supabaseService = {
     return data;
   },
 
-  async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5) {
+  async searchLegalDocuments(embedding: number[], matchThreshold = 0.7, matchCount = 5, areaFilter?: string): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .rpc('match_legal_documents_by_area', {
+        query_embedding: embedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        area_filter: areaFilter || null
+      });
+
+    if (error) {
+      if (error.message?.includes('timeout')) {
+        console.warn('Supabase RAG search timeout - possibly missing index or too many records. Continuing without extra context.');
+      } else {
+        console.error('Error searching legal documents in Supabase:', error);
+      }
+      return [];
+    }
+    return data || [];
+  },
+
+  async getAllLegalDocumentTitles(): Promise<string[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('legal_documents')
+      .select("metadata->>title")
+      .not('metadata->>title', 'is', null);
+
+    if (error || !data) return [];
+
+    const titles = data
+      .map((row: any) => Object.values(row)[0])
+      .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
+
+    return [...new Set(titles)] as string[];
+  },
+
+  async searchByTitles(titles: string[], chunksPerTitle = 5): Promise<any[]> {
+    const supabase = getSupabase();
+    if (!supabase || titles.length === 0) return [];
+
+    const results: any[] = [];
+    const seen = new Set<number>();
+
+    for (const title of titles) {
+      const { data, error } = await supabase
+        .from('legal_documents')
+        .select('*')
+        .eq('metadata->>title', title)
+        .limit(chunksPerTitle);
+
+      if (!error && data) {
+        data.forEach((doc: any) => {
+          if (!seen.has(doc.id)) {
+            seen.add(doc.id);
+            results.push({ ...doc, similarity: 1.0, source: 'title_exact' });
+          }
+        });
+      }
+    }
+    return results;
+  },
+
+  async keywordSearchLegalDocuments(query: string, matchCount = 15) {
     const supabase = getSupabase();
     if (!supabase) return [];
     
+    // Extract potential legal identifiers (e.g., IN 128, Art. 482, Lei 8.213)
+    const identifiers = query.match(/(IN|Art|Lei|Decreto|Súmula|Enunciado)\.?\s*\d+/gi) || [];
+    
+    // Split query into terms, but be more inclusive for numbers and identifiers
+    const terms = query.split(/\s+/).filter(t => t.length >= 2);
+    if (terms.length === 0 && identifiers.length === 0) return [];
+
+    const searchTerms = Array.from(new Set([...identifiers, ...terms]));
+    
+    let filter = '';
+    searchTerms.forEach((term, i) => {
+      // Escape special characters for ilike
+      const escapedTerm = term.replace(/[%_]/g, '\\$0');
+      if (i > 0) filter += ',';
+      filter += `content.ilike.%${escapedTerm}%,metadata->>title.ilike.%${escapedTerm}%`;
+    });
+
     const { data, error } = await supabase
-      .rpc('match_legal_documents', {
-        query_embedding: embedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount
-      });
+      .from('legal_documents')
+      .select('*')
+      .or(filter)
+      .limit(matchCount);
       
     if (error) {
-      console.error('Error searching legal documents in Supabase:', error);
+      console.error('Error keyword searching legal documents in Supabase:', error);
       return [];
     }
     return data || [];

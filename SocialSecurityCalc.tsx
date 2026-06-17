@@ -232,6 +232,14 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     const [isProcessing, setIsProcessing] = useState(false);
     const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
     const [isSavedCalculationsModalOpen, setIsSavedCalculationsModalOpen] = useState(false);
+    const [isSpecificReportModalOpen, setIsSpecificReportModalOpen] = useState(false);
+    const [specificReportConfig, setSpecificReportConfig] = useState({
+        demandType: 'concessao' as 'concessao' | 'revisao' | 'restabelecimento' | 'liquidacao',
+        selectedBenefit: '',
+        periodoVencidoInicio: '',
+        periodoVencidoFim: '',
+        jurosMarco: 'citacao' as 'citacao' | 'der' | 'protocolo'
+    });
     const [inpcIndices, setInpcIndices] = useState<Map<string, number> | undefined>(undefined);
     const [ibgeTable, setIbgeTable] = useState<IBGELifeExpectancy[] | undefined>(undefined);
 
@@ -792,7 +800,50 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             return {
                 clientName: aiData.client?.name || '',
                 cpf: aiData.client?.cpf || '',
-                birthDate: aiData.client?.birthDate ? aiData.client.birthDate.split('-').reverse().join('/') : '',
+                birthDate: (() => {
+                    const raw = (aiData.client?.birthDate || '').trim();
+                    if (!raw) return '';
+
+                    // Função auxiliar: tenta construir YYYY-MM-DD a partir
+                    // de qualquer variação comum e valida o resultado
+                    const toISO = (d: string, m: string, y: string): string => {
+                        const dd = d.padStart(2, '0');
+                        const mm = m.padStart(2, '0');
+                        const yyyy = y.length === 2 
+                            ? (parseInt(y) > 30 ? '19' : '20') + y 
+                            : y;
+                        const date = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+                        if (isNaN(date.getTime())) return '';
+                        return `${yyyy}-${mm}-${dd}`;
+                    };
+
+                    // 1. YYYY-MM-DD (padrão ISO — mais comum vindo da IA)
+                    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+                    // 2. DD/MM/YYYY ou DD-MM-YYYY
+                    const dmy = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+                    if (dmy) return toISO(dmy[1], dmy[2], dmy[3]);
+
+                    // 4. YYYY/MM/DD
+                    const ymd = raw.match(/^(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})$/);
+                    if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+
+                    // 5. DDMMYYYY (sem separador — ex: "15041963")
+                    const noslash = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+                    if (noslash) return toISO(noslash[1], noslash[2], noslash[3]);
+
+                    // 6. Tenta Date.parse como último recurso
+                    const fallback = new Date(raw + 'T12:00:00');
+                    if (!isNaN(fallback.getTime())) {
+                        const y = fallback.getFullYear();
+                        const m = String(fallback.getMonth() + 1).padStart(2, '0');
+                        const d = String(fallback.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+
+                    return ''; // Não reconhecido — deixa o campo vazio para preenchimento manual
+                })(),
                 motherName: aiData.client?.motherName || '',
                 gender: aiData.client?.gender || 'M',
                 bonds: mappedBonds,
@@ -832,7 +883,17 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             // Truncate text to ~300k characters to avoid Vercel function timeouts (approx 60-80 pages of dense text)
             // The free tier has a 10s limit, Pro has 60s (or 300s if configured). 
             // Gemini has a large context window, so we can send more.
-            const truncatedText = fullText.length > 300000 ? fullText.substring(0, 300000) + "\n...[Texto truncado para análise]..." : fullText;
+            const WAS_TRUNCATED = fullText.length > 300000;
+            const truncatedText = WAS_TRUNCATED
+                ? fullText.substring(0, 300000) + "\n...[Texto truncado para análise]..."
+                : fullText;
+
+            if (WAS_TRUNCATED) {
+                showToast(
+                    "⚠️ CNIS muito extenso — apenas os primeiros 300.000 caracteres foram analisados. Verifique se todos os vínculos foram importados.",
+                    "error"
+                );
+            }
             
             const aiResult = await analyzeCNISWithAI(truncatedText);
             
@@ -858,29 +919,286 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     };
 
     const calculateUnifiedTime = () => {
-        let totalDays = 0;
-        data.bonds.forEach(bond => {
-            if (bond.useInCalculation && bond.startDate && bond.endDate) {
-                let effectiveEndDate = bond.endDate;
-                if (data.der) {
-                    const bondEnd = parseDateLocal(bond.endDate);
-                    const derDate = parseDateLocal(data.der);
-                    if (bondEnd > derDate) {
-                        effectiveEndDate = data.der;
-                    }
-                }
-                
-                const time = calculateTime(bond.startDate, effectiveEndDate, bond.activityType, data.gender);
-                totalDays += (time.years * 365) + (time.months * 30) + time.days;
-            }
-        });
-        
-        const years = Math.floor(totalDays / 365);
-        const months = Math.floor((totalDays % 365) / 30);
-        const days = Math.floor((totalDays % 365) % 30);
-        
-        return `${years}a ${months}m ${days}d`;
+    // Usa o mesmo método dia a dia do unifiedTime
+    // para garantir consistência no relatório PDF
+    const activeBonds = data.bonds.filter(
+      b => b.useInCalculation && b.startDate && b.endDate
+    );
+    if (activeBonds.length === 0) return "0a 0m 0d";
+
+    const REFORM_DATE_MS = new Date('2019-11-13T12:00:00').getTime();
+
+    let minMs = Infinity;
+    let maxMs = -Infinity;
+
+    const processed = activeBonds.map(b => {
+      const start = parseDateLocal(b.startDate);
+      start.setHours(12, 0, 0, 0);
+      let end = parseDateLocal(b.endDate);
+      end.setHours(12, 0, 0, 0);
+      if (data.der) {
+        const der = parseDateLocal(data.der);
+        der.setHours(12, 0, 0, 0);
+        if (end > der) end = der;
+      }
+      if (start.getTime() < minMs) minMs = start.getTime();
+      if (end.getTime() > maxMs) maxMs = end.getTime();
+
+      let factor = 1.0;
+      if (b.activityType === 'special_25')
+        factor = data.gender === 'M' ? 1.4 : 1.2;
+      if (b.activityType === 'special_20')
+        factor = data.gender === 'M' ? 1.75 : 1.5;
+      if (b.activityType === 'special_15')
+        factor = data.gender === 'M' ? 2.33 : 2.0;
+
+      return { startMs: start.getTime(), endMs: end.getTime(), factor };
+    }).filter(b => b.startMs <= b.endMs);
+
+    if (processed.length === 0) return "0a 0m 0d";
+
+    let totalAdjustedDays = 0;
+    let current = new Date(minMs);
+    const maxDate = new Date(maxMs);
+    let loops = 0;
+
+    while (current <= maxDate && loops < 36600) {
+      const ms = current.getTime();
+      let maxFactor = 0;
+      let isActive = false;
+      for (const b of processed) {
+        if (ms >= b.startMs && ms <= b.endMs) {
+          isActive = true;
+          const f = ms <= REFORM_DATE_MS ? b.factor : 1.0;
+          if (f > maxFactor) maxFactor = f;
+        }
+      }
+      if (isActive) totalAdjustedDays += maxFactor;
+      current.setDate(current.getDate() + 1);
+      current.setHours(12, 0, 0, 0);
+      loops++;
+    }
+
+    const years = Math.floor(totalAdjustedDays / 365);
+    const months = Math.floor((totalAdjustedDays % 365) / 30);
+    const days = Math.floor((totalAdjustedDays % 365) % 30);
+    return `${years}a ${months}m ${days}d`;
+  };
+
+  const generateSpecificReport = () => {
+    const analysisResult = analyzeBenefits(data, inpcIndices, ibgeTable);
+    const config = specificReportConfig;
+
+    // Encontra o benefício selecionado
+    const benefit = analysisResult.benefits.find(
+      b => b.benefitName === config.selectedBenefit
+    );
+
+    if (!benefit || !benefit.isEligible || !benefit.rmiDetails) {
+      showToast('Benefício não encontrado ou não elegível.', 'error');
+      return;
+    }
+
+    const rmi = benefit.rmiDetails.finalRMI;
+    const der = data.der || new Date().toISOString().split('T')[0];
+
+    // Calcula parcelas vencidas
+    let totalVencidas = 0;
+    let mesesVencidos = 0;
+    if (config.periodoVencidoInicio && config.periodoVencidoFim) {
+      const inicio = parseDateLocal(config.periodoVencidoInicio);
+      const fim = parseDateLocal(config.periodoVencidoFim);
+      // Conta meses entre início e fim (inclusive)
+      mesesVencidos = (fim.getFullYear() - inicio.getFullYear()) * 12 
+                    + (fim.getMonth() - inicio.getMonth()) + 1;
+      if (mesesVencidos < 0) mesesVencidos = 0;
+      totalVencidas = rmi * mesesVencidos;
+    }
+
+    // Valor da causa = parcelas vencidas + 12 vincendas
+    const vincendas = rmi * 12;
+    const valorCausa = totalVencidas + vincendas;
+
+    // Tipo de demanda label
+    const demandaLabels: Record<string, string> = {
+      concessao: 'Concessão de Benefício',
+      revisao: 'Revisão de Benefício',
+      restabelecimento: 'Restabelecimento de Benefício',
+      liquidacao: 'Liquidação de Sentença'
     };
+
+    // Mês/ano marco de juros label
+    const jurosLabels: Record<string, string> = {
+      citacao: 'A partir da Citação',
+      der: 'A partir da DER',
+      protocolo: 'A partir do Protocolo Administrativo'
+    };
+
+    // ─── GERAR PDF ───────────────────────────────────
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+
+    // Cabeçalho
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RELATÓRIO ESPECÍFICO — ' + demandaLabels[config.demandType].toUpperCase(), 
+      pageWidth / 2, 18, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Cliente: ${data.clientName || 'Não informado'}`, margin, 28);
+    doc.text(`CPF: ${data.cpf || 'Não informado'}`, margin, 34);
+    doc.text(`DER/DII: ${der.split('-').reverse().join('/')}`, margin, 40);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, margin, 46);
+    doc.line(margin, 50, pageWidth - margin, 50);
+
+    // ── BLOCO RESUMO EXECUTIVO ──
+    let y = 58;
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESUMO EXECUTIVO', margin, y);
+    y += 8;
+
+    const resumoData = [
+      ['Tipo de Demanda', demandaLabels[config.demandType]],
+      ['Benefício Pleiteado', benefit.benefitName.replace(/^\d+[\.\d]*\) /, '')],
+      ['RMI Calculada', formatCurrency(rmi)],
+      ['DER / DIB Pretendida', der.split('-').reverse().join('/')],
+      ['Competência dos Juros', jurosLabels[config.jurosMarco]],
+    ];
+
+    if (mesesVencidos > 0) {
+      resumoData.push(
+        ['Período Vencido', 
+          `${config.periodoVencidoInicio.split('-').reverse().join('/')} a ${config.periodoVencidoFim.split('-').reverse().join('/')}`],
+        ['Meses Vencidos', `${mesesVencidos} meses`],
+        ['Total Parcelas Vencidas', formatCurrency(totalVencidas)],
+      );
+    }
+    resumoData.push(
+      ['12 Parcelas Vincendas', formatCurrency(vincendas)],
+      ['VALOR DA CAUSA', formatCurrency(valorCausa)],
+    );
+
+    autoTable(doc, {
+      startY: y,
+      body: resumoData,
+      theme: 'grid',
+      styles: { fontSize: 10 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 70 },
+        1: { cellWidth: 110 }
+      },
+      didParseCell: (d) => {
+        // Destaca linha do Valor da Causa
+        if (d.row.index === resumoData.length - 1) {
+          d.cell.styles.fontStyle = 'bold';
+          d.cell.styles.fontSize = 12;
+          d.cell.styles.fillColor = [230, 245, 230];
+        }
+        if (d.row.index === resumoData.length - 3 && mesesVencidos > 0) {
+          d.cell.styles.fillColor = [245, 245, 220];
+        }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    // @ts-ignore
+    y = doc.lastAutoTable.finalY + 12;
+
+    // ── DETALHAMENTO DA RMI ──
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    if (y > 250) { doc.addPage(); y = 20; }
+    doc.text('DETALHAMENTO DO CÁLCULO DA RMI', margin, y);
+    y += 6;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Fórmula: ${benefit.rmiDetails.calculationFormula}`, margin, y + 4);
+    doc.text(`Média dos Salários: ${formatCurrency(benefit.rmiDetails.average)}`, margin, y + 10);
+    doc.text(`Fator Aplicado: ${(benefit.rmiDetails.appliedFactor * 100).toFixed(2)}%`, margin, y + 16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`RMI: ${formatCurrency(rmi)}`, margin, y + 24);
+    y += 32;
+
+    // Tabela de salários
+    if (benefit.rmiDetails.salaries.length > 0) {
+      let totalOrig = 0, totalCorr = 0;
+      const salData = benefit.rmiDetails.salaries.map((s, i) => {
+        totalOrig += s.originalValue;
+        totalCorr += s.correctedValue;
+        return [
+          (i+1).toString(), s.month,
+          formatCurrency(s.originalValue),
+          s.correctionFactor.toFixed(6),
+          formatCurrency(s.correctedValue),
+          s.isLimit ? 'Sim' : 'Não'
+        ];
+      });
+      salData.push(['-', 'TOTAL', formatCurrency(totalOrig), '-', formatCurrency(totalCorr), '-']);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Nº', 'Competência', 'Valor Original', 'Fator INPC', 'Valor Corrigido', 'Teto?']],
+        body: salData,
+        theme: 'grid',
+        headStyles: { fillColor: [60, 60, 60] },
+        styles: { fontSize: 8 },
+        margin: { left: margin, right: margin },
+        didParseCell: (d) => {
+          if (d.row.index === salData.length - 1) {
+            d.cell.styles.fontStyle = 'bold';
+            d.cell.styles.fillColor = [240, 240, 240];
+          }
+        }
+      });
+      // @ts-ignore
+      y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ── MEMÓRIA DE CÁLCULO DAS PARCELAS ──
+    if (mesesVencidos > 0) {
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MEMÓRIA DE CÁLCULO — PARCELAS VENCIDAS', margin, y);
+      y += 8;
+
+      const parcData = [];
+      const inicioDate = parseDateLocal(config.periodoVencidoInicio);
+      for (let i = 0; i < mesesVencidos; i++) {
+        const d = new Date(inicioDate.getFullYear(), inicioDate.getMonth() + i, 1);
+        const mesStr = `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        parcData.push([(i+1).toString(), mesStr, formatCurrency(rmi)]);
+      }
+      parcData.push(['-', 'TOTAL', formatCurrency(totalVencidas)]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Nº', 'Competência', 'Valor']],
+        body: parcData,
+        theme: 'striped',
+        headStyles: { fillColor: [60, 60, 60] },
+        styles: { fontSize: 9 },
+        margin: { left: margin, right: margin },
+        didParseCell: (d) => {
+          if (d.row.index === parcData.length - 1) {
+            d.cell.styles.fontStyle = 'bold';
+            d.cell.styles.fillColor = [240, 240, 240];
+          }
+        }
+      });
+      // @ts-ignore
+      y = doc.lastAutoTable.finalY + 10;
+    }
+
+    doc.save(
+      `Relatorio_Especifico_${data.clientName.replace(/\s+/g,'_')}_${benefit.ruleType}.pdf`
+    );
+    setIsSpecificReportModalOpen(false);
+  };
 
     const generateReport = () => {
         const reportType = window.prompt(
@@ -1440,6 +1758,13 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 endDate = `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
             }
 
+            // Detecta se é benefício por incapacidade
+            const isBeneficio = 
+              block.includes('B31') || block.includes('B32') ||
+              block.includes('B91') || block.includes('B92') ||
+              /Benefício\s+\d/.test(block) ||
+              origin.toUpperCase().includes('BENEFÍCIO');
+
             bonds.push({
                 id: Math.random().toString(),
                 seq,
@@ -1453,7 +1778,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 sc,
                 activityType: 'common',
                 isConcomitant: false,
-                isBenefit: false,
+                isBenefit: isBeneficio,
                 useInCalculation: true
             });
         });
@@ -1538,6 +1863,12 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                     <button className={STYLES.BTN_SECONDARY} onClick={() => setIsSavedCalculationsModalOpen(true)}>
                         <FolderOpenIcon className="h-4 w-4" />
                         Abrir Salvos
+                    </button>
+                    <button
+                        className={STYLES.BTN_SUCCESS}
+                        onClick={() => setIsSpecificReportModalOpen(true)}>
+                        <DocumentTextIcon className="w-4 h-4" />
+                        Relatório por Benefício
                     </button>
                     <button className={STYLES.BTN_SECONDARY} onClick={generateReport}>
                         <ArrowDownTrayIcon className="h-4 w-4" />
@@ -2232,6 +2563,113 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 savedCalculations={savedCalculations}
                 onUpdateCalculations={onUpdateCalculations}
             />
+
+            {isSpecificReportModalOpen && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+                        <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4">
+                            Relatório Específico por Benefício
+                        </h2>
+
+                        {/* Tipo de Demanda */}
+                        <div className="mb-4">
+                            <label className={STYLES.LABEL_TEXT}>Tipo de Demanda</label>
+                            <select
+                                className={STYLES.INPUT_FIELD}
+                                value={specificReportConfig.demandType}
+                                onChange={e => setSpecificReportConfig(p => ({
+                                    ...p, demandType: e.target.value as any
+                                }))}>
+                                <option value="concessao">Concessão de Benefício</option>
+                                <option value="revisao">Revisão de Benefício</option>
+                                <option value="restabelecimento">Restabelecimento de Benefício</option>
+                                <option value="liquidacao">Liquidação de Sentença</option>
+                            </select>
+                        </div>
+
+                        {/* Benefício */}
+                        <div className="mb-4">
+                            <label className={STYLES.LABEL_TEXT}>Benefício Pleiteado</label>
+                            <select
+                                className={STYLES.INPUT_FIELD}
+                                value={specificReportConfig.selectedBenefit}
+                                onChange={e => setSpecificReportConfig(p => ({
+                                    ...p, selectedBenefit: e.target.value
+                                }))}>
+                                <option value="">-- Selecione --</option>
+                                {analyzeBenefits(data, inpcIndices, ibgeTable)
+                                    .benefits
+                                    .filter(b => b.isEligible)
+                                    .map(b => (
+                                        <option key={b.benefitName} value={b.benefitName}>
+                                            {b.benefitName}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        {/* Período Vencido */}
+                        <div className="mb-4">
+                            <label className={STYLES.LABEL_TEXT}>
+                                Período das Parcelas Vencidas
+                            </label>
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-slate-500 mb-1 block">De</label>
+                                    <input type="date" className={STYLES.INPUT_FIELD}
+                                        value={specificReportConfig.periodoVencidoInicio}
+                                        onChange={e => setSpecificReportConfig(p => ({
+                                            ...p, periodoVencidoInicio: e.target.value
+                                        }))} />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-slate-500 mb-1 block">Até</label>
+                                    <input type="date" className={STYLES.INPUT_FIELD}
+                                        value={specificReportConfig.periodoVencidoFim}
+                                        onChange={e => setSpecificReportConfig(p => ({
+                                            ...p, periodoVencidoFim: e.target.value
+                                        }))} />
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Deixe em branco se a ação é de concessão sem atrasados.
+                            </p>
+                        </div>
+
+                        {/* Marco dos Juros */}
+                        <div className="mb-6">
+                            <label className={STYLES.LABEL_TEXT}>
+                                Competência dos Juros de Mora
+                            </label>
+                            <select
+                                className={STYLES.INPUT_FIELD}
+                                value={specificReportConfig.jurosMarco}
+                                onChange={e => setSpecificReportConfig(p => ({
+                                    ...p, jurosMarco: e.target.value as any
+                                }))}>
+                                <option value="citacao">A partir da Citação</option>
+                                <option value="der">A partir da DER</option>
+                                <option value="protocolo">A partir do Protocolo Administrativo</option>
+                            </select>
+                        </div>
+
+                        {/* Botões */}
+                        <div className="flex gap-3">
+                            <button
+                                className={STYLES.BTN_SECONDARY + ' flex-1'}
+                                onClick={() => setIsSpecificReportModalOpen(false)}>
+                                Cancelar
+                            </button>
+                            <button
+                                className={STYLES.BTN_SUCCESS + ' flex-1'}
+                                onClick={generateSpecificReport}
+                                disabled={!specificReportConfig.selectedBenefit}>
+                                Gerar Relatório
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Toast Notification */}
             {toast && (

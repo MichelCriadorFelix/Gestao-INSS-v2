@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { BriefcaseIcon, XMarkIcon, PlusIcon, TrashIcon, BanknotesIcon, CheckIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ContractRecord, ContractModalProps, PaymentEntry } from '../types';
 import { formatCurrency } from '../utils';
@@ -11,13 +12,25 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
     const [newPaymentAmount, setNewPaymentAmount] = useState('');
     const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [newPaymentDueDate, setNewPaymentDueDate] = useState(new Date().toISOString().split('T')[0]);
+    const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
 
     const [clientSearchQuery, setClientSearchQuery] = useState('');
     const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const sortedClients = [...(clients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const filteredClients = sortedClients.filter(c => (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()));
+    const sortedClients = React.useMemo(() =>
+        [...(clients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+        [clients]
+    );
+    const filteredClients = React.useMemo(() =>
+        clientSearchQuery.trim()
+            ? sortedClients.filter(c =>
+                (c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                (c.cpf || '').includes(clientSearchQuery)
+              )
+            : sortedClients,
+        [sortedClients, clientSearchQuery]
+    );
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -82,6 +95,28 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         }
     };
 
+    const generateInstallments = (startDate: string, count: number, totalValue: number) => {
+        if (!startDate || count < 1 || totalValue <= 0) return;
+        const installmentValue = Math.round((totalValue / count) * 100) / 100;
+        const payments: any[] = [];
+        const [year, month, day] = startDate.split('-').map(Number);
+        for (let i = 0; i < count; i++) {
+            let m = month + i;
+            let y = year;
+            while (m > 12) { m -= 12; y++; }
+            const dueDate = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            payments.push({
+                id: `${Date.now()}-${i}`,
+                date: dueDate,
+                dueDate,
+                amount: installmentValue,
+                isPaid: false,
+                note: `Parcela ${i + 1}/${count}`
+            });
+        }
+        setFormData(prev => ({ ...prev, payments }));
+    };
+
     const handleAddPayment = () => {
         if (!newPaymentAmount || Number(newPaymentAmount) <= 0) return;
         const payment: PaymentEntry = {
@@ -101,6 +136,77 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
         const updatedPayments = (formData.payments || []).filter(p => p.id !== id);
         setFormData({ ...formData, payments: updatedPayments });
     }
+
+    const handleOpenWhatsApp = () => {
+        const client = (clients || []).find(c => c.id === formData.clientId);
+        let whatsapp = (client?.whatsapp || '').replace(/\D/g, '');
+        if (whatsapp && !whatsapp.startsWith('55')) {
+            whatsapp = '55' + whatsapp;
+        }
+        if (!whatsapp) {
+            console.warn('Cliente sem WhatsApp cadastrado.');
+            const btn = document.createElement('div');
+            btn.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ef4444;color:white;padding:12px 24px;border-radius:12px;z-index:9999;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+            btn.textContent = '⚠️ Este cliente não possui WhatsApp cadastrado.';
+            document.body.appendChild(btn);
+            setTimeout(() => document.body.removeChild(btn), 3000);
+            return;
+        }
+
+        const totalFee = Number(formData.totalFee) || 0;
+        const payments = formData.payments || [];
+        const totalPaid = payments.reduce((sum, p) => p.isPaid ? sum + p.amount : sum, 0);
+        const remaining = Math.max(0, totalFee - totalPaid);
+        const paidPayments = payments.filter(p => p.isPaid).sort((a, b) => (a.dueDate || a.date).localeCompare(b.dueDate || b.date));
+        const isFullyPaid = remaining === 0 && totalFee > 0;
+
+        const formatCurrencyLocal = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const formatDateLocal = (d: string) => {
+            if (!d) return '';
+            const parts = d.split('-');
+            if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            return d;
+        };
+
+        let msg = `*FELIX E CASTRO ADVOCACIA*\n`;
+        msg += `*Controle de Pagamento de Honorários*\n\n`;
+        msg += `*Cliente:* ${(formData.firstName || '')} ${(formData.lastName || '')}\n`;
+        msg += `*Serviço:* ${formData.serviceType || ''}\n\n`;
+        msg += `*Valor Total:* ${formatCurrencyLocal(totalFee)}\n`;
+
+        if (formData.paymentMethod === 'Parcelado') {
+            msg += `*Forma:* Parcelado em ${formData.installmentsCount || payments.length}x\n\n`;
+        } else {
+            msg += `*Forma:* À Vista\n\n`;
+        }
+
+        const allPayments = [...payments].sort((a, b) => (a.dueDate || a.date).localeCompare(b.dueDate || b.date));
+ 
+        if (allPayments.length > 0) {
+            msg += `*Histórico de Parcelas:*\n`;
+            allPayments.forEach((p, i) => {
+                const refDate = p.dueDate || p.date;
+                const [y, m] = refDate ? refDate.split('-') : ['', ''];
+                const monthYear = m && y ? `${m}/${y}` : formatDateLocal(refDate);
+                if (p.isPaid) {
+                    msg += `${i + 1}) ${monthYear} — ${formatCurrencyLocal(p.amount)} ✅\n`;
+                } else {
+                    msg += `${i + 1}) ${monthYear} — Aguardando pagamento ⏳\n`;
+                }
+            });
+            msg += `\n`;
+        }
+ 
+        if (isFullyPaid) {
+            msg += `✅ *TOTALMENTE QUITADO*\n`;
+            msg += `_Felix e Castro Advocacia agradece a preferência!_ 🙏`;
+        } else {
+            msg += `*Valor Restante:* ${formatCurrencyLocal(remaining)}`;
+        }
+
+        const encoded = encodeURIComponent(msg);
+        window.open(`https://wa.me/${whatsapp}?text=${encoded}`, '_blank');
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -153,59 +259,80 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                 <ChevronDownIcon className="w-5 h-5 text-slate-400" />
                             </button>
 
-                            {isClientDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
-                                    <div className="p-2 border-b border-slate-100 dark:border-slate-700">
-                                        <div className="relative">
-                                            <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar cliente..."
-                                                value={clientSearchQuery}
-                                                onChange={(e) => setClientSearchQuery(e.target.value)}
-                                                className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
-                                                autoFocus
-                                            />
+                            {isClientDropdownOpen && createPortal(
+                                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                                    onMouseDown={(e) => { if (e.target === e.currentTarget) { setIsClientDropdownOpen(false); setClientSearchQuery(''); } }}>
+                                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                                        onMouseDown={e => e.stopPropagation()}
+                                        onClick={e => e.stopPropagation()}>
+                                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 sticky top-0 z-20">
+                                            <span className="font-bold text-slate-800 dark:text-white text-sm">Selecionar Cliente</span>
+                                            <button type="button" onClick={() => { setIsClientDropdownOpen(false); setClientSearchQuery(''); }}
+                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold">✕</button>
+                                        </div>
+                                        <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-[56px] z-20">
+                                            <div className="relative">
+                                                <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar cliente..."
+                                                    value={clientSearchQuery}
+                                                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="overflow-y-auto flex-1 bg-white dark:bg-slate-900 min-h-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({ ...prev, clientId: undefined, firstName: '', lastName: '', cpf: '' }));
+                                                    setIsClientDropdownOpen(false);
+                                                    setClientSearchQuery('');
+                                                }}
+                                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-primary-600 dark:text-primary-400 transition font-bold border-b border-slate-50 dark:border-slate-800 flex items-center gap-2"
+                                            >
+                                                <PlusIcon className="w-4 h-4" /> Novo Cliente
+                                            </button>
+                                            {filteredClients.length > 0 ? (
+                                                filteredClients.map(c => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const nameParts = (c.name || '').split(' ');
+                                                            const firstName = nameParts[0] || '';
+                                                            const lastName = nameParts.slice(1).join(' ') || '';
+                                                            setFormData(prev => ({ 
+                                                                ...prev, 
+                                                                clientId: c.id, 
+                                                                firstName, 
+                                                                lastName, 
+                                                                cpf: c.cpf || '',
+                                                                // Pré-preenche honorários se vier de indicação
+                                                                totalFee: c.totalFee || prev.totalFee || 0,
+                                                                // Pré-preenche tipo de serviço se disponível
+                                                                serviceType: prev.serviceType || c.type || '',
+                                                            }));
+                                                            setIsClientDropdownOpen(false);
+                                                            setClientSearchQuery('');
+                                                        }}
+                                                        className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200 transition border-b border-slate-50 dark:border-slate-800 last:border-0"
+                                                    >
+                                                        <p className="font-bold uppercase truncate">{c.name}</p>
+                                                        <p className="text-[10px] text-slate-500 font-mono tracking-wider">{c.cpf}</p>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="p-8 text-center text-sm text-slate-400 italic">
+                                                    Nenhum cliente encontrado.
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="max-h-60 overflow-y-auto">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFormData({ ...formData, clientId: undefined, firstName: '', lastName: '', cpf: '' });
-                                                setIsClientDropdownOpen(false);
-                                                setClientSearchQuery('');
-                                            }}
-                                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition font-medium"
-                                        >
-                                            Novo Cliente
-                                        </button>
-                                        {filteredClients.length > 0 ? (
-                                            filteredClients.map(c => (
-                                                <button
-                                                    key={c.id}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const nameParts = (c.name || '').split(' ');
-                                                        const firstName = nameParts[0] || '';
-                                                        const lastName = nameParts.slice(1).join(' ') || '';
-                                                        setFormData({ ...formData, clientId: c.id, firstName, lastName, cpf: c.cpf });
-                                                        setIsClientDropdownOpen(false);
-                                                        setClientSearchQuery('');
-                                                    }}
-                                                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition border-t border-slate-50 dark:border-slate-800"
-                                                >
-                                                    {c.name}
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div className="px-4 py-4 text-center text-sm text-slate-500">
-                                                Nenhum cliente encontrado
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
-                            )}
+                            , document.body)}
                         </div>
                      </div>
 
@@ -237,7 +364,16 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                              <option value="Michel">Dr. Michel</option>
                              <option value="Luana">Dra. Luana</option>
                          </select>
-                         <p className="text-[10px] text-slate-400 mt-1">Define a divisão de lucros (60/40).</p>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">% Responsável Principal</label>
+                         <select name="lawyerSplit" value={formData.lawyerSplit ?? 60} onChange={(e) => setFormData(prev => ({...prev, lawyerSplit: Number(e.target.value)}))} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                             <option value={100}>100% / 0%</option>
+                             <option value={70}>70% / 30%</option>
+                             <option value={60}>60% / 40%</option>
+                             <option value={50}>50% / 50%</option>
+                         </select>
+                         <p className="text-[10px] text-slate-400 mt-1">Divisão: Responsável / Outro advogado</p>
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Valor Total Honorários (R$)</label>
@@ -246,12 +382,25 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Status do Processo <span className="text-red-500">*</span></label>
-                         <select name="status" value={formData.status || 'Pendente'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                         <select name="status" value={formData.status || 'Pendente'} onChange={(e) => {
+                             const newStatus = e.target.value;
+                             const update: Partial<ContractRecord> = { ...formData, status: newStatus as ContractRecord['status'] };
+                             if (newStatus === 'Concluído' && !formData.concludedAt) {
+                                 update.concludedAt = new Date().toISOString().split('T')[0];
+                             }
+                             setFormData(update);
+                         }} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="Pendente">Pendente</option>
                              <option value="Em Andamento">Em Andamento</option>
                              <option value="Concluído">Concluído</option>
                          </select>
                      </div>
+                     {formData.status === 'Concluído' && (
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Data de Conclusão</label>
+                         <input type="date" name="concludedAt" value={formData.concludedAt || ''} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                     </div>
+                     )}
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Forma de Pagamento</label>
                          <select name="paymentMethod" value={formData.paymentMethod || 'Parcelado'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
@@ -261,25 +410,49 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      </div>
                      
                      {formData.paymentMethod === 'Parcelado' && (
-                         <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 flex items-center justify-between gap-4">
-                             <div>
-                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Qtd. Parcelas</label>
-                                 <select 
-                                    name="installmentsCount" 
-                                    value={formData.installmentsCount || 1} 
-                                    onChange={(e) => setFormData({...formData, installmentsCount: Number(e.target.value)})} 
-                                    className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
-                                 >
-                                     {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                                         <option key={num} value={num}>{num}x</option>
-                                     ))}
-                                 </select>
+                         <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                             <div className="flex items-center justify-between gap-4 mb-4">
+                                 <div>
+                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Qtd. Parcelas</label>
+                                     <select
+                                         name="installmentsCount"
+                                         value={formData.installmentsCount || 2}
+                                         onChange={(e) => setFormData(prev => ({...prev, installmentsCount: Number(e.target.value)}))}
+                                         className="w-32 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg outline-none text-sm dark:text-white"
+                                     >
+                                         {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                             <option key={num} value={num}>{num}x</option>
+                                         ))}
+                                     </select>
+                                 </div>
+                                 <div className="text-right">
+                                     <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase mb-1">Valor por Parcela</p>
+                                     <p className="text-xl font-bold text-slate-800 dark:text-white font-mono">
+                                         {formatCurrency(installmentValue)}
+                                     </p>
+                                 </div>
                              </div>
-                             <div className="text-right">
-                                 <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase mb-1">Valor por Parcela</p>
-                                 <p className="text-xl font-bold text-slate-800 dark:text-white font-mono">
-                                     {formatCurrency(installmentValue)}
-                                 </p>
+                             <div className="flex items-end gap-3">
+                                 <div className="flex-1">
+                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Data do 1º Pagamento</label>
+                                     <input
+                                         type="date"
+                                         value={firstInstallmentDate}
+                                         onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                                         className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                     />
+                                 </div>
+                                 <button
+                                     type="button"
+                                     onClick={() => generateInstallments(
+                                         firstInstallmentDate,
+                                         Number(formData.installmentsCount) || 2,
+                                         Number(formData.totalFee) || 0
+                                     )}
+                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition whitespace-nowrap"
+                                 >
+                                     Gerar Parcelas
+                                 </button>
                              </div>
                          </div>
                      )}
@@ -321,13 +494,23 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                                 <BanknotesIcon className="h-4 w-4" />
                                             </div>
                                             <div>
-                                                <span className="block font-bold dark:text-slate-200">{formatCurrency(p.amount)}</span>
+                                                <input
+                                                    type="number"
+                                                    value={p.amount}
+                                                    onChange={(e) => {
+                                                        const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, amount: Number(e.target.value)} : pay);
+                                                        setFormData(prev => ({...prev, payments: updatedPayments}));
+                                                    }}
+                                                    className="block font-bold dark:text-slate-200 bg-transparent border-none p-0 focus:ring-0 w-28 text-sm"
+                                                    step="0.01"
+                                                    min="0"
+                                                />
                                                 <input 
                                                     type="date" 
                                                     value={p.dueDate || p.date || new Date().toISOString().split('T')[0]} 
                                                     onChange={(e) => {
                                                         const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, dueDate: e.target.value, date: e.target.value} : pay);
-                                                        setFormData({...formData, payments: updatedPayments});
+                                                        setFormData(prev => ({...prev, payments: updatedPayments}));
                                                     }}
                                                     className="text-[10px] text-slate-500 uppercase bg-transparent border-none p-0 focus:ring-0"
                                                 />
@@ -336,7 +519,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                                         <div className="flex items-center gap-2">
                                             <button type="button" onClick={() => {
                                                 const updatedPayments = formData.payments!.map(pay => pay.id === p.id ? {...pay, isPaid: !pay.isPaid} : pay);
-                                                setFormData({...formData, payments: updatedPayments});
+                                                setFormData(prev => ({...prev, payments: updatedPayments}));
                                             }} className={`p-2 rounded-lg transition ${p.isPaid ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
                                                 <CheckIcon className="h-4 w-4" />
                                             </button>
@@ -354,6 +537,18 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
 
                      <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                         <button type="button" onClick={onClose} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 rounded-xl transition">Cancelar</button>
+                        {formData.clientId && (clients || []).find(c => c.id === formData.clientId)?.whatsapp && (
+                            <button
+                                type="button"
+                                onClick={handleOpenWhatsApp}
+                                className="px-5 py-2.5 text-white font-medium bg-green-600 hover:bg-green-700 rounded-xl transition flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.534 5.855L.057 23.882l6.186-1.453A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.808 9.808 0 01-5.032-1.388l-.361-.214-3.732.877.944-3.618-.235-.372A9.808 9.808 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
+                                </svg>
+                                Enviar Cobrança
+                            </button>
+                        )}
                         <button type="submit" className="px-5 py-2.5 text-white font-medium bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/30 transition flex items-center gap-2">
                             <CheckIcon className="h-5 w-5" />
                             Salvar Contrato
