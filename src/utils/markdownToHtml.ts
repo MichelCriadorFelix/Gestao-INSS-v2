@@ -29,6 +29,9 @@ export const markdownToHtml = (text: string): string => {
       .replace(/(^|[^\*\n])\*([^\*\n]+)\*/g, '$1<em>$2</em>')
       .replace(/(^|[^_\n])_([^_\n]+)_/g, '$1<em>$2</em>');
       
+    // Wrap tables in responsive container to prevent breaking page layout when using white-space: nowrap
+    result = result.replace(/<table([\s\S]*?)<\/table>/gi, '<div class="overflow-x-auto w-full"><table$1</table></div>');
+
     // Sanitize the HTML to prevent XSS attacks
     return DOMPurify.sanitize(result);
   } catch (error) {

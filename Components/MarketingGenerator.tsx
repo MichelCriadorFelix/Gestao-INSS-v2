@@ -999,7 +999,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
               {/* History Section */}
             {savedPosts.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-gold-500/15">
                 <h3 className={`font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                   <ClockIcon className="w-5 h-5" />
                   Histórico de Posts
@@ -1020,7 +1020,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       </div>
                       <button 
                         onClick={() => handleLoadPost(post)}
-                        className="w-full py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded text-xs font-medium transition-colors"
+                        className="w-full py-1.5 bg-slate-200 dark:bg-bordeaux-900/40 hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 rounded text-xs font-medium transition-colors"
                       >
                         Carregar Post
                       </button>
@@ -1060,7 +1060,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         setIsEditingText(!isEditingText);
                         if (!isEditingText) setIsEditingImage(false);
                       }}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingText ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingText ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-bordeaux-900/40 dark:text-slate-300 dark:hover:bg-bordeaux-900/60'}`}
                     >
                       <PencilIcon className="w-4 h-4" />
                       {isEditingText ? 'Ocultar Edição' : 'Editar Textos'}
@@ -1070,7 +1070,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         setIsEditingImage(!isEditingImage);
                         if (!isEditingImage) setIsEditingText(false);
                       }}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingImage ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isEditingImage ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-bordeaux-900/40 dark:text-slate-300 dark:hover:bg-bordeaux-900/60'}`}
                     >
                       <PhotoIcon className="w-4 h-4" />
                       {isEditingImage ? 'Ocultar Edição Imagem' : 'Editar Imagem'}
@@ -1090,16 +1090,16 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                     <div className="space-y-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider opacity-50">Ajustes</h4>
-                        <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1">
+                        <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 rounded-lg p-1">
                           <button 
                             onClick={() => setImageEditMode('move')}
-                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'move' ? 'bg-white dark:bg-slate-700 shadow-sm font-bold' : 'opacity-50'}`}
+                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'move' ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm font-bold' : 'opacity-50'}`}
                           >
                             Mover
                           </button>
                           <button 
                             onClick={() => setImageEditMode('resize')}
-                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'resize' ? 'bg-white dark:bg-slate-700 shadow-sm font-bold' : 'opacity-50'}`}
+                            className={`px-2 py-1 text-[10px] rounded-md transition-all ${imageEditMode === 'resize' ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm font-bold' : 'opacity-50'}`}
                           >
                             Redimensionar
                           </button>
@@ -1113,7 +1113,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                             else setImgFrameY(prev => prev - 10); 
                           }} 
                           title={imageEditMode === 'move' ? 'Mover para cima' : 'Puxar borda superior'}
-                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                          className="p-2 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 flex justify-center"
                         >
                           <ChevronUpIcon className="w-4 h-4"/>
                         </button>
@@ -1124,7 +1124,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                             else setImgFrameX(prev => prev - 10); 
                           }} 
                           title={imageEditMode === 'move' ? 'Mover para esquerda' : 'Puxar borda esquerda'}
-                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                          className="p-2 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 flex justify-center"
                         >
                           <ChevronLeftIcon className="w-4 h-4"/>
                         </button>
@@ -1151,7 +1151,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                             }
                           }} 
                           title={imageEditMode === 'move' ? 'Mover para direita' : 'Puxar borda direita'}
-                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                          className="p-2 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 flex justify-center"
                         >
                           <ChevronRightIcon className="w-4 h-4"/>
                         </button>
@@ -1165,7 +1165,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                             }
                           }} 
                           title={imageEditMode === 'move' ? 'Mover para baixo' : 'Puxar borda inferior'}
-                          className="p-2 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300 dark:hover:bg-slate-700 flex justify-center"
+                          className="p-2 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300 dark:hover:bg-bordeaux-900/60 flex justify-center"
                         >
                           <ChevronDownIcon className="w-4 h-4"/>
                         </button>
@@ -1187,7 +1187,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                               onClick={() => {
                                 setImgFrameW(prev => Math.max(50, prev - 20));
                               }}
-                              className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300"
+                              className="text-[10px] p-1 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300"
                             >
                               - Largura (Simétrico)
                             </button>
@@ -1205,7 +1205,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                               onClick={() => {
                                 setImgFrameH(prev => Math.max(50, prev - 20));
                               }}
-                              className="text-[10px] p-1 bg-slate-200 dark:bg-slate-800 rounded hover:bg-slate-300"
+                              className="text-[10px] p-1 bg-slate-200 dark:bg-bordeaux-900/40 rounded hover:bg-slate-300"
                             >
                               - Altura (Simétrico)
                             </button>
@@ -1239,8 +1239,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                         <div className="flex justify-between items-center">
                           <label className="block text-xs font-medium opacity-70">Zoom: {Math.round(imageZoom * 100)}%</label>
                           <div className="flex gap-1">
-                            <button onClick={() => setImageZoom(prev => Math.max(0.5, prev - 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-xs">-</button>
-                            <button onClick={() => setImageZoom(prev => Math.min(3, prev + 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 rounded text-xs">+</button>
+                            <button onClick={() => setImageZoom(prev => Math.max(0.5, prev - 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-bordeaux-900/40 rounded text-xs">-</button>
+                            <button onClick={() => setImageZoom(prev => Math.min(3, prev + 0.1))} className="px-2 py-0.5 bg-slate-200 dark:bg-bordeaux-900/40 rounded text-xs">+</button>
                           </div>
                         </div>
                         <input 
@@ -1250,7 +1250,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                           step="0.1" 
                           value={imageZoom} 
                           onChange={(e) => setImageZoom(parseFloat(e.target.value))}
-                          className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                          className="w-full h-2 bg-slate-200 dark:bg-bordeaux-900/60 rounded-lg appearance-none cursor-pointer accent-primary-500"
                         />
                       </div>
                     </div>
@@ -1266,7 +1266,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       </button>
                       <p className="text-[10px] opacity-60 italic text-center">Selecione uma foto da sua galeria para substituir a atual.</p>
                       
-                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <div className="pt-2 border-t border-slate-200 dark:border-gold-500/15">
                         <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Dica</p>
                         <p className="text-[10px] opacity-60">
                           {imageEditMode === 'move' 
@@ -1414,14 +1414,14 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       {showAssetLibrary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-200 dark:border-gold-500/15 flex items-center justify-between">
               <div>
                 <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Biblioteca de Ativos</h2>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gerencie e selecione fotos para seus posts</p>
               </div>
               <button 
                 onClick={() => setShowAssetLibrary(false)}
-                className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-bordeaux-900/60 transition-colors ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
               >
                 <PlusIcon className="w-6 h-6 rotate-45" />
               </button>
@@ -1451,7 +1451,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       </button>
                     ) : (
                       <div className="relative group">
-                        <img src={newAssetPreview} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-slate-200 dark:border-slate-700" />
+                        <img src={newAssetPreview} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-slate-200 dark:border-gold-500/15" />
                         <button 
                           onClick={() => setNewAssetPreview(null)}
                           className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { getCurrentMinimumWage } from './constants/MinimumWage';
 import { 
   CalculatorIcon, 
   BanknotesIcon, 
@@ -56,6 +57,7 @@ interface LaborData {
   hasFgtsBalance: number; // Saldo já depositado para cálculo da multa
   hasFgtsPenaltyBalance: number; // Multa de 40% já paga
   fgtsPenaltyAllDeposited: boolean; // Se a multa de 40% foi totalmente depositada
+  weeklyHours?: 44 | 40 | 36 | 30; // Jornada semanal — define o divisor da hora (220/200/180/150)
   clientReport?: string; // Relato do cliente / Fatos relevantes
   
   // Jornada Contratual (Informativo)
@@ -210,6 +212,7 @@ const INITIAL_LABOR_DATA: LaborData = {
   hasFgtsBalance: 0,
   hasFgtsPenaltyBalance: 0,
   fgtsPenaltyAllDeposited: false,
+  weeklyHours: 44,
   contractualSchedule: {
       type: 'segunda_sexta',
       schedules: [
@@ -344,7 +347,7 @@ const calculateFgtsExact = (start: Date, end: Date, history: LaborData['salaryHi
     const s = new Date(start); s.setHours(0,0,0,0);
     const e = new Date(end); e.setHours(0,0,0,0);
     
-    let current = new Date(s.getFullYear(), s.getMonth(), 1);
+    const current = new Date(s.getFullYear(), s.getMonth(), 1);
     
     while (current <= e) {
         const year = current.getFullYear();
@@ -372,10 +375,8 @@ const calculateFgtsExact = (start: Date, end: Date, history: LaborData['salaryHi
             const monthlyBase = (salary / 30) * daysWorked;
             totalFgts += monthlyBase * 0.08;
             
-            // Count as a month if worked at least 15 days? Or just count any participation?
-            // User wants "months count". Usually 15 days rule applies for 13th/Vacation, but FGTS is daily.
-            // Let's count it as a month if there was any contribution.
-            if (totalFgts > 0) totalMonths++;
+            // Conta o mês se houve depósito naquele mês específico
+            if (monthlyBase > 0) totalMonths++;
         }
         
         current.setMonth(current.getMonth() + 1);
@@ -400,7 +401,7 @@ const calculateBenefitExact = (
     end: Date, 
     history: LaborData['salaryHistory'], 
     currentSalary: number,
-    calcFn: (salary: number, daysWorked: number) => number,
+    calcFn: (salary: number, daysWorked: number, monthDate?: Date) => number,
     fullMonthDays: number = 30
 ): { value: number, months: number, memory: string[] } => {
     let totalValue = 0;
@@ -411,7 +412,7 @@ const calculateBenefitExact = (
     const s = new Date(start); s.setHours(0,0,0,0);
     const e = new Date(end); e.setHours(0,0,0,0);
     
-    let current = new Date(s.getFullYear(), s.getMonth(), 1);
+    const current = new Date(s.getFullYear(), s.getMonth(), 1);
     
     while (current <= e) {
         const year = current.getFullYear();
@@ -436,7 +437,7 @@ const calculateBenefitExact = (
             const checkDate = new Date(year, month, Math.min(15, monthEnd.getDate()));
             const salary = getSalaryAtDate(checkDate, history, currentSalary);
             
-            const val = calcFn(salary, daysWorked);
+            const val = calcFn(salary, daysWorked, checkDate);
             
             if (val > 0) {
                 totalValue += val;
@@ -455,6 +456,9 @@ const calculateLaborResults = (calcData: LaborData) => {
     const start = parseDate(calcData.startDate);
     const end = parseDate(calcData.endDate);
     const salary = Number(calcData.baseSalary);
+    // Divisor da hora conforme jornada semanal (CLT art. 64): 44h=220, 40h=200, 36h=180, 30h=150
+    const HOUR_DIVISOR: Record<number, number> = { 44: 220, 40: 200, 36: 180, 30: 150 };
+    const hourDivisor = HOUR_DIVISOR[calcData.weeklyHours || 44] || 220;
 
     if (!salary) return [];
 
@@ -678,9 +682,11 @@ const calculateLaborResults = (calcData: LaborData) => {
             }
         });
         
-        if (end && calcData.claimVacationProportional && start) {
+        // Art. 146, §ún., CLT + Súmula 171 TST: na dispensa por JUSTA CAUSA não são
+        // devidas férias proporcionais (período aquisitivo incompleto)
+        if (end && calcData.claimVacationProportional && start && calcData.terminationReason !== 'justa_causa') {
             // Determine start of current vesting period (anniversary of start date)
-            let vestingStart = new Date(start);
+            const vestingStart = new Date(start);
             vestingStart.setFullYear(end.getFullYear());
             
             // If anniversary in current year is after end date, then the vesting period started last year
@@ -706,7 +712,6 @@ const calculateLaborResults = (calcData: LaborData) => {
     // 5. Adicionais
     if (start && end) {
         const monthsWorked = diffMonths(start, end);
-        const minimumWage = 1412;
         
         if (calcData.insalubridadeLevel !== 'nenhum') {
             let perc = 0;
@@ -714,22 +719,28 @@ const calculateLaborResults = (calcData: LaborData) => {
             if (calcData.insalubridadeLevel === 'medio') perc = 0.20;
             if (calcData.insalubridadeLevel === 'maximo') perc = 0.40;
             
-            const result = calculateBenefitExact(start, end, calcData.salaryHistory, salary, (sal, days) => {
-                const monthlyVal = minimumWage * perc;
+            // Base: salário mínimo DA COMPETÊNCIA (art. 192 CLT) — usa a tabela
+            // histórica oficial de constants/MinimumWage.ts, mês a mês.
+            const result = calculateBenefitExact(start, end, calcData.salaryHistory, salary, (sal, days, monthDate) => {
+                const dateStr = monthDate
+                    ? `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-15`
+                    : undefined;
+                const mwOfMonth = getCurrentMinimumWage(dateStr);
+                const monthlyVal = mwOfMonth * perc;
                 return (monthlyVal / 30) * days;
             });
             
             results.push({ 
-                desc: `Adicional Insalubridade (${perc * 100}% s/ Mínimo - ${result.months} meses)`, 
+                desc: `Adicional Insalubridade (${perc * 100}% s/ Mínimo da época - ${result.months} meses)`, 
                 value: result.value, 
                 category: 'Adicionais',
-                details: `Base: Salário Mínimo (${formatCurrency(minimumWage)})\nPercentual: ${perc * 100}%\nMeses Calculados: ${result.months}\nTotal: ${formatCurrency(result.value)}\n\nMemória (Últimos 12 meses):\n${result.memory.slice(-12).join('\n')}`
+                details: `Base: Salário Mínimo vigente em cada competência (tabela oficial)\nPercentual: ${perc * 100}%\nMeses Calculados: ${result.months}\nTotal: ${formatCurrency(result.value)}\n\nMemória (Últimos 12 meses):\n${result.memory.slice(-12).join('\n')}`
             });
             results.push({ 
                 desc: `Reflexos Insalubridade (Férias, 13º, FGTS)`, 
                 value: result.value * 0.3, 
                 category: 'Reflexos',
-                details: `Base de Cálculo: ${formatCurrency(result.value)}\nReflexos Estimados (30%): Férias + 1/3, 13º Salário, FGTS + 40%`
+                details: `Base de Cálculo: ${formatCurrency(result.value)}\nReflexos ESTIMADOS em 30% (Férias + 1/3, 13º, FGTS + 40%) — estimativa para valor da causa; liquidação por cálculo próprio`
             });
         }
 
@@ -749,7 +760,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                 desc: `Reflexos Periculosidade (Férias, 13º, FGTS)`, 
                 value: result.value * 0.3, 
                 category: 'Reflexos',
-                details: `Base de Cálculo: ${formatCurrency(result.value)}\nReflexos Estimados (30%): Férias + 1/3, 13º Salário, FGTS + 40%`
+                details: `Base de Cálculo: ${formatCurrency(result.value)}\nReflexos ESTIMADOS em 30% (Férias + 1/3, 13º, FGTS + 40%) — estimativa para valor da causa; liquidação por cálculo próprio`
             });
         }
 
@@ -772,7 +783,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                         // Usually "Prorrogação" means it went past 05:00. If user puts 07:00, it's 2 hours.
                         // If user puts 04:00, it's not extended.
                         
-                        let diffMinutes = (endHour * 60 + endMin) - (5 * 60);
+                        const diffMinutes = (endHour * 60 + endMin) - (5 * 60);
                         
                         // Handle case where shift goes into next day but user inputs time like "07:00"
                         // Assuming the input is the end time of the shift.
@@ -800,13 +811,13 @@ const calculateLaborResults = (calcData: LaborData) => {
                     const totalHoursPerMonth = period.hoursPerMonth + extendedHoursPerMonth;
 
                     const result = calculateBenefitExact(pStart, pEnd, calcData.salaryHistory, salary, (sal, days) => {
-                        const hourlyRate = sal / 220;
+                        const hourlyRate = sal / hourDivisor;
                         const nightRate = hourlyRate * 0.20;
                         const monthlyVal = nightRate * totalHoursPerMonth;
                         return (monthlyVal / workDaysPerMonth) * days;
                     }, workDaysPerMonth);
                     
-                    const detailsStr = `Salário Hora: Base / 220\n` +
+                    const detailsStr = `Salário Hora: Base / ${hourDivisor}\n` +
                         `Adicional Noturno: 20%\n` +
                         (period.hoursPerDay ? `Horas/Dia (Base): ${period.hoursPerDay}\n` : '') +
                         (period.daysPerMonth ? `Dias/Mês: ${period.daysPerMonth}\n` : '') +
@@ -844,7 +855,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                     const workDaysPerMonth = period.daysPerMonth || 26; // Default to 26 as per user request
 
                     const result = calculateBenefitExact(pStart, pEnd, calcData.salaryHistory, salary, (sal, days) => {
-                        const hourlyRate = sal / 220;
+                        const hourlyRate = sal / hourDivisor;
                         const intraRate = hourlyRate * 1.5;
                         
                         // User formula: (Sal/220) * Hours/Day * DaysWorked * 1.5
@@ -852,7 +863,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                         return (monthlyVal / workDaysPerMonth) * days;
                     }, workDaysPerMonth);
                     
-                    const detailsStr = `Salário Hora: Base / 220\n` +
+                    const detailsStr = `Salário Hora: Base / ${hourDivisor}\n` +
                         `Adicional (50%): 1.5x\n` +
                         `Horas/Dia: ${period.hoursPerDay}\n` +
                         `Dias Trabalhados/Mês: ${workDaysPerMonth}\n` +
@@ -914,7 +925,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                 const perc = ot.percentage === -1 ? (ot.customPercentage || 50) : ot.percentage;
                 
                 const result = calculateBenefitExact(otStart, otEnd, calcData.salaryHistory, salary, (sal, days) => {
-                    const hourlyRate = sal / 220;
+                    const hourlyRate = sal / hourDivisor;
                     const otRate = hourlyRate * (1 + (perc / 100));
                     const monthlyVal = otRate * ot.hoursPerMonth;
                     // User formula for proportional: (MonthlyVal / workDaysPerMonth) * DaysWorked
@@ -925,7 +936,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                 desc: `Horas Extras ${perc}% (${ot.hoursPerMonth}h/mês x ${result.months} meses)`, 
                 value: result.value, 
                 category: 'Horas Extras',
-                details: `Salário Hora: Base / 220\nPercentual: ${perc}%\nHoras/Mês: ${ot.hoursPerMonth}\nMeses Calculados: ${result.months}\nTotal: ${formatCurrency(result.value)}\n\nMemória (Últimos 12 meses):\n${result.memory.slice(-12).join('\n')}`
+                details: `Salário Hora: Base / ${hourDivisor}\nPercentual: ${perc}%\nHoras/Mês: ${ot.hoursPerMonth}\nMeses Calculados: ${result.months}\nTotal: ${formatCurrency(result.value)}\n\nMemória (Últimos 12 meses):\n${result.memory.slice(-12).join('\n')}`
             });
             
             if (ot.applyDsr) {
@@ -975,7 +986,7 @@ const calculateLaborResults = (calcData: LaborData) => {
     }
 
     if (calcData.timeBankBalance && calcData.timeBankBalance > 0) {
-        const hourlyRate = salary / 220;
+        const hourlyRate = salary / hourDivisor;
         const perc = calcData.timeBankOvertimePercentage || 50;
         const timeBankRate = hourlyRate * (1 + (perc / 100));
         const timeBankValue = calcData.timeBankBalance * timeBankRate;
@@ -1226,7 +1237,10 @@ const calculateLaborResults = (calcData: LaborData) => {
     if (calcData.applyFine467) {
         // User requested categories for Art. 467:
         // Saldo de Salário, Aviso Prévio, 13º, Férias, Intrajornada, Horas Extras, DSR, Reflexos
-        const includedCategories = ['Rescisórias', 'Horas Extras', 'Adicionais', 'Reflexos'];
+        // Art. 467 CLT: incide somente sobre verbas RESCISÓRIAS incontroversas
+        // não pagas na primeira audiência. Horas extras, adicionais e reflexos são
+        // tipicamente controvertidos — excluídos da base (decisão do escritório, jun/2026).
+        const includedCategories = ['Rescisórias'];
         
         const verbasParaMulta = results.filter(r => includedCategories.includes(r.category));
         const rescisorySum = verbasParaMulta.reduce((acc, curr) => acc + curr.value, 0);
@@ -1324,7 +1338,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                         
                         if (overlapStart && overlapEnd && overlapStart < overlapEnd && p.hoursPerMonth > 0) {
                             const resultNot = calculateBenefitExact(overlapStart, overlapEnd, [], off.amount, (val, days) => {
-                                const hourlyRate = val / 220;
+                                const hourlyRate = val / hourDivisor;
                                 const nightRate = hourlyRate * 0.20;
                                 return (nightRate * p.hoursPerMonth / 30) * days;
                             });
@@ -1345,7 +1359,7 @@ const calculateLaborResults = (calcData: LaborData) => {
                     if (overlapStart && overlapEnd && overlapStart < overlapEnd && ot.hoursPerMonth > 0) {
                         const perc = ot.percentage === -1 ? (ot.customPercentage || 50) : ot.percentage;
                         const resultHe = calculateBenefitExact(overlapStart, overlapEnd, [], off.amount, (val, days) => {
-                            const hourlyRate = val / 220;
+                            const hourlyRate = val / hourDivisor;
                             const otRate = hourlyRate * (1 + (perc / 100));
                             return (otRate * ot.hoursPerMonth / 30) * days;
                         });
@@ -2116,6 +2130,15 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               <div>
                                   <label className={STYLES.LABEL_TEXT}>Último Salário Base (R$)</label>
                                   <input type="number" className={STYLES.INPUT_FIELD} value={data.baseSalary} onChange={e => handleInputChange('baseSalary', e.target.value)} placeholder="0.00" />
+                              </div>
+                              <div>
+                                  <label className={STYLES.LABEL_TEXT}>Jornada Semanal (divisor da hora)</label>
+                                  <select className={STYLES.INPUT_FIELD} value={data.weeklyHours || 44} onChange={e => handleInputChange('weeklyHours', Number(e.target.value))}>
+                                      <option value={44}>44h (divisor 220)</option>
+                                      <option value={40}>40h (divisor 200)</option>
+                                      <option value={36}>36h (divisor 180)</option>
+                                      <option value={30}>30h (divisor 150)</option>
+                                  </select>
                               </div>
                               <div>
                                   <label className={STYLES.LABEL_TEXT}>Motivo da Rescisão</label>

@@ -9,7 +9,7 @@ export interface CorrectionIndex {
     cumulativeFactor: number;
 }
 
-const BCB_API_URL = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json';
+const BCB_API_URL = '/api/bcdata/inpc';
 
 export const fetchINPCData = async (): Promise<INPCData[]> => {
     try {
@@ -90,7 +90,7 @@ export const getCorrectionFactor = (
     if (!endFactor) {
         // Try previous month first (standard rule)
         const [m, y] = derMonth.split('/').map(Number);
-        let prevDate = new Date(y, m - 1, 1);
+        const prevDate = new Date(y, m - 1, 1);
         prevDate.setMonth(prevDate.getMonth() - 1);
         const prevMonthStr = `${prevDate.getMonth() + 1}/${prevDate.getFullYear()}`;
         endFactor = indicesMap.get(prevMonthStr);

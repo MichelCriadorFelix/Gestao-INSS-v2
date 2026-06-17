@@ -53,13 +53,13 @@ const EVENT_TYPES = {
   'perícia': { label: 'Perícia', color: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' },
   'atendimento': { label: 'Atendimento', color: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' },
   'prazo': { label: 'Prazo', color: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800' },
-  'outro': { label: 'Outro', color: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' }
+  'outro': { label: 'Outro', color: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-bordeaux-900/40 dark:text-slate-300 dark:border-gold-500/15' }
 };
 
 const STATUS_LABELS = {
   'pending': { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
   'resolved': { label: 'Resolvido', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300' }
+  'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-bordeaux-900/40 dark:text-slate-300' }
 };
 
 const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }) => {
@@ -132,10 +132,12 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   const handleSave = (closeForm = true) => {
     if (!selectedDate || !formData.type || !formData.time) return;
     
+    const targetDateStr = formData.date || format(selectedDate, 'yyyy-MM-dd');
+    
     const newEvent: AgendaEvent = {
       ...formData,
       id: formData.id || Math.random().toString(36).substr(2, 9),
-      date: format(selectedDate, 'yyyy-MM-dd'),
+      date: targetDateStr,
       time: formData.time,
       type: formData.type as any,
       description: formData.description || '',
@@ -146,6 +148,19 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
     } as AgendaEvent;
 
     onSaveEvent(newEvent);
+
+    if (targetDateStr !== format(selectedDate, 'yyyy-MM-dd')) {
+      try {
+        const newD = parseISO(targetDateStr);
+        setSelectedDate(newD);
+        if (newD.getMonth() !== currentDate.getMonth() || newD.getFullYear() !== currentDate.getFullYear()) {
+          setCurrentDate(newD);
+        }
+      } catch (e) {
+        console.error("Erro ao converter data para selectedDate:", e);
+      }
+    }
+
     if (closeForm) {
         setIsFormOpen(false);
     }
@@ -305,18 +320,18 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   const renderHeader = () => {
     return (
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+        <h2 className="fc-page-title text-2xl font-serif font-semibold text-slate-800 dark:text-cream-50 flex items-center gap-2">
           <CalendarIcon className="h-7 w-7 text-primary-600" />
           Agenda
         </h2>
         <div className="flex items-center gap-4">
-          <button onClick={prevMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={prevMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 transition-colors">
             <ChevronLeftIcon className="h-5 w-5 text-slate-600 dark:text-slate-300" />
           </button>
           <span className="text-lg font-medium text-slate-700 dark:text-slate-200 min-w-[150px] text-center capitalize">
             {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
           </span>
-          <button onClick={nextMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={nextMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 transition-colors">
             <ChevronRightIcon className="h-5 w-5 text-slate-600 dark:text-slate-300" />
           </button>
         </div>
@@ -366,8 +381,8 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           <div
             key={day.toString()}
             onClick={() => handleDayClick(cloneDay)}
-            className={`min-h-[100px] p-2 border border-slate-100 dark:border-slate-800/50 transition-all cursor-pointer relative group
-              ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 dark:bg-slate-900/20 text-slate-400' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'}
+            className={`min-h-[100px] p-2 border border-slate-100 dark:border-gold-500/20/50 transition-all cursor-pointer relative group
+              ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 dark:bg-bordeaux-950/60/20 text-slate-400' : 'bg-white dark:bg-bordeaux-950/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50'}
               ${isSelected ? 'ring-2 ring-inset ring-primary-500 bg-primary-50/30 dark:bg-primary-900/20' : ''}
               ${hasOverdue ? 'bg-red-50/30 dark:bg-red-900/10' : ''}
             `}
@@ -377,7 +392,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                 {formattedDate}
               </span>
               {dayEvents.length > 0 && (
-                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md ${hasOverdue ? 'bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>
+                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md ${hasOverdue ? 'bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200' : 'bg-slate-100 text-slate-500 dark:bg-bordeaux-900/40'}`}>
                   {dayEvents.length}
                 </span>
               )}
@@ -413,7 +428,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
       );
       days = [];
     }
-    return <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">{rows}</div>;
+    return <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/20 overflow-hidden">{rows}</div>;
   };
 
   const renderSidePanel = () => {
@@ -423,10 +438,10 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
     const dayEvents = events.filter(e => e.date === dateStr && e.status !== 'cancelled').sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
     return (
-      <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out z-50 ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white dark:bg-bordeaux-950/60 shadow-2xl border-l border-slate-200 dark:border-gold-500/20 transform transition-transform duration-300 ease-in-out z-50 ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+          <div className="p-6 border-b border-slate-200 dark:border-gold-500/20 flex justify-between items-center bg-slate-50 dark:bg-bordeaux-900/40/50">
             <div>
               <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize">
                 {format(selectedDate, 'EEEE', { locale: ptBR })}
@@ -435,7 +450,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                 {format(selectedDate, "d 'de' MMMM, yyyy", { locale: ptBR })}
               </p>
             </div>
-            <button onClick={() => setIsPanelOpen(false)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <button onClick={() => setIsPanelOpen(false)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition-colors">
               <XMarkIcon className="h-6 w-6 text-slate-500" />
             </button>
           </div>
@@ -454,7 +469,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
 
                 {dayEvents.length === 0 ? (
                   <div className="text-center py-10">
-                    <div className="bg-slate-100 dark:bg-slate-800 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="bg-slate-100 dark:bg-bordeaux-900/40 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
                       <CalendarIcon className="h-8 w-8 text-slate-400" />
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">Nenhum compromisso neste dia.</p>
@@ -605,7 +620,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
                           formData.type === key 
                             ? color + ' ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-primary-500' 
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-gold-500/15 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60'
                         }`}
                       >
                         {label}
@@ -623,7 +638,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                         type="date" 
                         value={formData.date}
                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                        className="w-full p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
                       />
                     </div>
                   )}
@@ -635,7 +650,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       type="time" 
                       value={formData.time}
                       onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
                     />
                   </div>
                 </div>
@@ -648,7 +663,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                     placeholder="Ex: Sala 01, Fórum, Clínica..."
                     value={formData.location || ''}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
                   />
                 </div>
 
@@ -665,11 +680,11 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       setShowClientDropdown(true);
                     }}
                     onFocus={() => setShowClientDropdown(true)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white"
                   />
                   
                   {showClientDropdown && clientSearch && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                       {filteredClients.map(client => (
                         <div 
                           key={client.id}
@@ -678,7 +693,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                             setClientSearch(client.name);
                             setShowClientDropdown(false);
                           }}
-                          className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700/50 last:border-0"
+                          className="p-3 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 cursor-pointer border-b border-slate-100 dark:border-gold-500/15/50 last:border-0"
                         >
                           <div className="font-medium text-slate-800 dark:text-white">{client.name}</div>
                           <div className="text-xs text-slate-500">{client.cpf}</div>
@@ -696,7 +711,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                     placeholder="Link da reunião, número do processo, sala..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none"
+                    className="w-full p-3 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none"
                   />
                 </div>
 
@@ -711,11 +726,11 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       <div className="flex gap-2">
                         <button type="button"
                           onClick={() => setFormData({ ...formData, gender: 'M' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'M' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'M' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-gold-500/15 text-slate-600 dark:text-slate-400'}`}
                         >👨 Masculino</button>
                         <button type="button"
                           onClick={() => setFormData({ ...formData, gender: 'F' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'F' ? 'bg-pink-500 text-white border-pink-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.gender === 'F' ? 'bg-pink-500 text-white border-pink-500' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-gold-500/15 text-slate-600 dark:text-slate-400'}`}
                         >👩 Feminino</button>
                       </div>
                     </div>
@@ -726,11 +741,11 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                       <div className="flex gap-2">
                         <button type="button"
                           onClick={() => setFormData({ ...formData, benefitType: 'incapacidade' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'incapacidade' || !formData.benefitType ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'incapacidade' || !formData.benefitType ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-gold-500/15 text-slate-600 dark:text-slate-400'}`}
                         >🏥 Incapacidade</button>
                         <button type="button"
                           onClick={() => setFormData({ ...formData, benefitType: 'bpc' })}
-                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'bpc' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.benefitType === 'bpc' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-gold-500/15 text-slate-600 dark:text-slate-400'}`}
                         >📋 BPC/LOAS</button>
                       </div>
                     </div>
@@ -743,7 +758,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                         placeholder="Ex: Não tome remédio que diminui a dor no dia da perícia. Leve a muleta. Informe que tem crise X vezes por semana..."
                         value={formData.extraInstructions || ''}
                         onChange={(e) => setFormData({ ...formData, extraInstructions: e.target.value })}
-                        className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none text-sm"
+                        className="w-full p-3 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white resize-none text-sm"
                       />
                     </div>
                   </div>
@@ -763,7 +778,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                         handleOpenForm();
                     }}
                     disabled={!formData.time}
-                    className="flex-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 dark:text-white py-3 px-4 rounded-xl font-bold transition-colors"
+                    className="flex-1 bg-slate-100 dark:bg-bordeaux-900/60 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 dark:text-white py-3 px-4 rounded-xl font-bold transition-colors"
                   >
                     Salvar e Adicionar Outro
                   </button>
@@ -788,7 +803,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           </div>
 
           {/* Daily Focus Section */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+          <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/20 p-6">
             <DailyFocus 
               events={events}
               clients={clients} 

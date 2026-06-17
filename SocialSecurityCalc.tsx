@@ -65,6 +65,8 @@ export interface SocialSecurityData {
     // New flags for benefit analysis
     isTeacher?: boolean;
     isPcd?: boolean;
+    pcdGrau?: 'leve' | 'moderada' | 'grave'; // LC 142/2013
+    isAccidentRelated?: boolean; // Incapacidade decorrente de acidente de trabalho (coef. 100%)
     
     // Custom Minimum Wage
     customMinWage?: number;
@@ -177,7 +179,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 const salaryMap = new Map(b.sc.map(s => [s.month, s]));
                 const newSc = [...b.sc];
 
-                let current = new Date(start);
+                const current = new Date(start);
                 // Limit loop to avoid infinite loops
                 let safety = 0;
                 while (current <= end && safety < 1200) {
@@ -348,9 +350,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         }
         
         let years = Math.floor(totalAdjustedDays / 365);
-        let remainingDays = totalAdjustedDays % 365;
+        const remainingDays = totalAdjustedDays % 365;
         let months = Math.floor(remainingDays / 30);
-        let days = Math.floor(remainingDays % 30);
+        const days = Math.floor(remainingDays % 30);
         
         if (months >= 12) {
             years += 1;
@@ -406,7 +408,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const start = parseDateLocal(b.startDate);
             start.setHours(12, 0, 0, 0);
             
-            let endStr = b.endDate;
+            const endStr = b.endDate;
             let end = parseDateLocal(endStr);
             end.setHours(12, 0, 0, 0);
 
@@ -438,7 +440,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         let totalAdjustedDays = 0;
         
         // 2. Iterate Day by Day using Date object to avoid DST drift
-        let current = new Date(minDateMs);
+        const current = new Date(minDateMs);
         const maxDate = new Date(maxDateMs);
         
         // Limit to 100 years to prevent infinite loops
@@ -499,7 +501,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             // Priority: Date Range (since SCs might be missing from AI)
             if (bond.startDate && bond.endDate) {
-                let current = parseDateLocal(bond.startDate);
+                const current = parseDateLocal(bond.startDate);
                 // Normalize to start of month and noon to avoid timezone issues
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
@@ -577,7 +579,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const bondMonths = new Set<string>();
             
             if (bond.startDate && bond.endDate) {
-                let current = parseDateLocal(bond.startDate);
+                const current = parseDateLocal(bond.startDate);
                 current.setDate(1);
                 current.setHours(12, 0, 0, 0);
                 
@@ -638,7 +640,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             return bond.sc.map(s => ({ month: s.month, value: s.value, indicators: s.indicators || [], isMissing: false }));
         }
 
-        let current = parseDateLocal(bond.startDate);
+        const current = parseDateLocal(bond.startDate);
         // Normalize to start of month
         current.setDate(1);
         current.setHours(12, 0, 0, 0);
@@ -724,7 +726,50 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         return Math.random().toString(36).substring(2) + Date.now().toString(36);
     };
 
-    const analyzeCNISWithAI = async (text: string): Promise<Partial<SocialSecurityData> | null> => {
+    // Extrai os salários de contribuição (SC) localmente, por regex determinístico,
+    // agrupados pelo número de sequência (Seq.) do vínculo no extrato CNIS.
+    // A IA retorna apenas os METADADOS dos vínculos; os salários vêm daqui —
+    // mais rápido (sem gerar milhares de tokens) e sem risco de truncamento.
+    const extractScBySeq = (content: string): Map<number, { month: string; value: number; indicators: string[] }[]> => {
+        const map = new Map<number, { month: string; value: number; indicators: string[] }[]>();
+        if (!content) return map;
+
+        // Mesmo padrão de início de vínculo usado pelo parser local:
+        // Seq. + (NIT ou CNPJ ou CEI)
+        const bondStartRegex = /\b(\d+)\s+(?=\d{3}\.\d{5}\.\d{2}-\d|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{2}\.\d{3}\.\d{5}\/\d{2})/g;
+        const starts: { index: number; seq: number }[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = bondStartRegex.exec(content)) !== null) {
+            starts.push({ index: m.index, seq: parseInt(m[1], 10) });
+        }
+
+        // Indicador deve começar com LETRA — senão o grupo opcional engole o mês
+        // seguinte quando várias remunerações estão na mesma linha (bug do parser legado)
+        const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z][A-Z0-9-]*))?/g;
+
+        starts.forEach((s, i) => {
+            const endIndex = starts[i + 1]?.index ?? content.length;
+            const block = content.substring(s.index, endIndex);
+            const sc: { month: string; value: number; indicators: string[] }[] = [];
+            let rm: RegExpExecArray | null;
+            remunRegex.lastIndex = 0;
+            while ((rm = remunRegex.exec(block)) !== null) {
+                const value = parseFloat(rm[2].replace(/\./g, '').replace(',', '.'));
+                if (!isNaN(value)) sc.push({ month: rm[1], value, indicators: rm[3] ? [rm[3]] : [] });
+            }
+            sc.sort((a, b) => {
+                const [ma, ya] = a.month.split('/').map(Number);
+                const [mb, yb] = b.month.split('/').map(Number);
+                return (ya * 12 + ma) - (yb * 12 + mb);
+            });
+            // Se o mesmo seq aparecer 2x (quebra de página), concatena
+            const existing = map.get(s.seq);
+            if (existing) { map.set(s.seq, existing.concat(sc)); } else { map.set(s.seq, sc); }
+        });
+        return map;
+    };
+
+    const analyzeCNISWithAI = async (text: string, fullTextForSc?: string): Promise<Partial<SocialSecurityData> | null> => {
         try {
             const response = await apiFetch('/api/analyze-cnis', {
                 method: 'POST',
@@ -741,7 +786,13 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             let aiData;
             try {
-                aiData = await response.json();
+                const responseText = await response.text();
+                if (responseText.trim().startsWith('<')) {
+                    console.error("AI Studio proxy returned HTML instead of JSON:", responseText.substring(0, 100));
+                    showToast("O ambiente de preview bloqueou a requisição. Por favor, abra o app em uma NOVA ABA utilizando o ícone no canto superior direito.", "error");
+                    return null;
+                }
+                aiData = JSON.parse(responseText);
             } catch (e) {
                 console.error("Failed to parse AI JSON:", e);
                 showToast("Erro ao processar resposta da IA (JSON inválido).", "error");
@@ -753,16 +804,25 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 return null;
             }
 
+            // Extrai os SC localmente do texto COMPLETO (sem truncamento de 300k)
+            const localScMap = extractScBySeq(fullTextForSc || text);
+
             const mappedBonds: CNISBond[] = (aiData.bonds || []).map((b: any) => {
                 // AI returns YYYY-MM-DD. We MUST keep it as YYYY-MM-DD for <input type="date">
                 let startDate = b.startDate || '';
                 let endDate = b.endDate || '';
                 
-                const sc = (b.sc || []).map((s: any) => ({ 
+                // Prioridade: SC extraído localmente (determinístico, texto integral).
+                // Fallback: SC da IA, caso o regex local não encontre nada para o seq.
+                const localSc = (typeof b.seq === 'number' || typeof b.seq === 'string')
+                    ? (localScMap.get(Number(b.seq)) || [])
+                    : [];
+                const aiSc = (b.sc || []).map((s: any) => ({ 
                     month: s.month, 
                     value: typeof s.value === 'number' ? s.value : parseFloat(String(s.value).replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0,
                     indicators: s.indicators || []
                 }));
+                const sc = localSc.length > 0 ? localSc : aiSc;
 
                 // Post-Processing: Infer dates if missing
                 if (!startDate && sc.length > 0) {
@@ -895,7 +955,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 );
             }
             
-            const aiResult = await analyzeCNISWithAI(truncatedText);
+            const aiResult = await analyzeCNISWithAI(truncatedText, fullText);
             
             if (aiResult) {
                 setData(prev => ({
@@ -958,7 +1018,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
     if (processed.length === 0) return "0a 0m 0d";
 
     let totalAdjustedDays = 0;
-    let current = new Date(minMs);
+    const current = new Date(minMs);
     const maxDate = new Date(maxMs);
     let loops = 0;
 
@@ -1246,7 +1306,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         if (analysisResult.isPcd) doc.text(`Pessoa com Deficiência (PcD): Sim`, margin, 122);
         
         // Bonds Table
-        let yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
+        const yPosBonds = analysisResult.isTeacher || analysisResult.isPcd ? 135 : 120;
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text("Detalhamento dos Vínculos Utilizados", margin, yPosBonds);
@@ -1296,7 +1356,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         });
 
         // @ts-ignore
-        let finalY = doc.lastAutoTable.finalY + 5;
+        const finalY = doc.lastAutoTable.finalY + 5;
         doc.setFontSize(8);
         doc.text("* Data fim limitada à DER para fins de cálculo.", margin, finalY);
 
@@ -1451,10 +1511,6 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             // Fallback local save if no prop provided
              try {
                 await supabaseService.saveCalculation(newCalc);
-                
-                const saved = localStorage.getItem('social_security_calculations');
-                const calculations = saved ? JSON.parse(saved) : [];
-                safeSetLocalStorage('social_security_calculations', JSON.stringify([newCalc, ...calculations]));
                 showToast("Novo cálculo salvo com sucesso!");
             } catch (e) {
                 console.error("Error saving", e);
@@ -1493,8 +1549,6 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             
             if (onUpdateCalculations) {
                 onUpdateCalculations(updatedList);
-            } else {
-                safeSetLocalStorage('social_security_calculations', JSON.stringify(updatedList));
             }
             showToast("Alterações salvas com sucesso!");
             
@@ -1724,7 +1778,9 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             const sc: { month: string; value: number, indicators?: string[] }[] = [];
             // Regex for MM/YYYY followed by Value
             // Value can be "1.234,56"
-            const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z0-9-]+))?/g;
+            // FIX: indicador deve começar com LETRA — antes, [A-Z0-9-]+ engolia o mês
+            // seguinte em remunerações na mesma linha, perdendo competências alternadas
+            const remunRegex = /(\d{2}\/\d{4})\s+([\d.]*,\d{2})(?:\s+([A-Z][A-Z0-9-]*))?/g;
             
             let remunMatch;
             // We search in the whole block
@@ -2024,6 +2080,29 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                 />
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Pessoa com Deficiência (PCD)</span>
+                            </label>
+                            {data.isPcd && (
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Grau (LC 142/2013):</span>
+                                    <select
+                                        value={data.pcdGrau || 'leve'}
+                                        onChange={e => setData(prev => ({ ...prev, pcdGrau: e.target.value as 'leve' | 'moderada' | 'grave' }))}
+                                        className="text-sm rounded border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:ring-indigo-500"
+                                    >
+                                        <option value="leve">Leve (33M/28F)</option>
+                                        <option value="moderada">Moderada (29M/24F)</option>
+                                        <option value="grave">Grave (25M/20F)</option>
+                                    </select>
+                                </div>
+                            )}
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={data.isAccidentRelated || false}
+                                    onChange={e => setData(prev => ({ ...prev, isAccidentRelated: e.target.checked }))}
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Incapacidade Acidentária (acidente/doença do trabalho — coef. 100%)</span>
                             </label>
                         </div>
                     </div>
@@ -2441,7 +2520,7 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                                                     const end = new Date(y2, m2 - 1, 1);   // Start of month
                                                                                                     
                                                                                                     const newSc: { month: string; value: number; indicators: string[] }[] = [];
-                                                                                                    let current = new Date(start);
+                                                                                                    const current = new Date(start);
                                                                                                     
                                                                                                     while (current <= end) {
                                                                                                         const m = String(current.getMonth() + 1).padStart(2, '0');

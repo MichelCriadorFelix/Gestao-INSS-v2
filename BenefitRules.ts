@@ -101,7 +101,7 @@ export const calculateTimeForPeriod = (
     let totalAdjustedDays = 0;
     
     // 2. Iterate Day by Day
-    let current = new Date(minDateMs);
+    const current = new Date(minDateMs);
     const maxDate = new Date(maxDateMs);
     
     // Limit to 100 years
@@ -199,7 +199,8 @@ export const calculateRMI = (
     customMinWage?: number,
     salaryLimitDate?: string,
     isTeacher?: boolean,
-    ibgeTable?: IBGELifeExpectancy[]
+    ibgeTable?: IBGELifeExpectancy[],
+    isAccidentRelated?: boolean
 ) => {
     // 1. Flatten and Group Salaries (Sum Concomitant)
     const groupedSalaries = new Map<string, { date: Date, value: number, originalValue: number, correctionFactor: number, monthStr: string }>();
@@ -230,7 +231,7 @@ export const calculateRMI = (
                     
                     // 1. Find End Factor (Month prior to DER)
                     const [derY, derM] = der!.split('-').map(Number);
-                    let targetEndDate = new Date(derY, derM - 1, 1);
+                    const targetEndDate = new Date(derY, derM - 1, 1);
                     targetEndDate.setMonth(targetEndDate.getMonth() - 1);
                     
                     // Get latest available index in map
@@ -289,7 +290,7 @@ export const calculateRMI = (
         });
     });
 
-    let allSalaries = Array.from(groupedSalaries.values());
+    const allSalaries = Array.from(groupedSalaries.values());
 
     if (allSalaries.length === 0) return { rmi: 0, rmiDetails: undefined };
 
@@ -330,12 +331,13 @@ export const calculateRMI = (
             }
             const a = 0.31;
             
-            // Bonus for Tc in formula
+            // Bonus for Tc in formula (Lei 8.213/91, art. 29, §9º):
+            // I - 5 anos mulher; II - 5 anos professor; III - 10 anos professora (valor TOTAL, não cumulativo com o inciso I)
             let TcBonus = 0;
-            if (gender === 'F') TcBonus += 5;
             if (isTeacher) {
-                if (gender === 'M') TcBonus += 5;
-                else TcBonus += 10;
+                TcBonus = gender === 'M' ? 5 : 10;
+            } else if (gender === 'F') {
+                TcBonus = 5;
             }
             
             const Tc = totalYears + TcBonus;
@@ -385,12 +387,13 @@ export const calculateRMI = (
             }
             const a = 0.31;
             
-            // Bonus for Tc in formula
+            // Bonus for Tc in formula (Lei 8.213/91, art. 29, §9º):
+            // I - 5 anos mulher; II - 5 anos professor; III - 10 anos professora (valor TOTAL, não cumulativo com o inciso I)
             let TcBonus = 0;
-            if (gender === 'F') TcBonus += 5;
             if (isTeacher) {
-                if (gender === 'M') TcBonus += 5;
-                else TcBonus += 10;
+                TcBonus = gender === 'M' ? 5 : 10;
+            } else if (gender === 'F') {
+                TcBonus = 5;
             }
             
             const Tc = totalYears + TcBonus;
@@ -400,19 +403,47 @@ export const calculateRMI = (
             appliedFactor = fator;
             calculationFormula += ` x Fator Previdenciário (${fator.toFixed(4)}) [${formulaDetails}, Tc+Bonus=${Tc.toFixed(2)}]`;
         } else if (ruleType === 'Disability') {
-            let base = 0.60;
-            const threshold = gender === 'M' ? 20 : 15;
-            if (totalYears > threshold) {
-                base += (totalYears - threshold) * 0.02;
+            // EC 103, art. 26, §3º, II: acidente de trabalho / doença profissional ou do trabalho = 100%
+            if (isAccidentRelated) {
+                coef = 1.0;
+                calculationFormula += ` x Coeficiente Incapacidade Permanente (Acidentária - 100%)`;
+            } else {
+                let base = 0.60;
+                const threshold = gender === 'M' ? 20 : 15;
+                if (totalYears > threshold) {
+                    base += (totalYears - threshold) * 0.02;
+                }
+                if (base > 1.0) base = 1.0;
+                coef = base;
+                calculationFormula += ` x Coeficiente Incapacidade Permanente (${(coef * 100).toFixed(0)}%)`;
             }
-            coef = base;
-            calculationFormula += ` x Coeficiente Incapacidade Permanente (${(coef * 100).toFixed(0)}%)`;
         } else if (ruleType === 'TemporaryDisability') {
             coef = 0.91;
             calculationFormula += ` x Coeficiente Incapacidade Temporária (91%)`;
+            // Lei 8.213/91, art. 29, §10: o auxílio não pode exceder a média
+            // aritmética simples dos 12 últimos salários de contribuição
+            const sortedByDate = [...allSalaries].sort((a, b) => b.date.getTime() - a.date.getTime());
+            const last12 = sortedByDate.slice(0, 12);
+            if (last12.length > 0) {
+                const media12 = last12.reduce((acc, s) => acc + s.value, 0) / last12.length;
+                const projected = average * coef;
+                if (projected > media12) {
+                    coef = media12 / average;
+                    calculationFormula += ` [Limitado à média dos 12 últimos SC (art. 29, §10): ${media12.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}]`;
+                }
+            }
         } else if (ruleType === 'Death') {
-            coef = 0.60; // Base 50% + 10%
-            calculationFormula += ` x Cota Pensão (60%)`;
+            // EC 103, art. 23: pensão = 50% + 10 p.p. por dependente, incidente sobre a
+            // aposentadoria por incapacidade permanente a que o segurado teria direito
+            // (60% + 2%/ano excedente). Assume-se 1 dependente (cota 60%).
+            let disabilityCoef = 0.60;
+            const dThreshold = gender === 'M' ? 20 : 15;
+            if (totalYears > dThreshold) {
+                disabilityCoef += (totalYears - dThreshold) * 0.02;
+            }
+            if (disabilityCoef > 1.0) disabilityCoef = 1.0;
+            coef = 0.60 * disabilityCoef;
+            calculationFormula += ` x Coef. Incapacidade (${(disabilityCoef * 100).toFixed(0)}%) x Cota Pensão 60% (1 dependente) = ${(coef * 100).toFixed(1)}%`;
         } else {
             // General Rule
             let base = 0.60;
@@ -490,8 +521,8 @@ export const checkInsuredQuality = (bonds: CNISBond[], der: string): { hasQualit
         if (b.sc.length > 0) {
              b.sc.forEach(s => uniqueMonths.add(s.month));
         } else if (b.startDate && b.endDate) {
-             let start = parseDateLocal(b.startDate);
-             let end = parseDateLocal(b.endDate);
+             const start = parseDateLocal(b.startDate);
+             const end = parseDateLocal(b.endDate);
              let safety = 0;
              while(start <= end && safety < 1200) {
                  uniqueMonths.add(`${start.getMonth()+1}/${start.getFullYear()}`);
@@ -574,7 +605,7 @@ export const calculateCarencia = (bonds: CNISBond[], targetDate: string, allBond
         // If it's a benefit, it must be intercalated
         if (bond.isBenefit && !isBondIntercalated(bond, allBonds)) return;
         
-        let current = new Date(start.getFullYear(), start.getMonth(), 1);
+        const current = new Date(start.getFullYear(), start.getMonth(), 1);
         const last = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), 1);
         
         while (current <= last) {
@@ -608,13 +639,13 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const totalCarencia = calculateCarencia(data.bonds, der, data.bonds);
 
     // Normaliza meses e dias antes de somar para evitar overflow
-    let totalMonths = age.months + timeTotal.months;
-    let extraYearsFromMonths = Math.floor(totalMonths / 12);
-    let remainingMonths = totalMonths % 12;
+    const totalMonths = age.months + timeTotal.months;
+    const extraYearsFromMonths = Math.floor(totalMonths / 12);
+    const remainingMonths = totalMonths % 12;
 
-    let totalDaysRaw = age.days + timeTotal.days;
-    let extraYearsFromDays = Math.floor(totalDaysRaw / 365);
-    let remainingDays = totalDaysRaw % 365;
+    const totalDaysRaw = age.days + timeTotal.days;
+    const extraYearsFromDays = Math.floor(totalDaysRaw / 365);
+    const remainingDays = totalDaysRaw % 365;
 
     const points = (age.years + timeTotal.years + 
                     extraYearsFromMonths + extraYearsFromDays) +
@@ -633,13 +664,13 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     const timeAtReformTotal = calculateTimeForPeriod(data.bonds, reformDate, data.gender);
     const ageAtReform = calculateAge(data.birthDate, reformDate);
     // Normaliza meses e dias antes de somar para evitar overflow
-    let totalMonthsAtReform = ageAtReform.months + timeAtReformTotal.months;
-    let extraYearsFromMonthsAtReform = Math.floor(totalMonthsAtReform / 12);
-    let remainingMonthsAtReform = totalMonthsAtReform % 12;
+    const totalMonthsAtReform = ageAtReform.months + timeAtReformTotal.months;
+    const extraYearsFromMonthsAtReform = Math.floor(totalMonthsAtReform / 12);
+    const remainingMonthsAtReform = totalMonthsAtReform % 12;
 
-    let totalDaysRawAtReform = ageAtReform.days + timeAtReformTotal.days;
-    let extraYearsFromDaysAtReform = Math.floor(totalDaysRawAtReform / 365);
-    let remainingDaysAtReform = totalDaysRawAtReform % 365;
+    const totalDaysRawAtReform = ageAtReform.days + timeAtReformTotal.days;
+    const extraYearsFromDaysAtReform = Math.floor(totalDaysRawAtReform / 365);
+    const remainingDaysAtReform = totalDaysRawAtReform % 365;
 
     const pointsAtReform = (ageAtReform.years + timeAtReformTotal.years + 
                             extraYearsFromMonthsAtReform + extraYearsFromDaysAtReform) + 
@@ -940,8 +971,9 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     }
 
     // 1.5 Aposentadoria por tempo de contribuição (Regra de Transição - Idade Progressiva)
-    const currentYear = new Date().getFullYear();
-    const yearsSince2019 = currentYear - 2019;
+    // Requisitos progressivos (EC 103, arts. 15 e 16) avaliados pelo ANO DA DER, não pelo ano em que a simulação roda
+    const derYear = parseDateLocal(der).getFullYear();
+    const yearsSince2019 = Math.max(0, derYear - 2019);
     let progAgeReqM = 61 + (yearsSince2019 * 0.5);
     let progAgeReqF = 56 + (yearsSince2019 * 0.5);
     if (progAgeReqM > 65) progAgeReqM = 65;
@@ -964,7 +996,7 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
             isEligible: false,
             ruleType: 'Post-Reform',
             category: 'aposentadorias',
-            missingDetails: `Idade Exigida (${currentYear}): ${progAgeReq}. Atual: ${age.years}. Tempo: ${timeTotal.years}/${progTimeReq}.`
+            missingDetails: `Idade Exigida (${derYear}): ${progAgeReq}. Atual: ${age.years}. Tempo: ${timeTotal.years}/${progTimeReq}.`
         });
     }
 
@@ -995,15 +1027,25 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     }
 
     // --- 1.7 & 1.8 Aposentadoria Especial ---
+    // IMPORTANTE: o requisito de 15/20/25 anos de atividade especial é contado em
+    // TEMPO SIMPLES, sem fator de conversão. O fator (1,4/1,75/2,33) serve apenas
+    // para converter tempo especial em tempo comum — nunca para atingir o próprio
+    // requisito da aposentadoria especial. (Mesma lógica do bloco 0.4 pré-reforma.)
     let specialTime15 = 0;
     let specialTime20 = 0;
     let specialTime25 = 0;
-    
+
+    const derObjSpecial = parseDateLocal(der);
     data.bonds.forEach(b => {
         if (!b.useInCalculation || !b.startDate) return;
-        const result = calculateTimeForPeriod([b], der, data.gender);
-        const years = result.years + (result.months / 12) + (result.days / 365);
-        
+        const bStart = parseDateLocal(b.startDate);
+        let bEnd = b.endDate ? parseDateLocal(b.endDate) : new Date(derObjSpecial);
+        if (bEnd > derObjSpecial) bEnd = new Date(derObjSpecial);
+        if (bStart > derObjSpecial) return;
+
+        const days = (bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24);
+        const years = days / 365;
+
         if (b.activityType === 'special_15') specialTime15 += years;
         if (b.activityType === 'special_20') specialTime20 += years;
         if (b.activityType === 'special_25') specialTime25 += years;
@@ -1027,6 +1069,44 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
             ruleType: 'Transition',
             category: 'aposentadorias',
             missingDetails: `Tempo Especial (25): ${specialTime25.toFixed(2)}/25. Pontos: ${points.toFixed(2)}/${specialPointsReq25}.`
+        });
+    }
+
+    // 1.7b Aposentadoria Especial 20 anos (Regra de Transição - 76 Pontos) — EC 103, art. 21, II
+    if (specialTime20 >= 20 && points >= 76 && totalCarencia >= 180) {
+         benefits.push({
+            benefitName: "1.7b) Aposentadoria Especial 20 anos (Regra de Transição - 76 Pontos)",
+            isEligible: true,
+            ruleType: 'Transition',
+            category: 'aposentadorias',
+            ...calculateRMI(data.bonds, 'Post-Reform', data.gender, timeTotal.years, inpcIndices, der, fractionalAge, data.customMinWage, undefined, data.isTeacher, ibgeTable)
+        });
+    } else {
+         benefits.push({
+            benefitName: "1.7b) Aposentadoria Especial 20 anos (Regra de Transição - 76 Pontos)",
+            isEligible: false,
+            ruleType: 'Transition',
+            category: 'aposentadorias',
+            missingDetails: `Tempo Especial (20): ${specialTime20.toFixed(2)}/20. Pontos: ${points.toFixed(2)}/76.`
+        });
+    }
+
+    // 1.7c Aposentadoria Especial 15 anos (Regra de Transição - 66 Pontos) — EC 103, art. 21, I
+    if (specialTime15 >= 15 && points >= 66 && totalCarencia >= 180) {
+         benefits.push({
+            benefitName: "1.7c) Aposentadoria Especial 15 anos (Regra de Transição - 66 Pontos)",
+            isEligible: true,
+            ruleType: 'Transition',
+            category: 'aposentadorias',
+            ...calculateRMI(data.bonds, 'Post-Reform', data.gender, timeTotal.years, inpcIndices, der, fractionalAge, data.customMinWage, undefined, data.isTeacher, ibgeTable)
+        });
+    } else {
+         benefits.push({
+            benefitName: "1.7c) Aposentadoria Especial 15 anos (Regra de Transição - 66 Pontos)",
+            isEligible: false,
+            ruleType: 'Transition',
+            category: 'aposentadorias',
+            missingDetails: `Tempo Especial (15): ${specialTime15.toFixed(2)}/15. Pontos: ${points.toFixed(2)}/66.`
         });
     }
 
@@ -1165,7 +1245,14 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
     }
 
     // 1.12 Aposentadoria da Pessoa com Deficiência (Por Tempo de Contribuição)
-    const pcdTimeReqLeve = data.gender === 'M' ? 33 : 28;
+    // LC 142/2013, art. 3º: grave 25(M)/20(F); moderada 29(M)/24(F); leve 33(M)/28(F)
+    const pcdGrau = data.pcdGrau || 'leve';
+    const pcdTimeReqMap: Record<string, { M: number, F: number }> = {
+        'grave':    { M: 25, F: 20 },
+        'moderada': { M: 29, F: 24 },
+        'leve':     { M: 33, F: 28 }
+    };
+    const pcdTimeReqLeve = (pcdTimeReqMap[pcdGrau] || pcdTimeReqMap['leve'])[data.gender];
     if (data.isPcd) {
          if (timeTotal.years >= pcdTimeReqLeve && totalCarencia >= 180) {
             benefits.push({
@@ -1181,7 +1268,7 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
                 isEligible: false,
                 ruleType: 'Post-Reform',
                 category: 'aposentadorias',
-                missingDetails: `Tempo PCD (Leve): ${timeTotal.years}/${pcdTimeReqLeve}.`
+                missingDetails: `Tempo PCD (${pcdGrau}): ${timeTotal.years}/${pcdTimeReqLeve}.`
             });
          }
     } else {
@@ -1201,7 +1288,7 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
             isEligible: true,
             ruleType: 'Disability',
             category: 'auxilios',
-            ...calculateRMI(data.bonds, 'Disability', data.gender, timeTotal.years, inpcIndices, der, fractionalAge, data.customMinWage, undefined, data.isTeacher, ibgeTable),
+            ...calculateRMI(data.bonds, 'Disability', data.gender, timeTotal.years, inpcIndices, der, fractionalAge, data.customMinWage, undefined, data.isTeacher, ibgeTable, data.isAccidentRelated),
             missingDetails: "Requer perícia médica confirmando incapacidade permanente."
         });
     } else {

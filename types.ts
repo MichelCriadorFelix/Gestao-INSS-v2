@@ -6,6 +6,8 @@ export interface ScannedDocument {
   url: string; // Base64
   date: string;
   tags?: string[];
+  ocrText?: string;
+  summary?: string;
 }
 
 export interface AgendaEvent {
@@ -56,6 +58,7 @@ export interface ClientRecord {
   
   // Campos do Representante Legal
   legalRepresentative?: string; // Nome
+  legalRepresentativeGender?: string;
   legalRepresentativeCpf?: string;
   legalRepresentativeMaritalStatus?: string;
   legalRepresentativeProfession?: string;
@@ -74,7 +77,9 @@ export interface ClientRecord {
   documents?: ScannedDocument[];
   documentCount?: number;
   petitionCount?: number;
+  narrativeCertificateCount?: number;
   petitions?: Petition[];
+  narrativeCertificates?: ScannedDocument[];
 }
 
 export enum UserRole {
@@ -93,6 +98,7 @@ export const AUTHORIZED_USERS = [
   { firstName: 'Michel', lastName: 'Felix', role: UserRole.ADVOGADO, email: 'michel.advprev@gmail.com' },
   { firstName: 'Luana', lastName: 'Castro', role: UserRole.ADVOGADO, email: 'luanacadvogada@gmail.com' },
   { firstName: 'Fabrícia', lastName: 'Sousa', role: UserRole.SECRETARIA, email: 'fabriciasousa2025@outlook.com' },
+  { firstName: 'Felix & Castro', lastName: 'Advocacia', role: UserRole.ADVOGADO, email: 'felixecastroadv@gmail.com' },
 ];
 
 export interface FocusTask {

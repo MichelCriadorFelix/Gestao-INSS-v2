@@ -8,12 +8,23 @@ import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
 import { supabaseService } from '../services/supabaseService';
+import { apiFetch } from '../services/apiService';
+import { extractTextFromPDF } from '../src/utils/pdfParser';
 
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
+        // BUCKETS PRIVADOS: converte URL pública gravada no banco em URL assinada (1h)
+        docUrl = await supabaseService.resolveStorageUrl(docUrl);
         let downloadUrl = docUrl;
         let isObjectURL = false;
+        let finalDocName = docName || 'documento.pdf';
         
+        // Identificar se é PDF, imagem ou texto de antemão por url ou nome
+        let isPdf = finalDocName.toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
+        let isPng = finalDocName.toLowerCase().endsWith('.png') || docUrl.toLowerCase().includes('.png') || docUrl.startsWith('data:image/png');
+        let isJpg = finalDocName.toLowerCase().endsWith('.jpg') || finalDocName.toLowerCase().endsWith('.jpeg') || docUrl.toLowerCase().includes('.jpg') || docUrl.toLowerCase().includes('.jpeg') || docUrl.startsWith('data:image/jpeg');
+        let isTxt = finalDocName.toLowerCase().endsWith('.txt') || docUrl.toLowerCase().includes('.txt') || docUrl.startsWith('data:text/plain');
+
         if (docUrl.startsWith('data:')) {
             // Fix for sometimes malformed or very long base64 strings
             const parts = docUrl.split('base64,');
@@ -24,6 +35,11 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
                     mimeType = headerPart.substring(5);
                 }
                 
+                if (mimeType.toLowerCase().includes('pdf') || mimeType === 'application/pdf') isPdf = true;
+                if (mimeType.toLowerCase().includes('png') || mimeType === 'image/png') isPng = true;
+                if (mimeType.toLowerCase().includes('jpeg') || mimeType.toLowerCase().includes('jpg') || mimeType === 'image/jpeg') isJpg = true;
+                if (mimeType.toLowerCase().includes('plain') || mimeType === 'text/plain') isTxt = true;
+
                 // Remove any invalid characters (spaces, newlines, etc)
                 const safeBase64 = parts[1].replace(/[^A-Za-z0-9+/=]/g, '');
                 
@@ -43,6 +59,12 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
                     const response = await fetch(docUrl);
                     if (!response.ok) throw new Error("Network error with data URI");
                     const blob = await response.blob();
+                    
+                    if (blob.type.toLowerCase().includes('pdf') || blob.type === 'application/pdf') isPdf = true;
+                    if (blob.type.toLowerCase().includes('png') || blob.type === 'image/png') isPng = true;
+                    if (blob.type.toLowerCase().includes('jpeg') || blob.type.toLowerCase().includes('jpg') || blob.type === 'image/jpeg') isJpg = true;
+                    if (blob.type.toLowerCase().includes('plain') || blob.type === 'text/plain') isTxt = true;
+
                     downloadUrl = window.URL.createObjectURL(blob);
                     isObjectURL = true;
                 }
@@ -51,13 +73,30 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
             const response = await fetch(docUrl);
             if (!response.ok) throw new Error("Network error fetching url");
             const blob = await response.blob();
+            
+            if (blob.type.toLowerCase().includes('pdf') || blob.type === 'application/pdf') isPdf = true;
+            if (blob.type.toLowerCase().includes('png') || blob.type === 'image/png') isPng = true;
+            if (blob.type.toLowerCase().includes('jpeg') || blob.type.toLowerCase().includes('jpg') || blob.type === 'image/jpeg') isJpg = true;
+            if (blob.type.toLowerCase().includes('plain') || blob.type === 'text/plain') isTxt = true;
+
             downloadUrl = window.URL.createObjectURL(blob);
             isObjectURL = true;
         }
 
+        // Aplicar extensão correta se faltar no filename original
+        if (isPdf && !finalDocName.toLowerCase().endsWith('.pdf')) {
+            finalDocName = finalDocName + '.pdf';
+        } else if (isPng && !finalDocName.toLowerCase().endsWith('.png')) {
+            finalDocName = finalDocName + '.png';
+        } else if (isJpg && !finalDocName.toLowerCase().endsWith('.jpg') && !finalDocName.toLowerCase().endsWith('.jpeg')) {
+            finalDocName = finalDocName + '.jpg';
+        } else if (isTxt && !finalDocName.toLowerCase().endsWith('.txt')) {
+            finalDocName = finalDocName + '.txt';
+        }
+
         const link = document.createElement('a');
         link.href = downloadUrl;
-        link.download = docName || 'documento.pdf';
+        link.download = finalDocName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -71,9 +110,15 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
         
         // Ultimate fallback
         try {
+            let finalDocName = docName || 'documento.pdf';
+            const isPdf = finalDocName.toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf');
+            if (isPdf && !finalDocName.toLowerCase().endsWith('.pdf')) {
+                finalDocName = finalDocName + '.pdf';
+            }
+            
             const link = document.createElement('a');
             link.href = docUrl;
-            link.download = docName || 'documento.pdf';
+            link.download = finalDocName;
             link.target = '_blank';
             document.body.appendChild(link);
             link.click();
@@ -88,14 +133,105 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       maritalStatus: 'Solteiro(a)',
       profession: ''
   });
-  const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions' | 'certidao'>('info');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDocName, setEditDocName] = useState('');
   const [syncStatus, setSyncStatus] = useState<Record<string, 'syncing' | 'error' | 'success' | 'compressing'>>({});
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false); // UX: feedback visível durante o upload de anexos
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const certidaoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCertidaoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      setIsAttaching(true); // mostra "Enviando..." imediatamente
+      const newDocs: ScannedDocument[] = [];
+      const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
+      const clientId = formData.id || 'temp';
+
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          // Accept pdf or text
+          if (file.type !== 'application/pdf' && file.type !== 'text/plain') continue;
+
+          const id = Date.now().toString() + 'cert' + i;
+          newSyncStatus[id] = 'syncing';
+          
+          try {
+              const reader = new FileReader();
+              const base64Promise = new Promise<string>((resolve, reject) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = reject;
+              });
+              reader.readAsDataURL(file);
+              const base64Url = await base64Promise;
+
+              // Tenta fazer upload para o Supabase Storage
+              let finalUrl = base64Url;
+              try {
+                  const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/certidao_${id}`, base64Url);
+                  if (storageUrl) {
+                      finalUrl = storageUrl;
+                  }
+              } catch (storageErr) {
+                  console.warn("Storage upload failed for file:", file.name, storageErr);
+              }
+
+              let ocrText: string | undefined = undefined;
+              if (file.type === 'application/pdf') {
+                  try {
+                      const pdfResult = await extractTextFromPDF(file);
+                      if (pdfResult && pdfResult.text && pdfResult.text.trim().length > 100) {
+                          console.log(`[GED CERTIDAO] ⚡️ OCR local extraído para ${file.name} (${pdfResult.text.trim().length} chars)`);
+                          ocrText = pdfResult.text;
+                      }
+                  } catch (pdfErr) {
+                      console.warn("Erro ao extrair texto local em tempo de upload:", pdfErr);
+                  }
+              }
+
+              const newDoc: ScannedDocument = {
+                  id,
+                  name: file.name,
+                  type: file.type || 'application/pdf',
+                  url: finalUrl,
+                  date: new Date().toISOString(),
+                  ocrText: ocrText
+              };
+              
+              newDocs.push(newDoc);
+          } catch (error) {
+              console.error("Error reading file:", error);
+              newSyncStatus[id] = 'error';
+          }
+      }
+
+      setIsAttaching(false);
+      if (newDocs.length > 0) {
+          const updatedDocs = [...(formData.narrativeCertificates || []), ...newDocs];
+          const updatedFormData = { ...formData, narrativeCertificates: updatedDocs };
+          setFormData(updatedFormData);
+          setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+
+          try {
+              await onSave(updatedFormData as ClientRecord);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'success');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          } catch (e) {
+              console.error("Error saving uploaded certificates:", e);
+              newDocs.forEach(doc => newSyncStatus[doc.id] = 'error');
+              setSyncStatus(prev => ({ ...prev, ...newSyncStatus }));
+          }
+      }
+      
+      if (e.target) {
+          e.target.value = '';
+      }
+  };
 
   const AVAILABLE_TAGS = [
       { id: 'pessoal', label: 'Pessoal', color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -107,10 +243,33 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      const formattedData = { ...initialData };
+      const formatCpf = (val: string) => {
+        if (!val) return val;
+        let v = val.replace(/\D/g, "");
+        if (v.length > 11) v = v.slice(0, 11);
+        return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+      };
+      const formatDateStr = (val: string) => {
+        if (!val) return val;
+        let v = val.replace(/\D/g, "");
+        if (v.length > 8) v = v.slice(0, 8);
+        return v.replace(/(\d{2})(\d)/, "$1/$2").replace(/(\d{2})(\d)/, "$1/$2");
+      };
+
+      if (formattedData.cpf) formattedData.cpf = formatCpf(formattedData.cpf);
+      if (formattedData.legalRepresentativeCpf) formattedData.legalRepresentativeCpf = formatCpf(formattedData.legalRepresentativeCpf);
+
+      ['der', 'medExpertiseDate', 'socialExpertiseDate', 'extensionDate', 'dcbDate', 'ninetyDaysDate', 'securityMandateDate'].forEach(dateField => {
+        if ((formattedData as any)[dateField]) {
+            (formattedData as any)[dateField] = formatDateStr((formattedData as any)[dateField]);
+        }
+      });
+      
+      setFormData(formattedData);
     } else {
       setFormData({
-          nationality: 'Brasileira',
+          nationality: 'brasileiro',
           maritalStatus: 'Solteiro(a)',
           profession: ''
       });
@@ -142,7 +301,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       // 1. Download document if it's a URL
       let file: File;
       if (doc.url.startsWith('http')) {
-        const response = await fetch(doc.url);
+        const fetchableUrl = await supabaseService.resolveStorageUrl(doc.url);
+        const response = await fetch(fetchableUrl);
         const blob = await response.body ? await response.blob() : null;
         if (!blob) throw new Error("Falha ao baixar arquivo para compressão.");
         file = new File([blob], doc.name, { type: doc.type });
@@ -197,7 +357,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let value = e.target.value;
+    if (e.target.name === 'cpf' || e.target.name === 'legalRepresentativeCpf') {
+      let v = value.replace(/\D/g, "");
+      if (v.length > 11) v = v.slice(0, 11);
+      value = v
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    } else if (['der', 'medExpertiseDate', 'socialExpertiseDate', 'extensionDate', 'dcbDate', 'ninetyDaysDate', 'securityMandateDate'].includes(e.target.name)) {
+      let v = value.replace(/\D/g, "");
+      if (v.length > 8) v = v.slice(0, 8);
+      value = v
+        .replace(/(\d{2})(\d)/, "$1/$2")
+        .replace(/(\d{2})(\d)/, "$1/$2");
+    }
+    setFormData({ ...formData, [e.target.name]: value });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -208,6 +383,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const handleRemoveDocument = (docId: string) => {
       const updatedDocs = (formData.documents || []).filter(d => d.id !== docId);
       setFormData({ ...formData, documents: updatedDocs });
+  }
+
+  const handleRemoveCertidao = (docId: string) => {
+      const updatedDocs = (formData.narrativeCertificates || []).filter(d => d.id !== docId);
+      setFormData({ ...formData, narrativeCertificates: updatedDocs });
   }
 
   const handleUnifiedOCR = async () => {
@@ -228,13 +408,30 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                return;
           }
 
-          const documentsToProcess = docsToProcess.map(doc => ({
-              url: doc.url,
-              mimeType: doc.type,
-              name: doc.name
+          // BUCKET PRIVADO: o backend baixa estes arquivos — envia URLs assinadas
+          const documentsToProcess = await Promise.all(docsToProcess.map(async doc => {
+              const resolvedUrl = await supabaseService.resolveStorageUrl(doc.url);
+              let base64Images: string[] = [];
+              try {
+                  const res = await fetch(resolvedUrl);
+                  const blob = await res.blob();
+                  const localFile = new File([blob], doc.name, { type: doc.type });
+                  const pdfResult = await extractTextFromPDF(localFile);
+                  if (pdfResult && pdfResult.images) {
+                      base64Images = pdfResult.images;
+                  }
+              } catch (err) {
+                  console.error("Falha ao preparar imagens locais para transcrever documento no GED:", err);
+              }
+              return {
+                  url: resolvedUrl,
+                  mimeType: doc.type,
+                  name: doc.name,
+                  images: base64Images
+              };
           }));
 
-          const ocrRes = await fetch('/api/ocr-unified', {
+          const ocrRes = await apiFetch('/api/ocr-unified', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({ documents: documentsToProcess })
@@ -309,6 +506,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       const files = e.target.files;
       if (!files || files.length === 0) return;
 
+      setIsAttaching(true); // mostra "Enviando..." imediatamente
       const newDocs: ScannedDocument[] = [];
       const newSyncStatus: Record<string, 'syncing' | 'error' | 'success'> = {};
       const clientId = formData.id || 'temp';
@@ -341,12 +539,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                   console.warn("Storage upload failed for file:", file.name, storageErr);
               }
 
+              let ocrText: string | undefined = undefined;
+              if (file.type === 'application/pdf') {
+                  try {
+                      const pdfResult = await extractTextFromPDF(file);
+                      if (pdfResult && pdfResult.text && pdfResult.text.trim().length > 100) {
+                          console.log(`[GED UPLOAD] ⚡️ OCR local extraído para ${file.name} (${pdfResult.text.trim().length} chars)`);
+                          ocrText = pdfResult.text;
+                      }
+                  } catch (pdfErr) {
+                      console.warn("Erro ao extrair texto local em tempo de upload:", pdfErr);
+                  }
+              }
+
               const newDoc: ScannedDocument = {
                   id,
                   name: file.name,
                   type: file.type || 'application/pdf',
                   url: finalUrl,
-                  date: new Date().toISOString()
+                  date: new Date().toISOString(),
+                  ocrText: ocrText
               };
               
               newDocs.push(newDoc);
@@ -356,6 +568,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           }
       }
 
+      setIsAttaching(false);
       if (newDocs.length > 0) {
           const updatedDocs = [...(formData.documents || []), ...newDocs];
           const updatedFormData = { ...formData, documents: updatedDocs };
@@ -478,7 +691,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           const words = text.split(/\s+/); // Separa por qualquer espaço em branco
           const spaceWidth = doc.getTextWidth(" "); // Largura padrão do espaço
 
-          let lines: string[][] = [];
+          const lines: string[][] = [];
           let currentLineWords: string[] = [];
           let currentLineWidth = 0;
 
@@ -575,7 +788,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
               const repAddress = formData.legalRepresentativeAddress || clientAddress; // Usa endereço do rep ou do cliente
 
-              outorganteText = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito no CPF sob o nº ${clientCPF}, representado por sua genitora e outorgante, ${repName}, ${repNacionality}, ${repCivil}, ${repProf} inscrita no CPF sob o nº ${repCPF} residente e domiciliado à ${repAddress}.`;
+              const isMaleRep = formData.legalRepresentativeGender === 'M';
+              const repTitle = isMaleRep ? 'seu genitor' : 'sua genitora';
+              const repInscrito = isMaleRep ? 'inscrito' : 'inscrita';
+
+              outorganteText = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito no CPF sob o nº ${clientCPF}, representado por ${repTitle} e outorgante, ${repName}, ${repNacionality}, ${repCivil}, ${repProf} ${repInscrito} no CPF sob o nº ${repCPF} residente e domiciliado à ${repAddress}.`;
           } else {
               outorganteText = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}.`;
           }
@@ -624,7 +841,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           let text = "";
           
           if (isMinor) {
-               text = `Eu, ${formData.legalRepresentative?.toUpperCase()}, brasileiro(a), representante legal de ${clientName}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
+               const isMaleRep = formData.legalRepresentativeGender === 'M';
+               const repNacionalidade = isMaleRep ? 'brasileiro' : 'brasileira';
+               const repInscrito = isMaleRep ? 'inscrito' : 'inscrita';
+               const repDomiciliado = isMaleRep ? 'domiciliado' : 'domiciliada';
+               const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+               const repAddress = formData.legalRepresentativeAddress || clientAddress;
+               text = `Eu, ${formData.legalRepresentative?.toUpperCase()}, ${repNacionalidade}, representante legal de ${clientName}, ${repInscrito} no CPF sob o nº ${repCPF}, residente e ${repDomiciliado} à ${repAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
           } else {
                text = `Eu, ${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
           }
@@ -805,7 +1028,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     { label: "Endereço Completo", name: "address", type: "text", width: "full" },
     
     // CAMPOS DO REPRESENTANTE LEGAL (Expandidos)
-    { label: "Rep. Legal - Nome", name: "legalRepresentative", type: "text", width: "full" },
+    { label: "Rep. Legal - Nome", name: "legalRepresentative", type: "text", width: "half" },
+    { label: "Rep. Legal - Gênero", name: "legalRepresentativeGender", type: "select", width: "half", options: ["M", "F"] },
     { label: "Rep. Legal - CPF", name: "legalRepresentativeCpf", type: "text", width: "half" },
     { label: "Rep. Legal - Nacionalidade", name: "legalRepresentativeNationality", type: "text", width: "half" },
     { label: "Rep. Legal - Est. Civil", name: "legalRepresentativeMaritalStatus", type: "select", width: "half", options: ["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] },
@@ -824,8 +1048,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10">
+      <div className="bg-white dark:bg-bordeaux-950/60 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-gold-500/20 flex flex-col">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
                 {initialData ? <PencilSquareIcon className="h-6 w-6" /> : <PlusIcon className="h-6 w-6" />}
@@ -834,13 +1058,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 {initialData ? 'Editar Processo' : 'Novo Processo'}
             </h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800 px-6">
+        <div className="flex border-b border-slate-100 dark:border-gold-500/20 px-6">
             <button 
                 onClick={() => setActiveTab('info')}
                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -858,6 +1082,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'petitions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
                 Petições ({formData.petitions?.length || 0})
+            </button>
+            <button 
+                onClick={() => setActiveTab('certidao')}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'certidao' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+                Certidão Narratória ({formData.narrativeCertificates?.length || 0})
             </button>
         </div>
         
@@ -879,7 +1109,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name={field.name}
                                     value={(formData as any)[field.name] || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 >
                                     <option value="">Selecione...</option>
                                     {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -894,8 +1124,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     readOnly={field.readOnly}
                                     className={`w-full px-4 py-2.5 border rounded-xl outline-none transition text-sm
                                         ${field.readOnly 
-                                            ? 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 cursor-not-allowed border-slate-200 dark:border-slate-700' 
-                                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500'
+                                            ? 'bg-slate-50 dark:bg-bordeaux-900/40/50 text-slate-500 cursor-not-allowed border-slate-200 dark:border-gold-500/15' 
+                                            : 'bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500'
                                         }`}
                                 />
                             )}
@@ -904,7 +1134,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 })}
                 
                 <div className="md:col-span-6 mt-2 space-y-4">
-                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group">
+                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition group">
                         <input 
                             type="checkbox" 
                             checked={formData.isReferral || false}
@@ -922,7 +1152,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </label>
 
                     {formData.isReferral && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl bg-slate-50 dark:bg-bordeaux-900/40/50">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
                                     Nome do Indicador
@@ -932,7 +1162,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="referrerName"
                                     value={formData.referrerName || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                             <div>
@@ -944,7 +1174,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="referrerPercentage"
                                     value={formData.referrerPercentage || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                             <div>
@@ -956,13 +1186,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                     name="totalFee"
                                     value={formData.totalFee || ''}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition text-sm"
                                 />
                             </div>
                         </div>
                     )}
                     
-                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group">
+                    <label className="flex items-center gap-3 cursor-pointer p-4 border border-slate-200 dark:border-gold-500/15 rounded-xl hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50 transition group">
                         <input 
                             type="checkbox" 
                             checked={formData.isDailyAttention || false}
@@ -980,11 +1210,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </label>
                 </div>
 
-                <div className="md:col-span-6 flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="md:col-span-6 flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20">
                     <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition shadow-sm"
+                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded-xl transition shadow-sm"
                     >
                     Cancelar
                     </button>
@@ -1010,7 +1240,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             await downloadFileRobust(doc.url, doc.name);
                                         }
                                     }}
-                                    className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                    className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
                                 >
                                     <ArrowDownTrayIcon className="h-4 w-4" />
                                     Baixar PDFs
@@ -1026,11 +1256,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             />
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
                             >
                                 <ArrowUpTrayIcon className="h-4 w-4" />
                                 Upload
                             </button>
+                            {isAttaching && (
+                                <span className="flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                    Enviando arquivo(s)... aguarde
+                                </span>
+                            )}
                             <button 
                                 onClick={handleUnifiedOCR}
                                 disabled={isGeneratingOCR || !formData.documents || formData.documents.length === 0}
@@ -1050,15 +1286,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
-                        <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
                             <DocumentTextIcon className="h-5 w-5 text-blue-500" />
                             Gerar Procuração
                         </button>
-                        <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
                             <ScaleIcon className="h-5 w-5 text-purple-500" />
                             Gerar Declaração
                         </button>
-                        <button onClick={() => generatePDF('renuncia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        <button onClick={() => generatePDF('renuncia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
                             <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-500" />
                             Gerar Renúncia
                         </button>
@@ -1067,7 +1303,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="space-y-3">
                         {formData.documents && formData.documents.length > 0 ? (
                             formData.documents.map((doc, idx) => (
-                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl gap-3">
+                                <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl gap-3">
                                     <div className="flex items-center gap-3 flex-1">
                                         <div className="flex flex-col gap-1">
                                             <button onClick={() => moveDocument(idx, 'up')} disabled={idx === 0} className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUpIcon className="h-4 w-4" /></button>
@@ -1083,7 +1319,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                                         type="text" 
                                                         value={editDocName} 
                                                         onChange={(e) => setEditDocName(e.target.value)}
-                                                        className="flex-1 px-2 py-1 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                                        className="flex-1 px-2 py-1 text-sm border rounded dark:bg-bordeaux-900/60 dark:border-slate-600 dark:text-white"
                                                         autoFocus
                                                         onKeyDown={(e) => e.key === 'Enter' && saveDocName(doc.id)}
                                                     />
@@ -1121,14 +1357,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                         </button>
 
                                         <div className="relative">
-                                            <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg" title="Etiquetas">
+                                            <button onClick={() => setActiveTagMenu(activeTagMenu === doc.id ? null : doc.id)} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 rounded-lg" title="Etiquetas">
                                                 <TagIcon className="h-5 w-5" />
                                             </button>
                                             {activeTagMenu === doc.id && (
-                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 p-2">
+                                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl shadow-lg z-10 p-2">
                                                     <p className="text-xs font-bold text-slate-500 mb-2 px-2">Etiquetas</p>
                                                     {AVAILABLE_TAGS.map(t => (
-                                                        <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                                        <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 rounded cursor-pointer">
                                                             <input type="checkbox" checked={doc.tags?.includes(t.id) || false} onChange={() => toggleTag(doc.id, t.id)} className="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
                                                             <span className={`text-xs px-1.5 py-0.5 rounded-md border ${t.color}`}>{t.label}</span>
                                                         </label>
@@ -1151,14 +1387,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
                                 <DocumentPlusIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
                                 <p className="text-slate-500 text-sm">Nenhum documento anexado.</p>
                             </div>
                         )}
                     </div>
                     
-                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
+                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20 text-right">
                          <button
                             type="button"
                             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
@@ -1169,7 +1405,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </button>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'petitions' ? (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <h4 className="font-bold text-slate-700 dark:text-white">Petições do Cliente</h4>
@@ -1178,7 +1414,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     <div className="space-y-3">
                         {formData.petitions && formData.petitions.length > 0 ? (
                             formData.petitions.map((petition, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl">
+                                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl">
                                     <div className="flex items-center gap-3">
                                         <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
                                             <DocumentTextIcon className="h-6 w-6" />
@@ -1203,14 +1439,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
                                 <DocumentPlusIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
                                 <p className="text-slate-500 text-sm">Nenhuma petição vinculada.</p>
                             </div>
                         )}
                     </div>
                     
-                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
+                    <div className="mt-8 pt-4 border-t border-slate-100 dark:border-gold-500/20 text-right">
                          <button
                             type="button"
                             onClick={() => handleSubmit({ preventDefault: () => {} } as any)}
@@ -1221,7 +1457,86 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </button>
                     </div>
                 </div>
-            )}
+            ) : activeTab === 'certidao' ? (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-slate-700 dark:text-white">Certidões Narratórias</h4>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="file" 
+                                multiple 
+                                accept=".pdf,image/*,.txt"
+                                ref={certidaoFileInputRef} 
+                                onChange={handleCertidaoUpload} 
+                                className="hidden" 
+                            />
+                            <button 
+                                onClick={() => certidaoFileInputRef.current?.click()}
+                                className="flex items-center gap-2 bg-slate-100 dark:bg-bordeaux-900/40 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg text-sm font-bold border border-slate-200 dark:border-gold-500/15 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition"
+                            >
+                                <ArrowUpTrayIcon className="h-4 w-4" />
+                                Upload
+                            </button>
+                            {isAttaching && (
+                                <span className="flex items-center gap-2 text-sm font-bold text-amber-600 dark:text-amber-400">
+                                    <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                    Enviando arquivo(s)... aguarde
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        {formData.narrativeCertificates && formData.narrativeCertificates.length > 0 ? (
+                            formData.narrativeCertificates.map((doc, idx) => (
+                                <div key={doc.id || idx} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 w-full">
+                                            <div className="h-10 w-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center shrink-0">
+                                                <DocumentTextIcon className="h-6 w-6" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm text-slate-800 dark:text-white truncate">
+                                                    {doc.name}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {doc.type} • {doc.date ? new Date(doc.date).toLocaleDateString('pt-BR') : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => downloadFileRobust(doc.url, doc.name)}
+                                                className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
+                                                title="Baixar"
+                                            >
+                                                <ArrowDownTrayIcon className="h-5 w-5" />
+                                            </button>
+                                            <button onClick={() => handleRemoveCertidao(doc.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg" title="Excluir">
+                                                <TrashIcon className="h-5 w-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 w-full mt-2">
+                                        {syncStatus[doc.id] === 'syncing' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 w-fit">Salvando...</span>
+                                        ) : syncStatus[doc.id] === 'error' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 w-fit">Recarregue e tente novamente</span>
+                                        ) : syncStatus[doc.id] === 'success' ? (
+                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 w-fit">Salvo no Supabase</span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-xl">
+                                <DocumentTextIcon className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                                <p className="text-slate-500 text-sm">Nenhuma certidão narratória enviada.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : null}
       </div>
       <ScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onSave={handleScannerSave} />
     </div>

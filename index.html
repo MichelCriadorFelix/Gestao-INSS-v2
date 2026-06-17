@@ -2,42 +2,17 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>Felix e Castro Advocacia Especializada</title>
-    <meta name="theme-color" content="#be123c">
+    <meta name="theme-color" content="#6B1A1F">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
     
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
-                            950: '#172554',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link id="manifest-placeholder" rel="manifest" href="">
     
     <script>
@@ -46,18 +21,18 @@
             const manifest = {
                 "name": "Felix e Castro Advocacia Especializada",
                 "short_name": "Felix e Castro",
-                "start_url": "/",
+                "start_url": window.location.origin + "/",
                 "display": "standalone",
-                "background_color": "#26190f",
-                "theme_color": "#be123c",
+                "background_color": "#6B1A1F",
+                "theme_color": "#6B1A1F",
                 "icons": [
                     {
-                        "src": "https://cdn-icons-png.flaticon.com/512/924/924915.png",
+                        "src": window.location.origin + "/icon-192.png",
                         "sizes": "192x192",
                         "type": "image/png"
                     },
                     {
-                        "src": "https://cdn-icons-png.flaticon.com/512/924/924915.png",
+                        "src": window.location.origin + "/icon-512.png",
                         "sizes": "512x512",
                         "type": "image/png"
                     }
@@ -72,7 +47,11 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Custom Scrollbar */
+        h1, h2, h3, .font-display, .font-serif {
+            font-family: 'Cormorant Garamond', serif;
+            letter-spacing: -0.01em;
+        }
+        /* Custom Scrollbar - Felix & Castro */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -81,14 +60,14 @@
             background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #d9c4a0;
             border-radius: 4px;
         }
         .dark ::-webkit-scrollbar-thumb {
-            background: #475569;
+            background: #5a3a1f;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+            background: #C9A961;
         }
         .custom-scrollbar::-webkit-scrollbar {
             width: 4px;
@@ -220,7 +199,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-500 selection:text-white">
+<body class="bg-cream-50 dark:bg-[#0f0a0a] text-slate-900 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-primary-900 selection:text-cream-50">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

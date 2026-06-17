@@ -127,17 +127,17 @@ export async function extractTextFromPDF(
         // 2. Extract Image (OCR for handwritten/scanned docs)
         // Renderiza se tiver pouco texto (provável scan) ou se for as primeiras páginas críticas
         const isCriticalPage = i <= 20;
-        const isLowTextDensity = pageText.trim().length < 400; 
+        const isLowTextDensity = pageText.trim().length < 1500; // Aumentado para 1500 para ser mais sensível a scans com pouco texto textual
 
         if ((isLowTextDensity || isCriticalPage) && i <= MAX_PAGES_FOR_VISION) {
             try {
-                // DYNAMIC SCALING: Target ~2048px on the longest side
+                // DYNAMIC SCALING: Target ~2048px on the longest side for high precision
                 const originalViewport = page.getViewport({ scale: 1.0 });
                 const targetLongestSide = 2048;
                 const currentLongestSide = Math.max(originalViewport.width, originalViewport.height);
-                const dynamicScale = Math.min(3.0, targetLongestSide / currentLongestSide);
+                const dynamicScale = Math.max(1.5, Math.min(3.5, targetLongestSide / currentLongestSide));
                 
-                let viewport = page.getViewport({ scale: dynamicScale });
+                const viewport = page.getViewport({ scale: dynamicScale });
                 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d', { alpha: false }); 

@@ -43,6 +43,27 @@ const styles = `
     margin-top: 1.5rem !important;
     margin-bottom: 1rem !important;
   }
+  .ProseMirror table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 1.5rem 0 !important;
+    overflow: hidden;
+  }
+  .ProseMirror td, .ProseMirror th {
+    min-width: 1rem;
+    border: 1px solid #c8a96180 !important;
+    padding: 8px 12px !important;
+    vertical-align: middle;
+    box-sizing: border-box;
+    position: relative;
+    text-align: inherit;
+  }
+  .ProseMirror th {
+    font-weight: bold;
+    background-color: rgba(201, 169, 97, 0.05);
+  }
   @media print {
     @page {
       margin: 2cm;
@@ -242,7 +263,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedFont, setSelectedFont] = useState<string>('Roboto');
+  const [selectedFont, setSelectedFont] = useState<string>('Times');
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<ChatDocument[]>([]);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -389,44 +410,85 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       const fullPrompt = `[CONTEXTO INTEGRAL DOS DOCUMENTOS]\n${docContext}\n\n[SOLICITAÇÃO DO ADVOGADO]\n${aiPrompt}\n\nINSTRUÇÃO: 'GERAR PEÇA'. Use os dados técnicos acima (valores, datas, rubricas) e fundamente com base nos documentos citados.`;
 
-      const response = await apiFetch('/api/dr-michel/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: fullPrompt,
-          history: [],
-          images: [],
-          modelProvider: eliteProviderOverride,
-          model: eliteModelOverride
-        })
-      });
-
-      if (!response.ok) throw new Error('Falha na geração');
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      let isFinished = false;
+      let resumeCount = 0;
+      const MAX_RESUMES = 3;
       let fullText = '';
-      let buffer = '';
-      
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.text) {
-                  fullText += data.text;
-                }
-              } catch (e) {}
-            }
+
+      while (!isFinished && resumeCount <= MAX_RESUMES) {
+        let currentMessage = fullPrompt;
+        if (resumeCount > 0) {
+          const lastWords = fullText.slice(-100).replace(/\n/g, ' ');
+          currentMessage = `(A GERAÇÃO FOI INTERROMPIDA PELO LIMITE. CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, A PARTIR DESTE TRECHO: "${lastWords}")`;
+        }
+        try {
+          const response = await apiFetch('/api/dr-michel/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: currentMessage,
+              history: resumeCount === 0 ? [] : [{ role: 'user', content: fullPrompt }, { role: 'assistant', content: fullText }],
+              images: [],
+              modelProvider: eliteProviderOverride,
+              model: eliteModelOverride
+            })
+          });
+
+          if (!response.ok) {
+            if (resumeCount === 0) throw new Error('Falha na geração');
+            else throw new Error('Falha ao retomar');
           }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                isFinished = true;
+                break;
+              }
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6);
+                  if (dataStr === '[DONE]') {
+                    isFinished = true;
+                    continue;
+                  }
+                  try {
+                    const data = JSON.parse(dataStr);
+                    if (data.error) throw new Error(data.error);
+                    if (data.max_tokens) {
+                      isFinished = false;
+                      throw new Error("MAX_TOKENS_HIT");
+                    }
+                    if (data.text) {
+                      fullText += data.text;
+                    }
+                  } catch (e) {
+                     if ((e as Error).message === 'MAX_TOKENS_HIT') throw e;
+                  }
+                }
+              }
+            }
+          } else {
+            isFinished = true;
+          }
+        } catch (readError: any) {
+           if (resumeCount < MAX_RESUMES && (readError.message === 'MAX_TOKENS_HIT' || readError.name === 'TypeError' || readError.message.includes('fetch'))) {
+             resumeCount++;
+             await new Promise(r => setTimeout(r, 2000));
+           } else {
+             isFinished = true;
+             if (resumeCount === 0) throw readError;
+           }
         }
       }
 
@@ -473,18 +535,19 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     extensions: [
       StarterKit.configure({
         paragraph: false,
-        bulletList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
-        orderedList: {
-          keepMarks: true,
-          keepAttributes: false,
-        },
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
       }),
       CustomParagraph,
-      BulletList,
-      OrderedList,
+      BulletList.configure({
+        keepMarks: true,
+        keepAttributes: false,
+      }),
+      OrderedList.configure({
+        keepMarks: true,
+        keepAttributes: false,
+      }),
       ListItem,
       Underline,
       TextAlign.configure({
@@ -501,7 +564,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     ],
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-slate-800 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap print:w-full print:min-h-0 print:shadow-none print:border-none print:m-0 print:bg-transparent',
+        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[1122px] w-[794px] bg-white dark:bg-bordeaux-950/60 text-slate-900 dark:text-slate-100 shadow-2xl border border-slate-200 dark:border-gold-500/20 rounded-sm mb-20 [&_blockquote]:ml-[4cm] [&_blockquote]:text-sm [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 dark:[&_blockquote]:text-slate-700 font-serif [&_p]:indent-[2cm] [&_p.no-indent]:indent-0 whitespace-pre-wrap print:w-full print:min-h-0 print:shadow-none print:border-none print:m-0 print:bg-transparent',
         style: `line-height: 1.5; padding: ${topBottomMargin} ${leftRightMargin};`,
       },
     },
@@ -520,8 +583,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }, []);
 
   useEffect(() => {
-    if (editor) {
-      editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
+    if (!editor || editor.isDestroyed) return;
+    try {
+      if (editor.view && editor.view.dom) {
+        editor.view.dom.style.padding = `${topBottomMargin} ${leftRightMargin}`;
+      }
+    } catch (e) {
+      // Editor view may not be mounted yet
     }
   }, [topBottomMargin, leftRightMargin, editor]);
 
@@ -674,7 +742,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       removeFontProperty(pdfMakeContent);
 
       // Apply text-indent to paragraphs
-      const applyIndent = (nodes: any[], inBlockquote = false, inTable = false) => {
+      const applyIndent = (nodes: any[], inBlockquote = false, inTable = false, isSmallTable = false) => {
         if (!Array.isArray(nodes)) return;
         nodes.forEach(node => {
           if (!node || typeof node !== 'object') return;
@@ -693,9 +761,16 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.listStyle = undefined;
             node.list = undefined;
             if (inTable) {
-              node.alignment = 'left';
+              if (isSmallTable) {
+                // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
+                node.alignment = node.alignment || 'center';
+                node.noWrap = true; // Avoid splitting names to next line in signatures
+                node.fontSize = 10;
+              } else {
+                node.alignment = 'left';
+                node.fontSize = 9; // Reduce to 9pt in larger tables to ensure clean, organized fit
+              }
               node.leadingIndent = 0;
-              node.fontSize = 10; // Reduce font size inside tables to avoid overflow
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
             } else {
               const isCenterOrRight = node.alignment === 'center' || node.alignment === 'right';
@@ -714,9 +789,63 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
-            // Let the columns take necessary space but distribute them using * 
-            // We use '*' but limit the table width implicitly by the page layout
-            node.table.widths = Array(colCount).fill('*');
+            
+            if (colCount <= 3) {
+              // Signatures and small tables: stretch equally across margin to margin
+              node.table.widths = Array(colCount).fill('*');
+              node.alignment = 'center';
+            } else {
+              // Larger tables (colCount > 3): Dynamically allocate widths to prevent overflow.
+              const colTextLengths = Array(colCount).fill(0);
+              node.table.body.forEach((row: any[]) => {
+                if (row && Array.isArray(row)) {
+                  row.forEach((cell: any, colIdx: number) => {
+                    if (cell && colIdx < colCount) {
+                      let textLen = 0;
+                      const getLength = (c: any) => {
+                        if (!c) return;
+                        if (typeof c === 'string') {
+                          textLen += c.trim().length;
+                        } else if (typeof c.text === 'string') {
+                          textLen += c.text.trim().length;
+                        } else if (Array.isArray(c.text)) {
+                          c.text.forEach(getLength);
+                        } else if (Array.isArray(c.stack)) {
+                          c.stack.forEach(getLength);
+                        } else if (c.stack && typeof c.stack === 'object') {
+                          getLength(c.stack);
+                        } else if (c.text && typeof c.text === 'object') {
+                          getLength(c.text);
+                        }
+                      };
+                      getLength(cell);
+                      if (textLen > colTextLengths[colIdx]) {
+                        colTextLengths[colIdx] = textLen;
+                      }
+                    }
+                  });
+                }
+              });
+
+              // Find the index of the column with the maximum content length
+              const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
+              
+              const widths = Array(colCount).fill('auto');
+              widths[maxLenIdx] = '*';
+              
+              // Also check if any other column is significant and has long text, can also be '*' if needed, but keep a balance
+              let starsUsed = 1;
+              for (let i = 0; i < colCount; i++) {
+                if (i !== maxLenIdx && colTextLengths[i] > 18 && starsUsed < 2) {
+                  widths[i] = '*';
+                  starsUsed++;
+                }
+              }
+              node.table.widths = widths;
+            }
+            
+            // For signature tables (<= 3 columns), center the table by adding padding margins if possible
+            // or rely on auto alignment.
             node.layout = {
               hLineWidth: function () { return 1; },
               vLineWidth: function () { return 1; },
@@ -738,16 +867,24 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.margin = [0, 12, 0, 12];
           }
 
-          if (node.stack) applyIndent(node.stack, isBlockquote, isTable);
-          if (node.text && Array.isArray(node.text)) applyIndent(node.text, isBlockquote, isTable);
-          if (node.ul) applyIndent(node.ul, isBlockquote, isTable);
-          if (node.ol) applyIndent(node.ol, isBlockquote, isTable);
+          if (node.stack) applyIndent(node.stack, isBlockquote, isTable, isSmallTable);
+          if (node.text && Array.isArray(node.text)) applyIndent(node.text, isBlockquote, isTable, isSmallTable);
+          if (node.ul) applyIndent(node.ul, isBlockquote, isTable, isSmallTable);
+          if (node.ol) applyIndent(node.ol, isBlockquote, isTable, isSmallTable);
           if (node.table && node.table.body) {
+            const colCount = node.table.body[0]?.length || 0;
             node.table.body.forEach((row: any[]) => {
               row.forEach((cell: any) => {
                 if (cell && typeof cell === 'object') {
-                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true);
-                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true);
+                  if (colCount > 3) {
+                    // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
+                    delete cell.noWrap;
+                  } else {
+                    // For small tables like signatures, ensure noWrap so it fits exactly on a single line!
+                    cell.noWrap = true;
+                  }
+                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true, colCount <= 3);
+                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true, colCount <= 3);
                 }
               });
             });
@@ -829,7 +966,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-200 dark:bg-slate-950 overflow-hidden print:overflow-visible print:h-auto print:bg-white">
+    <div className="flex flex-col h-full bg-slate-200 dark:bg-bordeaux-950 overflow-hidden print:overflow-visible print:h-auto print:bg-white">
       <EliteRedactionModal
         isOpen={showEliteModal}
         onClose={() => setShowEliteModal(false)}
@@ -839,8 +976,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }}
       />
       {/* Header */}
-      <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 gap-4 flex-shrink-0 z-10 shadow-sm print:hidden">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition">
+      <header className="h-14 bg-white dark:bg-bordeaux-950/60 border-b border-slate-200 dark:border-gold-500/20 flex items-center px-4 gap-4 flex-shrink-0 z-10 shadow-sm print:hidden">
+        <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full transition">
           <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </button>
         <div className="flex-1">
@@ -857,9 +994,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
       <div className="flex flex-1 overflow-hidden print:overflow-visible">
         {/* Sidebar */}
-        <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-4 gap-6 flex-shrink-0 overflow-y-auto z-10 print:hidden">
+        <aside className="w-64 bg-white dark:bg-bordeaux-950/60 border-r border-slate-200 dark:border-gold-500/20 flex flex-col p-4 gap-6 flex-shrink-0 overflow-y-auto z-10 print:hidden">
           {/* Client Info */}
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+          <div className="bg-slate-50 dark:bg-bordeaux-900/40/50 p-3 rounded-xl border border-slate-100 dark:border-gold-500/15">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase">
                 <User className="w-3 h-3" /> Cliente
@@ -888,8 +1025,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 </button>
                 
                 {isClientDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 overflow-hidden">
-                    <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+                  <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="p-2 border-b border-slate-100 dark:border-gold-500/15">
                       <div className="relative">
                         <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -897,7 +1034,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                           placeholder="Buscar cliente..."
                           value={clientSearchQuery}
                           onChange={(e) => setClientSearchQuery(e.target.value)}
-                          className="w-full pl-8 pr-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full pl-8 pr-2 py-1.5 bg-slate-50 dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           autoFocus
                         />
                       </div>
@@ -912,7 +1049,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                               setIsClientDropdownOpen(false);
                               setClientSearchQuery('');
                             }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-bordeaux-900/60/50 text-slate-700 dark:text-slate-200 transition"
                           >
                             {c.name}
                           </button>
@@ -939,13 +1076,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             </button>
             <button 
               onClick={generatePDF}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
               <FileDown className="w-4 h-4 text-red-500" /> Baixar PDF
             </button>
             <button 
               onClick={() => setIsHeaderFooterModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
               <Layout className="w-4 h-4 text-blue-500" /> Cabeçalho e rodapé
             </button>
@@ -955,20 +1092,20 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                   editor.commands.setContent('');
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 hover:bg-slate-50 dark:hover:bg-bordeaux-900/60 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition"
             >
               <Trash2 className="w-4 h-4 text-orange-500" /> Limpar Editor
             </button>
           </div>
 
           {/* Category & Type */}
-          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-gold-500/20">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Categoria</label>
               <select 
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm p-2 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm p-2 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
               >
                 <option>Petição inicial</option>
                 <option>Contestação</option>
@@ -1017,14 +1154,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
-                className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-20 flex flex-col print:hidden"
+                className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-bordeaux-950/60 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl z-20 flex flex-col print:hidden"
               >
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+                <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between bg-slate-50 dark:bg-bordeaux-950/60/50">
                   <div className="flex items-center gap-2">
                     <Scale className="w-5 h-5 text-indigo-500" />
                     <h3 className="font-bold text-sm text-slate-800 dark:text-white">Assistente IA</h3>
                   </div>
-                  <button onClick={() => setIsAiPanelOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition">
+                  <button onClick={() => setIsAiPanelOpen(false)} className="p-1 hover:bg-slate-200 dark:hover:bg-bordeaux-900/50 rounded transition">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -1035,7 +1172,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Documentos do Processo</label>
                     <div 
                       onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-500 transition-colors group"
+                      className="border-2 border-dashed border-slate-200 dark:border-gold-500/20 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-500 transition-colors group"
                     >
                       <Upload className="w-6 h-6 mx-auto text-slate-400 group-hover:text-indigo-500 mb-2" />
                       <p className="text-xs text-slate-500">Clique para anexar arquivos do processo (PDF)</p>
@@ -1052,7 +1189,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     {uploadedDocs.length > 0 && (
                       <div className="space-y-2 mt-2">
                         {uploadedDocs.map(doc => (
-                          <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700">
+                          <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-bordeaux-900/40/50 rounded border border-slate-100 dark:border-gold-500/15">
                             <div className="flex items-center gap-2 overflow-hidden">
                               <FileTextIcon className="w-3 h-3 text-indigo-500 flex-shrink-0" />
                               <span className="text-[10px] font-medium truncate text-slate-700 dark:text-slate-300">{doc.name}</span>
@@ -1076,7 +1213,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       placeholder="Ex: Gere uma petição inicial de aposentadoria por idade rural, destacando o período de 1990 a 2010 conforme documentos anexos."
-                      className="w-full h-32 p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                      className="w-full h-32 p-3 text-sm bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                     />
                   </div>
 
@@ -1086,7 +1223,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                         <span>{aiProgressText}</span>
                         <span>{aiProgress}%</span>
                       </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-slate-100 dark:bg-bordeaux-900/40 rounded-full h-1.5 overflow-hidden">
                         <motion.div 
                           className="bg-indigo-500 h-full"
                           initial={{ width: 0 }}
@@ -1097,7 +1234,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                   )}
                 </div>
 
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                <div className="p-4 border-t border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-950/60/50">
                   <button
                     onClick={() => handleAiGenerate()}
                     disabled={isAiGenerating || (!aiPrompt.trim() && uploadedDocs.length === 0)}
@@ -1121,13 +1258,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           </AnimatePresence>
 
           {/* Toolbar */}
-          <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm print:hidden">
+          <div className="bg-white dark:bg-bordeaux-950/60 border-b border-slate-200 dark:border-gold-500/20 p-2 flex flex-wrap items-center gap-1 flex-shrink-0 z-10 shadow-sm print:hidden">
             <select
               value={selectedFont}
               onChange={(e) => setSelectedFont(e.target.value)}
               title="Selecionar fonte"
               style={{ fontFamily: FONT_OPTIONS.find(f => f.value === selectedFont)?.css }}
-              className="h-8 px-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              className="h-8 px-2 text-sm bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-md text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               {FONT_OPTIONS.map(f => (
                 <option key={f.value} value={f.value} style={{ fontFamily: f.css }}>
@@ -1136,7 +1273,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               ))}
             </select>
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive('bold')}
@@ -1162,7 +1299,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               icon={<X className="w-4 h-4" />}
             />
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
 
             <ToolbarButton 
               onClick={() => editor.chain().focus().setTextAlign('left').run()}
@@ -1185,7 +1322,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               icon={<AlignJustify className="w-4 h-4" />}
             />
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
 
             <ToolbarButton 
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -1194,7 +1331,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               title="Citação (Recuo 4cm)"
             />
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
 
             <ToolbarButton 
               onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
@@ -1203,7 +1340,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               title="Assistente de Petição IA"
             />
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
 
             <ToolbarButton 
               onClick={() => editor.chain().focus().undo().run()}
@@ -1214,7 +1351,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               icon={<Redo className="w-4 h-4" />}
             />
 
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
 
             <ToolbarButton 
               onClick={() => {
@@ -1229,7 +1366,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               title="Configurar Tabela"
             />
             {editor.isActive('table') && (
-              <div className="flex items-center gap-1 px-1 border-l border-slate-200 dark:border-slate-800 ml-1">
+              <div className="flex items-center gap-1 px-1 border-l border-slate-200 dark:border-gold-500/20 ml-1">
                 <ToolbarButton 
                   onClick={() => editor.chain().focus().addRowAfter().run()}
                   icon={<div className="flex flex-col items-center"><TableIcon className="w-3 h-3" /><Plus className="w-2 h-2 text-emerald-500" /></div>}
@@ -1260,7 +1397,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           </div>
 
           {/* Editor Content */}
-          <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-slate-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
+          <div className="flex-1 overflow-y-auto p-12 bg-slate-200 dark:bg-bordeaux-950 flex justify-center print:p-0 print:bg-white print:overflow-visible print:block">
             <style>{`.ProseMirror * { font-family: ${FONT_OPTIONS.find(f => f.value === selectedFont)?.css || 'inherit'} !important; }`}</style>
             <div 
               className="relative print:shadow-none print:w-full print:max-w-none print:block"
@@ -1280,13 +1417,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
+              className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col"
             >
-              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                   <TableIcon className="w-5 h-5 text-indigo-500" /> Configurar Tabela
                 </h3>
-                <button onClick={() => setIsTableModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
+                <button onClick={() => setIsTableModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
@@ -1297,7 +1434,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     type="number" 
                     value={tableRows}
                     onChange={(e) => setTableRows(parseInt(e.target.value) || 1)}
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -1306,14 +1443,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                     type="number" 
                     value={tableCols}
                     onChange={(e) => setTableCols(parseInt(e.target.value) || 1)}
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
-              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+              <div className="p-4 border-t border-slate-100 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/40/50 flex justify-end gap-3">
                 <button 
                   onClick={() => setIsTableModalOpen(false)}
-                  className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-lg transition"
                 >
                   Cancelar
                 </button>
@@ -1340,13 +1477,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+              className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
             >
-              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                   <PencilSquareIcon className="w-5 h-5" /> Personalizar logotipo, cabeçalho e rodapé
                 </h3>
-                <button onClick={() => setIsHeaderFooterModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
+                <button onClick={() => setIsHeaderFooterModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
@@ -1361,7 +1498,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                         <input 
                           value={topBottomMargin}
                           onChange={(e) => setTopBottomMargin(e.target.value)}
-                          className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
                       <div className="flex-1">
@@ -1369,16 +1506,16 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                         <input 
                           value={leftRightMargin}
                           onChange={(e) => setLeftRightMargin(e.target.value)}
-                          className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Sua logo (opcional)</label>
-                      <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-indigo-500 transition cursor-pointer group">
+                      <div className="border-2 border-dashed border-slate-200 dark:border-gold-500/15 rounded-xl p-8 text-center hover:border-indigo-500 transition cursor-pointer group">
                         <Upload className="w-8 h-8 text-slate-400 group-hover:text-indigo-500 mx-auto mb-2" />
                         <p className="text-sm font-bold text-slate-600 dark:text-slate-400">Arraste o seu logo aqui ou clique em</p>
-                        <button className="mt-2 px-4 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-xs font-bold flex items-center gap-2 mx-auto">
+                        <button className="mt-2 px-4 py-1.5 bg-slate-100 dark:bg-bordeaux-900/40 hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 rounded-lg text-xs font-bold flex items-center gap-2 mx-auto">
                           <Upload className="w-3 h-3" /> Selecionar arquivo
                         </button>
                         <p className="mt-4 text-[10px] text-slate-400">Não tem logotipo? Não tem problema! Nossos designs funcionam mesmo sem um logotipo.</p>
@@ -1429,7 +1566,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                             placeholder="Whatsapp / Fone"
                             value={config.whatsapp}
                             onChange={(e) => setConfig({...config, whatsapp: e.target.value})}
-                            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                           />
                         </div>
                         <div className="relative">
@@ -1438,7 +1575,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                             placeholder="E-mail"
                             value={config.email}
                             onChange={(e) => setConfig({...config, email: e.target.value})}
-                            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                           />
                         </div>
                       </div>
@@ -1448,7 +1585,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                           placeholder="Instagram"
                           value={config.instagram}
                           onChange={(e) => setConfig({...config, instagram: e.target.value})}
-                          className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full pl-10 pr-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
                     </div>
@@ -1483,7 +1620,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+              <div className="p-4 border-t border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/40/50 flex justify-end gap-3">
                 <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm mr-auto">
                   <Check className="w-4 h-4" /> Tudo salvo!
                 </div>
@@ -1507,7 +1644,7 @@ const ToolbarButton = ({ onClick, active = false, icon, onContextMenu, title }: 
     onClick={onClick}
     onContextMenu={onContextMenu}
     title={title}
-    className={`p-2 rounded transition ${active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+    className={`p-2 rounded transition ${active ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50'}`}
   >
     {icon}
   </button>
@@ -1519,9 +1656,9 @@ const InputField = ({ label, value, onChange }: { label: string, value: string, 
       placeholder="Opcional"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 peer placeholder-transparent"
+      className="w-full px-4 py-2 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 peer placeholder-transparent"
     />
-    <label className="absolute left-2 -top-2 px-1 bg-white dark:bg-slate-900 text-[10px] font-bold text-slate-500 uppercase transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:top-2 peer-placeholder-shown:left-4 peer-focus:-top-2 peer-focus:left-2 peer-focus:text-[10px]">
+    <label className="absolute left-2 -top-2 px-1 bg-white dark:bg-bordeaux-950/60 text-[10px] font-bold text-slate-500 uppercase transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:top-2 peer-placeholder-shown:left-4 peer-focus:-top-2 peer-focus:left-2 peer-focus:text-[10px]">
       {label}
     </label>
   </div>
@@ -1530,7 +1667,7 @@ const InputField = ({ label, value, onChange }: { label: string, value: string, 
 const TemplateCard = ({ id, title, selected, onClick }: { id: string, title: string, selected: boolean, onClick: () => void }) => (
   <div 
     onClick={onClick}
-    className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all ${selected ? 'border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}
+    className={`relative border-2 rounded-xl p-4 cursor-pointer transition-all ${selected ? 'border-red-500 bg-red-50/50 dark:bg-red-900/10' : 'border-slate-200 dark:border-gold-500/20 hover:border-slate-300 dark:hover:border-slate-700'}`}
   >
     {selected && (
       <div className="absolute -top-3 left-4 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -1538,12 +1675,12 @@ const TemplateCard = ({ id, title, selected, onClick }: { id: string, title: str
       </div>
     )}
     <p className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center mb-4">{title}</p>
-    <div className="aspect-[4/3] bg-white dark:bg-slate-800 rounded border border-slate-100 dark:border-slate-700 p-2 overflow-hidden">
+    <div className="aspect-[4/3] bg-white dark:bg-bordeaux-900/40 rounded border border-slate-100 dark:border-gold-500/15 p-2 overflow-hidden">
       <div className="h-1 w-full bg-red-500 mb-2" />
       <div className="space-y-1">
-        <div className="h-1 w-3/4 bg-slate-200 dark:bg-slate-700" />
-        <div className="h-1 w-full bg-slate-200 dark:bg-slate-700" />
-        <div className="h-1 w-1/2 bg-slate-200 dark:bg-slate-700" />
+        <div className="h-1 w-3/4 bg-slate-200 dark:bg-bordeaux-900/60" />
+        <div className="h-1 w-full bg-slate-200 dark:bg-bordeaux-900/60" />
+        <div className="h-1 w-1/2 bg-slate-200 dark:bg-bordeaux-900/60" />
       </div>
     </div>
   </div>

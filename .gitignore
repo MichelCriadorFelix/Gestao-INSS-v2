@@ -1,4 +1,5 @@
-# Logs
+temp-repo
+temp-repo/
 logs
 *.log
 npm-debug.log*
@@ -12,6 +13,11 @@ dist
 dist-ssr
 *.local
 
+# Variáveis de ambiente - NUNCA commitar
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +28,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backups e arquivos temporários de restauração
+*.backup_restaurado
+*.backup
+*.bak
+*.backup_restored
