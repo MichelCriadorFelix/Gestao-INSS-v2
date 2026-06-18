@@ -785,7 +785,7 @@ async function detectUserIntent(message: string): Promise<string> {
   const msgLower = safeMessage.toLowerCase();
 
   // PRIORIDADE MÁXIMA: comando explícito de de tomada de ciência (GED) -> evita enviar texto bruto gigantesco de OCRs ao modelo detector
-  if (msgLower.includes("[fase de tomada de ciência]") || msgLower.includes("[fase de tomada de ciencia]")) {
+  if (msgLower.includes("fase de tomada de ciên") || msgLower.includes("fase de tomada de cien")) {
     console.log("[Detector de Intenção] Fast-path [FASE DE TOMADA DE CIÊNCIA] -> [ARQUIVO]");
     return "[ARQUIVO]";
   }
@@ -4508,7 +4508,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     );
 
     // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
-    if (isStorageRequest && !isGenerationRequest && !isReportRequest) {
+    if (isStorageRequest) {
       modelProvider = 'gemini';
       model = 'gemini-3-flash-preview';
       console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
@@ -5115,7 +5115,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     );
 
     // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
-    if (isStorageRequest && !isGenerationRequest && !isReportRequestLuana) {
+    if (isStorageRequest) {
       modelProvider = 'gemini';
       model = 'gemini-3-flash-preview';
       console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
@@ -5801,7 +5801,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     );
 
     // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
-    if (isStorageRequest && !isGenerationRequest && !isReportRequest) {
+    if (isStorageRequest) {
       modelProvider = 'gemini';
       model = 'gemini-3-flash-preview';
       console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
