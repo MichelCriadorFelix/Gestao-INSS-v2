@@ -4127,7 +4127,7 @@ app.post("/api/rag/plan", async (req, res) => {
 
     const parsedChunks = [...nucleoChunks, ...integralChunks];
     let ragContext = '';
-    const RAG_CHAR_LIMIT = 300000;
+    const RAG_CHAR_LIMIT = 150000;
 
     for (const c of parsedChunks) {
       const piece = `FONTE: ${c.title} [Recuperação Exata]\n${c.content}`;
