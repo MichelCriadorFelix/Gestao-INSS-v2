@@ -4706,24 +4706,16 @@ REGRAS DE OURO:
 
     // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTOR PREVIDENCIÁRIO]
-    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos trabalhistas.
-    ` : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
-    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
-    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
-    O número de documentos na seção 12 deve refletir a totalidade do compilado.
-    Dr. Michel, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito PREVIDENCIÁRIO. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito do Trabalho como "Reintegração", "Obras", "Horas Extras", "Verbas Rescisórias" ou "FGTS". Isso é inaceitável e causará erro de sistema.
-    - **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Se não tiver salários reais, calcule com o salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (DER → ajuizamento) + 12 vincendas. Escreva o valor calculado, não um placeholder. Registre que é estimado com base no salário mínimo.
-    **SISTEMÁTICA DE CÁLCULO DE RMI (APOSENTADORIA POR IDADE):** Média de 100% dos salários desde 07/1994. Alíquota de 60% + 2% por ano que exceder 15 (mulher) ou 20 (homem). Sem os dados exatos, use placeholders explicativos.
-    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou os tópicos "Pedidos e Requerimentos", "Valor da Causa" e "Rol de Documentos". É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição. Remova qualquer tag "(RAG)" antes de enviar.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista (ex: I. DA GRATUIDADE DE JUSTIÇA, II. DA OPÇÃO PELO JUÍZO 100% DIGITAL, etc), o software será rejeitado. O uso de Tabelas de Resumo e Quadros Contributivos é OBRIGATÓRIO se estiver na estrutura.
-    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL" ou qualquer variação. Infração grave.
-    Sua redação deve ser densa, citando provas específicas.
-    `;
+[LEMBRETE — MODO CONSULTOR PREVIDENCIÁRIO]
+Dúvida jurídica: seja direto, técnico e fundamentado. PROIBIDO inventar artigos ou incluir conceitos trabalhistas.
+` : `
+[CHECKLIST PRÉ-REDAÇÃO — FALHAS CRÍTICAS DOCUMENTADAS]
+• DOCUMENTOS: liste TODOS na seção 1 (STATUS) e seção 12 (ROL) — não apenas os primeiros.
+• ÁREA: Direito PREVIDENCIÁRIO apenas — PROIBIDO FGTS, Horas Extras, Verbas Rescisórias ou conceitos trabalhistas.
+• TAGS: PROIBIDO incluir "RAG", "Base de Conhecimento" ou qualquer referência tecnológica na petição.
+• ENDEREÇAMENTO (FIX#6): "AO JUÍZO DA __ VARA FEDERAL..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE...". NUNCA "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ FEDERAL".
+• ESTRUTURA: siga a ESTRUTURA OBRIGATÓRIA na ordem exata (I. Gratuidade → II. Juízo Digital → III. Resumo...).
+`;
     // FIX#8: sanitizar histórico antes de enviar à API (mesclar mensagens consecutivas do mesmo role)
     const sanitizedHistory = sanitizeHistory(history);
     const historyParts = sanitizedHistory.map((h: any) => ({
@@ -4764,13 +4756,7 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       if (ragTruncated.length < ragContext.length) {
         console.log(`[RAG] ragContext truncado para Dr. Michel: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
       }
-      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
-ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
-Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
-NUNCA afirme algo que contradiga o texto abaixo.
-ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO, você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
-Leis/jurisprudências recuperadas:
-${ragTruncated}`;
+      finalMessage += `\n\n[BASE DE CONHECIMENTO — use EXCLUSIVAMENTE; prevalece sobre seu treinamento; ignore dispositivos marcados como REVOGADOS]\n${ragTruncated}`;
     }
 
     // FIX#1: sempre busca draft quando há sessionId (não depende mais de isCorrectionRequest)
@@ -5353,26 +5339,16 @@ REGRAS DE OURO:
 
     // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTORA TRABALHISTA]
-    Você está respondendo uma dúvida jurídica trabalhista. Seja direta, técnica e fundamentada.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO fornecer informações externas.
-    Baseie-se ESTRITAMENTE na Base de Conhecimento (RAG) fornecida na mensagem.
-    Informe sempre o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
-    ` : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA E ABSOLUTA SOBRE CÁLCULOS]
-    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
-    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
-    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
-    O número de documentos na seção 12 deve refletir a totalidade do compilado.
-    Dra. Luana, você DEVE basear 100% da sua peça/relatório nos valores financeiros e pedidos contidos no "Cálculo Estimado da Causa" ou na "Planilha de Cálculos" previamente analisados.
-    **PROIBIÇÃO DE REPETIÇÃO E TERMOS DE IA:** Jamais repita os mesmos pedidos ou tópicos no final da peça. É TERMINANTEMENTE PROIBIDO incluir as strings "RAG", "Base de Conhecimento", "Local OCR" ou referências ao sistema de IA no corpo da petição.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS" (Tópicos I, II, III...). Se você pular um tópico obrigatório ou mudar a ordem prevista para cada tipo de ação trabalhista, o software será rejeitado. O tópico "Resumo da Demanda" deve ser um texto narrativo e não uma tabela.
-    O VALOR DA CAUSA e o valor de CADA PEDIDO INDIVIDUAL PRECISAM SER FIELMENTE TRANSCRITOS do cálculo. NUNCA ESTIME OU INVENTE VALORES.
-    É TERMINANTEMENTE PROIBIDO usar placeholders genéricos como "[VALOR]" se a informação estiver disposta no histórico.
-    É ESTRITAMENTE PROIBIDO incluir pedidos indemnizatórios (como Dano Moral) se eles NÃO estiverem devidamente quantificados/cobrados na planilha de cálculos.
-    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA DO TRABALHO DE..." ou "MM. JUÍZO DA __ VARA DO TRABALHO DE...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DO TRABALHO" ou qualquer variação.
-    Seja combativa, aplique a CLT (Lei 13.467/2017) e não se esqueça de honrar fielmente o cálculo estimado.
-    `;
+[LEMBRETE — MODO CONSULTORA TRABALHISTA]
+Dúvida jurídica: seja direta, técnica e fundamentada. PROIBIDO inventar artigos. Informe o rito processual aplicável (Sumário, Sumaríssimo ou Ordinário) quando relevante.
+` : `
+[CHECKLIST PRÉ-REDAÇÃO — FALHAS CRÍTICAS DOCUMENTADAS]
+• DOCUMENTOS: liste TODOS na seção 1 (STATUS) e seção 12 (ROL) — não apenas os primeiros.
+• CÁLCULOS: baseie 100% da peça nos valores do "Cálculo Estimado da Causa" ou "Planilha de Cálculos". Valor da causa e cada pedido devem ser transcritos fielmente — NUNCA use placeholder se o valor constar no histórico. Dano Moral só entra se quantificado na planilha.
+• TAGS: PROIBIDO incluir "RAG", "Base de Conhecimento" ou referências ao sistema de IA na petição.
+• ENDEREÇAMENTO (FIX#6): "AO JUÍZO DA __ VARA DO TRABALHO DE..." ou "MM. JUÍZO DA __ VARA DO TRABALHO DE...". NUNCA "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DO TRABALHO".
+• ESTRUTURA: siga as estruturas obrigatórias para cada tipo de ação trabalhista. "Resumo da Demanda" = texto narrativo, não tabela.
+`;
 
     // FIX#8: sanitizar histórico
     const sanitizedHistory = sanitizeHistory(history);
@@ -5415,13 +5391,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       if (ragTruncated.length < ragContext.length) {
         console.log(`[RAG] ragContext truncado para Dra. Luana: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
       }
-      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
-ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
-Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
-NUNCA afirme algo que contradiga o texto abaixo.
-ATENÇÃO: Se o texto recuperado indicar que um artigo ou parágrafo foi REVOGADO (ex: "Revogado pela Lei...", "Revogado pela Emenda..."), você DEVE IGNORAR o conteúdo revogado e NÃO utilizá-lo na sua resposta.
-Leis/jurisprudências recuperadas:
-${ragTruncated}`;
+      finalMessage += `\n\n[BASE DE CONHECIMENTO — use EXCLUSIVAMENTE; prevalece sobre seu treinamento; ignore dispositivos marcados como REVOGADOS]\n${ragTruncated}`;
     }
 
     // FIX#1: sempre busca draft quando há sessionId
@@ -5995,23 +5965,16 @@ REGRAS DE OURO:
     if (history.length > 40) history = history.slice(-40);
 
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
-    [LEMBRETE TÉCNICO — MODO CONSULTOR CDC/CIVIL]
-    Você está respondendo uma dúvida jurídica. Seja direto, técnico e fundamentado.
-    PROIBIDO inventar artigos, súmulas ou valores. PROIBIDO incluir conceitos previdenciários ou trabalhistas.
-    ` : `
-    [DIRETRIZ DE ELITE - PRIORIDADE MÁXIMA]
-    **LEITURA COMPLETA OBRIGATÓRIA:** Antes de redigir o relatório, confirme mentalmente que
-    leu TODOS os documentos do compilado integral. Na seção 1 (STATUS DA LEITURA) e na seção 12
-    (DOCUMENTOS ANALISADOS), liste TODOS os documentos encontrados — não apenas os primeiros.
-    O número de documentos na seção 12 deve refletir a totalidade do compilado.
-    Dr. Felix e Castro, você é um advogado combativo. Você DEVE extrair dados REAIS.
-    **PROTEÇÃO DE TEMA (ANTI-ALUCINAÇÃO):** Você está atuando em Direito do CONSUMIDOR e/ou Direito CIVIL. É TERMINANTEMENTE PROIBIDO incluir conceitos de Direito Previdenciário (BPC, aposentadoria, auxílio-doença, RMI, EC 103/2019) ou Direito do Trabalho (Horas Extras, FGTS, Verbas Rescisórias, Reintegração). Isso é inaceitável.
-    **PROIBIÇÃO DE INVENÇÃO (VALOR DA CAUSA):** NUNCA invente valores sem base. Calcule com os dados disponíveis. Se faltar dado, estime com transparência e registre como estimativa.
-    **PROIBIÇÃO DE REPETIÇÃO E TAGS:** Jamais repita os mesmos pedidos ou tópicos. É PROIBIDO incluir as strings "(RAG)" ou "[RAG]" no texto da petição.
-    **REGRA DE OURO (ESTRUTURA):** Você DEVE seguir RIGOROSAMENTE as "ESTRUTURAS OBRIGATÓRIAS". Se você pular um tópico obrigatório ou mudar a ordem prevista, o software será rejeitado.
-    **FIX#6 — ENDEREÇAMENTO OBRIGATÓRIO:** O cabeçalho DEVE ser "AO JUÍZO DA __ VARA..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL CÍVEL...". É ABSOLUTAMENTE PROIBIDO usar "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DE DIREITO" ou qualquer variação.
-    Sua redação deve ser densa, citando provas específicas.
-    `;
+[LEMBRETE — MODO CONSULTOR CDC/CIVIL]
+Dúvida jurídica: seja direto, técnico e fundamentado. PROIBIDO inventar artigos ou incluir conceitos previdenciários/trabalhistas.
+` : `
+[CHECKLIST PRÉ-REDAÇÃO — FALHAS CRÍTICAS DOCUMENTADAS]
+• DOCUMENTOS: liste TODOS na seção 1 (STATUS) e seção 12 (ROL) — não apenas os primeiros.
+• ÁREA: Direito do CONSUMIDOR e/ou CIVIL apenas — PROIBIDO BPC, aposentadoria, RMI, FGTS, Horas Extras ou qualquer conceito previdenciário/trabalhista.
+• TAGS: PROIBIDO incluir "(RAG)" ou "[RAG]" no texto da petição.
+• ENDEREÇAMENTO (FIX#6): "AO JUÍZO DA __ VARA..." ou "AO JUÍZO DO __ JUIZADO ESPECIAL CÍVEL...". NUNCA "EXCELENTÍSSIMO SENHOR DOUTOR JUIZ DE DIREITO".
+• ESTRUTURA: siga RIGOROSAMENTE as estruturas obrigatórias — PROIBIDO pular tópico ou alterar a ordem.
+`;
 
     // FIX#8: sanitizar histórico
     const sanitizedHistory = sanitizeHistory(history);
@@ -6029,7 +5992,7 @@ REGRAS DE OURO:
       if (ragTruncated.length < ragContext.length) {
         console.log(`[RAG] ragContext truncado para Dr. Felix: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
       }
-      finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]\nLeis/jurisprudências recuperadas:\n${ragTruncated}`;
+      finalMessage += `\n\n[BASE DE CONHECIMENTO — use EXCLUSIVAMENTE; prevalece sobre seu treinamento; ignore dispositivos marcados como REVOGADOS]\n${ragTruncated}`;
     }
     if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
 
