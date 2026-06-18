@@ -4497,7 +4497,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
 
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
@@ -4832,7 +4832,7 @@ ${message}`;
     } else if (isReportRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Optimization: avoid overthinking for reports
-    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
       maxOutputTokens = 8192;
       thinkingConfig = undefined; // Velocidade para armazenamento/ciência
     }
@@ -5101,7 +5101,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
 
     const isStorageRequest = isStorageIntent || 
                              message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -5379,7 +5379,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
     }
 
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
-    if (message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    if (message.includes("FASE DE TOMADA DE CIÊNCIA")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
     if (ragContext) {
@@ -5505,7 +5505,7 @@ ${message}`;
     } else if (isReportRequestLuana) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Optimization: fast execution
-    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
       maxOutputTokens = 8192;
       thinkingConfig = undefined;
     }
@@ -5790,7 +5790,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
@@ -6083,7 +6083,7 @@ ${message}`;
     } else if (isReportRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Optimization: avoid overthinking for reports
-    } else if ((message || "").includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
       maxOutputTokens = 8192;
       thinkingConfig = undefined;
     }
@@ -6486,7 +6486,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const intent = await detectUserIntent(message);
     const isGenerationIntent = intent === "[GERAÇÃO]";
     const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("[FASE DE TOMADA DE CIÊNCIA]");
+    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
 
@@ -6512,7 +6512,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     // minimal é o nível mais baixo disponível no 3.5 — velocidade máxima para respostas curtas
     let thinkingConfig: any = undefined;
 
-    if (isStorageRequest || message.includes("[FASE DE TOMADA DE CIÊNCIA]")) {
+    if (isStorageRequest || message.includes("FASE DE TOMADA DE CIÊNCIA")) {
       maxOutputTokens = 2048;
       thinkingConfig = undefined;
     }
