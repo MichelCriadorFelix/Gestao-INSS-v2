@@ -641,6 +641,7 @@ Não omita nenhum detalhe técnico.`
 
       // 2. RETORNO AO FLUXO TRADICIONAL NATIVO DO GOOGLE CASO NÃO TENHA IMAGENS OU CHAVE OPENROUTER
       let currentFileUri = doc.fileUri;
+      let usedKeyIndex = doc.keyIndex !== undefined ? parseInt(String(doc.keyIndex)) : undefined;
       let tmpPath = "";
 
       if (!currentFileUri && doc.url) {
@@ -658,6 +659,7 @@ Não omita nenhum detalhe técnico.`
               doc.name || 'document'
             );
             currentFileUri = uploadResult.uri;
+            usedKeyIndex = uploadResult.keyIndex;
           } else {
             console.warn(`Falha ao baixar doc ${doc.name} da URL.`);
           }
@@ -688,11 +690,11 @@ REGRAS:
 
       try {
         const response = await callGemini({
-      bypassOpenRouter: true,
+          bypassOpenRouter: true,
           model: "gemini-3.5-flash",
           contents: { role: "user", parts },
           config: { temperature: 0.1, maxOutputTokens: 16383 }
-        });
+        }, MAX_RETRIES, 0, 0, usedKeyIndex);
 
         const extracted = response.text || "[Falha na extração de texto ou conteúdo vazio]";
         unifiedText += `${docHeader}\n${extracted}\n\n`;
@@ -4883,7 +4885,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
 4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro della seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
 5. DENSIDADE EXTREMA: A petição deve ter entre 5000 e 7000 palavras. Crie argumentos extremamente aprofundados, transcreva leis na íntegra, explore a fundamentação jurídica de cada fato e laudo sem limites. Não faça resumos, seja o mais completo e denso possível.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
+6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculated com nota de que é estimado. NUNCA use placeholder.
 7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
             const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
@@ -4921,7 +4923,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               : currentContents;
             const pinnedKey = activeDocCache
               ? (parseInt(String(cacheKeyIndex)))
-              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+              : (keyIndex !== undefined 
+                  ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
+                  : undefined);
             const streamConfig: any = activeDocCache
               ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
@@ -5600,7 +5604,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               : currentContents;
             const pinnedKey = activeDocCache
               ? (parseInt(String(cacheKeyIndex)))
-              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+              : (keyIndex !== undefined 
+                  ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
+                  : undefined);
             const luanaSafety = [
                   { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                   { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -5955,9 +5961,6 @@ REGRAS DE OURO:
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
     }
 
-    // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
-    // Limite de segurança: 40 mensagens (regra inegociável Felix & Castro)
-    // Previne edge cases extremos sem sacrificar contexto normal
     if (history.length > 40) history = history.slice(-40);
 
     const REINFORCEMENT_PROMPT = isStorageRequest ? "" : intent === "[DÚVIDA]" ? `
@@ -6182,7 +6185,9 @@ REGRAS ABSOLUTAS:
               : currentContents;
             const pinnedKey = activeDocCache
               ? (parseInt(String(cacheKeyIndex)))
-              : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+              : (keyIndex !== undefined 
+                  ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
+                  : undefined);
             const streamConfig: any = activeDocCache
               ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
@@ -6736,7 +6741,9 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
   const pinnedKey = activeDocCache
     ? (parseInt(String(cacheKeyIndex)))
-    : (keyIndex !== undefined ? parseInt(keyIndex) + attempt - 1 : undefined);
+    : (keyIndex !== undefined 
+        ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
+        : undefined);
 
   let maxTokensHit = false;
   let attemptText = "";
