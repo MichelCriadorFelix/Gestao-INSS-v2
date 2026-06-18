@@ -259,6 +259,7 @@ app.post("/api/ocr", async (req, res) => {
     });
 
     const response = await callGemini({
+      bypassOpenRouter: true,
       model: "gemini-3.5-flash",
       contents: { role: "user", parts },
       config: {
@@ -508,6 +509,7 @@ REGRAS ABSOLUTAS DE EXTRAÇÃO:
 ${specialInstructions}`;
 
     const response = await callGemini({
+      bypassOpenRouter: true,
       model: "gemini-3.5-flash",
       contents: {
         role: "user",
@@ -553,7 +555,7 @@ app.post("/api/ocr-unified", async (req, res) => {
       const docHeader = `--- INÍCIO DO DOCUMENTO ${i + 1}: ${doc.name} ---`;
 
       // 1. PROCESSAMENTO DE ELITE VIA OPENROUTER COM IMAGENS EXTRAÍDAS
-      if (apiKey && doc.images && Array.isArray(doc.images) && doc.images.length > 0) {
+      if (false && apiKey && doc.images && Array.isArray(doc.images) && doc.images.length > 0) {
         console.log(`[OCR SERVERLESS OPENROUTER] Extraindo OCR de ${doc.images.length} páginas de imagem via OpenRouter para ${doc.name}...`);
         let extractedText = "";
 
@@ -686,6 +688,7 @@ REGRAS:
 
       try {
         const response = await callGemini({
+      bypassOpenRouter: true,
           model: "gemini-3.5-flash",
           contents: { role: "user", parts },
           config: { temperature: 0.1, maxOutputTokens: 16383 }
@@ -4191,6 +4194,7 @@ app.post("/api/analyze-cnis", async (req, res) => {
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
+      bypassOpenRouter: true,
       model: "gemini-3.5-flash", // Garante o uso do Flash para CNIS como solicitado
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
@@ -4260,6 +4264,7 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
     const response = await callGemini({
+      bypassOpenRouter: true,
       model: 'gemini-3.5-flash',
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
@@ -4334,6 +4339,7 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
     Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
+      bypassOpenRouter: true,
       model: 'gemini-3.5-flash',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
