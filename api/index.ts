@@ -4042,43 +4042,75 @@ app.post("/api/rag/plan", async (req, res) => {
       const batch = curatedPlan.slice(i, i + batchSize);
       
       const promises = batch.map(async (planItem: any) => {
-        // Busca TODOS os chunks do título (a lei/súmula). O filtro por artigo é feito
-        // em JavaScript abaixo — NÃO via .or() do PostgREST.
-        // MOTIVO: o .or() com `content.ilike."%Art. 42.%"` é frágil — o PostgREST usa
-        // vírgula como separador de condições, e valores contendo '.' , ',' e aspas
-        // quebravam o parsing, fazendo a busca por artigo falhar silenciosamente e
-        // retornar chunks errados (ex.: trazia Art. 28 em vez de 42/59). Resultado: o
-        // núcleo (Arts. 42/59) era reportado como "ausente na base" mesmo existindo.
+        // BUSCA CIRÚRGICA: para artigos específicos, vai direto no banco com padrões ILIKE
+        // em lotes de 18 (mesmo padrão do searchByTitles no cliente). Evita baixar a lei
+        // inteira (ex: 800 chunks da CLT) para usar apenas 2-3 artigos.
+        if (!planItem.integral && Array.isArray(planItem.artigos) && planItem.artigos.length > 0) {
+          const filters: string[] = [];
+          planItem.artigos.forEach((numRaw: string) => {
+            const n = String(numRaw).trim();
+            filters.push(`content.ilike."%Art. ${n}.%"`);
+            filters.push(`content.ilike."%Art. ${n} %"`);
+            filters.push(`content.ilike."%Art. ${n},%"`);
+            filters.push(`content.ilike."%Art. ${n}-%"`);
+            filters.push(`content.ilike."%Art. ${n}º%"`);
+            filters.push(`content.ilike."%Art. ${n}°%"`);
+            filters.push(`content.ilike."%Art. ${n}o %"`);
+            filters.push(`content.ilike."%§ ${n}%"`);
+            filters.push(`content.ilike."%§ ${n}º%"`);
+          });
+
+          const uniqueFilters = [...new Set(filters)];
+          const seenIds = new Set<number>();
+          const hitRows: any[] = [];
+          const FILTER_BATCH = 18;
+
+          for (let f = 0; f < uniqueFilters.length; f += FILTER_BATCH) {
+            const slice = uniqueFilters.slice(f, f + FILTER_BATCH).join(',');
+            const { data, error } = await activeSupabase
+              .from('legal_documents')
+              .select('id, content, metadata')
+              .eq('metadata->>title', planItem.titulo)
+              .or(slice)
+              .order('id', { ascending: true })
+              .limit(20);
+            if (error) {
+              console.error(`[RAG PLAN] Erro busca cirúrgica "${planItem.titulo}":`, error);
+            } else {
+              for (const d of (data || [])) {
+                if (!seenIds.has(d.id)) { seenIds.add(d.id); hitRows.push(d); }
+              }
+            }
+          }
+
+          // Segunda camada de validação JS: garante que "Art. 9" não case em "Art. 90"
+          const artRegexes = planItem.artigos.map((numRaw: string) => {
+            const n = String(numRaw).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${n}(?:[^0-9]|$)`, 'i');
+          });
+          const validated = hitRows.filter((d: any) =>
+            artRegexes.some((re: RegExp) => re.test(d.content || ''))
+          );
+
+          console.log(`[RAG PLAN] "${planItem.titulo}" artigos [${planItem.artigos.join(',')}]: ${hitRows.length} hits DB → ${validated.length} validados`);
+          return validated.map((d: any) => ({ title: planItem.titulo, content: d.content }));
+        }
+
+        // Para itens integrais (súmulas, OJs, leis curtas): busca os primeiros chunks em ordem.
+        // MAX_CHUNKS_POR_TITULO_INTEGRAL=12 limita o ragContext final.
         const { data, error } = await activeSupabase
           .from('legal_documents')
           .select('id, content, metadata')
           .eq('metadata->>title', planItem.titulo)
-          .limit(200);
+          .order('id', { ascending: true })
+          .limit(50);
+
         if (error) {
-           console.error("Error fetching doc in PLAN:", error);
-           return [];
-        }
-        let rows = data || [];
-
-        // Se o item pede artigos específicos (núcleo da tese), filtra em JS de forma
-        // determinística. Casa "Art. 42", "Art. 42.", "Art. 42,", "Art. 42-", "Art. 42 "
-        // e parágrafos "§ 42", tolerando o número colado a ponto/vírgula/espaço/fim.
-        if (!planItem.integral && Array.isArray(planItem.artigos) && planItem.artigos.length > 0) {
-          const artRegexes = planItem.artigos.map((numRaw: string) => {
-            const num = String(numRaw).trim();
-            const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // (?:[^\d]|$) garante que "42" não case dentro de "428" ou "420"
-            return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${esc}(?:[^0-9]|$)`, 'i');
-          });
-          rows = rows.filter((d: any) =>
-            artRegexes.some((re: RegExp) => re.test(d.content || ''))
-          );
+          console.error("Error fetching doc in PLAN:", error);
+          return [];
         }
 
-        return rows.map((d: any) => ({
-          title: planItem.titulo,
-          content: d.content
-        }));
+        return (data || []).map((d: any) => ({ title: planItem.titulo, content: d.content }));
       });
       
       const results = await Promise.all(promises);
