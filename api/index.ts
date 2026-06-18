@@ -2410,15 +2410,15 @@ const MODEL_HIERARCHY = [
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-2.0-flash-exp": "gemini-3.5-flash",
-  "gemini-1.5-flash-latest": "gemini-3.5-flash",
-  "gemini-1.5-flash": "gemini-3.5-flash",
-  "gemini-1.5-pro": "gemini-3.5-flash",
-  "gemini-2.5-flash": "gemini-3.5-flash",
-  "gemini-3.5-flash": "gemini-3.5-flash",
-  "gemini-3-flash-preview": "gemini-3-flash-preview",
-  "google/gemini-3.5-flash": "gemini-3.5-flash",
-  "google/gemini-3-flash-preview": "gemini-3-flash-preview"
+  "gemini-2.0-flash-exp": "gemini-2.5-flash",
+  "gemini-1.5-flash-latest": "gemini-2.5-flash",
+  "gemini-1.5-flash": "gemini-2.5-flash",
+  "gemini-1.5-pro": "gemini-2.5-flash",
+  "gemini-2.5-flash": "gemini-2.5-flash",
+  "gemini-3.5-flash": "gemini-2.5-flash",
+  "gemini-3-flash-preview": "gemini-2.5-flash",
+  "google/gemini-3.5-flash": "gemini-2.5-flash",
+  "google/gemini-3-flash-preview": "gemini-2.5-flash"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2426,8 +2426,8 @@ function getEffectiveModel(modelName?: string): string {
   const mapped = MODEL_MAPPING[modelName];
   if (mapped) return mapped;
   
-  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
+  if (modelName.includes('3.5-flash')) return "gemini-2.5-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-2.5-flash";
   if (modelName.includes('deepseek')) return modelName;
   return modelName;
 }
@@ -2733,7 +2733,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     // Critical Failure
     if (retries === 0) {
       if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
-        const helpMsg = process.env.OPENROUTER_API_KEY 
+        const helpMsg = (process.env.OPENROUTER_API_KEY && !params.bypassOpenRouter)
             ? `⚠️ LIMITE DE COTA NO OPENROUTER: O modelo selecionado atingiu o limite de requisições. Aguarde um momento ou tente usar outro provedor/modelo.`
             : `⚠️ LIMITE DE COTA ATINGIDO: O plano gratuito do Gemini (Free Tier) tem um limite de requisições por minuto. Como você está enviando documentos ou conversas extremamente grandes, a cota de tokens (1 milhão por minuto) se esgota rapidamente.\n\nPor favor, AGUARDE 1 MINUTO e envie sua requisição novamente, ou limpe o histórico/documentos para não reenviar os mesmos dados longos repetidas vezes.`;
         throw new Error(helpMsg);
