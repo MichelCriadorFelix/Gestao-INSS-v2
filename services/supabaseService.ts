@@ -763,15 +763,10 @@ export const supabaseService = {
   async saveLegalDocuments(chunks: { content: string, metadata: any, embedding: number[] }[]) {
     const supabase = await getLegalClient();
     if (!supabase) return null;
-
-    const rows = chunks.map(c => ({
-      ...c,
-      areas_juridicas: Array.isArray(c.metadata?.areas) ? c.metadata.areas : []
-    }));
-
+    
     const { data, error } = await supabase
       .from('legal_documents')
-      .insert(rows);
+      .insert(chunks);
       
     if (error) {
       console.error('Error saving legal documents to Supabase:', error);
@@ -971,9 +966,6 @@ export const supabaseService = {
             filterVariants.push(`content.ilike."%Art. ${n} %"`); // "Art. 725 P" espaço
             filterVariants.push(`content.ilike."%Art. ${n},%"`); // "Art. 15,"
             filterVariants.push(`content.ilike."%Art. ${n}-%"`); // "Art. 19-E"
-            filterVariants.push(`content.ilike."%Art. ${n}º%"`); // "Art. 9º" ordinal (CLT, CC, CPC)
-            filterVariants.push(`content.ilike."%Art. ${n}°%"`); // "Art. 9°" grau (variante)
-            filterVariants.push(`content.ilike."%Art. ${n}o %"`); // "Art. 9o " ordinal com 'o' minúsculo
             filterVariants.push(`content.ilike."%§ ${n}%"`);
             filterVariants.push(`content.ilike."%§ ${n}º%"`);
           };
@@ -1098,7 +1090,7 @@ export const supabaseService = {
     return finalResults;
   },
 
-  async keywordSearchLegalDocuments(query: string, matchCount = 15, areas?: string[]) {
+  async keywordSearchLegalDocuments(query: string, matchCount = 15) {
     const supabase = await getLegalClient();
     if (!supabase) return [];
     
@@ -1141,15 +1133,12 @@ export const supabaseService = {
 
     if (!filter) return [];
 
-    let dbQuery = supabase
+    const { data, error } = await supabase
       .from('legal_documents')
       .select('*')
-      .or(filter);
-    if (areas && areas.length > 0) {
-      dbQuery = dbQuery.overlaps('areas_juridicas', areas);
-    }
-    const { data, error } = await dbQuery.limit(matchCount);
-
+      .or(filter)
+      .limit(matchCount);
+      
     if (error) {
       console.error('Error keyword searching legal documents in Supabase:', error);
       return [];
@@ -1241,24 +1230,20 @@ export const supabaseService = {
     }
   },
 
-  async getLegalDocumentTitles(areas?: string[]): Promise<string[]> {
+  async getLegalDocumentTitles(): Promise<string[]> {
     const supabase = await getLegalClient();
     if (!supabase) return [];
-
+    
     let allData: any[] = [];
     let page = 0;
     const pageSize = 1000;
     let hasMore = true;
 
     while (hasMore) {
-      let query = supabase
+      const { data, error } = await supabase
         .from('legal_documents')
         .select('metadata')
         .range(page * pageSize, (page + 1) * pageSize - 1);
-      if (areas && areas.length > 0) {
-        query = query.overlaps('areas_juridicas', areas);
-      }
-      const { data, error } = await query;
         
       if (error) {
         console.error('Error fetching legal document titles from Supabase:', error);

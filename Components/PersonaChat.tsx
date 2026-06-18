@@ -558,7 +558,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         // Qualquer lei, súmula ou jurisprudência adicionada
         // futuramente será encontrada automaticamente,
         // desde que o título siga os padrões da base:
-        const allLawTitles = await supabaseService.getLegalDocumentTitles(AGENT_AREAS);
+        const allLawTitles = await supabaseService.getLegalDocumentTitles();
         const allTitles = supabaseService.filterLawTitles(allLawTitles, enrichedQueryText);
 
         console.log(`[RAG LITERAL MATCH] Filtro de títulos encontrou:`, allTitles);
@@ -639,7 +639,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
           }),
-          supabaseService.keywordSearchLegalDocuments(enrichedQueryText, 15, AGENT_AREAS),
+          supabaseService.keywordSearchLegalDocuments(enrichedQueryText, 15),
           plannerPromise
         ]);
 
@@ -718,7 +718,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             if (deterministicRag && deterministicRag.trim().length > 0) {
               console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados com sucesso por plano determinístico.`);
               ragContext = ragContext
-                ? `${ragContext}\n\n---\n\n${deterministicRag}`
+                ? `${deterministicRag}\n\n---\n\n${ragContext}`
                 : deterministicRag;
             } else {
               console.log(`[RAG Determinístico] Nenhum chunk específico exigido pelo planner.`);
