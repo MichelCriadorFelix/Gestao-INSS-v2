@@ -510,15 +510,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       // RAG é somente para relatório e peças pelo comando de gerar peça, ou gerar relatório, ou quando for uma dúvida jurídica
       // que pergunte algo que deva ser comprovado com lei, jurisprudência, tema, ou seja, com a base de conhecimento.
-      const isReportOrPeca = !isScienceOrAudit && (
+      const isReportOrPeca = 
         messageText.includes('[FASE DE GERAÇÃO]') || 
         /gerar\s+(peça|petição|relatório|relatorio|minuta|artigo)/i.test(messageText) ||
-        /\b(gerar peça|gerar petição|gerar relatório|gerar relatorio|gerar minuta|criar peça|criar petição|criar relatório|criar minuta)\b/i.test(messageText)
-      );
+        /\b(gerar peça|gerar petição|gerar relatório|gerar relatorio|gerar minuta|criar peça|criar petição|criar relatório|criar minuta)\b/i.test(messageText);
 
-      const isLegalDoubt = !isScienceOrAudit && /\b(lei|artigo|súmula|sumula|jurisprudência|jurisprudencia|tema|STJ|STF|TNU|enunciado|o que diz|qual\s+artigo|qual\s+lei|qual\s+base|fundamentação|fundamentacao|fundamento)\b/i.test(messageText);
+      const isLegalDoubt = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos)\b/i.test(messageText);
       
-      const shouldSendRag = !isScienceOrAudit && (isReportOrPeca || isLegalDoubt);
+      const shouldSendRag = isReportOrPeca || isLegalDoubt;
 
       console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isScienceOrAudit: ${isScienceOrAudit}, isReportOrPeca: ${isReportOrPeca}, isLegalDoubt: ${isLegalDoubt})`);
 
