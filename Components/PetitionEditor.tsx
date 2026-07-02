@@ -790,43 +790,52 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
             
-            if (colCount <= 3) {
+            // Calculate max text length to determine if it's a signature table or data table
+            const colTextLengths = Array(colCount).fill(0);
+            let maxTotalLen = 0;
+            node.table.body.forEach((row: any[]) => {
+              if (row && Array.isArray(row)) {
+                row.forEach((cell: any, colIdx: number) => {
+                  if (cell && colIdx < colCount) {
+                    let textLen = 0;
+                    const getLength = (c: any) => {
+                      if (!c) return;
+                      if (typeof c === 'string') {
+                        textLen += c.trim().length;
+                      } else if (typeof c.text === 'string') {
+                        textLen += c.text.trim().length;
+                      } else if (Array.isArray(c.text)) {
+                        c.text.forEach(getLength);
+                      } else if (Array.isArray(c.stack)) {
+                        c.stack.forEach(getLength);
+                      } else if (c.stack && typeof c.stack === 'object') {
+                        getLength(c.stack);
+                      } else if (c.text && typeof c.text === 'object') {
+                        getLength(c.text);
+                      }
+                    };
+                    getLength(cell);
+                    if (textLen > colTextLengths[colIdx]) {
+                      colTextLengths[colIdx] = textLen;
+                    }
+                    if (textLen > maxTotalLen) {
+                      maxTotalLen = textLen;
+                    }
+                  }
+                });
+              }
+            });
+
+            // Heuristic for signature table: <= 3 columns and no cell has long text
+            const isSignatureTable = colCount <= 3 && maxTotalLen < 60;
+            node._isSignatureTable = isSignatureTable;
+
+            if (isSignatureTable) {
               // Signatures and small tables: stretch equally across margin to margin
               node.table.widths = Array(colCount).fill('*');
               node.alignment = 'center';
             } else {
-              // Larger tables (colCount > 3): Dynamically allocate widths to prevent overflow.
-              const colTextLengths = Array(colCount).fill(0);
-              node.table.body.forEach((row: any[]) => {
-                if (row && Array.isArray(row)) {
-                  row.forEach((cell: any, colIdx: number) => {
-                    if (cell && colIdx < colCount) {
-                      let textLen = 0;
-                      const getLength = (c: any) => {
-                        if (!c) return;
-                        if (typeof c === 'string') {
-                          textLen += c.trim().length;
-                        } else if (typeof c.text === 'string') {
-                          textLen += c.text.trim().length;
-                        } else if (Array.isArray(c.text)) {
-                          c.text.forEach(getLength);
-                        } else if (Array.isArray(c.stack)) {
-                          c.stack.forEach(getLength);
-                        } else if (c.stack && typeof c.stack === 'object') {
-                          getLength(c.stack);
-                        } else if (c.text && typeof c.text === 'object') {
-                          getLength(c.text);
-                        }
-                      };
-                      getLength(cell);
-                      if (textLen > colTextLengths[colIdx]) {
-                        colTextLengths[colIdx] = textLen;
-                      }
-                    }
-                  });
-                }
-              });
-
+              // Larger tables or tables with long text: Dynamically allocate widths to prevent overflow.
               // Find the index of the column with the maximum content length
               const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
               
@@ -872,19 +881,19 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           if (node.ul) applyIndent(node.ul, isBlockquote, isTable, isSmallTable);
           if (node.ol) applyIndent(node.ol, isBlockquote, isTable, isSmallTable);
           if (node.table && node.table.body) {
-            const colCount = node.table.body[0]?.length || 0;
+            const isSignatureTable = node._isSignatureTable === true;
             node.table.body.forEach((row: any[]) => {
               row.forEach((cell: any) => {
                 if (cell && typeof cell === 'object') {
-                  if (colCount > 3) {
+                  if (isSignatureTable) {
+                    // For signature tables, ensure noWrap so it fits exactly on a single line!
+                    cell.noWrap = true;
+                  } else {
                     // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
                     delete cell.noWrap;
-                  } else {
-                    // For small tables like signatures, ensure noWrap so it fits exactly on a single line!
-                    cell.noWrap = true;
                   }
-                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true, colCount <= 3);
-                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true, colCount <= 3);
+                  if (cell.stack) applyIndent(cell.stack, isBlockquote, true, isSignatureTable);
+                  if (cell.text && Array.isArray(cell.text)) applyIndent(cell.text, isBlockquote, true, isSignatureTable);
                 }
               });
             });
