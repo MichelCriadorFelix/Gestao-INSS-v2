@@ -190,6 +190,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
   ): string => {
     const gender = event.gender || (client?.gender) || 'M';
     const benefitType = event.benefitType || 'incapacidade';
+    const diseaseType = event.diseaseType || 'ortopedica';
     const isFem = gender === 'F';
     const isBpc = benefitType === 'bpc';
     const isSocial = event.type === 'perícia' && event.description?.toLowerCase().includes('social');
@@ -227,31 +228,63 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
       docs = `Organize assim, nessa ordem:\n` +
         `1️⃣ Laudo médico com o CID (diagnóstico) — *esse vem primeiro*\n` +
         `2️⃣ Outros laudos médicos (do mais antigo ao mais recente)\n` +
-        `3️⃣ Exames de imagem (ressonância, tomografia, raio-x)\n` +
-        `4️⃣ Exames laboratoriais\n` +
-        `5️⃣ Receitas médicas\n` +
-        `6️⃣ RG e CPF originais`;
+        `3️⃣ Exames de imagem e testes específicos\n` +
+        `4️⃣ Receitas médicas atualizadas\n` +
+        `5️⃣ RG e CPF originais`;
     }
 
-    const respostas = isSocial
-      ? `✅ Fale somente sobre as limitações, dificuldades e dependência de terceiros ${isFem ? 'da senhora' : 'do senhor'}.\n` +
+    let respostas = '';
+    let postura = '';
+    let acomp = '';
+
+    if (isSocial) {
+      respostas = `✅ Fale somente sobre as limitações, dificuldades e dependência de terceiros ${isFem ? 'da senhora' : 'do senhor'}.\n` +
         `✅ Sobre renda: informe somente o que cada morador *efetivamente recebe* todo mês. Não omita, não invente.\n` +
         `⚠️ Se perguntarem com quem mora: informe o nome e grau de parentesco de cada um.\n` +
         `⚠️ Se perguntarem o que ${pronoun} faz no dia a dia: fale somente das dificuldades e dependência.\n` +
         `❌ Não mencione melhorias na saúde ou na situação financeira.\n` +
-        `❌ Responda somente o que for perguntado.`
-      : `✅ Fale *somente sobre as limitações e dificuldades* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de trabalhar.\n` +
-        `❌ *Não mencione nenhuma melhora*, mesmo que em algum dia se sinta um pouco melhor. O que vale é o pior dia.\n` +
-        `⚠️ *Se o ${perito} perguntar "consegue andar?"* — não diga "consigo, mas com dificuldade." Diga: *"Tenho muita dificuldade, sinto muita dor, preciso parar bastante."* Sempre pela limitação.\n` +
-        `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3}, o que precisa de ajuda.`;
-
-    const acomp = isSocial
-      ? `Leve um acompanhante. ⚠️ *Atenção:* a ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} e da situação real da família — sem inventar e sem omitir renda.`
-      : `Leve um acompanhante de confiança. ⚠️ *Atenção:* o ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} — nunca de melhorias.\n\nO acompanhante também deve estar com roupa simples${isFem ? ', sem maquiagem' : ''}, sem acessórios, sem perfume forte.`;
-
-    const postura = isSocial
-      ? `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Responda com clareza e objetividade. Não discuta nem questione a ${perito} durante a avaliação.`
-      : `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não discuta com o ${perito}, mesmo que ele pareça indiferente — isso é normal. Se tiver dificuldade para sentar, se mover ou ficar em pé, demonstre naturalmente, sem forçar e sem exagerar.`;
+        `❌ Responda somente o que for perguntado.`;
+      
+      postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Responda com clareza e objetividade. Não discuta nem questione a ${perito} durante a avaliação.`;
+      
+      acomp = `Leve um acompanhante. ⚠️ *Atenção:* a ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} e da situação real da família — sem inventar e sem omitir renda.`;
+    } else {
+      // Perícia Médica - Adaptável por tipo de doença
+      acomp = `Leve um acompanhante de confiança. ⚠️ *Atenção:* o ${perito} pode chamá-lo separadamente. Ele precisa falar somente das dificuldades ${pronoun2} — nunca de melhorias.\n\nO acompanhante também deve estar com roupa simples${isFem ? ', sem maquiagem' : ''}, sem acessórios, sem perfume forte.`;
+      
+      if (diseaseType === 'psiquiatrica') {
+        respostas = `✅ Fale *somente sobre as limitações e crises* — o que ${pronoun} NÃO consegue fazer, esquecimentos, medos, isolamento social, e se precisa de supervisão constante.\n` +
+          `❌ *Não finja que está tudo bem.* É comum o paciente psiquiátrico tentar parecer "normal" para o perito, mas isso PREJUDICA seu benefício. Se sentir vontade de chorar, chore. Se estiver nervoso(a), demonstre.\n` +
+          `⚠️ *Não omita:* Relate se tiver pensamentos ruins, crises de ansiedade, desânimo severo, delírios ou insônia grave.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale somente que fica deitado(a), sem ânimo para nada, e que outras pessoas precisam te ajudar no dia a dia.`;
+        postura = `Não tenha vergonha de demonstrar o seu verdadeiro estado emocional. A depressão, ansiedade e outros transtornos são doenças invisíveis, por isso o perito só vai entender se ${pronoun} relatar a dor psicológica exatamente como ela é.`;
+      } else if (diseaseType === 'autismo') {
+        respostas = `✅ Foque nas *dificuldades sociais, crises sensoriais e necessidade de rotina*. O autismo não se cura, então o foco é o *impedimento de longo prazo*.\n` +
+          `✅ Se o perito perguntar algo e ${pronoun} não conseguir responder ou entrar em crise, o acompanhante *deve* assumir a fala para explicar a situação.\n` +
+          `❌ *Não mascare os sintomas (masking).* Se a luz incomodar, diga. Se o barulho incomodar, tampe os ouvidos. O perito precisa ver as reais limitações.\n` +
+          `⚠️ Relate as crises: quantas vezes ocorrem, qual o gatilho, se há autoagressão, seletividade alimentar severa ou dependência de terceiros.`;
+        postura = `Seja você mesmo(a). Evite forçar contato visual ou esconder movimentos repetitivos (stims) se eles costumam acontecer para te acalmar.`;
+        acomp = `⚠️ *MUITO IMPORTANTE:* O acompanhante tem papel crucial aqui. O perito precisa saber das crises (meltdowns) que só a família vê. O acompanhante deve relatar tudo o que o paciente precisa de ajuda para fazer.`;
+      } else if (diseaseType === 'cardiologica') {
+        respostas = `✅ Fale *somente sobre o cansaço, falta de ar e palpitações*.\n` +
+          `❌ *Não diga apenas "eu ando".* Diga: "Se eu andar até o portão, sinto uma dor no peito e uma falta de ar insuportável, preciso parar e sentar."\n` +
+          `⚠️ Relate que a doença é silenciosa e exige repouso para não agravar o risco de infarto/complicações.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale que qualquer esforço (varrer a casa, arrumar a cama) causa exaustão extrema.`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Se estiver ofegante ou com dores durante a perícia, informe o perito no mesmo momento.`;
+      } else if (diseaseType === 'oncologica') {
+        respostas = `✅ Relate os *efeitos colaterais do tratamento (quimio/rádio)*: cansaço extremo, náuseas, imunidade baixa, fraqueza severa, indisposição.\n` +
+          `❌ O fato de o câncer estar "controlado" ou em tratamento não significa capacidade. Destaque que a imunidade impossibilita pegar transporte público ou estar em locais com outras pessoas.\n` +
+          `⚠️ *Se perguntar da melhora:* não diga que está "melhorando". Diga que os dias pós-tratamento são de cama e que não tem forças físicas para nenhuma rotina.`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Se sentir fraqueza, vertigem ou precisar de apoio para levantar/sentar, demonstre.`;
+      } else {
+        // ortopedica / padrao / outra
+        respostas = `✅ Fale *somente sobre as limitações e dificuldades físicas* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de trabalhar.\n` +
+          `❌ *Não mencione nenhuma melhora*, mesmo que em algum dia se sinta um pouco melhor. O que vale é o pior dia.\n` +
+          `⚠️ *Se o ${perito} perguntar "consegue andar?"* — não diga "consigo, mas com dificuldade." Diga: *"Tenho muita dificuldade, sinto muita dor, preciso parar bastante."* Sempre pela limitação.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3}, o que precisa de ajuda (ex: não consegue levantar peso, não consegue abaixar).`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não discuta com o ${perito}, mesmo que ele pareça indiferente — isso é normal. Se tiver dificuldade para sentar, se mover ou ficar em pé, demonstre naturalmente, sem forçar e sem exagerar.`;
+      }
+    }
 
     return `*FELIX E CASTRO ADVOCACIA*\n` +
       `*${tipoEvento}${nome ? ' — ' + nome : ''} — Leia com atenção!*\n\n` +
@@ -749,6 +782,25 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                         >📋 BPC/LOAS</button>
                       </div>
                     </div>
+
+                    {/* Tipo de Doença/Condição */}
+                    {!(formData.description?.toLowerCase().includes('social')) && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipo de Condição (Adapta o Texto)</label>
+                        <select
+                          value={formData.diseaseType || 'ortopedica'}
+                          onChange={(e) => setFormData({ ...formData, diseaseType: e.target.value as any })}
+                          className="w-full p-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white text-sm"
+                        >
+                          <option value="ortopedica">🦴 Ortopédica / Física (Coluna, Joelho, etc)</option>
+                          <option value="psiquiatrica">🧠 Psiquiátrica (Depressão, Ansiedade, etc)</option>
+                          <option value="autismo">🧩 Autismo / TDAH / Neurodivergência</option>
+                          <option value="cardiologica">🫀 Cardiológica / Pulmonar</option>
+                          <option value="oncologica">🎗️ Oncológica (Câncer)</option>
+                          <option value="outra">📝 Outra / Geral</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* Instruções Específicas */}
                     <div>
