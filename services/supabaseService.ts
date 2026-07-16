@@ -115,7 +115,11 @@ export const supabaseService = {
       .limit(20); // PERF: payload de carga inicial; conversas antigas permanecem no banco
       
     if (error) {
-      console.error('Error fetching AI conversations from Supabase:', error);
+      if (error.message?.includes('row-level security') || error.code === '42501' || error.message?.includes('RLS') || error.message?.includes('relation "public.ai_conversations" does not exist')) {
+        console.warn('Supabase DB bloqueado ou inexistente. Carregando conversas locais apenas.');
+        return [];
+      }
+      console.warn('Error fetching AI conversations from Supabase:', error);
       return [];
     }
     
