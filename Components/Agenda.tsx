@@ -278,11 +278,17 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
         postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Se sentir fraqueza, vertigem ou precisar de apoio para levantar/sentar, demonstre.`;
       } else {
         // ortopedica / padrao / outra
-        respostas = `✅ Fale *somente sobre as limitações e dificuldades físicas* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de trabalhar.\n` +
+        respostas = `✅ Fale *somente sobre as limitações e dificuldades físicas* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de ter uma rotina normal.\n` +
           `❌ *Não mencione nenhuma melhora*, mesmo que em algum dia se sinta um pouco melhor. O que vale é o pior dia.\n` +
-          `⚠️ *Se o ${perito} perguntar "consegue andar?"* — não diga "consigo, mas com dificuldade." Diga: *"Tenho muita dificuldade, sinto muita dor, preciso parar bastante."* Sempre pela limitação.\n` +
-          `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3}, o que precisa de ajuda (ex: não consegue levantar peso, não consegue abaixar).`;
-        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não discuta com o ${perito}, mesmo que ele pareça indiferente — isso é normal. Se tiver dificuldade para sentar, se mover ou ficar em pé, demonstre naturalmente, sem forçar e sem exagerar.`;
+          `⚠️ *Se o ${perito} perguntar o que consegue fazer (andar, pegar peso, usar as mãos, etc)* — não diga "consigo, mas com dificuldade." Diga: *"Tenho muita dificuldade, sinto muita dor, não consigo fazer."* Sempre foque na limitação.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3}, o que precisa de ajuda (ex: não consegue levantar peso, abaixar, segurar objetos, etc).`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não discuta com o ${perito}, mesmo que ele pareça indiferente — isso é normal. Se tiver dificuldade para sentar, se mover, ficar em pé ou usar as mãos, demonstre naturalmente, sem forçar e sem exagerar.`;
+      }
+      
+      if (isBpc) {
+        respostas += `\n\n🎯 *FOCO DO BENEFÍCIO (BPC/LOAS):* O objetivo principal aqui é provar o seu *impedimento de longo prazo*. O perito precisa entender as *barreiras* que a doença impõe para que você participe da sociedade em igualdade com as outras pessoas. Foque no quanto você precisa de ajuda de terceiros para viver de forma independente.`;
+      } else {
+        respostas += `\n\n🎯 *FOCO DO BENEFÍCIO (Incapacidade):* O objetivo principal aqui é provar a sua *incapacidade para o trabalho*. O perito precisa entender exatamente como a sua doença te impede de exercer a sua profissão ou qualquer outra atividade laboral.`;
       }
     }
 
