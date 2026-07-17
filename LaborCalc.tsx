@@ -2107,13 +2107,21 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
                               <div className="md:col-span-2">
                                   <label className={STYLES.LABEL_TEXT}>Nome do Cliente / Reclamante</label>
                                   <div className="flex gap-2">
-                                      <input type="text" className={STYLES.INPUT_FIELD} value={data.employeeName} onChange={e => handleInputChange('employeeName', e.target.value)} placeholder="Ex: João da Silva" />
-                                      <select className={`${STYLES.INPUT_FIELD} w-1/3`} onChange={handleClientSelect} defaultValue="">
-                                          <option value="" disabled>Selecionar...</option>
-                                          {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                          {contracts.map(c => <option key={c.id} value={`${c.firstName} ${c.lastName}`}>{c.firstName} {c.lastName}</option>)}
-                                      </select>
-                                      <select className={`${STYLES.INPUT_FIELD} w-1/4`} value={data.employeeGender || 'M'} onChange={e => handleInputChange('employeeGender', e.target.value)}>
+                                      <div className="flex-1">
+                                          <input 
+                                              type="text" 
+                                              list="labor-client-options"
+                                              className={STYLES.INPUT_FIELD} 
+                                              value={data.employeeName} 
+                                              onChange={e => handleInputChange('employeeName', e.target.value)} 
+                                              placeholder="Busque na lista ou digite o nome..." 
+                                          />
+                                          <datalist id="labor-client-options">
+                                              {clients.map(c => <option key={`c-${c.id}`} value={c.name} />)}
+                                              {contracts.map(c => <option key={`con-${c.id}`} value={`${c.firstName} ${c.lastName}`} />)}
+                                          </datalist>
+                                      </div>
+                                      <select className={`${STYLES.INPUT_FIELD} w-1/4 max-w-[150px]`} value={data.employeeGender || 'M'} onChange={e => handleInputChange('employeeGender', e.target.value)}>
                                           <option value="M">Masculino</option>
                                           <option value="F">Feminino</option>
                                       </select>

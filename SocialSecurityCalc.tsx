@@ -2000,18 +2000,6 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                     <div className={STYLES.CARD_HEADER}>
                         <span className={STYLES.STEP_BADGE}>2</span>
                         <h3 className={STYLES.CARD_TITLE}>Dados do Segurado</h3>
-                        <div className="ml-auto">
-                            <select 
-                                className="text-xs bg-white dark:bg-slate-800 border border-slate-300 rounded px-2 py-1"
-                                onChange={handleClientSelect}
-                                value={data.clientId || ''}
-                            >
-                                <option value="">Carregar de Cliente...</option>
-                                {clients.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
-                        </div>
                     </div>
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1">
@@ -2027,10 +2015,23 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                             <label className={STYLES.LABEL_TEXT}>Nome do Segurado</label>
                             <input 
                                 type="text" 
+                                list="soc-client-options"
                                 className={STYLES.INPUT_FIELD} 
                                 value={data.clientName}
-                                onChange={e => handleInputChange('clientName', e.target.value)}
+                                onChange={e => {
+                                    handleInputChange('clientName', e.target.value);
+                                    // Tenta carregar dados do cliente se o nome bater exatamente
+                                    const client = clients.find(c => c.name === e.target.value);
+                                    if (client) {
+                                        handleInputChange('clientId', client.id);
+                                        if (client.cpf) handleInputChange('cpf', client.cpf);
+                                    }
+                                }}
+                                placeholder="Busque na lista ou digite o nome..."
                             />
+                            <datalist id="soc-client-options">
+                                {clients.map(c => <option key={`soc-c-${c.id}`} value={c.name} />)}
+                            </datalist>
                         </div>
                         <div>
                             <label className={STYLES.LABEL_TEXT}>Data de Nascimento</label>
