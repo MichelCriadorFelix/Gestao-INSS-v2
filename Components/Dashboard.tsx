@@ -255,7 +255,7 @@ export default function Dashboard({
             )
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'clients' },
+                { event: '*', schema: 'public', table: 'clients' },
                 (payload: any) => {
                     if (payload.new?.id === 8 && Array.isArray(payload.new?.data)) {
                         setResolvedAlerts(payload.new.data);
@@ -591,23 +591,46 @@ export default function Dashboard({
               }
           } else if (type === 'agenda') {
               if (supabase) {
-                  // Proteção: busca o estado atual do Supabase antes de salvar
-                  // para nunca sobrescrever com array vazio
-                  if (newData.length === 0) {
-                      const { data: current } = await supabase
-                          .from('clients').select('data').eq('id', 7).maybeSingle();
-                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                  // Mescla os dados atuais do banco com os novos para evitar perda de dados por race condition
+                  const { data: current } = await supabase
+                      .from('clients').select('data').eq('id', 7).maybeSingle();
+                      
+                  let mergedData = newData;
+
+                  if (current?.data && Array.isArray(current.data)) {
+                      const currentAgenda = current.data;
+                      const mergedMap = new Map();
+                      
+                      // 1. Adiciona todos que estão na nuvem
+                      currentAgenda.forEach(e => mergedMap.set(e.id, e));
+                      
+                      // 2. Remove os que foram excluídos localmente nesta iteração
+                      // Se um evento estava no estado local (agendaEvents) mas não está mais no novo (newData), foi deletado.
+                      agendaEvents.forEach(oldEvent => {
+                          if (!newData.some(newEvent => newEvent.id === oldEvent.id)) {
+                              mergedMap.delete(oldEvent.id);
+                          }
+                      });
+                      
+                      // 3. Adiciona/Atualiza com os dados locais
+                      newData.forEach(e => mergedMap.set(e.id, e));
+                      
+                      mergedData = Array.from(mergedMap.values());
+                  }
+
+                  if (mergedData.length === 0 && current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                      if (newData.length === 0 && agendaEvents.length === 0) {
                           setIsSyncing(false);
-                          return; // Não sobrescreve dados existentes com array vazio
+                          return; // Proteção: Não sobrescreve com array vazio se local não tinha nada
                       }
                   }
-                  const error = await upsertWithRetry({ id: 7, data: newData });
+
+                  const error = await upsertWithRetry({ id: 7, data: mergedData });
                   if (error) {
                       console.error("Sync error (Agenda):", error);
                       setSaveError("Erro de sincronização (Agenda).");
                   } else {
-                      setAgendaEvents(newData);
-                      // safeSetLocalStorage('agenda_events', JSON.stringify(newData)); // Removed
+                      setAgendaEvents(mergedData);
                   }
                   setIsSyncing(false);
                   return;
@@ -616,22 +639,31 @@ export default function Dashboard({
               // safeSetLocalStorage('agenda_events', JSON.stringify(newData)); // Removed
           } else if (type === 'resolved_alerts') {
               if (supabase) {
-                  // Proteção: nunca sobrescreve alertas resolvidos com array vazio
-                  if (newData.length === 0) {
-                      const { data: current } = await supabase
-                          .from('clients').select('data').eq('id', 8).maybeSingle();
-                      if (current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                  // Mescla os alertas resolvidos com a nuvem para evitar race condition
+                  const { data: current } = await supabase
+                      .from('clients').select('data').eq('id', 8).maybeSingle();
+                      
+                  let mergedData = newData;
+                  
+                  if (current?.data && Array.isArray(current.data)) {
+                      // Alertas resolvidos apenas crescem, podemos fazer um Set (união)
+                      const resultSet = new Set([...current.data, ...newData]);
+                      mergedData = Array.from(resultSet);
+                  }
+
+                  if (mergedData.length === 0 && current?.data && Array.isArray(current.data) && current.data.length > 0) {
+                      if (newData.length === 0 && resolvedAlerts.length === 0) {
                           setIsSyncing(false);
-                          return; // Não sobrescreve dados existentes com array vazio
+                          return;
                       }
                   }
-                  const error = await upsertWithRetry({ id: 8, data: newData });
+
+                  const error = await upsertWithRetry({ id: 8, data: mergedData });
                   if (error) {
                       console.error("Sync error (Resolved Alerts):", error);
                       setSaveError("Erro de sincronização (Alertas).");
                   } else {
-                      setResolvedAlerts(newData);
-                      // safeSetLocalStorage('inss_resolved_alerts', JSON.stringify(newData)); // Removed
+                      setResolvedAlerts(mergedData);
                   }
                   setIsSyncing(false);
                   return;
