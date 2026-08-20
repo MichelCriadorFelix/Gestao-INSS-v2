@@ -893,7 +893,7 @@ function detectRevisionIntent(message: string, hasDraft: boolean): RevisionInten
 
   const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
   const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
-  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na ))/i.test(msg);
+  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na )|retir|remov|apagu|exclui|delet|tirar|retirar|remover)/i.test(msg);
   if (isFullRegen) return 'FULL_REGENERATION';
   if (isPointCorrection) return 'POINT_CORRECTION';
   if (isAddition) return 'ADDITION';
@@ -4819,8 +4819,13 @@ ${ragTruncated}`;
           // Correção pontual — REESCREVE A PETIÇÃO INTEIRA aplicando a correção, para não quebrar a persistência e UI
           const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo toda a estrutura, provas e citações idênticas à versão anterior, mas aplique a correção ou ajuste solicitado na parte pertinente.
+O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo toda a estrutura, provas e citações idênticas à versão anterior, mas aplique a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
+3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
@@ -4834,6 +4839,10 @@ ${message}`;
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo. REESCREVA a petição por completo, mantendo a estrutura da versão anterior, mas inserindo o novo argumento, tópico ou parágrafo no local apropriado.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
@@ -4849,6 +4858,10 @@ ${message}`;
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
@@ -5487,8 +5500,13 @@ ${ragTruncated}`;
         if (revisionIntent === 'POINT_CORRECTION') {
           const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a exata correção solicitada na parte pertinente.
+O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
+3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
@@ -5501,6 +5519,10 @@ ${message}`;
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo à peça já existente. REESCREVA a petição inteira e completa integrando organicamente o novo parágrafo ou tópico.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
@@ -5515,6 +5537,10 @@ ${message}`;
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
@@ -6094,8 +6120,13 @@ REGRAS DE OURO:
         if (revisionIntent === 'POINT_CORRECTION') {
           const draftParaRegen = draftContent.substring(0, 60000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a correção pertinente.
+O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
+3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça truncada ...]' : ''}
@@ -6108,6 +6139,10 @@ ${message}`;
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo à peça. REESCREVA a petição inteira e completa integrando o novo parágrafo ou tópico apropriadamente.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
@@ -6122,6 +6157,10 @@ ${message}`;
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
+
+[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
+1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
+2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
 ${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}

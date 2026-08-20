@@ -95,6 +95,26 @@ const getArtifactTitle = (content: string = '') => {
   return "Peça Processual / Documento Jurídico";
 };
 
+export const cleanPetitionDocument = (rawContent: string = ''): string => {
+  if (!rawContent) return '';
+
+  // Detect where the legal document starts
+  const startRegex = /(?:AO\s+JUÍZO|EXCELENTÍSSIMO|PROCESSO\s+Nº|REQUERIMENTO|CONTESTAÇÃO|PARECER\s+JURÍDICO|NOTIFICAÇÃO\s+EXTRAJUDICIAL|ILUSTRÍSSIMO|MEMORIAIS|AGRAVO|MANDADO\s+DE\s+SEGURANÇA)/i;
+  const match = rawContent.match(startRegex);
+
+  let cleaned = rawContent;
+  if (match && match.index !== undefined && match.index > 0) {
+    // Cut off conversational preambles before the petition header!
+    cleaned = rawContent.slice(match.index);
+  }
+
+  // Remove trailing conversational sign-offs after the petition concludes
+  const endRegex = /\n\n(?:Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição).*/i;
+  cleaned = cleaned.replace(endRegex, '');
+
+  return cleaned.trim();
+};
+
 const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -387,7 +407,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   };
 
   const copyToClipboard = (text: string, msgId: string) => {
-    navigator.clipboard.writeText(text).then(() => {
+    const textToCopy = isArtifactContent(text) ? cleanPetitionDocument(text) : text;
+    navigator.clipboard.writeText(textToCopy).then(() => {
       setCopiedId(msgId);
       setTimeout(() => setCopiedId(null), 2000);
     });
@@ -1454,10 +1475,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   const generateDocx = async (content: string) => {
     try {
+      const cleaned = cleanPetitionDocument(content);
       const response = await apiFetch('/api/dr-michel/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content: cleaned })
       });
 
       if (!response.ok) throw new Error('Falha ao gerar documento');
@@ -1478,8 +1500,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   const handleOpenInEditor = (content: string) => {
     if (onOpenPetition) {
+      const cleaned = cleanPetitionDocument(content);
       // Convert Markdown to HTML to ensure formatting (bold, italic, lists) is preserved
-      const formattedContent = markdownToHtml(content);
+      const formattedContent = markdownToHtml(cleaned);
 
       onOpenPetition({
         title: `${persona.petitionTitlePrefix} - ${new Date().toLocaleDateString('pt-BR')}`,
@@ -2104,9 +2127,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         {activeArtifactId && (
           <div className="fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0">
             {(() => {
-              const content = activeArtifactId === 'streaming' 
+              const rawContent = activeArtifactId === 'streaming' 
                 ? streamingMessage 
                 : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || '';
+              const content = cleanPetitionDocument(rawContent);
               return (
                 <>
                   {/* ARTIFACT HEADER */}
