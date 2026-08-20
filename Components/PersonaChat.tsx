@@ -74,19 +74,10 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const isArtifactMessage = (content: string = '') => {
-  if (!content) return false;
-  return content.length > 500 && (
-    /EXCELENTÍSSIMO|AO JUÍZO|DOS FATOS|DO DIREITO|DOS PEDIDOS|RELATÓRIO|PARECER|CONTESTAÇÃO|RECURSO|INICIAL|AGRAVO|MANDADO DE SEGURANÇA|NOTIFICAÇÃO|\[GERAÇÃO MODULAR\]|\[CORREÇÃO CIRÚRGICA\]/i.test(content)
-  );
-};
-
 const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
-  const [streamingAsArtifact, setStreamingAsArtifact] = useState<boolean>(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
@@ -781,7 +772,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       let fullText = '';
       let isFinished = false;
-      let isArtifactActive = false;
       let resumeCount = 0;
       const MAX_RESUMES = 3;
 
@@ -914,12 +904,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
                     fullText += data.text;
                     setStreamingMessage(fullText);
-                    
-                    if (!isArtifactActive && isArtifactMessage(fullText)) {
-                      isArtifactActive = true;
-                      setStreamingAsArtifact(true);
-                      setActiveArtifactId('streaming');
-                    }
                   } else {
                     console.log("[SSE UNKNOWN] Recebido objeto JSON sem text/status:", data);
                   }
@@ -964,11 +948,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         content: fullText || "Desculpe, não consegui gerar uma resposta.",
         timestamp: new Date().toISOString()
       };
-
-      if (isArtifactActive) {
-        setStreamingAsArtifact(false);
-        setActiveArtifactId(assistantMsg.id);
-      }
 
       setSessions(prev => prev.map(s => 
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
@@ -1603,11 +1582,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         </div>
       </aside>
 
-      {/* MAIN CONTENT SPLIT */}
-      <div className="flex-1 flex min-w-0">
-        
-        {/* CHAT AREA */}
-        <div className={`flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0 transition-all duration-300 ${activeArtifactId ? 'w-full md:w-1/2 md:border-r border-slate-200 dark:border-gold-500/20' : 'w-full'}`}>
+      {/* CHAT AREA */}
+      <div className="flex-1 flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0">
           {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
@@ -1712,38 +1688,20 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                           </span>
                         </div>
                         
-                        {isArtifactMessage(msg.content) ? (
-                          <div 
-                            className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-colors w-full max-w-md shadow-sm" 
-                            onClick={() => setActiveArtifactId(msg.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="bg-white dark:bg-bordeaux-950 p-2 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800/50">
-                                <FileText className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-sm text-emerald-800 dark:text-emerald-300">Petição Gerada</h4>
-                                <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Clique para visualizar o artefato ao lado</p>
-                              </div>
-                            </div>
-                            <ChevronRight className="w-5 h-5 text-emerald-400" />
-                          </div>
-                        ) : (
-                          <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                          prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                                          prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                          prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                          prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                                          prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                          prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                          prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
-                                          prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
-                                          prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
-                                          prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
-                                          font-inter">
-                            <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
-                          </div>
-                        )}
+                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
+                                        prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
+                                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
+                                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+                                        prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
+                                        prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
+                                        prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
+                                        prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
+                                        font-inter">
+                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                        </div>
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => copyToClipboard(msg.content || '', msg.id)}
@@ -1804,33 +1762,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     )}
 
                     {streamingMessage && (
-                      streamingAsArtifact ? (
-                        <div 
-                          className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-4 flex items-center justify-between cursor-pointer w-full max-w-md shadow-sm"
-                          onClick={() => setActiveArtifactId('streaming')}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="bg-white dark:bg-bordeaux-950 p-2 rounded-lg shadow-sm border border-emerald-100 dark:border-emerald-800/50 relative">
-                              <FileText className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></div>
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm text-emerald-800 dark:text-emerald-300">Gerando Peça...</h4>
-                              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">Visualizando no artefato ao lado</p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                        prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                        font-inter">
-                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
-                          <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
-                        </div>
-                      )
+                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
+                                      prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                      prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
+                                      prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                      prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+                                      font-inter">
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
+                        <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2047,78 +1987,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           </div>
         </div>
         
-        {/* ARTIFACT AREA */}
-        {activeArtifactId && (
-          <div className="flex fixed inset-0 md:static md:w-1/2 flex-col bg-slate-50 dark:bg-bordeaux-950/40 relative animate-fade-in z-50 md:z-10 shadow-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-gold-500/20 flex justify-between items-center bg-white dark:bg-bordeaux-950 shadow-sm z-20 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight">Artefato de Peça</h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Geração de Documento</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const content = activeArtifactId === 'streaming' 
-                      ? streamingMessage 
-                      : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || '';
-                    if (content) {
-                      generateDocx(content);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-md text-xs font-semibold transition-colors border border-emerald-200 dark:border-emerald-800 shadow-sm"
-                  title="Baixar Word"
-                >
-                  <Download className="w-3.5 h-3.5" /> Baixar DOCX
-                </button>
-                <button
-                  onClick={() => {
-                    const content = activeArtifactId === 'streaming' 
-                      ? streamingMessage 
-                      : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || '';
-                    if (content) {
-                      handleOpenInEditor(content);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-semibold transition-colors shadow-sm"
-                  title="Abrir no Editor"
-                >
-                  <Edit2 className="w-3.5 h-3.5" /> Editor
-                </button>
-                <button
-                  onClick={() => setActiveArtifactId(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-md transition-colors"
-                >
-                  <XMark className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 relative scroll-smooth">
-              <div className="max-w-3xl mx-auto bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-sm p-8 sm:p-12 min-h-full prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                              prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                              prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                              prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                              prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                              font-inter">
-                <div dangerouslySetInnerHTML={{ 
-                  __html: markdownToHtml(
-                    activeArtifactId === 'streaming' 
-                      ? streamingMessage 
-                      : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || ''
-                  ) 
-                }} />
-                {activeArtifactId === 'streaming' && (
-                  <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
       </div>
 
       {/* Client Import Modal */}
