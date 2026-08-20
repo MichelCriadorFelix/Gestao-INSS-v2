@@ -4509,15 +4509,23 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3-flash-preview';
-      console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
+      model = 'gemini-3.7-flash';
+      console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
     } else {
-      modelProvider = 'openrouter';
-      model = (req.body.model && req.body.model.includes('deepseek')) ? req.body.model : 'deepseek/deepseek-v4-flash';
-      console.log(`[Dr.Michel] 🧠 Peça, relatório, ou chat geral. Usando OpenRouter: ${model}`);
+      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
+      
+      if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
+        modelProvider = 'gemini';
+        model = getEffectiveModel(reqModel);
+      } else {
+        modelProvider = 'openrouter';
+        model = reqModel.replace(/^openrouter\//, '');
+      }
+      console.log(`[Dr.Michel] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
 
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
@@ -5118,15 +5126,23 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3-flash-preview';
-      console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
+      model = 'gemini-3.7-flash';
+      console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
     } else {
-      modelProvider = 'openrouter';
-      model = (req.body.model && req.body.model.includes('deepseek')) ? req.body.model : 'deepseek/deepseek-v4-flash';
-      console.log(`[Dra.Luana] 🧠 Peça, relatório, ou chat geral. Usando OpenRouter: ${model}`);
+      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
+      
+      if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
+        modelProvider = 'gemini';
+        model = getEffectiveModel(reqModel);
+      } else {
+        modelProvider = 'openrouter';
+        model = reqModel.replace(/^openrouter\//, '');
+      }
+      console.log(`[Dra.Luana] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
@@ -5806,15 +5822,23 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3-flash-preview';
-      console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
+      model = 'gemini-3.7-flash';
+      console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
     } else {
-      modelProvider = 'openrouter';
-      model = (req.body.model && req.body.model.includes('deepseek')) ? req.body.model : 'deepseek/deepseek-v4-flash';
-      console.log(`[Dr.FelixCastro] 🧠 Peça, relatório, ou chat geral. Usando OpenRouter: ${model}`);
+      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
+      
+      if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
+        modelProvider = 'gemini';
+        model = getEffectiveModel(reqModel);
+      } else {
+        modelProvider = 'openrouter';
+        model = reqModel.replace(/^openrouter\//, '');
+      }
+      console.log(`[Dr.FelixCastro] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
 
     let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
@@ -6495,15 +6519,23 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
 
-    // Se for anexar arquivo/ler documento, vamos focar no Gemini gratuito 3.0 via Vercel
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3-flash-preview';
-      console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3-flash-preview' nativo (bypass OpenRouter).");
+      model = 'gemini-3.7-flash';
+      console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
     } else {
-      modelProvider = 'openrouter';
-      model = (req.body.model && req.body.model.includes('deepseek')) ? req.body.model : 'deepseek/deepseek-v4-flash';
-      console.log(`[Sec.Fabricia] 🧠 Peça, relatório, ou chat geral. Usando OpenRouter: ${model}`);
+      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
+      
+      if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
+        modelProvider = 'gemini';
+        model = getEffectiveModel(reqModel);
+      } else {
+        modelProvider = 'openrouter';
+        model = reqModel.replace(/^openrouter\//, '');
+      }
+      console.log(`[Sec.Fabricia] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
 
     // FIX RESIDUAL #3: Fabrícia nunca gera petições → isGenerationRequest sempre false.
