@@ -2407,6 +2407,7 @@ let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
 const MODEL_HIERARCHY = [
+  "gemini-3.7-flash",
   "gemini-3.5-flash",
   "gemini-3-flash-preview"
 ];
@@ -2417,10 +2418,11 @@ const MODEL_MAPPING: Record<string, string> = {
   "gemini-1.5-flash": "gemini-2.5-flash",
   "gemini-1.5-pro": "gemini-2.5-flash",
   "gemini-2.5-flash": "gemini-2.5-flash",
-  "gemini-3.5-flash": "gemini-2.5-flash",
-  "gemini-3-flash-preview": "gemini-2.5-flash",
-  "google/gemini-3.5-flash": "gemini-2.5-flash",
-  "google/gemini-3-flash-preview": "gemini-2.5-flash"
+  "gemini-3.5-flash": "gemini-3.5-flash",
+  "gemini-3.7-flash": "gemini-3.7-flash",
+  "gemini-3-flash-preview": "gemini-3-flash-preview",
+  "google/gemini-3.5-flash": "gemini-3.5-flash",
+  "google/gemini-3-flash-preview": "gemini-3-flash-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2428,8 +2430,9 @@ function getEffectiveModel(modelName?: string): string {
   const mapped = MODEL_MAPPING[modelName];
   if (mapped) return mapped;
   
-  if (modelName.includes('3.5-flash')) return "gemini-2.5-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-2.5-flash";
+  if (modelName.includes('3.7-flash')) return "gemini-3.7-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
   if (modelName.includes('deepseek')) return modelName;
   return modelName;
 }
@@ -3429,7 +3432,7 @@ app.post("/api/rag/plan", async (req, res) => {
     try {
       console.log(`[RAG PLAN_API] 2. Invocando modelo de IA para selecionar documentos de ${inventory.length} opções...`);
       const plannerResp = await callGemini({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.7-flash",
         contents: { role: "user", parts: [{ text: plannerInput }] },
         config: {
           systemInstruction: RAG_PLANNER_PROMPT,
@@ -4056,7 +4059,7 @@ app.post("/api/rag/plan", async (req, res) => {
           .from('legal_documents')
           .select('id, content, metadata')
           .eq('metadata->>title', planItem.titulo)
-          .limit(200);
+          .limit(3000);
         if (error) {
            console.error("Error fetching doc in PLAN:", error);
            return [];

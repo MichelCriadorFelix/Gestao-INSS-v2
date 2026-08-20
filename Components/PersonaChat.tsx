@@ -517,9 +517,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       const isLegalDoubt = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos)\b/i.test(messageText);
       
-      const shouldSendRag = isReportOrPeca || isLegalDoubt;
+      const isRevision = /\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[CORREÇÃO CIRÚRGICA]") || messageText.includes("[CORRECAO CIRURGICA]") || messageText.includes("[GERAÇÃO MODULAR]") || messageText.includes("[GERACAO MODULAR]");
 
-      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isScienceOrAudit: ${isScienceOrAudit}, isReportOrPeca: ${isReportOrPeca}, isLegalDoubt: ${isLegalDoubt})`);
+      const shouldSendRag = isReportOrPeca || isLegalDoubt || isRevision;
+
+      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isScienceOrAudit: ${isScienceOrAudit}, isReportOrPeca: ${isReportOrPeca}, isLegalDoubt: ${isLegalDoubt}, isRevision: ${isRevision})`);
 
       try {
         if (!shouldSendRag) {
@@ -1954,12 +1956,17 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     onChange={(e) => {
                       const val = e.target.value;
                       setSelectedModel(val);
-                      setSelectedModelProvider('openrouter');
+                      setSelectedModelProvider(val.includes('gemini') ? 'gemini' : 'openrouter');
                     }}
                     className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
                   >
+                    <optgroup label="Nativo Google">
+                      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+                      <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                    </optgroup>
                     <optgroup label="OpenRouter">
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
+                      <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
                     </optgroup>
                   </select>
                 </div>
