@@ -75,40 +75,101 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
-const isArtifactContent = (content: string = '') => {
+const isReportContent = (content: string = ''): boolean => {
+  if (!content || content.length < 250) return false;
+
+  const hasReportHeader = /(?:RELATÓRIO\s+DE\s+ANÁLISE|RELATÓRIO\s+DO\s+PROCESSO|AUDITORIA\s+PROCESSUAL|RELATÓRIO\s+PREVIDENCIÁRIO|RELATÓRIO\s+TRABALHISTA|RELATÓRIO\s+JURÍDICO|COMPILADO\s+INTEGRAL\s+DO\s+PROCESSO|RELATÓRIO\s+DE\s+AUDITORIA)/i.test(content);
+  const hasReportSections = /(?:1\.\s*STATUS\s+DA\s+LEITURA|STATUS\s+DA\s+LEITURA)/i.test(content) &&
+    /(?:DOCUMENTOS\s+ANALISADOS|RESUMO\s+DOS\s+FATOS|PARECER\s+DE\s+VIABILIDADE|DIAGNÓSTICO\s+JURÍDICO|CÁLCULO\s+ESTIMADO|ORIENTAÇÃO\s+DE\s+REDAÇÃO)/i.test(content);
+
+  return hasReportHeader || hasReportSections;
+};
+
+const isPetitionContent = (content: string = ''): boolean => {
   if (!content || content.length < 350) return false;
-  return /EXCELENTÍSSIMO|AO JUÍZO|DOS FATOS|DO DIREITO|DOS PEDIDOS|CONTESTAÇÃO|REQUERIMENTO|NOTIFICAÇÃO|PARECER|\[GERAÇÃO MODULAR\]|\[CORREÇÃO CIRÚRGICA\]|PROCESSO Nº|MANDADO DE SEGURANÇA|AGRAVO/i.test(content);
+
+  if (isReportContent(content)) return false;
+
+  const hasPetitionHeader = /(?:AO|EXCELENTÍSSIMO|AO\s+DOUTO|ILUSTRÍSSIMO)\s+(?:JUÍZO|JUIZ|TRIBUNAL|DESEMBARGADOR|MINISTRO|DELEGADO|GERENTE|INSS)/i.test(content) ||
+    /(?:PETIÇÃO\s+INICIAL|CONTESTAÇÃO|RECURSO\s+INOMINADO|AGRAVO\s+DE\s+INSTRUMENTO|APELAÇÃO|EMBARGOS\s+DE\s+DECLARAÇÃO|MANDADO\s+DE\s+SEGURANÇA|NOTIFICAÇÃO\s+EXTRAJUDICIAL|PARECER\s+JURÍDICO|REQUERIMENTO\s+ADMINISTRATIVO|MEMORIAIS\s+PROCEDIMENTAIS|HABEAS\s+DATA|HABEAS\s+CORPUS)/i.test(content);
+
+  const hasFatos = /(?:DOS\s+FATOS|I\s*-\s*DOS\s+FATOS|I\.\s*DOS\s+FATOS)/i.test(content);
+  const hasDireitoOuPedidos = /(?:DO\s+DIREITO|DOS\s+PEDIDOS|DO\s+MÉRITO|DOS\s+REQUERIMENTOS|DA\s+FUNDAMENTAÇÃO)/i.test(content);
+
+  return hasPetitionHeader || (hasFatos && hasDireitoOuPedidos);
+};
+
+const isArtifactContent = (content: string = ''): boolean => {
+  return isPetitionContent(content) || isReportContent(content);
+};
+
+export const getArtifactTypeInfo = (content: string = '') => {
+  if (isReportContent(content)) {
+    return {
+      type: 'report',
+      badgeLabel: 'Relatório do Processo',
+      panelSubtitle: 'Relatório do Processo / Análise Jurídica',
+      defaultTitle: 'Relatório de Análise do Processo'
+    };
+  }
+  return {
+    type: 'petition',
+    badgeLabel: 'Artefato de Peça',
+    panelSubtitle: 'Artefato de Peça Processual',
+    defaultTitle: 'Peça Processual / Documento Jurídico'
+  };
 };
 
 const getArtifactTitle = (content: string = '') => {
   if (!content) return "Documento Jurídico";
-  const match = content.match(/(?:AO JUÍZO|EXCELENTÍSSIMO|REQUERIMENTO|PETIÇÃO|CONTESTAÇÃO|PARECER|RECURSO|MANDADO|AGRAVO)[^\n]*/i);
-  if (match) {
-    const clean = match[0].replace(/[*#_]/g, '').trim();
-    if (clean.length > 5 && clean.length < 75) return clean;
+  const typeInfo = getArtifactTypeInfo(content);
+
+  if (typeInfo.type === 'report') {
+    const reportMatch = content.match(/(?:RELATÓRIO|AUDITORIA|ANÁLISE)[^\n]*/i);
+    if (reportMatch) {
+      const clean = reportMatch[0].replace(/[*#_]/g, '').trim();
+      if (clean.length > 5 && clean.length < 80) return clean;
+    }
+  } else {
+    const match = content.match(/(?:AO JUÍZO|EXCELENTÍSSIMO|REQUERIMENTO|PETIÇÃO|CONTESTAÇÃO|PARECER|RECURSO|MANDADO|AGRAVO|EMBARGOS)[^\n]*/i);
+    if (match) {
+      const clean = match[0].replace(/[*#_]/g, '').trim();
+      if (clean.length > 5 && clean.length < 80) return clean;
+    }
   }
+
   const headingMatch = content.match(/^#+\s*(.+)$/m);
   if (headingMatch && headingMatch[1]) {
     const clean = headingMatch[1].replace(/[*#_]/g, '').trim();
-    if (clean.length > 5 && clean.length < 75) return clean;
+    if (clean.length > 5 && clean.length < 80) return clean;
   }
-  return "Peça Processual / Documento Jurídico";
+
+  return typeInfo.defaultTitle;
 };
 
 export const cleanPetitionDocument = (rawContent: string = ''): string => {
   if (!rawContent) return '';
 
-  // Detect where the legal document starts
-  const startRegex = /(?:AO\s+JUÍZO|EXCELENTÍSSIMO|PROCESSO\s+Nº|REQUERIMENTO|CONTESTAÇÃO|PARECER\s+JURÍDICO|NOTIFICAÇÃO\s+EXTRAJUDICIAL|ILUSTRÍSSIMO|MEMORIAIS|AGRAVO|MANDADO\s+DE\s+SEGURANÇA)/i;
+  if (isReportContent(rawContent)) {
+    const startReportRegex = /(?:#+\s*RELATÓRIO|RELATÓRIO\s+DE\s+ANÁLISE|RELATÓRIO\s+DO\s+PROCESSO|AUDITORIA\s+PROCESSUAL|1\.\s*STATUS\s+DA\s+LEITURA|STATUS\s+DA\s+LEITURA)/i;
+    const matchReport = rawContent.match(startReportRegex);
+    let cleanedReport = rawContent;
+    if (matchReport && matchReport.index !== undefined && matchReport.index > 0) {
+      cleanedReport = rawContent.slice(matchReport.index);
+    }
+    const endRegex = /\n\n(?:Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição).*/i;
+    cleanedReport = cleanedReport.replace(endRegex, '');
+    return cleanedReport.trim();
+  }
+
+  const startRegex = /(?:AO\s+JUÍZO|EXCELENTÍSSIMO|PROCESSO\s+Nº|REQUERIMENTO|CONTESTAÇÃO|PARECER\s+JURÍDICO|NOTIFICAÇÃO\s+EXTRAJUDICIAL|ILUSTRÍSSIMO|MEMORIAIS|AGRAVO|MANDADO\s+DE\s+SEGURANÇA|PETIÇÃO\s+INICIAL|RECURSO)/i;
   const match = rawContent.match(startRegex);
 
   let cleaned = rawContent;
   if (match && match.index !== undefined && match.index > 0) {
-    // Cut off conversational preambles before the petition header!
     cleaned = rawContent.slice(match.index);
   }
 
-  // Remove trailing conversational sign-offs after the petition concludes
   const endRegex = /\n\n(?:Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição).*/i;
   cleaned = cleaned.replace(endRegex, '');
 
@@ -1772,7 +1833,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                                           {getArtifactTitle(msg.content)}
                                         </h4>
                                         <span className="text-[10px] font-semibold bg-emerald-200/60 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                                          Artefato de Peça
+                                          {getArtifactTypeInfo(msg.content).badgeLabel}
                                         </span>
                                       </div>
                                       <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
@@ -2145,7 +2206,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         </h3>
                         <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          Artefato de Peça Processual
+                          {getArtifactTypeInfo(content).panelSubtitle}
                         </p>
                       </div>
                     </div>
