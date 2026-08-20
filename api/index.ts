@@ -4817,7 +4817,7 @@ ${ragTruncated}`;
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
           // Correção pontual — REESCREVE A PETIÇÃO INTEIRA aplicando a correção, para não quebrar a persistência e UI
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
 O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo toda a estrutura, provas e citações idênticas à versão anterior, mas aplique a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -4828,14 +4828,14 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'ADDITION') {
           // Adição — REESCREVE A PETIÇÃO INTEIRA aplicando a adição
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo. REESCREVA a petição por completo, mantendo a estrutura da versão anterior, mas inserindo o novo argumento, tópico ou parágrafo no local apropriado.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -4845,15 +4845,14 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'FULL_REGENERATION') {
           // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
@@ -4864,7 +4863,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -5118,32 +5117,25 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
       res.end();
     } catch (err: any) {
       clearInterval(heartbeat);
-      (() => {
-    let _errStr = err.message ;
-    if (_errStr === 'CACHE_INVALID') {
-      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
-      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
-    }
-    if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
-      _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
-    }
-    res.write(`data: ${JSON.stringify({ error: _errStr })}\n\n`);
-  })();
+      let _errStr = err?.message || "Erro interno";
+      if (_errStr === 'CACHE_INVALID') {
+        try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
+        _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
+      }
+      if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
+        _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
+      }
+      try { res.write(`data: ${JSON.stringify({ error: _errStr })}\n\n`); } catch {}
       res.end();
     }
-  } catch (err: any) {
+  } catch (error: any) {
     clearInterval(heartbeat);
-    (() => {
-    let _errStr = err.message ;
-    if (_errStr === 'CACHE_INVALID') {
-      try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
-      _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
-    }
+    console.error("Error in chat (Dr. Michel):", error);
+    let _errStr = error?.message || "Falha no chat";
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
-    res.write(`data: ${JSON.stringify({ error: _errStr })}\n\n`);
-  })();
+    try { res.write(`data: ${JSON.stringify({ error: _errStr })}\n\n`); } catch {}
     res.end();
   }
 });
@@ -5498,7 +5490,7 @@ ${ragTruncated}`;
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
 O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -5509,13 +5501,13 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo à peça já existente. REESCREVA a petição inteira e completa integrando organicamente o novo parágrafo ou tópico.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -5525,14 +5517,13 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'FULL_REGENERATION') {
-          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
@@ -5543,7 +5534,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -6118,7 +6109,7 @@ REGRAS DE OURO:
 
       if (draftContent) {
         if (revisionIntent === 'POINT_CORRECTION') {
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
 O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a alteração ou remoção solicitada.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -6129,13 +6120,13 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça truncada ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça truncada ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'ADDITION') {
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
 O usuário pediu para ACRESCENTAR algo à peça. REESCREVA a petição inteira e completa integrando o novo parágrafo ou tópico apropriadamente.
 NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
@@ -6145,14 +6136,13 @@ NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         } else if (revisionIntent === 'FULL_REGENERATION') {
-          // FIX#3: injeta corpo real (60k chars) — com histórico completo no contexto, 60k é excelente
-          const draftParaRegen = draftContent.substring(0, 60000);
+          const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
 O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
@@ -6163,7 +6153,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 60000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
