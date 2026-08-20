@@ -3272,8 +3272,8 @@ let globalTitleAreasTimestamp = 0;
 
 app.post("/api/rag/plan", async (req, res) => {
   try {
-    const { caseContext, areas, dbConfig } = req.body;
-    console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
+    const { caseContext, areas, dbConfig, personaId } = req.body;
+    console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Persona: ${personaId || 'N/D'}. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
     
     // Choose active Supabase client based on client DB config (if present) to stay in sync with custom DB settings
     let activeSupabase = (dbConfig && dbConfig.url && dbConfig.key)
@@ -3294,6 +3294,24 @@ app.post("/api/rag/plan", async (req, res) => {
       } catch (err) {
         console.warn("[RAG PLAN_API] Error checking custom database legal_documents. Falling back to supabaseAdmin:", err);
         activeSupabase = supabaseAdmin;
+      }
+    }
+
+    let caseContextWithMemory = caseContext || "";
+    if (personaId) {
+      try {
+        const { data: rules } = await activeSupabase
+          .from('ai_memory_rules')
+          .select('rule_text')
+          .eq('active', true)
+          .in('persona', [personaId, 'global']);
+        if (rules && rules.length > 0) {
+          const rulesText = rules.map(r => r.rule_text).join('\n');
+          caseContextWithMemory += "\n\n[MEMÓRIA DE APRENDIZADO CONTÍNUO (REGRAS DE CONTEXTO)]\n" + rulesText;
+          console.log(`[RAG PLAN_API] Mescladas ${rules.length} regras de memória à varredura cognitiva de RAG.`);
+        }
+      } catch (err) {
+        console.warn("[RAG PLAN_API] Erro ao buscar regras de memória para plano:", err);
       }
     }
 
@@ -3426,7 +3444,7 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 2. PLANNER — Flash escolhe da lista (grounding)
-    const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContext).substring(0, 9000)}`;
+    const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContextWithMemory).substring(0, 9000)}`;
     
     let plan: any[] = [];
     try {
@@ -3585,7 +3603,7 @@ app.post("/api/rag/plan", async (req, res) => {
       .map((it: any) => it.titulo);
 
     // COGNITIVE SAFETY-NET: Se o caso tratar de qualquer especialidade (Cível, Consumidor, Trabalhista, Previdenciário), nós garantimos que as leis basilares, decretos e súmulas são injetados no plano de RAG.
-    const contextStr = String(caseContext).toLowerCase();
+    const contextStr = String(caseContextWithMemory).toLowerCase();
 
     // Helper para injetar/mesclar artigos em um título do plano curatedPlan (usa useFull = true para bypassar filtros de área na segurança cognitiva)
     const injectIntoPlan = (title: string, articles: string[], isWhole = false) => {
@@ -3649,8 +3667,8 @@ app.post("/api/rag/plan", async (req, res) => {
     };
 
     // 1. Deteção de Súmulas e Temas por Padrão Numérico
-    const sumulaMatches = caseContext.matchAll(/(?:s[uú]mula|s[uú]m)\s*(\d+)/gi);
-    const temaMatches = caseContext.matchAll(/(?:tema)\s*(\d+[\d\.]*)/gi);
+    const sumulaMatches = caseContextWithMemory.matchAll(/(?:s[uú]mula|s[uú]m)\s*(\d+)/gi);
+    const temaMatches = caseContextWithMemory.matchAll(/(?:tema)\s*(\d+[\d\.]*)/gi);
 
     for (const match of sumulaMatches) {
       const num = match[1];
@@ -3681,7 +3699,7 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 2. Detecção de correspondências de Leis/Decretos com artigos conjugados (Ex: "art. 42 da lei 8.213" ou "lei 8213, art 59")
-    const artBeforeLawMatches = caseContext.matchAll(/(?:arts?\.?|artigos?)\s+([0-9\s,e]+)\s*(?:da|do|de)?\s*(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
+    const artBeforeLawMatches = caseContextWithMemory.matchAll(/(?:arts?\.?|artigos?)\s+([0-9\s,e]+)\s*(?:da|do|de)?\s*(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
     for (const match of artBeforeLawMatches) {
       const arts = match[1].match(/\d+/g) || [];
       const type = match[2].toLowerCase();
@@ -3694,7 +3712,7 @@ app.post("/api/rag/plan", async (req, res) => {
       }
     }
 
-    const lawBeforeArtMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)\s*,?\s*(?:arts?\.?|artigos?)\s+([0-9\s,e]+)/gi);
+    const lawBeforeArtMatches = caseContextWithMemory.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)\s*,?\s*(?:arts?\.?|artigos?)\s+([0-9\s,e]+)/gi);
     for (const match of lawBeforeArtMatches) {
       const type = match[1].toLowerCase();
       const lawNum = match[2];
@@ -3708,7 +3726,7 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 3. Detecção de menção simples de Leis / Decretos com varredura local de artigos próximos
-    const genericLawMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
+    const genericLawMatches = caseContextWithMemory.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
     for (const match of genericLawMatches) {
       const type = match[1].toLowerCase();
       const lawNum = match[2];
@@ -3718,8 +3736,8 @@ app.post("/api/rag/plan", async (req, res) => {
       if (matchedTitle) {
         const matchIndex = match.index || 0;
         const windowStart = Math.max(0, matchIndex - 100);
-        const windowEnd = Math.min(caseContext.length, matchIndex + 150);
-        const contextWindow = caseContext.substring(windowStart, windowEnd);
+        const windowEnd = Math.min(caseContextWithMemory.length, matchIndex + 150);
+        const contextWindow = caseContextWithMemory.substring(windowStart, windowEnd);
         
         const localArts: string[] = [];
         const artMatches = contextWindow.matchAll(/(?:art\.?|artigo)\s*(\d+)/gi);
@@ -3749,13 +3767,13 @@ app.post("/api/rag/plan", async (req, res) => {
       const hasMention = normKeys.some(k => {
         if (k.length <= 4) {
           const regex = new RegExp(`(?:[^a-zA-Z]|^)${k}(?:[^a-zA-Z]|$)`, 'i');
-          return regex.test(caseContext);
+          return regex.test(caseContextWithMemory);
         }
-        return caseContext.toLowerCase().includes(k);
+        return caseContextWithMemory.toLowerCase().includes(k);
       });
 
       if (hasMention) {
-        const normStr = caseContext.toLowerCase();
+        const normStr = caseContextWithMemory.toLowerCase();
         let index = -1;
         for (const k of normKeys) {
           index = normStr.indexOf(k);
@@ -3765,8 +3783,8 @@ app.post("/api/rag/plan", async (req, res) => {
         const localArts: string[] = [];
         if (index > -1) {
           const windowStart = Math.max(0, index - 100);
-          const windowEnd = Math.min(caseContext.length, index + 150);
-          const contextWindow = caseContext.substring(windowStart, windowEnd);
+          const windowEnd = Math.min(caseContextWithMemory.length, index + 150);
+          const contextWindow = caseContextWithMemory.substring(windowStart, windowEnd);
           const artMatches = contextWindow.matchAll(/(?:art\.?|artigo)\s*(\d+)/gi);
           for (const am of artMatches) {
             localArts.push(am[1]);
@@ -4679,7 +4697,6 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     }
 
     let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
-    selectedSystemPrompt = await injectAiMemoryRules('dr-michel', selectedSystemPrompt);
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
@@ -5033,6 +5050,9 @@ ${message}`;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
+      // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
+      selectedSystemPrompt = await injectAiMemoryRules('dr-michel', selectedSystemPrompt);
+
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
@@ -5321,7 +5341,6 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     }
 
     let selectedSystemPrompt = DRA_LUANA_SYSTEM_PROMPT + getCurrentDateContext();
-    selectedSystemPrompt = await injectAiMemoryRules('dra-luana', selectedSystemPrompt);
 
     // Injeção de Diretrizes Customizadas Felix & Castro para Modos Inteligentes
     if (msgUpper.includes("[GERAÇÃO MODULAR]") || msgUpper.includes("[GERACAO MODULAR]")) {
@@ -5724,6 +5743,9 @@ ${message}`;
       const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
+      // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
+      selectedSystemPrompt = await injectAiMemoryRules('dra-luana', selectedSystemPrompt);
+
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
@@ -6017,7 +6039,6 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     }
 
     let selectedSystemPrompt = DR_FELIX_CASTRO_SYSTEM_PROMPT + getCurrentDateContext();
-    selectedSystemPrompt = await injectAiMemoryRules('dr-felix-castro', selectedSystemPrompt);
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
@@ -6337,6 +6358,9 @@ ${message}`;
       }
 
       const MAX_ATTEMPTS = 3;
+
+      // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
+      selectedSystemPrompt = await injectAiMemoryRules('dr-felix-castro', selectedSystemPrompt);
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
@@ -6746,7 +6770,6 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     }
 
     let selectedSystemPrompt = SEC_FABRICIA_PROMPT + getCurrentDateContext();
-    selectedSystemPrompt = await injectAiMemoryRules('sec-fabricia', selectedSystemPrompt);
     const temperature = 0.3; // A bit more creative for writing Whatsapp messages
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT ======
@@ -6947,6 +6970,9 @@ const currentContents = [...contents];
 let finalMaxTokensHit = false;
 const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : null;
 const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
+
+      // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
+      selectedSystemPrompt = await injectAiMemoryRules('sec-fabricia', selectedSystemPrompt);
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));

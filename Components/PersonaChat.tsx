@@ -725,7 +725,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             body: JSON.stringify({ 
               caseContext: plannerContext, 
               areas: AGENT_AREAS,
-              dbConfig: getDbConfig()
+              dbConfig: getDbConfig(),
+              personaId: persona.aiName
             }),
             signal: abortController.signal
           }).catch(err => {
