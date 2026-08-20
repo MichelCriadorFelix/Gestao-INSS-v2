@@ -34,6 +34,13 @@ import { AiMemoryModal } from './AiMemoryModal';
 import { PersonaConfig } from './personaConfig';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 
+const modelDisplayNames: Record<string, string> = {
+  'gemini-3.7-flash': 'Gemini 3.7 Flash',
+  'gemini-3.5-flash': 'Gemini 3.5 Flash',
+  'deepseek/deepseek-v4-flash': 'DeepSeek V4',
+  'anthropic/claude-3.5-sonnet': 'Claude 3.5 Sonnet',
+};
+
 interface ChatDocument {
   id: string;
   name: string;
@@ -1994,8 +2001,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${/Premium/.test(petitionLength) ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`}></span>
                 {/Premium/.test(petitionLength)
-                  ? `Tier Premium ativo · DeepSeek V3.2 (OpenRouter)`
-                  : `Tier ${petitionLength.replace(' palavras', 'p').replace(/(\d{4})/, '$1 palavras')} · DeepSeek V4 Flash`}
+                  ? `Tier Premium ativo · ${modelDisplayNames[selectedModel] || selectedModel}`
+                  : `Tier ${petitionLength.replace(' palavras', 'p').replace(/(\d{4})/, '$1 palavras')} · ${modelDisplayNames[selectedModel] || selectedModel}`}
               </div>
             )}
 
