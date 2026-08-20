@@ -2440,8 +2440,8 @@ function getEffectiveModel(modelName?: string): string {
 function getApiKeys() {
   const keys: string[] = [];
   
-  // Suporta chaves individuais (API_KEY_1...) ou listas (API_KEY, GEMINI_API_KEY)
-  const envVars = ['GEMINI_API_KEY', 'API_KEY'];
+  // Suporta chaves individuais (API_KEY_1...) ou listas (API_KEY, GEMINI_API_KEY, GEMINI_KEYS)
+  const envVars = ['GEMINI_API_KEY', 'API_KEY', 'GEMINI_KEYS'];
   for (let i = 1; i <= 40; i++) envVars.push(`API_KEY_${i}`);
 
   for (const envVar of envVars) {
