@@ -5194,15 +5194,15 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
     if (modelProvider !== 'openrouter') {
       const reqModel = req.body.model;
-      if (reqModel && (reqModel === 'gemini-3-flash-preview' || reqModel === 'gemini-3.5-flash')) {
-        model = reqModel;
+      if (reqModel) {
+        model = getEffectiveModel(reqModel);
         console.log(`[Dra.Luana] Usando modelo solicitado explicitamente: ${model}`);
       } else if (isStorageRequest && !isGenerationRequest) {
-        model = "gemini-3-flash-preview";
-        console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3-flash-preview' por padrão para processamento e leitura.");
+        model = "gemini-3.7-flash";
+        console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3.7-flash' por padrão.");
       } else {
-        model = "gemini-3.5-flash";
-        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.5-flash' por padrão.");
+        model = "gemini-3.7-flash";
+        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.7-flash' por padrão.");
       }
     }
 

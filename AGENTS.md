@@ -3,7 +3,7 @@
 ## Infraestrutura e Serviços
 - **Database e Storage:** Supabase Pro (PostgreSQL, pgvector para RAG, Auth, Storage).
 - **Hospedagem:** Vercel Pro (Deployment principal).
-- **Modelo de IA Padrão:** O modelo principal e padrão de todo o sistema é SEMPRE o `gemini-3.5-flash` (via `@google/genai` SSR stream).
+- **Modelo de IA Padrão:** O modelo principal e padrão de todo o sistema é SEMPRE o `gemini-3.7-flash` (via `@google/genai` SSR stream).
 - **Modelos Alternativos:** Integração com OpenRouter (Modelos Elite) para requisições específicas via API.
 
 ## Funcionalidades Core

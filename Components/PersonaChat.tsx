@@ -129,8 +129,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
-  const [selectedModelProvider, setSelectedModelProvider] = useState('openrouter');
-  const [selectedModel, setSelectedModel] = useState('deepseek/deepseek-v4-flash');
+  const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2052,12 +2052,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   <select
                     value={petitionLength}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      setPetitionLength(val);
-                      if (val === 'Premium 7000 palavras') {
-                        setSelectedModel('deepseek/deepseek-v4-flash');
-                        setSelectedModelProvider('openrouter');
-                      }
+                      setPetitionLength(e.target.value);
                     }}
                     className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-xs text-slate-600 dark:text-slate-300 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/30 cursor-pointer flex-1 min-w-0 max-w-[80px] sm:max-w-none sm:w-auto truncate shrink"
                     title="Tamanho da Peça (Padrão Ouro Felix & Castro)"
