@@ -4656,6 +4656,28 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
+    // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
+    let draftContent = "";
+    if (sessionId) {
+      try {
+        const { data: draftData } = await supabaseAdmin
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dr_michel_${sessionId}`)
+          .maybeSingle();
+
+        if (draftData && draftData.messages && draftData.messages.length > 0) {
+          draftContent = draftData.messages[0].content || "";
+        }
+      } catch (e) {
+        console.error("Supabase petition_draft fetch error early:", e);
+      }
+    }
+
+    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+
     const intent = await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
     
@@ -4665,15 +4687,17 @@ app.post("/api/dr-michel/chat", async (req, res) => {
                             msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
                             msgUpper.includes("[VALIDACAO E AUDITORIA]");
 
-    const isGenerationIntent = intent === "[GERAÇÃO]";
-    const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
+    // BLINDAGEM: Se estamos revisando uma peça existente, a intenção DEVE ser tratada como GERAÇÃO
+    const isGenerationIntent = intent === "[GERAÇÃO]" || isRevisionRequested;
+    const isCasualIntent = intent === "[CASUAL]" && !isRevisionRequested;
+    const isStorageIntent = (intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA")) && !isRevisionRequested;
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
     // Prioridade sobre qualquer classificação de intenção por IA.
     const isGenerationRequest = !isReportRequest && (
       isGenerationIntent ||
+      isRevisionRequested ||
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
@@ -4919,29 +4943,11 @@ Leis/jurisprudências recuperadas:
 ${ragTruncated}`;
     }
 
-    // FIX#1: sempre busca draft quando há sessionId (não depende mais de isCorrectionRequest)
-      if (sessionId) {
-      let draftContent = "";
-      try {
-        const { data: draftData } = await supabaseAdmin
-          .from('ai_conversations')
-          .select('messages')
-          .eq('lawyer_type', 'petition_draft')
-          .eq('id', `draft_dr_michel_${sessionId}`)
-          .maybeSingle();
-
-        if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content || "";
-        }
-      } catch (e) {
-        console.error("Supabase petition_draft fetch error:", e);
-      }
-
-      const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Reutilizar o rascunho buscado precocemente para injeção de contexto na revisão
+    if (draftContent) {
       console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION') {
+      if (revisionIntent === 'POINT_CORRECTION') {
           // Correção pontual — REESCREVE A PETIÇÃO INTEIRA aplicando a correção, para não quebrar a persistência e UI
           const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
@@ -4995,7 +5001,6 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         }
-      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
@@ -5281,6 +5286,28 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
+    // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
+    let draftContent = "";
+    if (sessionId) {
+      try {
+        const { data: draftData } = await supabaseAdmin
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dra_luana_${sessionId}`)
+          .maybeSingle();
+
+        if (draftData && draftData.messages && draftData.messages.length > 0) {
+          draftContent = draftData.messages[0].content || "";
+        }
+      } catch (e) {
+        console.error("Supabase petition_draft fetch error early (Luana):", e);
+      }
+    }
+
+    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
@@ -5290,9 +5317,10 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                                  msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
                                  msgUpper.includes("[VALIDACAO E AUDITORIA]");
 
-    const isGenerationIntent = intent === "[GERAÇÃO]";
-    const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
+    // BLINDAGEM: Se estamos revisando uma peça existente, a intenção DEVE ser tratada como GERAÇÃO
+    const isGenerationIntent = intent === "[GERAÇÃO]" || isRevisionRequested;
+    const isCasualIntent = intent === "[CASUAL]" && !isRevisionRequested;
+    const isStorageIntent = (intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA")) && !isRevisionRequested;
 
     const isStorageRequest = isStorageIntent || 
                              message.includes("INSTRUÇÃO OBRIGATÓRIA: Apenas armazene") || 
@@ -5302,6 +5330,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     // Prioridade sobre qualquer classificação de intenção por IA.
     const isGenerationRequest = !isReportRequestLuana && (
       isGenerationIntent ||
+      isRevisionRequested ||
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
@@ -5599,29 +5628,11 @@ Leis/jurisprudências recuperadas:
 ${ragTruncated}`;
     }
 
-    // FIX#1: sempre busca draft quando há sessionId
-      if (sessionId) {
-      let draftContent = "";
-      try {
-        const { data: draftData } = await supabaseAdmin
-          .from('ai_conversations')
-          .select('messages')
-          .eq('lawyer_type', 'petition_draft')
-          .eq('id', `draft_dra_luana_${sessionId}`)
-          .maybeSingle();
-
-        if (draftData && draftData.messages && draftData.messages.length > 0) {
-          draftContent = draftData.messages[0].content || "";
-        }
-      } catch (e) {
-        console.error("Supabase petition_draft fetch error:", e);
-      }
-
-      const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Reutilizar o rascunho buscado precocemente para injeção de contexto na revisão
+    if (draftContent) {
       console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION') {
+      if (revisionIntent === 'POINT_CORRECTION') {
           const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
 O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a alteração ou remoção solicitada.
@@ -5672,7 +5683,6 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         }
-      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
@@ -5998,6 +6008,28 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
     message = message || "";
 
+    // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
+    let draftContent = "";
+    if (sessionId) {
+      try {
+        const { data: draftData } = await supabaseAdmin
+          .from('ai_conversations')
+          .select('messages')
+          .eq('lawyer_type', 'petition_draft')
+          .eq('id', `draft_dr_felix_castro_${sessionId}`)
+          .maybeSingle();
+
+        if (draftData && draftData.messages && draftData.messages.length > 0) {
+          draftContent = draftData.messages[0].content || "";
+        }
+      } catch (e) {
+        console.error("Supabase petition_draft fetch error early (Felix Castro):", e);
+      }
+    }
+
+    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+
     const intent = await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
     
@@ -6007,15 +6039,17 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
                             msgUpper.includes("[VALIDAÇÃO E AUDITORIA]") || 
                             msgUpper.includes("[VALIDACAO E AUDITORIA]");
 
-    const isGenerationIntent = intent === "[GERAÇÃO]";
-    const isCasualIntent = intent === "[CASUAL]";
-    const isStorageIntent = intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA");
+    // BLINDAGEM: Se estamos revisando uma peça existente, a intenção DEVE ser tratada como GERAÇÃO
+    const isGenerationIntent = intent === "[GERAÇÃO]" || isRevisionRequested;
+    const isCasualIntent = intent === "[CASUAL]" && !isRevisionRequested;
+    const isStorageIntent = (intent === "[ARQUIVO]" || message.includes("FASE DE TOMADA DE CIÊNCIA")) && !isRevisionRequested;
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
     // BLINDAGEM ABSOLUTA: se é pedido de relatório, JAMAIS é geração de peça.
     // Prioridade sobre qualquer classificação de intenção por IA.
     const isGenerationRequest = !isReportRequest && (
       isGenerationIntent ||
+      isRevisionRequested ||
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
@@ -6226,27 +6260,11 @@ REGRAS DE OURO:
     }
     if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
 
-    // Draft injection para revisão — sempre busca quando há sessionId
-    if (sessionId) {
-      let draftContent = "";
-      try {
-        const { data: draftRow } = await supabaseAdmin
-          .from('ai_conversations')
-          .select('messages')
-          .eq('id', `draft_dr_felix_castro_${sessionId}`)
-          .single();
-        if (draftRow?.messages?.[0]?.content) {
-          draftContent = draftRow.messages[0].content;
-        }
-      } catch (e) {
-        console.error("Supabase petition_draft fetch error (FelixCastro):", e);
-      }
-
-      const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Reutilizar o rascunho buscado precocemente para injeção de contexto na revisão
+    if (draftContent) {
       console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (draftContent) {
-        if (revisionIntent === 'POINT_CORRECTION') {
+      if (revisionIntent === 'POINT_CORRECTION') {
           const draftParaRegen = draftContent.substring(0, 200000);
           finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
 O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a alteração ou remoção solicitada.
@@ -6297,7 +6315,6 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
         }
-      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
