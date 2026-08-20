@@ -3681,29 +3681,29 @@ app.post("/api/rag/plan", async (req, res) => {
     }
 
     // 2. Detecção de correspondências de Leis/Decretos com artigos conjugados (Ex: "art. 42 da lei 8.213" ou "lei 8213, art 59")
-    const artBeforeLawMatches = caseContext.matchAll(/(?:art\.?|artigo)\s*(\d+)\s*(?:[º°ª\s])*(?:da|do|de)?\s*(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
+    const artBeforeLawMatches = caseContext.matchAll(/(?:arts?\.?|artigos?)\s+([0-9\s,e]+)\s*(?:da|do|de)?\s*(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)/gi);
     for (const match of artBeforeLawMatches) {
-      const art = match[1];
+      const arts = match[1].match(/\d+/g) || [];
       const type = match[2].toLowerCase();
       const lawNum = match[3];
       const isDecreto = type === "decreto";
       
       const matchedTitle = allDbTitles.find(t => matchLawTitle(t, lawNum, isDecreto));
-      if (matchedTitle) {
-        injectIntoPlan(matchedTitle, [art]);
+      if (matchedTitle && arts.length > 0) {
+        injectIntoPlan(matchedTitle, arts);
       }
     }
 
-    const lawBeforeArtMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)\s*,?\s*(?:art\.?|artigo)\s*(\d+)/gi);
+    const lawBeforeArtMatches = caseContext.matchAll(/(lei|decreto)\s*(?:nº\s*)?(\d+[\d\.]*)\s*,?\s*(?:arts?\.?|artigos?)\s+([0-9\s,e]+)/gi);
     for (const match of lawBeforeArtMatches) {
       const type = match[1].toLowerCase();
       const lawNum = match[2];
-      const art = match[3];
+      const arts = match[3].match(/\d+/g) || [];
       const isDecreto = type === "decreto";
       
       const matchedTitle = allDbTitles.find(t => matchLawTitle(t, lawNum, isDecreto));
-      if (matchedTitle) {
-        injectIntoPlan(matchedTitle, [art]);
+      if (matchedTitle && arts.length > 0) {
+        injectIntoPlan(matchedTitle, arts);
       }
     }
 
@@ -4070,15 +4070,28 @@ app.post("/api/rag/plan", async (req, res) => {
         // determinística. Casa "Art. 42", "Art. 42.", "Art. 42,", "Art. 42-", "Art. 42 "
         // e parágrafos "§ 42", tolerando o número colado a ponto/vírgula/espaço/fim.
         if (!planItem.integral && Array.isArray(planItem.artigos) && planItem.artigos.length > 0) {
-          const artRegexes = planItem.artigos.map((numRaw: string) => {
-            const num = String(numRaw).trim();
-            const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // (?:[^\d]|$) garante que "42" não case dentro de "428" ou "420"
-            return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${esc}(?:[^0-9]|$)`, 'i');
+          // Normaliza os artigos pedidos: separa strings com vírgulas ou 'e' e extrai só os números/identificadores
+          const flatArts: string[] = [];
+          planItem.artigos.forEach((a: string) => {
+            const parts = String(a).split(/(?:,| e | ou |;|\/)/i);
+            parts.forEach(p => {
+              const clean = p.trim();
+              const numMatch = clean.match(/\d+[-a-zA-Z]*/);
+              if (numMatch) flatArts.push(numMatch[0]);
+            });
           });
-          rows = rows.filter((d: any) =>
-            artRegexes.some((re: RegExp) => re.test(d.content || ''))
-          );
+          
+          if (flatArts.length > 0) {
+            const artRegexes = flatArts.map((numRaw: string) => {
+              const num = String(numRaw).trim();
+              const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              // (?:[^\d]|$) garante que "42" não case dentro de "428" ou "420"
+              return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${esc}(?:[^0-9]|$)`, 'i');
+            });
+            rows = rows.filter((d: any) =>
+              artRegexes.some((re: RegExp) => re.test(d.content || ''))
+            );
+          }
         }
 
         return rows.map((d: any) => ({
