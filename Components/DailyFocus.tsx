@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AgendaEvent, ClientRecord, ContractRecord, User } from '../types';
-import { format, isBefore, startOfDay, addDays, parseISO, isSameDay } from 'date-fns';
+import { AgendaEvent, ClientRecord, ContractRecord, User, FocusTask, TaskLogEntry } from '../types';
+import { format, isBefore, startOfDay, addDays, parseISO, isSameDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   CheckCircleIcon, 
@@ -9,7 +9,10 @@ import {
   ExclamationCircleIcon,
   DocumentTextIcon,
   CalendarIcon,
-  SparklesIcon
+  SparklesIcon,
+  UserIcon,
+  TagIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 import { isUrgentDate, parseDate } from '../utils';
 
@@ -24,26 +27,37 @@ interface DailyFocusProps {
   onUpdateDailyFocus?: (state: any) => void;
 }
 
-interface FocusTask {
-  id: string;
-  title: string;
-  description: string;
-  type: 'alert' | 'contract' | 'postponed';
-  priority: 'high' | 'medium' | 'low';
-  dueDate?: string;
-  clientId?: string;
-  clientName?: string;
-  originalAlertKey?: string;
-}
+// Helper to safely parse dates in various formats: ISO, YYYY-MM-DD, or DD/MM/YYYY
+const parseAnyDate = (dateVal: string | undefined | null): Date | null => {
+  if (!dateVal) return null;
+  const trimmed = String(dateVal).trim();
+  if (!trimmed) return null;
+  
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length === 3) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      const date = new Date(y, m, d);
+      return isNaN(date.getTime()) ? null : date;
+    }
+  }
 
-interface TaskLogEntry {
-  id: string;
-  taskId: string;
-  title: string;
-  action: 'completed' | 'discarded' | 'postponed';
-  completedAt: string;
-  completedBy: string;
-}
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  try {
+    const d = parseISO(trimmed);
+    if (!isNaN(d.getTime())) return d;
+  } catch (e) {}
+
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+};
 
 export default function DailyFocus({ events, clients, contracts, user, darkMode, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }: DailyFocusProps) {
   const resolvedTasks = dailyFocusState?.resolvedTasks || [];
@@ -72,23 +86,44 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       if (contract.status === 'Pendente') {
         const taskId = `contract-${contract.id}`;
         if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
-          let parsedDate;
-          try {
-            parsedDate = parseISO(contract.createdAt);
-            if (isNaN(parsedDate.getTime())) throw new Error("Invalid date");
-          } catch (e) {
-            parsedDate = new Date();
+          const parsedDate = parseAnyDate(contract.createdAt) || new Date();
+          const todayStart = startOfDay(today);
+          const contractDateStart = startOfDay(parsedDate);
+          const daysPending = differenceInDays(todayStart, contractDateStart);
+
+          let elapsedText = '';
+          if (daysPending <= 0) {
+            elapsedText = 'Assinado hoje';
+          } else if (daysPending === 1) {
+            elapsedText = 'Pendente há 1 dia (ontem)';
+          } else if (daysPending < 30) {
+            elapsedText = `Pendente há ${daysPending} dias`;
+          } else if (daysPending < 60) {
+            const remainingDays = daysPending % 30;
+            elapsedText = remainingDays === 0 ? 'Pendente há 1 mês' : `Pendente há 1 mês e ${remainingDays}d (${daysPending}d)`;
+          } else {
+            const months = Math.floor(daysPending / 30);
+            const remainingDays = daysPending % 30;
+            elapsedText = remainingDays === 0 ? `Pendente há ${months} meses` : `Pendente há ${months} meses e ${remainingDays}d (${daysPending}d)`;
           }
+
+          const clientFullName = `${contract.firstName} ${contract.lastName}`.trim();
+          const dateFormatted = format(parsedDate, 'dd/MM/yyyy');
 
           tasks.push({
             id: taskId,
-            title: `Contrato Pendente - ${contract.firstName} ${contract.lastName}`,
-            description: `Contrato assinado em ${format(parsedDate, 'dd/MM/yyyy')}. Necessário protocolar/dar andamento.`,
+            title: `Contrato Pendente - ${clientFullName}`,
+            description: `Contrato assinado em ${dateFormatted} (${elapsedText}). Necessário protocolar/dar andamento.`,
             type: 'contract',
-            priority: 'high',
+            priority: daysPending >= 15 ? 'high' : 'high',
             dueDate: contract.createdAt,
             clientId: contract.clientId,
-            clientName: `${contract.firstName} ${contract.lastName}`
+            clientName: clientFullName,
+            eventDateFormatted: dateFormatted,
+            elapsedOrRemainingText: elapsedText,
+            serviceType: contract.serviceType || 'Processo / Benefício',
+            lawyerName: contract.lawyer ? (contract.lawyer === 'Michel' ? 'Dr. Michel' : 'Dra. Luana') : undefined,
+            categoryBadge: 'Contrato Pendente'
           });
         }
       }
@@ -101,7 +136,11 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       if (!isPostponedA && isPostponedB) return 1;
       if (a.priority === 'high' && b.priority !== 'high') return -1;
       if (a.priority !== 'high' && b.priority === 'high') return 1;
-      if (a.dueDate && b.dueDate) return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime();
+      if (a.dueDate && b.dueDate) {
+        const dateA = parseAnyDate(a.dueDate)?.getTime() || 0;
+        const dateB = parseAnyDate(b.dueDate)?.getTime() || 0;
+        return dateA - dateB;
+      }
       return 0;
     });
 
@@ -133,19 +172,42 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
         if (dateStr && isUrgentDate(dateStr)) {
           const taskId = `alert-${client.id}-${key}`;
           if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
-            const parsedDate = parseDate(dateStr);
+            const parsedDate = parseAnyDate(dateStr);
             if (!parsedDate) return;
+
+            const todayStart = startOfDay(today);
+            const targetDateStart = startOfDay(parsedDate);
+            const diffDays = differenceInDays(targetDateStart, todayStart);
+
+            let timingText = '';
+            if (diffDays === 0) {
+              timingText = 'Vence Hoje';
+            } else if (diffDays === 1) {
+              timingText = 'Vence Amanhã';
+            } else if (diffDays === -1) {
+              timingText = 'Vencido ontem (1 dia)';
+            } else if (diffDays < -1) {
+              timingText = `Vencido há ${Math.abs(diffDays)} dias`;
+            } else {
+              timingText = `Vence em ${diffDays} dias`;
+            }
+
+            const dateFormatted = format(parsedDate, 'dd/MM/yyyy');
 
             tasks.push({
               id: taskId,
               title: `${title} - ${client.name}`,
-              description: `Vencimento: ${format(parsedDate, 'dd/MM/yyyy')}`,
+              description: `Data do Prazo: ${dateFormatted} (${timingText})`,
               type: 'alert',
               priority: isBefore(parsedDate, startOfDay(today)) ? 'high' : 'medium',
               dueDate: parsedDate.toISOString(),
               clientId: client.id,
               clientName: client.name,
-              originalAlertKey: key
+              originalAlertKey: key,
+              eventDateFormatted: dateFormatted,
+              elapsedOrRemainingText: timingText,
+              serviceType: client.type || 'Benefício INSS',
+              categoryBadge: title
             });
           }
         }
@@ -154,7 +216,7 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       checkAlert(client.extensionDate, 'Prorrogação', 'extension');
       checkAlert(client.medExpertiseDate, 'Perícia Médica', 'medExpertise');
       checkAlert(client.socialExpertiseDate, 'Perícia Social', 'socialExpertise');
-      checkAlert(client.dcbDate, 'DCB', 'dcb');
+      checkAlert(client.dcbDate, 'DCB (Cessação)', 'dcb');
       checkAlert(client.ninetyDaysDate, 'Revisão 90 Dias', 'ninetyDays');
       checkAlert(client.securityMandateDate, 'Mandado de Segurança', 'securityMandate');
     });
@@ -163,19 +225,47 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
     events.forEach(event => {
       if (event.status === 'resolved' || event.status === 'cancelled') return;
       
-      const eventDate = parseISO(event.date);
+      const eventDate = parseAnyDate(event.date) || new Date();
       if (isBefore(eventDate, startOfDay(today)) || isSameDay(eventDate, today)) {
         const taskId = `agenda-${event.id}`;
         if (!resolvedTasks.includes(taskId) && !postponedTasks.find((p: FocusTask) => p.id === taskId)) {
+          const todayStart = startOfDay(today);
+          const eventDateStart = startOfDay(eventDate);
+          const diffDays = differenceInDays(eventDateStart, todayStart);
+
+          let timingText = '';
+          if (diffDays === 0) {
+            timingText = 'Hoje';
+          } else if (diffDays === 1) {
+            timingText = 'Amanhã';
+          } else if (diffDays === -1) {
+            timingText = 'Ontem (Atrasado)';
+          } else if (diffDays < -1) {
+            timingText = `Atrasado há ${Math.abs(diffDays)} dias`;
+          } else {
+            timingText = `Em ${diffDays} dias`;
+          }
+
+          const eventTypeCap = event.type.charAt(0).toUpperCase() + event.type.slice(1);
+          const dateFormatted = format(eventDate, 'dd/MM/yyyy');
+          const timeStr = event.time || '09:00';
+          const clientOrDesc = event.clientName || event.description || 'Compromisso';
+
           tasks.push({
             id: taskId,
-            title: `Agenda: ${event.type.charAt(0).toUpperCase() + event.type.slice(1)}`,
-            description: `${event.time} - ${event.clientName || event.description}`,
+            title: `Agenda: ${eventTypeCap} - ${clientOrDesc}`,
+            description: `Data: ${dateFormatted} às ${timeStr} (${timingText})${event.location ? ` • Local: ${event.location}` : ''}`,
             type: 'alert',
             priority: isBefore(eventDate, startOfDay(today)) ? 'high' : 'medium',
             dueDate: event.date,
             clientId: event.clientId,
-            clientName: event.clientName
+            clientName: event.clientName || event.description,
+            eventDateFormatted: dateFormatted,
+            eventTime: timeStr,
+            elapsedOrRemainingText: timingText,
+            location: event.location,
+            serviceType: event.benefitType ? `Benefício: ${event.benefitType}` : undefined,
+            categoryBadge: `Agenda (${eventTypeCap})`
           });
         }
       }
@@ -188,7 +278,11 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
       if (!isPostponedA && isPostponedB) return 1;
       if (a.priority === 'high' && b.priority !== 'high') return -1;
       if (a.priority !== 'high' && b.priority === 'high') return 1;
-      if (a.dueDate && b.dueDate) return parseISO(a.dueDate).getTime() - parseISO(b.dueDate).getTime();
+      if (a.dueDate && b.dueDate) {
+        const dateA = parseAnyDate(a.dueDate)?.getTime() || 0;
+        const dateB = parseAnyDate(b.dueDate)?.getTime() || 0;
+        return dateA - dateB;
+      }
       return 0;
     });
 
@@ -286,38 +380,151 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
                 key={task.id} 
                 className={`flex flex-col p-4 rounded-2xl border shadow-sm transition-all hover:shadow-md ${
                   darkMode 
-                    ? 'bg-slate-800 border-slate-700 hover:border-primary-500/50' 
+                    ? 'bg-slate-800/95 border-slate-700 hover:border-primary-500/50' 
                     : 'bg-white border-slate-200 hover:border-primary-300'
-                } ${task.priority === 'high' ? 'ring-1 ring-red-500/50' : ''}`}
+                } ${task.priority === 'high' ? 'ring-1 ring-red-500/50 dark:ring-red-500/40' : ''}`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`p-2 rounded-lg ${
-                    task.type === 'alert' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
-                    task.type === 'contract' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
-                    'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
-                  }`}>
-                    {task.type === 'alert' ? <ExclamationCircleIcon className="w-5 h-5" /> :
-                     task.type === 'contract' ? <DocumentTextIcon className="w-5 h-5" /> :
-                     <CalendarIcon className="w-5 h-5" />}
+                {/* Header: Icon + Category Badge + Priority */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${
+                      task.type === 'contract' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
+                      task.categoryBadge?.includes('Perícia') ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
+                      task.categoryBadge?.includes('Atendimento') ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                      task.categoryBadge?.includes('Audiência') ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                      'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                    }`}>
+                      {task.type === 'contract' ? <DocumentTextIcon className="w-4 h-4" /> :
+                       task.categoryBadge?.includes('Perícia') ? <SparklesIcon className="w-4 h-4" /> :
+                       task.categoryBadge?.includes('Agenda') ? <CalendarIcon className="w-4 h-4" /> :
+                       <ExclamationCircleIcon className="w-4 h-4" />}
+                    </div>
+                    <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 truncate">
+                      {task.categoryBadge || (task.type === 'contract' ? 'Contrato' : 'Prazo')}
+                    </span>
                   </div>
+
                   {task.priority === 'high' && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0">
                       Urgente
                     </span>
                   )}
                 </div>
                 
-                <h3 className={`font-bold text-sm mb-1 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                {/* Title */}
+                <h3 className={`font-bold text-sm mb-2.5 leading-snug line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                   {task.title}
                 </h3>
-                <p className={`text-xs mb-4 flex-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {task.description}
-                </p>
+
+                {/* Structured Metadata Box */}
+                <div className={`p-2.5 rounded-xl text-xs space-y-1.5 mb-3 flex-1 ${
+                  darkMode ? 'bg-slate-900/50 border border-slate-700/60' : 'bg-slate-50 border border-slate-100'
+                }`}>
+                  {/* Contrato Info */}
+                  {task.type === 'contract' ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <CalendarIcon className="w-3.5 h-3.5 opacity-70" /> Assinado em:
+                        </span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {task.eventDateFormatted || 'Data não informada'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <ClockIcon className="w-3.5 h-3.5 opacity-70" /> Tempo:
+                        </span>
+                        <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-[11px]">
+                          {task.elapsedOrRemainingText || 'Pendente'}
+                        </span>
+                      </div>
+
+                      {task.serviceType && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 truncate">Serviço:</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[140px] text-right">
+                            {task.serviceType}
+                          </span>
+                        </div>
+                      )}
+
+                      {task.lawyerName && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400">Responsável:</span>
+                          <span className="font-medium text-primary-600 dark:text-primary-400">
+                            {task.lawyerName}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Prazos e Agenda Info */
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <CalendarIcon className="w-3.5 h-3.5 opacity-70" /> Data:
+                        </span>
+                        <span className="font-bold text-primary-700 dark:text-primary-300">
+                          {task.eventDateFormatted} {task.eventTime ? `às ${task.eventTime}` : ''}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <ClockIcon className="w-3.5 h-3.5 opacity-70" /> Situação:
+                        </span>
+                        <span className={`font-semibold px-1.5 py-0.5 rounded text-[11px] ${
+                          task.elapsedOrRemainingText?.includes('Atrasado') || task.elapsedOrRemainingText?.includes('Vencido')
+                            ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : task.elapsedOrRemainingText === 'Hoje' || task.elapsedOrRemainingText === 'Vence Hoje'
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-bold'
+                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          {task.elapsedOrRemainingText || 'Pendente'}
+                        </span>
+                      </div>
+
+                      {task.clientName && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <UserIcon className="w-3 h-3 opacity-70" /> Cliente:
+                          </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
+                            {task.clientName}
+                          </span>
+                        </div>
+                      )}
+
+                      {task.location && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <TagIcon className="w-3 h-3 opacity-70" /> Local:
+                          </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
+                            {task.location}
+                          </span>
+                        </div>
+                      )}
+
+                      {task.serviceType && !task.location && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400">Assunto:</span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
+                            {task.serviceType}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
                 
+                {/* Action Buttons */}
                 <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-gold-500/15">
                   <button 
                     onClick={() => handleAction(task, 'completed')}
-                    title="Marcar como Concluído"
+                    title="Marcar como Concluído / Protocolado"
                     className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition-colors"
                   >
                     <CheckCircleIcon className="w-5 h-5" />

@@ -112,13 +112,20 @@ export interface FocusTask {
   clientId?: string;
   clientName?: string;
   originalAlertKey?: string;
+  eventDateFormatted?: string;
+  eventTime?: string;
+  elapsedOrRemainingText?: string;
+  serviceType?: string;
+  lawyerName?: string;
+  location?: string;
+  categoryBadge?: string;
 }
 
 export interface TaskLogEntry {
   id: string;
   taskId: string;
   title: string;
-  action: 'completed' | 'discarded';
+  action: 'completed' | 'discarded' | 'postponed';
   completedAt: string;
   completedBy: string;
 }
