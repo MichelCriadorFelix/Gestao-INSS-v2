@@ -4487,6 +4487,111 @@ app.delete("/api/ai-memory-rules/:id", async (req, res) => {
 });
 
 // ====================================================================
+// AUTOMATED BACKEND-MANAGED CONTEXT CACHING
+// Evita reenviar documentos gigantes em todas as mensagens do chat.
+// Vincula o cache de contexto ao modelo selecionado e rotaciona chaves.
+// ====================================================================
+interface SessionCacheInfo {
+  cacheName: string;
+  keyIndex: number;
+  expiresAt: number;
+  textLength: number;
+  model: string;
+}
+
+const documentCaches = new Map<string, SessionCacheInfo>();
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+async function getOrBuildContextCache(
+  sessionId: string | undefined,
+  documentText: string | undefined,
+  modelName: string,
+  res: any
+): Promise<{ cacheName: string; keyIndex: number } | null> {
+  if (!documentText || documentText.length < 30000) {
+    return null;
+  }
+
+  const cacheKey = sessionId ? `${sessionId}_${modelName}` : `hash_${hashString(documentText)}_${modelName}`;
+  const existing = documentCaches.get(cacheKey);
+  const keys = getApiKeys();
+
+  if (keys.length === 0) return null;
+
+  if (existing && existing.textLength === documentText.length && existing.expiresAt > Date.now()) {
+    try {
+      const idx = existing.keyIndex % keys.length;
+      const aiCacheCheck = new GoogleGenAI({ apiKey: keys[idx] });
+      // Renovação deslizante: update estende o TTL por +1h
+      await aiCacheCheck.caches.update({ name: existing.cacheName, config: { ttl: '3600s' } });
+      existing.expiresAt = Date.now() + 3500 * 1000;
+      console.log(`[AUTO-CACHE] 💾 Reusando cache existente: ${existing.cacheName} (chave ${idx}) para ${modelName}`);
+      try {
+        res.write(`data: ${JSON.stringify({ status: `💾 [Cache Ativo] Usando cache inteligente de alta velocidade para o documento (${Math.round(documentText.length / 1000)}k caracteres)...` })}\n\n`);
+      } catch {}
+      return { cacheName: existing.cacheName, keyIndex: idx };
+    } catch (cacheErr: any) {
+      console.warn(`[AUTO-CACHE] Cache anterior inválido/expirado (${existing.cacheName}):`, cacheErr.message);
+      documentCaches.delete(cacheKey);
+    }
+  }
+
+  // Criar novo context cache
+  try {
+    console.log(`[AUTO-CACHE] ⚡ Criando novo cache de contexto para ${modelName} (~${Math.round(documentText.length / 1000)}k caracteres)...`);
+    try {
+      res.write(`data: ${JSON.stringify({ status: `⚡ [Otimização] Criando cache de contexto de alta velocidade para o documento (${Math.round(documentText.length / 1000)}k caracteres)...` })}\n\n`);
+    } catch {}
+
+    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    const idx = currentKeyIndex;
+    const ai = new GoogleGenAI({ apiKey: keys[idx] });
+
+    const cache = await ai.caches.create({
+      model: modelName,
+      config: {
+        contents: [{ role: 'user', parts: [{ text: "DOCUMENTOS DO CASO (ÍNTEGRA PARA CONSULTA E CITAÇÃO LITERAL):\n\n" + documentText }] }],
+        ttl: '3600s',
+        displayName: `doc-cache-${Date.now()}`
+      }
+    });
+
+    if (!cache.name) {
+      throw new Error("Não foi possível gerar um nome para o cache.");
+    }
+
+    const cacheInfo: SessionCacheInfo = {
+      cacheName: cache.name as string,
+      keyIndex: idx,
+      expiresAt: Date.now() + 3500 * 1000,
+      textLength: documentText.length,
+      model: modelName
+    };
+
+    documentCaches.set(cacheKey, cacheInfo);
+    console.log(`[AUTO-CACHE] 💾 Criado com sucesso: ${cache.name} na chave ${idx} para modelo ${modelName}`);
+    try {
+      res.write(`data: ${JSON.stringify({ status: `💾 [Cache Ativo] Documento otimizado! Suas respostas e alterações serão processadas instantaneamente.` })}\n\n`);
+    } catch {}
+    return { cacheName: cache.name as string, keyIndex: idx };
+  } catch (err: any) {
+    console.warn("[AUTO-CACHE] Falha ao criar cache de contexto (fluxo segue sem cache):", err.message);
+    try {
+      res.write(`data: ${JSON.stringify({ status: `⚠️ [Aviso Cache] Não foi possível otimizar via cache (${err.message}). Processando texto integral...` })}\n\n`);
+    } catch {}
+    return null;
+  }
+}
+
+// ====================================================================
 // CONTEXT CACHING (economia de ~75% nos tokens do documento por sessão)
 // O documento grande é cacheado UMA vez no Gemini (TTL 1h); as mensagens
 // seguintes referenciam o cache em vez de reenviar o texto. O cache é
@@ -4648,23 +4753,27 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
-    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
-    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    // CACHE: valida ou cria o cache do documento no backend de forma transparente.
+    // Evita transferir o documento inteiro em todas as mensagens de conversas longas.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
+    if (documentContext && modelProvider === 'gemini') {
+      const cacheResult = await getOrBuildContextCache(sessionId, documentContext, model, res);
+      if (cacheResult) {
+        activeDocCache = cacheResult.cacheName;
+        cacheKeyIndex = cacheResult.keyIndex; // Sobrescreve com a chave do criador do cache
+      }
+    } else if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      // Fallback para compatibilidade se o frontend enviar diretamente
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
-        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
         await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
         try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
-        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        console.log(`[CACHE] 💾 Cache manual válido e renovado por +1h (${cachedContent}, chave ${cacheIdx})`);
       } catch (cacheErr: any) {
-        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        console.warn(`[CACHE] Cache manual inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
       }
     }
@@ -5318,23 +5427,27 @@ O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO 
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
-    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
-    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    // CACHE: valida ou cria o cache do documento no backend de forma transparente.
+    // Evita transferir o documento inteiro em todas as mensagens de conversas longas.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
+    if (documentContext && modelProvider === 'gemini') {
+      const cacheResult = await getOrBuildContextCache(sessionId, documentContext, model, res);
+      if (cacheResult) {
+        activeDocCache = cacheResult.cacheName;
+        cacheKeyIndex = cacheResult.keyIndex; // Sobrescreve com a chave do criador do cache
+      }
+    } else if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      // Fallback para compatibilidade se o frontend enviar diretamente
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
-        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
         await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
         try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
-        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        console.log(`[CACHE] 💾 Cache manual válido e renovado por +1h (${cachedContent}, chave ${cacheIdx})`);
       } catch (cacheErr: any) {
-        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        console.warn(`[CACHE] Cache manual inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
       }
     }
@@ -5976,23 +6089,27 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
     const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
-    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
-    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
-    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    // CACHE: valida ou cria o cache do documento no backend de forma transparente.
+    // Evita transferir o documento inteiro em todas as mensagens de conversas longas.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
+    if (documentContext && modelProvider === 'gemini') {
+      const cacheResult = await getOrBuildContextCache(sessionId, documentContext, model, res);
+      if (cacheResult) {
+        activeDocCache = cacheResult.cacheName;
+        cacheKeyIndex = cacheResult.keyIndex; // Sobrescreve com a chave do criador do cache
+      }
+    } else if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      // Fallback para compatibilidade se o frontend enviar diretamente
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
-        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
         await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
         try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
-        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        console.log(`[CACHE] 💾 Cache manual válido e renovado por +1h (${cachedContent}, chave ${cacheIdx})`);
       } catch (cacheErr: any) {
-        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        console.warn(`[CACHE] Cache manual inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
       }
     }
@@ -6638,23 +6755,27 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const availableForContext = inputBudget - reservedTokens;
     const maxDocCtxChars = Math.floor(availableForContext * 0.80 * 3.5);
 
-    // CACHE: valida o cache do documento ANTES de montar o prompt. Se válido,
-    // o documento NÃO é injetado (o modelo o lê do cache, ~75% mais barato).
-    // Se inválido/expirado, avisa o cliente e segue com o texto completo.
+    // CACHE: valida ou cria o cache do documento no backend de forma transparente.
+    // Evita transferir o documento inteiro em todas as mensagens de conversas longas.
     let activeDocCache: string | null = null;
-    if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter' && model === 'gemini-3.5-flash') { // cache criado p/ 3.5: modelo diferente => usa texto completo (evita 400)
+    if (documentContext && modelProvider === 'gemini') {
+      const cacheResult = await getOrBuildContextCache(sessionId, documentContext, model, res);
+      if (cacheResult) {
+        activeDocCache = cacheResult.cacheName;
+        cacheKeyIndex = cacheResult.keyIndex; // Sobrescreve com a chave do criador do cache
+      }
+    } else if (cachedContent && cacheKeyIndex !== undefined && cacheKeyIndex !== null && modelProvider !== 'openrouter') {
+      // Fallback para compatibilidade se o frontend enviar diretamente
       try {
         const cacheKeys = getApiKeys();
         const cacheIdx = parseInt(String(cacheKeyIndex)) % cacheKeys.length;
         const aiCacheCheck = new GoogleGenAI({ apiKey: cacheKeys[cacheIdx] });
-        // Renovação deslizante: update valida E estende o TTL por +1h a cada mensagem.
-        // Enquanto a conversa estiver ativa o cache nunca expira; abandonada, morre em 1h.
         await aiCacheCheck.caches.update({ name: cachedContent, config: { ttl: '3600s' } });
         activeDocCache = cachedContent;
         try { res.write(`data: ${JSON.stringify({ cacheRenewedUntil: Date.now() + 3500 * 1000 })}\n\n`); } catch {}
-        console.log(`[CACHE] 💾 Cache válido e renovado por +1h (${cachedContent}, chave ${cacheIdx}) — documento omitido do prompt.`);
+        console.log(`[CACHE] 💾 Cache manual válido e renovado por +1h (${cachedContent}, chave ${cacheIdx})`);
       } catch (cacheErr: any) {
-        console.warn(`[CACHE] Cache inválido/expirado (${cachedContent}):`, cacheErr.message);
+        console.warn(`[CACHE] Cache manual inválido/expirado (${cachedContent}):`, cacheErr.message);
         try { res.write(`data: ${JSON.stringify({ cacheInvalid: true, status: '💾 Cache do documento expirou — usando o texto completo nesta requisição.' })}\n\n`); } catch {}
       }
     }
