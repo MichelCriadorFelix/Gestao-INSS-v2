@@ -4066,11 +4066,9 @@ app.post("/api/rag/plan", async (req, res) => {
         }
         let rows = data || [];
 
-        // Se o item pede artigos específicos (núcleo da tese), filtra em JS de forma
-        // determinística. Casa "Art. 42", "Art. 42.", "Art. 42,", "Art. 42-", "Art. 42 "
-        // e parágrafos "§ 42", tolerando o número colado a ponto/vírgula/espaço/fim.
+        // Se o item pede artigos específicos (núcleo da tese), realiza varredura INDIVIDUAL
+        // para CADA artigo solicitado, garantindo que NENHUM artigo do conjunto fique de fora.
         if (!planItem.integral && Array.isArray(planItem.artigos) && planItem.artigos.length > 0) {
-          // Normaliza os artigos pedidos: separa strings com vírgulas ou 'e' e extrai só os números/identificadores
           const flatArts: string[] = [];
           planItem.artigos.forEach((a: string) => {
             const parts = String(a).split(/(?:,| e | ou |;|\/)/i);
@@ -4082,15 +4080,46 @@ app.post("/api/rag/plan", async (req, res) => {
           });
           
           if (flatArts.length > 0) {
-            const artRegexes = flatArts.map((numRaw: string) => {
+            const matchedRowsForPlanItem: any[] = [];
+            const seenIds = new Set<string | number>();
+
+            // Varredura por artigo individual
+            for (const numRaw of flatArts) {
               const num = String(numRaw).trim();
-              const esc = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              // (?:[^\d]|$) garante que "42" não case dentro de "428" ou "420"
-              return new RegExp(`(?:Art\\.?|Artigo|§)\\s*${esc}(?:[^0-9]|$)`, 'i');
-            });
-            rows = rows.filter((d: any) =>
-              artRegexes.some((re: RegExp) => re.test(d.content || ''))
-            );
+              const cleanNum = num.replace(/\./g, '');
+              const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const escClean = cleanNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const re = new RegExp(`(?:Art\\.?|Artigo|§|Súmula|Tema)\\s*(?:${escNum}|${escClean})(?:[^0-9]|$)`, 'i');
+
+              // 1. Tenta encontrar na lista de rows carregada
+              let foundForThisArt = rows.filter((d: any) => re.test(d.content || ''));
+
+              // 2. Se não encontrou nas rows locais, faz busca direcionada no Supabase para ESTE artigo específico
+              if (foundForThisArt.length === 0) {
+                try {
+                  const { data: artData } = await activeSupabase
+                    .from('legal_documents')
+                    .select('id, content, metadata')
+                    .ilike('content', `%${num}%`)
+                    .limit(30);
+
+                  if (artData && artData.length > 0) {
+                    foundForThisArt = artData.filter((d: any) => re.test(d.content || ''));
+                  }
+                } catch (artErr) {
+                  console.warn(`[RAG PLAN_API] Erro ao buscar artigo individual ${num}:`, artErr);
+                }
+              }
+
+              foundForThisArt.forEach((d: any) => {
+                if (!seenIds.has(d.id)) {
+                  seenIds.add(d.id);
+                  matchedRowsForPlanItem.push(d);
+                }
+              });
+            }
+
+            rows = matchedRowsForPlanItem;
           }
         }
 

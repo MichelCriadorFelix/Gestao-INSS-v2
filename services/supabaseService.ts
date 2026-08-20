@@ -954,53 +954,32 @@ export const supabaseService = {
       const titleSeen = new Set<number>();
       const subQueries: any[] = [];
 
-      // 1. Busca integrada das partes do documento (Subqueries paralelas para o mesmo título)
+      // 1. Busca integrada INDIVIDUAL para cada artigo (Garante que múltiplos artigos sejam encontrados sem falhar no PostgREST)
       if (articleNumbers.length > 0) {
-        const filters: string[] = [];
         articleNumbers.forEach(num => {
-          const semPonto = num.replace(/\./g, '');
-          // Converter número sem ponto milhar em com ponto: "1851" → "1.851"
-          const comPonto = /^\d{4}$/.test(semPonto)
-            ? `${semPonto.slice(0, 1)}.${semPonto.slice(1)}`
-            : null;
-
-          const filterVariants: string[] = [];
-          const addV = (n: string) => {
-            filterVariants.push(`content.ilike."%Art. ${n}.%"`); // "Art. 1.829." ponto final
-            filterVariants.push(`content.ilike."%Art. ${n} %"`); // "Art. 725 P" espaço
-            filterVariants.push(`content.ilike."%Art. ${n},%"`); // "Art. 15,"
-            filterVariants.push(`content.ilike."%Art. ${n}-%"`); // "Art. 19-E"
-            filterVariants.push(`content.ilike."%§ ${n}%"`);
-            filterVariants.push(`content.ilike."%§ ${n}º%"`);
-          };
-
-          addV(num);
-          if (semPonto !== num) addV(semPonto); // tinha ponto → adicionar sem ponto
-          if (comPonto && comPonto !== num) addV(comPonto); // sem ponto → adicionar com ponto
-
-          const uniqueVariants = [...new Set(filterVariants)];
-          filters.push(...uniqueVariants);
-        });
-
-        const uniqueFilters = [...new Set(filters)];
-
-        // Executa em lotes integrados no PostgREST para não estourar tamanho de query
-        const batchSize = 18;
-        for (let i = 0; i < uniqueFilters.length; i += batchSize) {
-          const filterSlice = uniqueFilters.slice(i, i + batchSize).join(',');
           subQueries.push(
             supabase
               .from('legal_documents')
               .select('*')
               .eq('metadata->>title', title)
-              .or(filterSlice)
-              .limit(15)
+              .ilike('content', `%${num}%`)
+              .limit(30)
               .then(res => {
-                if (res.error) console.error(`Error in article query for title ${title}:`, res.error);
-                return (res.data || []).map(d => ({ ...d, is_target_article: true }));
+                if (res.error) {
+                  console.error(`Erro ao buscar artigo ${num} para ${title}:`, res.error);
+                  return [];
+                }
+                const rawDocs = res.data || [];
+                const cleanNum = num.replace(/\./g, '');
+                const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escClean = cleanNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = new RegExp(`(?:Art\\.?|Artigo|§|Súmula|Tema)\\s*(?:${escNum}|${escClean})(?:[^0-9]|$)`, 'i');
+                return rawDocs
+                  .filter(d => re.test(d.content || ''))
+                  .map(d => ({ ...d, is_target_article: true }));
               })
           );
-        }
+        });
       }
 
       if (keywords.length > 0) {

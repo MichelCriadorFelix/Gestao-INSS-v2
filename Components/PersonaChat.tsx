@@ -20,7 +20,8 @@ import {
   CheckCircleIcon as CheckCircle,
   SparklesIcon as Sparkles,
   ScissorsIcon as Scissors,
-  ShieldExclamationIcon as ShieldExclamation
+  ShieldExclamationIcon as ShieldExclamation,
+  ArrowsPointingOutIcon as Maximize2
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -74,10 +75,32 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
+const isArtifactContent = (content: string = '') => {
+  if (!content || content.length < 350) return false;
+  return /EXCELENTÍSSIMO|AO JUÍZO|DOS FATOS|DO DIREITO|DOS PEDIDOS|CONTESTAÇÃO|REQUERIMENTO|NOTIFICAÇÃO|PARECER|\[GERAÇÃO MODULAR\]|\[CORREÇÃO CIRÚRGICA\]|PROCESSO Nº|MANDADO DE SEGURANÇA|AGRAVO/i.test(content);
+};
+
+const getArtifactTitle = (content: string = '') => {
+  if (!content) return "Documento Jurídico";
+  const match = content.match(/(?:AO JUÍZO|EXCELENTÍSSIMO|REQUERIMENTO|PETIÇÃO|CONTESTAÇÃO|PARECER|RECURSO|MANDADO|AGRAVO)[^\n]*/i);
+  if (match) {
+    const clean = match[0].replace(/[*#_]/g, '').trim();
+    if (clean.length > 5 && clean.length < 75) return clean;
+  }
+  const headingMatch = content.match(/^#+\s*(.+)$/m);
+  if (headingMatch && headingMatch[1]) {
+    const clean = headingMatch[1].replace(/[*#_]/g, '').trim();
+    if (clean.length > 5 && clean.length < 75) return clean;
+  }
+  return "Peça Processual / Documento Jurídico";
+};
+
 const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+  const [streamingAsArtifact, setStreamingAsArtifact] = useState<boolean>(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
@@ -773,6 +796,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       let fullText = '';
       let isFinished = false;
       let resumeCount = 0;
+      let isArtifactActive = false;
       const MAX_RESUMES = 3;
 
       while (!isFinished && resumeCount <= MAX_RESUMES) {
@@ -904,6 +928,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
                     fullText += data.text;
                     setStreamingMessage(fullText);
+                    if (!isArtifactActive && isArtifactContent(fullText)) {
+                      isArtifactActive = true;
+                      setStreamingAsArtifact(true);
+                      setActiveArtifactId('streaming');
+                    }
                   } else {
                     console.log("[SSE UNKNOWN] Recebido objeto JSON sem text/status:", data);
                   }
@@ -948,6 +977,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         content: fullText || "Desculpe, não consegui gerar uma resposta.",
         timestamp: new Date().toISOString()
       };
+
+      if (isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) {
+        setStreamingAsArtifact(false);
+        setActiveArtifactId(assistantMsg.id);
+      }
 
       setSessions(prev => prev.map(s => 
         s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
@@ -1582,126 +1616,182 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         </div>
       </aside>
 
-      {/* CHAT AREA */}
-      <div className="flex-1 flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0">
+      {/* MAIN CONTENT SPLIT (CHAT + ARTIFACT DRAWER) */}
+      <div className="flex-1 flex min-w-0 h-full overflow-hidden relative">
+
+        {/* CHAT AREA */}
+        <div className={`flex flex-col relative bg-white dark:bg-bordeaux-950 min-w-0 transition-all duration-300 h-full overflow-hidden ${
+          activeArtifactId ? 'w-full lg:w-1/2 lg:border-r border-slate-200 dark:border-gold-500/20' : 'w-full'
+        }`}>
           {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-bordeaux-900/40 shadow-md rounded-full border border-slate-200 dark:border-gold-500/15 hover:scale-110 transition-transform"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        )}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="absolute left-4 top-4 z-10 p-2 bg-white dark:bg-bordeaux-900/40 shadow-md rounded-full border border-slate-200 dark:border-gold-500/15 hover:scale-110 transition-transform"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
 
-        {/* WELCOME SCREEN OR MESSAGES */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-          {!currentSession || currentSession.messages.length === 0 ? (
-            <div className="max-w-4xl mx-auto mt-12 space-y-12">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-                  Olá, MICHEL!<br />
-                  <span className="text-emerald-600">{persona.welcomeTitle}</span>
-                </h2>
-                <p className="text-slate-500 dark:text-slate-400">{persona.subtitle}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-primary-700" />
-                  </div>
-                  <h4 className="font-bold text-slate-800 dark:text-white mb-2">Resumo de Caso</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Crie resumo de documentos, destacando fatos e argumentos jurídicos.</p>
-                  <button 
-                    onClick={() => handleSendMessage('Gere um resumo técnico deste caso com base nos dados da calculadora.')}
-                    className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
-                  >
-                    Começar <ChevronRight className="w-4 h-4" />
-                  </button>
+          {/* WELCOME SCREEN OR MESSAGES */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            {!currentSession || currentSession.messages.length === 0 ? (
+              <div className="max-w-4xl mx-auto mt-12 space-y-12">
+                <div className="text-center space-y-4">
+                  <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+                    Olá, MICHEL!<br />
+                    <span className="text-emerald-600">{persona.welcomeTitle}</span>
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400">{persona.subtitle}</p>
                 </div>
 
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Briefcase className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <h4 className="font-bold text-slate-800 dark:text-white mb-2">Geração de Peças</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Redija petições iniciais, recursos e requerimentos prontos para o Word.</p>
-                  <button 
-                    onClick={() => handleSendMessage('GERAR PEÇA: Petição Inicial de Aposentadoria por Tempo de Contribuição.')}
-                    className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
-                  >
-                    Começar <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
-                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Search className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <h4 className="font-bold text-slate-800 dark:text-white mb-2">Análise de Provas</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Envie CNIS, PPP ou laudos para identificar lacunas e agentes nocivos.</p>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
-                  >
-                    Começar <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 py-4">
-                <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ou gerencie manualmente abaixo</span>
-                <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
-              </div>
-            </div>
-          ) : (
-            <div className="max-w-3xl mx-auto space-y-6 px-2 sm:px-4">
-              {currentSession.messages.map(msg => (
-                <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                  {msg.role === 'user' ? (
-                    // BUBBLE DO USUÁRIO — estilo Claude (cinza claro à direita, compacto)
-                    <div className="max-w-[85%] bg-slate-100 dark:bg-bordeaux-900/40 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
-                      <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
-                        {(msg.content || '').length > 3000
-                          ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
-                          : (msg.content || '')}
-                      </div>
-                      <div className="flex justify-end mt-1.5">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                          {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                    <div className="w-12 h-12 bg-primary-100 dark:bg-bordeaux-900/40 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <FileText className="w-6 h-6 text-primary-700" />
                     </div>
-                  ) : (
-                    // BUBBLE DA IA — estilo Claude (largura total, avatar, prose tipográfico)
-                    <div className="w-full flex gap-3 sm:gap-4">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
-                        <Bot className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
-                          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-2">Resumo de Caso</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Crie resumo de documentos, destacando fatos e argumentos jurídicos.</p>
+                    <button 
+                      onClick={() => handleSendMessage('Gere um resumo técnico deste caso com base nos dados da calculadora.')}
+                      className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                      Começar <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Briefcase className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-2">Geração de Peças</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Redija petições iniciais, recursos e requerimentos prontos para o Word.</p>
+                    <button 
+                      onClick={() => handleSendMessage('GERAR PEÇA: Petição Inicial de Aposentadoria por Tempo de Contribuição.')}
+                      className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                      Começar <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="bg-white dark:bg-bordeaux-950/60 p-6 rounded-2xl border border-slate-200 dark:border-gold-500/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group">
+                    <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Search className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-2">Análise de Provas</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Envie CNIS, PPP ou laudos para identificar lacunas e agentes nocivos.</p>
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-4 text-emerald-600 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                      Começar <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 py-4">
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ou gerencie manualmente abaixo</span>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-bordeaux-900/40"></div>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-3xl mx-auto space-y-6 px-1 sm:px-2">
+                {currentSession.messages.map(msg => (
+                  <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
+                    {msg.role === 'user' ? (
+                      // BUBBLE DO USUÁRIO — estilo Claude
+                      <div className="max-w-[85%] bg-slate-100 dark:bg-bordeaux-900/40 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
+                        <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
+                          {(msg.content || '').length > 3000
+                            ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
+                            : (msg.content || '')}
+                        </div>
+                        <div className="flex justify-end mt-1.5">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
                             {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        
-                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                        prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                        prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
-                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                        prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
-                                        prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
-                                        prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
-                                        prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
-                                        font-inter">
-                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                      </div>
+                    ) : (
+                      // BUBBLE DA IA — estilo Claude com Artefatos
+                      <div className="w-full flex gap-3 sm:gap-4">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
+                          <Bot className="w-5 h-5 text-white" />
                         </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
+                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
+                              {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+
+                          {isArtifactContent(msg.content) ? (
+                            <div className="space-y-3">
+                              {/* Intro text if any */}
+                              {msg.content.split('\n\n').length > 1 && !msg.content.trim().startsWith('EXCELENTÍSSIMO') && !msg.content.trim().startsWith('AO JUÍZO') && (
+                                <div className="prose prose-slate dark:prose-invert max-w-none prose-sm font-inter">
+                                  <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content.split('\n\n')[0] || '') }} />
+                                </div>
+                              )}
+
+                              {/* ARTIFACT EMBEDDED CARD */}
+                              <div className="border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 rounded-xl p-3.5 transition-all shadow-sm">
+                                <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="p-2.5 bg-emerald-600 text-white rounded-lg shadow-sm shrink-0">
+                                      <FileText className="w-5 h-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-bold text-sm text-emerald-900 dark:text-emerald-100 truncate">
+                                          {getArtifactTitle(msg.content)}
+                                        </h4>
+                                        <span className="text-[10px] font-semibold bg-emerald-200/60 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                                          Artefato de Peça
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
+                                        ~{Math.round((msg.content || '').split(' ').length)} palavras • Clique para visualizar ao lado
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                                    <button
+                                      onClick={() => setActiveArtifactId(msg.id)}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                                    >
+                                      <Maximize2 className="w-3.5 h-3.5" /> Ver no Painel
+                                    </button>
+                                    <button
+                                      onClick={() => generateDocx(msg.content || '')}
+                                      className="px-2.5 py-1.5 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                      title="Baixar Word"
+                                    >
+                                      <Download className="w-3.5 h-3.5 text-emerald-600" /> DOCX
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
+                                            prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
+                                            prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                            prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
+                                            prose-strong:text-slate-900 dark:prose-strong:text-slate-100 prose-strong:font-semibold
+                                            prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                            prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+                                            prose-blockquote:text-slate-700 dark:prose-blockquote:text-slate-300
+                                            prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em]
+                                            prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
+                                            prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
+                                            font-inter">
+                              <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                            </div>
+                          )}
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => copyToClipboard(msg.content || '', msg.id)}
@@ -1762,15 +1852,42 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     )}
 
                     {streamingMessage && (
-                      <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
-                                      prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                      prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
-                                      prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                      prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
-                                      font-inter">
-                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
-                        <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
-                      </div>
+                      streamingAsArtifact || isArtifactContent(streamingMessage) ? (
+                        <div className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-xl p-3.5 shadow-sm animate-pulse">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-emerald-600 text-white rounded-lg shadow-sm relative">
+                                <FileText className="w-5 h-5" />
+                                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping"></div>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm text-emerald-900 dark:text-emerald-100">
+                                  Redigindo Peça no Painel Lateral...
+                                </h4>
+                                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                                  Acompanhe a escrita ao vivo ao lado
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setActiveArtifactId('streaming')}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" /> Ver Painel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
+                                        prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                        prose-p:leading-[1.7] prose-p:text-slate-700 dark:prose-p:text-slate-300
+                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+                                        font-inter">
+                          <div dangerouslySetInnerHTML={{ __html: markdownToHtml(streamingMessage) }} />
+                          <span className="w-1.5 h-4 bg-emerald-500 inline-block animate-pulse ml-1 align-middle rounded-sm"></span>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
@@ -1986,7 +2103,99 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             </p>
           </div>
         </div>
+      </div>
         
+        {/* ARTIFACT AREA (RIGHT PANEL) */}
+        {activeArtifactId && (
+          <div className="fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0">
+            {(() => {
+              const content = activeArtifactId === 'streaming' 
+                ? streamingMessage 
+                : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || '';
+              return (
+                <>
+                  {/* ARTIFACT HEADER */}
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between bg-white dark:bg-bordeaux-950 shadow-sm z-20 shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight truncate">
+                          {getArtifactTitle(content)}
+                        </h3>
+                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Artefato de Peça Processual
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => copyToClipboard(content, 'artifact')}
+                        className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+                        title="Copiar Texto"
+                      >
+                        {copiedId === 'artifact' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        <span className="hidden sm:inline">Copiar</span>
+                      </button>
+
+                      <button
+                        onClick={() => generateDocx(content)}
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                        title="Baixar Word (.docx)"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">DOCX</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenInEditor(content)}
+                        className="px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                        title="Abrir no Editor Completo"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Editor</span>
+                      </button>
+
+                      <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900 mx-1"></div>
+
+                      <button
+                        onClick={() => setActiveArtifactId(null)}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-bordeaux-900 rounded-lg transition-colors"
+                        title="Fechar Artefato"
+                      >
+                        <XMark className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ARTIFACT DOCUMENT SHEET */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth relative">
+                    <div className="max-w-3xl mx-auto bg-white dark:bg-bordeaux-950/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-2xl p-6 sm:p-12 min-h-full font-inter text-slate-800 dark:text-slate-100 prose prose-slate dark:prose-invert max-w-none
+                                    prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
+                                    prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                    prose-p:leading-[1.75] prose-p:text-slate-700 dark:prose-p:text-slate-200
+                                    prose-strong:text-slate-900 dark:prose-strong:text-white prose-strong:font-semibold
+                                    prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                    prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
+                      <div dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }} />
+
+                      {activeArtifactId === 'streaming' && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-bordeaux-900 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                          <span>Redigindo peça jurídica em tempo real...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
       </div>
 
       {/* Client Import Modal */}
