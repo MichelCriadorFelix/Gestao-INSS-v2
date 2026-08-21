@@ -327,7 +327,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           
           setSessions(formattedSessions);
           if (!currentSessionId) {
-            setCurrentSessionId(formattedSessions[0].id);
+            const firstSession = formattedSessions[0];
+            setCurrentSessionId(firstSession.id);
+            if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+              const lastArtifact = [...(firstSession.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+              if (lastArtifact) {
+                setActiveArtifactId(lastArtifact.id);
+              }
+            }
           }
         }
       } catch (error) {
@@ -1823,6 +1830,16 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                 key={session.id}
                 onClick={() => {
                   setCurrentSessionId(session.id);
+                  if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                    const lastArtifact = [...(session.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+                    if (lastArtifact) {
+                      setActiveArtifactId(lastArtifact.id);
+                    } else {
+                      setActiveArtifactId(null);
+                    }
+                  } else {
+                    setActiveArtifactId(null);
+                  }
                   if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
                 className={`group p-3 rounded-xl cursor-pointer border transition-all ${currentSessionId === session.id ? 'bg-white dark:bg-bordeaux-900/40 border-emerald-500 shadow-md' : 'border-transparent hover:bg-white dark:hover:bg-bordeaux-900/50/50 hover:border-slate-200 dark:hover:border-slate-700'}`}
@@ -1998,7 +2015,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                               )}
 
                               {/* ARTIFACT EMBEDDED CARD */}
-                              <div className="border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 rounded-xl p-3.5 transition-all shadow-sm">
+                              <div 
+                                onClick={() => setActiveArtifactId(msg.id)}
+                                className="border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 rounded-xl p-3.5 transition-all shadow-sm cursor-pointer"
+                              >
                                 <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
                                   <div className="flex items-center gap-3 min-w-0">
                                     <div className="p-2.5 bg-emerald-600 text-white rounded-lg shadow-sm shrink-0">
@@ -2019,7 +2039,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       onClick={() => setActiveArtifactId(msg.id)}
                                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5"
@@ -2027,7 +2047,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                                       <Maximize2 className="w-3.5 h-3.5" /> Ver no Painel
                                     </button>
                                     <button
-                                      onClick={() => generateDocx(msg.content || '')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        generateDocx(msg.content || '');
+                                      }}
                                       className="px-2.5 py-1.5 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                                       title="Baixar Word"
                                     >
