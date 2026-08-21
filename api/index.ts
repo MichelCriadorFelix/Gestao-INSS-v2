@@ -2591,6 +2591,43 @@ const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
+interface KeyStatus {
+  exhaustedUntil: number; // Para Rate Limits (por minuto)
+  dailyExhausted: boolean; // Para Cota Diária (ex: 25M tokens)
+}
+const keyStatusRegistry: Record<string, KeyStatus> = {};
+
+function getAvailableKey(keys: string[], startIndex: number): { key: string, index: number, waitMs: number } {
+  let minWait = Infinity;
+  const now = Date.now();
+  
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (startIndex + i) % keys.length;
+    const key = keys[idx];
+    
+    // Ignora chaves permanentemente inválidas
+    if (invalidKeys.has(key)) continue;
+
+    const status = keyStatusRegistry[key];
+    if (!status) return { key, index: idx, waitMs: 0 };
+    if (status.dailyExhausted) continue; // Pula chaves esgotadas para o dia todo
+    if (status.exhaustedUntil <= now) return { key, index: idx, waitMs: 0 }; // Já liberou do limite por minuto
+    
+    const waitTime = status.exhaustedUntil - now;
+    if (waitTime < minWait) {
+      minWait = waitTime;
+    }
+  }
+  
+  if (minWait === Infinity) {
+    // Todas as chaves ativas estão esgotadas DIARIAMENTE
+    return { key: '', index: -1, waitMs: -1 };
+  }
+  
+  // Estão todas no limite por minuto. Retorna o menor tempo de espera necessário.
+  return { key: '', index: -1, waitMs: minWait };
+}
+
 const MODEL_HIERARCHY = [
   "gemini-3.7-flash",
   "gemini-3.5-flash",
@@ -2787,152 +2824,89 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  // Rotaciona a chave global na primeira tentativa para distribuir carga round-robin
+  let activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
+  let apiKey = keys[activeKeyIndex % keys.length];
+
+  const available = getAvailableKey(keys, currentKeyIndex);
+  if (available.waitMs === -1) {
+    throw new Error("ALL_KEYS_EXHAUSTED: Todas as chaves esgotaram a cota diária do projeto Google Cloud (25.000.000 tokens).");
+  }
+  if (available.waitMs > 0) {
+    const msgWait = `[Wait] Proteção de Rate Limit. Aguardando ${Math.ceil(available.waitMs / 1000)}s para liberar cota...`;
+    console.log(msgWait);
+    await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
+    return callGemini(params, retries, 0, 0, forcedKeyIndex);
+  }
+  
+  activeKeyIndex = available.index;
+  apiKey = available.key;
+  
   if (retries === MAX_RETRIES) {
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    currentKeyIndex = (activeKeyIndex + 1) % keys.length;
   }
 
-  // Determina o índice da chave para esta tentativa
-  const activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
-  const apiKey = keys[activeKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
-  // Select model from hierarchy or use the requested model on first try
-  const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  // Se o usuário especificou um modelo, mantemos ele mesmo em retries de cota, 
-  // exceto se for erro de modelo não encontrado (404) ou erro de argumento inválido (400)
-  const requestedModel = (modelIndex === 0) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
+  const requestedModel = params.model || MODEL_HIERARCHY[0];
   const currentModel = getEffectiveModel(requestedModel);
-  
-  // Override model in params
+
   const finalParams = { ...params, model: currentModel };
   
-  // Fallback: Remove tools if not on the primary model or if retrying heavily
-  if (modelIndex > 0 || failuresOnCurrentModel > 1) {
+  if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
       delete finalParams.config.tools;
     }
   }
 
   try {
-    const response = await ai.models.generateContent(finalParams);
-    
-    let responseText = "";
-    try {
-      responseText = response.text || "";
-    } catch (e) {
-      // Ignore
-    }
-    
-    if (!responseText) {
-      let isSafetyBlock = false;
-      if (response.candidates && response.candidates.length > 0) {
-        const candidate = response.candidates[0];
-        if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKLIST' || candidate.finishReason === 'PROHIBITED_CONTENT') {
-           isSafetyBlock = true;
-        }
-      } else if (response.promptFeedback && response.promptFeedback.blockReason) {
-        isSafetyBlock = true;
-      }
-      
-      if (!isSafetyBlock) {
-        throw new Error("EMPTY_RESPONSE");
-      }
-    }
-    
-    return response;
+    return await ai.models.generateContent(finalParams);
   } catch (error: any) {
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
     const errorMessage = error.message || errorStr;
     
-    // Detect Error Types
-    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    const isEmpty = errorMessage.includes('Response was empty');
+    const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
+    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
-    const isEmpty = errorMessage.includes('EMPTY_RESPONSE');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
-    if (isInvalidKey) {
-      invalidKeys.add(apiKey);
-    }
+    if (isInvalidKey) invalidKeys.add(apiKey);
+    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
+    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
-    // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
-      return callGemini(paramsWithoutFiles, 1, modelIndex, 0, activeKeyIndex);
+      return callGemini(paramsWithoutFiles, 1, 0, 0, activeKeyIndex);
     }
-    
-    if ((isOverloaded || isNotFound || isEmpty || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
-      const nextKeyIdx = (activeKeyIndex + 1) % keys.length;
-      if (!isBadRequest) {
-        currentKeyIndex = nextKeyIdx;
-      }
-      
-      let nextModelIndex = modelIndex;
-      let nextFailures = failuresOnCurrentModel + 1;
-      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
 
-      if (isBadRequest || isNotFound) {
-         // Bad Request or Not Found: Switch model immediately as the config/model is likely the problem
-         if (!params.model) {
-             nextModelIndex++;
-             nextFailures = 0;
-             delay = 500;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro de Requisição (400/404) no modelo ${currentModel}. Trocando para ${MODEL_HIERARCHY[Math.min(nextModelIndex, MODEL_HIERARCHY.length - 1)]}...`);
-         } else {
-             delay = 500;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Erro 400/404 no modelo ${currentModel}. Fallback de modelo desativado pelo usuário. Rotacionando chaves...`);
-         }
-      } else if (isEmpty) {
-         delay = 1000;
-         console.log(`[Tentativa ${MAX_RETRIES - retries}] Resposta vazia no modelo ${currentModel}. Tentando novamente...`);
-      } else {
-         // 429/503: Retry logic
-         delay = errorMessage.includes('503') ? 3000 : 2000;
-         
-         // Switch model faster on quota errors if all keys are exhausted.
-         if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
-             nextModelIndex++;
-             nextFailures = 0;
-             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota esgotada no modelo ${currentModel} após tentar múltiplos projetos. Trocando modelo...`);
-         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
-             nextModelIndex++;
-             nextFailures = 0;
-             console.log(`[Tentativa ${MAX_RETRIES - retries}] Muitas falhas (${failuresOnCurrentModel}) no modelo ${currentModel}. Trocando modelo...`);
-         } else {
-             const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
-             const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
-             let errorReason = 'sobrecarga/cota';
-             if (isInvalidKey) errorReason = 'chave inválida';
-             else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
-             else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
-             else if (isNotFound) errorReason = 'modelo não encontrado (404)';
-             else if (isEmpty) errorReason = 'resposta vazia';
-             
-             const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
-             console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`);
-         }
-      }
+    if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest || isEmpty) && retries > 0) {
+      let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
+      let nextFailures = failuresOnCurrentModel + 1;
       
+      const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
+      const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
+      
+      let errorReason = 'sobrecarga/cota';
+      if (isInvalidKey) errorReason = 'chave inválida';
+      else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
+      else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
+      else if (isNotFound) errorReason = 'modelo não encontrado (404)';
+      else if (isEmpty) errorReason = 'resposta vazia';
+        
+      const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
+      console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`); 
+
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, nextModelIndex, nextFailures, nextKeyIdx);
+      return callGemini(params, retries - 1, 0, nextFailures, undefined);
     }
     
-    // Critical Failure
     if (retries === 0) {
-      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429")) {
-        const helpMsg = (process.env.OPENROUTER_API_KEY && !params.bypassOpenRouter)
-            ? `⚠️ LIMITE DE COTA NO OPENROUTER: O modelo selecionado atingiu o limite de requisições. Aguarde um momento ou tente usar outro provedor/modelo.`
-            : `⚠️ LIMITE DE COTA ATINGIDO: O plano gratuito do Gemini (Free Tier) tem um limite de requisições por minuto. Como você está enviando documentos ou conversas extremamente grandes, a cota de tokens (1 milhão por minuto) se esgota rapidamente.\n\nPor favor, AGUARDE 1 MINUTO e envie sua requisição novamente, ou limpe o histórico/documentos para não reenviar os mesmos dados longos repetidas vezes.`;
-        throw new Error(helpMsg);
-      }
-      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS.
-      Último modelo: ${currentModel}.
-      Erro Original: ${errorMessage}.
-      Chaves ativas: ${keys.length}.
-      Verifique se suas chaves estão em PROJETOS DIFERENTES no Google Cloud.`);
+      if (isOverloaded) throw new Error(`ALL_KEYS_EXHAUSTED: ${errorMessage}`);
+      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Erro: ${errorMessage}`);
     }
     throw error;
   }
@@ -3061,24 +3035,41 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
   // CACHE: requisições com cachedContent ficam FIXAS na chave que criou o cache
-  // (caches são por projeto). Retries reusam a mesma chave em vez de rotacionar.
   const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
-  
-  // Rotaciona a chave global na primeira tentativa para distribuir carga round-robin se não houver cache fixado
-  if (retries === MAX_RETRIES && !cachePinned) {
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+
+  let activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
+  let apiKey = keys[activeKeyIndex % keys.length];
+  let waitMs = 0;
+
+  // Se não estamos fixados a um cache, buscar a próxima chave disponível
+  if (!cachePinned) {
+    const available = getAvailableKey(keys, currentKeyIndex);
+    if (available.waitMs === -1) {
+      throw new Error("ALL_KEYS_EXHAUSTED: Todas as chaves esgotaram a cota diária do projeto Google Cloud (25.000.000 tokens).");
+    }
+    if (available.waitMs > 0) {
+      const msgWait = `[Wait] Proteção de Rate Limit. Aguardando ${Math.ceil(available.waitMs / 1000)}s para liberar cota...`;
+      console.log(msgWait);
+      if (onStatus) onStatus(msgWait);
+      await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
+      return callGeminiStream(params, retries, 0, 0, forcedKeyIndex, onStatus);
+    }
+    
+    activeKeyIndex = available.index;
+    apiKey = available.key;
+    
+    // Rotaciona round-robin para a próxima requisição inicial
+    if (retries === MAX_RETRIES) {
+      currentKeyIndex = (activeKeyIndex + 1) % keys.length;
+    }
   }
 
-  // Determina qual chave usar.
-  const activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
-  const apiKey = keys[activeKeyIndex % keys.length];
   const ai = new GoogleGenAI({ apiKey });
   
-  const safeModelIndex = Math.min(modelIndex, MODEL_HIERARCHY.length - 1);
-  const requestedModel = (modelIndex === 0) ? (params.model || MODEL_HIERARCHY[0]) : MODEL_HIERARCHY[safeModelIndex];
+  // FIX: Não rebaixa mais o modelo. Mantém o original para evitar alucinações.
+  const requestedModel = params.model || MODEL_HIERARCHY[0];
   const currentModel = getEffectiveModel(requestedModel);
 
-  // Auto-Failover Matrix logging (as requested by user via screenshot pattern)
   const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
   const keyMask = apiKey ? `..${apiKey.substring(apiKey.length - 6)}` : 'N/A';
   const msgTrial = `[Auto-Failover Matrix] Chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) | Tentando modelo: ${currentModel}`;
@@ -3087,7 +3078,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   
   const finalParams = { ...params, model: currentModel };
   
-  if (modelIndex > 0 || failuresOnCurrentModel > 1) {
+  if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
       delete finalParams.config.tools;
     }
@@ -3099,89 +3090,55 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
     const errorMessage = error.message || errorStr;
     
-    // CACHE: se a falha é do cache (expirado/não encontrado/incompatível), aborta
-    // imediatamente com sinal específico — o endpoint avisa o cliente para reenviar.
     if (params?.config?.cachedContent && (errorMessage.includes('CachedContent') || /cached?\s*content/i.test(errorMessage) || errorMessage.includes('NOT_FOUND') || errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT'))) {
       throw new Error('CACHE_INVALID');
     }
-    const isOverloaded = errorMessage.includes('429') || errorMessage.includes('503') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+    
+    const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
+    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
-    if (isInvalidKey) {
-      invalidKeys.add(apiKey);
-    }
+    if (isInvalidKey) invalidKeys.add(apiKey);
+    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
+    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
-    // FIX#5: arquivo Gemini expirado — remover fileData e tentar 1x sem arquivos
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
-      return callGeminiStream(paramsWithoutFiles, 1, modelIndex, 0, activeKeyIndex, onStatus);
+      return callGeminiStream(paramsWithoutFiles, 1, 0, 0, activeKeyIndex, onStatus);
     }
 
-    // CACHE + COTA: se a chave do cache está sobrecarregada ou sem cota, aborta o cache imediatamente
-    // (CACHE_INVALID) para que a rota mude instantaneamente para texto completo na próxima chave rotacionada.
     if (cachePinned && isOverloaded) {
-      console.warn('[CACHE] Cota excedida ou sobrecarga na chave do cache — abandonando o cache imediatamente para rotacionar com texto completo.');
+      console.warn('[CACHE] Cota excedida no cache — abandonando cache.');
       throw new Error('CACHE_INVALID');
     }
 
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
-      const nextKeyIdx = (activeKeyIndex + 1) % keys.length;
-      if (!isBadRequest) {
-        currentKeyIndex = nextKeyIdx;
-      }
-      
-      let nextModelIndex = modelIndex;
+      let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
       let nextFailures = failuresOnCurrentModel + 1;
-      let delay = (isInvalidKey || isPermissionDenied) ? 500 : 2000;
-
-      if (isBadRequest || isNotFound) {
-         nextModelIndex++;
-         nextFailures = 0;
-         delay = 500;
-         const msg1 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] (${currentModel}) falhou: ${errorMessage.substring(0, 50)}. Trocando Matrix...`; 
-         console.log(msg1); 
-         if(onStatus) onStatus(msg1);
-      } else {
-         // FASE C: Espaçamento de failover para recuperação suave de taxa de requisições
-         delay = 3500; 
-         
-         if ((errorMessage.includes('Quota exceeded') || isOverloaded) && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1) {
-             nextModelIndex++;
-             nextFailures = 0;
-             const nextModelName = MODEL_HIERARCHY[nextModelIndex];
-             const msg3 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota/Taxa atingida no ${currentModel} após tentar múltiplos projetos. Alternando para ${nextModelName}...`; console.log(msg3); if(onStatus) onStatus(msg3);
-         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1) {
-             nextModelIndex++;
-             nextFailures = 0;
-             const nextModelName = MODEL_HIERARCHY[nextModelIndex];
-             const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Alternando para modelo resiliente ${nextModelName}...`; console.log(msg4); if(onStatus) onStatus(msg4);
-         } else {
-             const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
-             const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
-             let errorReason = 'sobrecarga/cota';
-             if (isInvalidKey) errorReason = 'chave inválida';
-             else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
-             else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
-             else if (isNotFound) errorReason = 'modelo não encontrado (404)';
-             
-             const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
-             const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`; console.log(msg5); if(onStatus) onStatus(msg5);
-         }
-      }
       
+      let errorReason = 'sobrecarga/cota';
+      if (isInvalidKey) errorReason = 'chave inválida';
+      else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
+      else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
+      else if (isNotFound) errorReason = 'modelo não encontrado (404)';
+        
+      const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
+      const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`; 
+      console.log(msg5); 
+      if (onStatus) onStatus(msg5);
+
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, nextModelIndex, nextFailures, nextKeyIdx, onStatus);
+      return callGeminiStream(params, retries - 1, 0, nextFailures, undefined, onStatus);
     }
     
     if (retries === 0) {
-      if (errorMessage.includes("Quota exceeded") || errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-        throw new Error(`ALL_KEYS_EXHAUSTED: ${errorMessage}`);
-      }
-      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Último modelo: ${currentModel}. Erro: ${errorMessage}`);
+      if (isOverloaded) throw new Error(`ALL_KEYS_EXHAUSTED: ${errorMessage}`);
+      throw new Error(`FALHA CRÍTICA APÓS ${MAX_RETRIES} TENTATIVAS. Erro: ${errorMessage}`);
     }
     throw error;
   }
@@ -3191,46 +3148,50 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  const apiKey = keys[currentKeyIndex % keys.length];
+  const available = getAvailableKey(keys, currentKeyIndex);
+  if (available.waitMs === -1) {
+    throw new Error("ALL_KEYS_EXHAUSTED: Todas as chaves esgotaram a cota diária do projeto Google Cloud (25.000.000 tokens).");
+  }
+  if (available.waitMs > 0) {
+    console.log(`[Embed Wait] Aguardando ${Math.ceil(available.waitMs / 1000)}s para liberar cota...`);
+    await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
+    return callGeminiEmbed(text, retries);
+  }
+  
+  const activeKeyIndex = available.index;
+  const apiKey = available.key;
+  
+  if (retries === MAX_RETRIES) {
+    currentKeyIndex = (activeKeyIndex + 1) % keys.length;
+  }
+
   const ai = new GoogleGenAI({ apiKey });
 
   try {
-    const result = await ai.models.embedContent({
-      model: 'gemini-embedding-2-preview',
-      contents: [text],
-      config: {
-        outputDimensionality: 768
-      }
+    const response = await ai.models.embedContent({
+      model: "text-embedding-004",
+      contents: { role: "user", parts: [{ text }] },
     });
-    return result.embeddings?.[0]?.values || [];
+    return response.embeddings?.[0]?.values || [];
   } catch (error: any) {
     const errorMessage = error.message || String(error);
+    
+    const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
+    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found') || errorMessage.includes('unauthorized');
     
-    if (isInvalidKey) {
-      invalidKeys.add(apiKey);
-    }
+    if (isInvalidKey) invalidKeys.add(apiKey);
+    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
+    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
-    console.error(`Erro ao gerar embedding com a chave ${currentKeyIndex}:`, errorMessage);
-    
-    // Rotate key
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    console.error(`Erro ao gerar embedding com a chave ${activeKeyIndex}: ${errorMessage.substring(0, 90)}`);
     
     if (retries > 0) {
-      // If we hit a 429, we should wait longer. Let's extract retryDelay if present, or default to 5 seconds.
-      let delay = 2000;
-      if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-         delay = 10000; // Wait 10 seconds on quota errors before trying the next key
-         const match = errorMessage.match(/retry in (\d+\.?\d*)s/);
-         if (match && match[1]) {
-             delay = Math.min(parseFloat(match[1]) * 1000 + 1000, 65000); // Max 65s wait
-         }
-      }
-
-      console.log(`Aguardando ${delay}ms antes de tentar novamente com a próxima chave... (${retries} tentativas restantes)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return callGeminiEmbed(text, retries - 1);
     }
+    
     throw error;
   }
 }
