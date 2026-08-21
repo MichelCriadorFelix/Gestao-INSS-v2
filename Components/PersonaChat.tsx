@@ -191,6 +191,87 @@ export const cleanPetitionDocument = (rawContent: string = ''): string => {
   return cleaned.trim();
 };
 
+export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: string): { updatedText: string; appliedCount: number } => {
+  let doc = originalDoc;
+  let appliedCount = 0;
+
+  const patchRegex = /```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*([\s\S]*?)```/g;
+  let match;
+  const blocksToProcess: string[] = [];
+
+  while ((match = patchRegex.exec(aiResponseText)) !== null) {
+    if (match[1] && match[1].trim()) {
+      blocksToProcess.push(match[1]);
+    }
+  }
+
+  if (blocksToProcess.length === 0) {
+    blocksToProcess.push(aiResponseText);
+  }
+
+  for (const block of blocksToProcess) {
+    // 1. <<<SEARCH ... === ... >>>
+    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>/g;
+    let srMatch;
+    while ((srMatch = searchReplaceRegex.exec(block)) !== null) {
+      const search = srMatch[1].trim();
+      const replace = srMatch[2].trim();
+      if (search && doc.includes(search)) {
+        doc = doc.replace(search, replace);
+        appliedCount++;
+      } else if (search) {
+        const cleanSearch = search.replace(/\s+/g, ' ');
+        const cleanDoc = doc.replace(/\s+/g, ' ');
+        if (cleanDoc.includes(cleanSearch)) {
+          doc = doc.replace(new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'), replace);
+          appliedCount++;
+        }
+      }
+    }
+
+    // 2. SEARCH: ... REPLACE: ...
+    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$))/gi;
+    let lsrMatch;
+    while ((lsrMatch = labeledSRRegex.exec(block)) !== null) {
+      const search = lsrMatch[1].trim();
+      const replace = lsrMatch[2].trim();
+      if (search && doc.includes(search)) {
+        doc = doc.replace(search, replace);
+        appliedCount++;
+      }
+    }
+
+    // 3. <<<AFTER ... === ... >>>
+    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    let aiMatch;
+    while ((aiMatch = afterInsertRegex.exec(block)) !== null) {
+      const target = (aiMatch[1] || aiMatch[3] || '').trim();
+      const insert = (aiMatch[2] || aiMatch[4] || '').trim();
+      if (target && insert) {
+        const idx = doc.indexOf(target);
+        if (idx !== -1) {
+          const insertPos = idx + target.length;
+          doc = doc.substring(0, insertPos) + '\n\n' + insert + doc.substring(insertPos);
+          appliedCount++;
+        }
+      }
+    }
+
+    // 4. <<<REMOVE ... >>>
+    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)\s*>>>|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    let rMatch;
+    while ((rMatch = removeRegex.exec(block)) !== null) {
+      const target = (rMatch[1] || rMatch[2] || '').trim();
+      if (target && doc.includes(target)) {
+        doc = doc.replace(target, '');
+        appliedCount++;
+      }
+    }
+  }
+
+  return { updatedText: doc, appliedCount };
+};
+
 const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -910,6 +991,17 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const compressedHistory = compressHistory(session?.messages || []);
       console.log(`[HISTORY COMPRESSION] Histórico filtrado de mensagens de ${session?.messages?.length || 0} para ${compressedHistory.length} após compressão.`);
 
+      // Obter o texto do artefato atualmente ativo para garantir edições cirúrgicas precisas
+      const activeDocText = editableArtifactText || 
+        (activeArtifactId && activeArtifactId !== 'streaming' ? session?.messages?.find(m => m.id === activeArtifactId)?.content : undefined) ||
+        [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content))?.content;
+
+      const isSurgicalCorrection = messageText.includes('[CORREÇÃO CIRÚRGICA') || 
+                                   messageText.includes('[CORRECAO CIRURGICA') || 
+                                   messageText.includes('[GERAÇÃO MODULAR') || 
+                                   messageText.includes('[GERACAO MODULAR') ||
+                                   (!!activeDocText && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|abaixo|acima|antes|depois|corrija|ajuste|edite)/i.test(messageText));
+
       let fullText = '';
       let isFinished = false;
       let resumeCount = 0;
@@ -935,7 +1027,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           model: eliteModelOverride || selectedModel,
           petitionLength,
           sessionId: session?.id,
-          ragContextLength: ragContext ? ragContext.length : 0
+          ragContextLength: ragContext ? ragContext.length : 0,
+          hasArtifactContent: !!activeDocText,
+          isArtifactCorrection: isSurgicalCorrection
         };
 
         console.log(`[HTTP POST CHAT] Chamando endpoint: ${persona.chatEndpoint}. Payload:`, fetchPayload);
@@ -957,7 +1051,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               model: eliteModelOverride || selectedModel,
               petitionLength,
               keyIndex: session?.uploadKeyIndex,
-              sessionId: session?.id
+              sessionId: session?.id,
+              artifactContent: activeDocText || undefined,
+              isArtifactCorrection: isSurgicalCorrection
             }),
             signal: abortController.signal
           });
@@ -1054,7 +1150,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
                     fullText += data.text;
                     setStreamingMessage(fullText);
-                    if (!isArtifactActive && isArtifactContent(fullText)) {
+                    // Não ativa o painel de streaming se for uma edição cirúrgica de artefato existente
+                    if (!isArtifactActive && isArtifactContent(fullText) && !isSurgicalCorrection) {
                       isArtifactActive = true;
                       setStreamingAsArtifact(true);
                       setActiveArtifactId('streaming');
@@ -1097,10 +1194,27 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
 
+      // Fallback local: se for cirúrgico e o backend não enviou artifactUpdate, tenta aplicar patches localmente
+      let finalArtifactUpdate = receivedArtifactUpdate;
+      if (!finalArtifactUpdate && activeDocText && isSurgicalCorrection) {
+        const localRes = applyLocalArtifactPatches(activeDocText, fullText);
+        if (localRes.appliedCount > 0) {
+          finalArtifactUpdate = localRes.updatedText;
+          setEditableArtifactText(finalArtifactUpdate);
+          setArtifactUpdatePulse(true);
+          setTimeout(() => setArtifactUpdatePulse(false), 2500);
+        }
+      }
+
       // Limpar blocos de código de artifact_patch do texto para a conversa ficar elegante e focada no parecer
       let displayContent = fullText || "Desculpe, não consegui gerar uma resposta.";
-      if (receivedArtifactUpdate) {
-        displayContent = displayContent.replace(/```(?:artifact_patch|patch)?[\s\S]*?```/gi, '').trim();
+      if (finalArtifactUpdate || isSurgicalCorrection) {
+        displayContent = displayContent
+          .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?[\s\S]*?```/gi, '')
+          .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?>>>/g, '')
+          .replace(/<<<AFTER[\s\S]*?===[\s\S]*?>>>/g, '')
+          .replace(/<<<REMOVE[\s\S]*?>>>/g, '')
+          .trim();
         if (!displayContent) {
           displayContent = "✅ **Alteração aplicada com sucesso ao Artefato!** O documento foi atualizado cirurgicamente com a modificação solicitada mantendo todas as demais seções intactas.";
         }
@@ -1113,7 +1227,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         timestamp: new Date().toISOString()
       };
 
-      if (receivedArtifactUpdate) {
+      if (finalArtifactUpdate) {
         // Atualiza a mensagem do artefato anterior na conversa para que o documento fique sincronizado
         setSessions(prev => prev.map(s => {
           if (s.id !== sessionId) return s;
@@ -1122,7 +1236,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             if (isArtifactContent(updatedMessages[i].content)) {
               updatedMessages[i] = {
                 ...updatedMessages[i],
-                content: receivedArtifactUpdate!
+                content: finalArtifactUpdate!
               };
               break;
             }
@@ -1133,7 +1247,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           };
         }));
       } else {
-        if (isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) {
+        if ((isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) && !isSurgicalCorrection) {
           setStreamingAsArtifact(false);
           setActiveArtifactId(assistantMsg.id);
         }

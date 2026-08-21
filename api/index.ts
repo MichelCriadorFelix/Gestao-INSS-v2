@@ -884,16 +884,17 @@ type RevisionIntent = 'POINT_CORRECTION' | 'ADDITION' | 'FULL_REGENERATION' | 'N
  * Sem keyword → NO_ACTION: modelo responde normalmente sem o draft no prompt.
  */
 function detectRevisionIntent(message: string, hasDraft: boolean): RevisionIntent {
-  if (!hasDraft) return 'NEW_GENERATION';
   const msg = message.toLowerCase();
   
-  if (msg.includes("[correção cirúrgica]") || msg.includes("[correcao cirurgica]") || msg.includes("[geração modular]") || msg.includes("[geracao modular]")) {
+  if (msg.includes("[correção cirúrgica") || msg.includes("[correcao cirurgica") || msg.includes("[geração modular") || msg.includes("[geracao modular")) {
     return 'POINT_CORRECTION';
   }
 
+  if (!hasDraft) return 'NEW_GENERATION';
+
   const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
   const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
-  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na )|retir|remov|apagu|exclui|delet|tirar|retirar|remover)/i.test(msg);
+  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na )|retir|remov|apagu|exclui|delet|tirar|retirar|remover|abaixo das assinaturas|depois das assinaturas|antes das assinaturas)/i.test(msg);
   if (isFullRegen) return 'FULL_REGENERATION';
   if (isPointCorrection) return 'POINT_CORRECTION';
   if (isAddition) return 'ADDITION';
@@ -1009,13 +1010,23 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
   let doc = originalDoc;
   let appliedCount = 0;
 
-  // Regex para capturar blocos de patch
+  // 1. Extrair blocos de patch dentro de markdown fences (ex: ```artifact_patch ... ```)
   const patchRegex = /```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*([\s\S]*?)```/g;
   let match;
+  const blocksToProcess: string[] = [];
 
   while ((match = patchRegex.exec(aiResponseText)) !== null) {
-    const block = match[1];
+    if (match[1] && match[1].trim()) {
+      blocksToProcess.push(match[1]);
+    }
+  }
 
+  // Se nenhum bloco com fence foi encontrado, processa o texto inteiro como potencial bloco de patch
+  if (blocksToProcess.length === 0) {
+    blocksToProcess.push(aiResponseText);
+  }
+
+  for (const block of blocksToProcess) {
     // Padrão 1: <<<SEARCH ... === ... >>>
     const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>/g;
     let srMatch;
@@ -1079,10 +1090,13 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
   // Remove os blocos de código de patch da resposta amigável para o chat
   let cleanResponse = aiResponseText
     .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*[\s\S]*?```/g, '')
+    .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?>>>/g, '')
+    .replace(/<<<AFTER[\s\S]*?===[\s\S]*?>>>/g, '')
+    .replace(/<<<REMOVE[\s\S]*?>>>/g, '')
     .trim();
 
   if (!cleanResponse) {
-    cleanResponse = "✅ As alterações solicitadas foram aplicadas com sucesso no artefato da petição.";
+    cleanResponse = "✅ As alterações solicitadas foram aplicadas com sucesso diretamente no artefato da petição.";
   }
 
   return {
@@ -4813,8 +4827,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     message = message || "";
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
-    let draftContent = "";
-    if (sessionId) {
+    let draftContent = req.body.artifactContent || req.body.draftContent || "";
+    if (!draftContent && sessionId) {
       try {
         const { data: draftData } = await supabaseAdmin
           .from('ai_conversations')
@@ -4831,8 +4845,30 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       }
     }
 
-    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Se o draft veio no payload e temos sessionId, persiste no Supabase em background
+    if (draftContent && sessionId) {
+      Promise.resolve(supabaseAdmin.from('ai_conversations').upsert({
+        id: `draft_dr_michel_${sessionId}`,
+        lawyer_type: 'petition_draft',
+        title: 'DrMichel',
+        date: new Date().toISOString(),
+        auth_id: (req as any).user?.id || null,
+        messages: [{ role: 'assistant', content: draftContent }]
+      })).catch((err: any) => console.warn("Background draft sync warn (Michel):", err?.message));
+    }
+
+    const isExplicitSurgical = !!req.body.isArtifactCorrection || 
+                               message.includes("[CORREÇÃO CIRÚRGICA") || 
+                               message.includes("[CORRECAO CIRURGICA") || 
+                               message.includes("[GERAÇÃO MODULAR") || 
+                               message.includes("[GERACAO MODULAR");
+
+    let revisionIntent = detectRevisionIntent(message, !!draftContent);
+    if (isExplicitSurgical && draftContent) {
+      revisionIntent = 'POINT_CORRECTION';
+    }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+    const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
     const intent = await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
@@ -5062,9 +5098,8 @@ REGRAS DE OURO:
     // ============================================================
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
 
-    // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
-    if (isGenerationRequest) {
+    if (isGenerationRequest && !isSurgicalMode) {
       if (petitionLength && petitionLength !== 'Padrão (Livre)') {
         const target = parsePetitionTarget(petitionLength);
         lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
@@ -5082,7 +5117,9 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
+    let finalMessage = isSurgicalMode 
+      ? message 
+      : message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (ragContext) {
       // Dynamic RAG Budget based on ratios computed upstream
       const ragBudgetChars = Math.floor(availableForContext * ratioRag * 3.5);
@@ -5103,7 +5140,7 @@ ${ragTruncated}`;
     if (draftContent) {
       console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+      if (isSurgicalMode) {
         const draftParaRegen = draftContent.substring(0, 200000);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editor Jurídico de Elite no Artefato/Petição já existente.
@@ -5468,8 +5505,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     message = message || "";
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
-    let draftContent = "";
-    if (sessionId) {
+    let draftContent = req.body.artifactContent || req.body.draftContent || "";
+    if (!draftContent && sessionId) {
       try {
         const { data: draftData } = await supabaseAdmin
           .from('ai_conversations')
@@ -5486,8 +5523,30 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       }
     }
 
-    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Se o draft veio no payload e temos sessionId, persiste no Supabase em background
+    if (draftContent && sessionId) {
+      Promise.resolve(supabaseAdmin.from('ai_conversations').upsert({
+        id: `draft_dra_luana_${sessionId}`,
+        lawyer_type: 'petition_draft',
+        title: 'DraLuana',
+        date: new Date().toISOString(),
+        auth_id: (req as any).user?.id || null,
+        messages: [{ role: 'assistant', content: draftContent }]
+      })).catch((err: any) => console.warn("Background draft sync warn (Luana):", err?.message));
+    }
+
+    const isExplicitSurgicalLuana = !!req.body.isArtifactCorrection || 
+                                    message.includes("[CORREÇÃO CIRÚRGICA") || 
+                                    message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("[GERAÇÃO MODULAR") || 
+                                    message.includes("[GERACAO MODULAR");
+
+    let revisionIntent = detectRevisionIntent(message, !!draftContent);
+    if (isExplicitSurgicalLuana && draftContent) {
+      revisionIntent = 'POINT_CORRECTION';
+    }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+    const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
     const intent = await detectUserIntent(message);
@@ -5773,7 +5832,7 @@ REGRAS DE OURO:
 
     // FIX#10: detectar recomendação de extensão no histórico; fallback fixo 5000 palavras
     let lengthConstraint = "";
-    if (isGenerationRequest) {
+    if (isGenerationRequest && !isSurgicalMode) {
       if (petitionLength && petitionLength !== 'Padrão (Livre)') {
         const target = parsePetitionTarget(petitionLength);
         lengthConstraint = `\n\n[ALVO DE EXTENSÃO DA PEÇA — INSTRUÇÃO CRÍTICA]
@@ -5790,7 +5849,9 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       }
     }
 
-    let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
+    let finalMessage = isSurgicalMode 
+      ? message 
+      : message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (message.includes("FASE DE TOMADA DE CIÊNCIA")) {
       finalMessage += "\n\n" + PHASED_SCIENCE_PROMPT;
     }
@@ -5813,7 +5874,7 @@ ${ragTruncated}`;
     if (draftContent) {
       console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+      if (isSurgicalMode) {
         const draftParaRegen = draftContent.substring(0, 200000);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editora Jurídica de Elite Previdenciária no Artefato/Petição já existente.
@@ -6218,8 +6279,8 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     message = message || "";
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
-    let draftContent = "";
-    if (sessionId) {
+    let draftContent = req.body.artifactContent || req.body.draftContent || "";
+    if (!draftContent && sessionId) {
       try {
         const { data: draftData } = await supabaseAdmin
           .from('ai_conversations')
@@ -6236,8 +6297,30 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       }
     }
 
-    const revisionIntent = detectRevisionIntent(message, !!draftContent);
+    // Se o draft veio no payload e temos sessionId, persiste no Supabase em background
+    if (draftContent && sessionId) {
+      Promise.resolve(supabaseAdmin.from('ai_conversations').upsert({
+        id: `draft_dr_felix_castro_${sessionId}`,
+        lawyer_type: 'petition_draft',
+        title: 'DrFelixCastro',
+        date: new Date().toISOString(),
+        auth_id: (req as any).user?.id || null,
+        messages: [{ role: 'assistant', content: draftContent }]
+      })).catch((err: any) => console.warn("Background draft sync warn (Felix):", err?.message));
+    }
+
+    const isExplicitSurgicalFelix = !!req.body.isArtifactCorrection || 
+                                    message.includes("[CORREÇÃO CIRÚRGICA") || 
+                                    message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("[GERAÇÃO MODULAR") || 
+                                    message.includes("[GERACAO MODULAR");
+
+    let revisionIntent = detectRevisionIntent(message, !!draftContent);
+    if (isExplicitSurgicalFelix && draftContent) {
+      revisionIntent = 'POINT_CORRECTION';
+    }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
+    const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
     const intent = await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
@@ -6467,13 +6550,13 @@ REGRAS DE OURO:
       }
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]\nLeis/jurisprudências recuperadas:\n${ragTruncated}`;
     }
-    if (REINFORCEMENT_PROMPT) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
+    if (REINFORCEMENT_PROMPT && !isSurgicalMode) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
 
     // Reutilizar o rascunho buscado precocemente para injeção de contexto na revisão
     if (draftContent) {
       console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+      if (isSurgicalMode) {
         const draftParaRegen = draftContent.substring(0, 200000);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editor Jurídico de Elite Civil/Consumidor no Artefato/Petição já existente.
