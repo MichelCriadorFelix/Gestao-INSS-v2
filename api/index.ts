@@ -792,6 +792,12 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[ARQUIVO]";
   }
 
+  // PRIORIDADE MÁXIMA: comando explícito de geração de peça (botão ou texto)
+  if (/(?:^|\b)(?:gerar\s+pe[çc]a|gerar\s+peti[çc][ãa]o|gerar\s+inicial|gerar\s+recurso|fazer\s+a\s+pe[çc]a|redigir\s+pe[çc]a|elaborar\s+pe[çc]a)(?:\b|$)/i.test(safeMessage.trim())) {
+    console.log("[Detector] Comando explícito GERAR PEÇA -> [GERAÇÃO]");
+    return "[GERAÇÃO]";
+  }
+
   // PRIORIDADE MÁXIMA: comando explícito de relatório (botão ou texto) → nunca peça
   if (/^gerar\s+relat[óo]rio/i.test(safeMessage.trim()) || /\[gerar\s+relat[óo]rio\]/i.test(msgLower)) {
     console.log("[Detector] Comando explícito GERAR RELATÓRIO → [DÚVIDA] (rota relatório)");
