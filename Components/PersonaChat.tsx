@@ -29,7 +29,8 @@ import {
   PencilSquareIcon as EditSquare,
   BoltIcon as Bolt,
   EyeIcon as Eye,
-  ArrowPathRoundedSquareIcon as RefreshCw
+  ArrowPathRoundedSquareIcon as RefreshCw,
+  StopIcon as Stop
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -324,11 +325,24 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const artifactSheetRef = useRef<HTMLDivElement>(null);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
   
   const sessionsRef = useRef(sessions);
   const pendingSyncRef = useRef<Set<string>>(new Set());
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncedSessionsRef = useRef<Record<string, string>>({});
+
+  const handleStopGeneration = () => {
+    if (activeAbortControllerRef.current) {
+      console.log("[USER ABORT] Usuário cancelou a geração manualmente.");
+      activeAbortControllerRef.current.abort();
+      activeAbortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setStreamingMessage('');
+    setProgress(0);
+    setProgressText('');
+  };
 
   useEffect(() => {
     if (pendingAudit) {
@@ -678,6 +692,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     setIsLoading(true);
 
     let timeoutId: any;
+    let fullText = '';
     try {
       // Check payload size roughly
       const payloadSize = JSON.stringify({
@@ -694,6 +709,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       }
 
       const abortController = new AbortController();
+      activeAbortControllerRef.current = abortController;
       timeoutId = setTimeout(() => {
         abortController.abort();
       }, 800000); // 800 seconds — conforme solicitado pelo usuário
@@ -1002,7 +1018,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                                    messageText.includes('[GERACAO MODULAR') ||
                                    (!!activeDocText && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|abaixo|acima|antes|depois|corrija|ajuste|edite)/i.test(messageText));
 
-      let fullText = '';
+      fullText = '';
       let isFinished = false;
       let resumeCount = 0;
       let isArtifactActive = false;
@@ -1258,11 +1274,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       }
     } catch (error: any) {
       if (timeoutId) clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        console.log("[GENERATION ABORTED] Requisição cancelada pelo usuário ou timeout.");
         const assistantMsg: Message = {
           id: generateId(),
           role: 'assistant',
-          content: '[Aviso: Tempo limite de 5 minutos atingido antes de receber dados. Tente novamente.]',
+          content: fullText.trim() ? `${fullText}\n\n*[⏹️ Geração interrompida pelo usuário]*` : '[⏹️ Geração cancelada pelo usuário.]',
           timestamp: new Date().toISOString()
         };
         setSessions(prev => prev.map(s => 
@@ -1282,6 +1299,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       }
     } finally {
       setIsLoading(false);
+      activeAbortControllerRef.current = null;
+      setProgress(0);
+      setProgressText('');
     }
   };
 
@@ -2242,9 +2262,18 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         <div className="w-full bg-slate-100 dark:bg-bordeaux-900/40 rounded-full h-1.5 overflow-hidden">
                           <div className="bg-gradient-to-r from-primary-600 to-primary-700 h-1.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
                         </div>
-                        <div className="flex justify-between text-[11px] text-slate-500">
+                        <div className="flex justify-between items-center text-[11px] text-slate-500">
                           <span className="font-medium text-emerald-600 dark:text-emerald-400">{progress}% • Padrão Ouro Felix & Castro</span>
-                          <span className="animate-pulse">{isUploading ? "Processando GED..." : "Redigindo peça..."}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="animate-pulse">{isUploading ? "Processando GED..." : "Redigindo peça..."}</span>
+                            <button
+                              onClick={handleStopGeneration}
+                              className="text-[11px] text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:underline flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 transition-colors"
+                              title="Cancelar e liberar o chat"
+                            >
+                              <Stop className="w-3 h-3" /> Cancelar
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2481,14 +2510,25 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     </optgroup>
                   </select>
                 </div>
-                <button 
-                  onClick={() => handleSendMessage()}
-                  disabled={!input.trim() || isLoading}
-                  className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
-                  title="Enviar mensagem"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+                {isLoading ? (
+                  <button 
+                    onClick={handleStopGeneration}
+                    className="flex-shrink-0 bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl shadow-lg shadow-rose-900/40 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold animate-pulse"
+                    title="Interromper geração imediatamente"
+                  >
+                    <Stop className="w-4 h-4" />
+                    <span className="hidden sm:inline">Parar</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleSendMessage()}
+                    disabled={!input.trim()}
+                    className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
+                    title="Enviar mensagem"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </div>
             <p className="text-[10px] text-center text-slate-400 mt-3">

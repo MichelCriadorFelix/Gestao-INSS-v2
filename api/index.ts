@@ -2572,7 +2572,7 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 `;
 
 // Logic for API Key Rotation (Round-Robin)
-const MAX_RETRIES = 60; // Matrix expandida para suportar rotação agressiva de até 60 tentativas
+const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender a conexão por minutos desnecessários
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
