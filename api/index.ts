@@ -936,6 +936,162 @@ function smartTruncate(text: string, maxChars: number): string {
     + text.substring(text.length - tailSize);
 }
 
+function normalizeForMatching(str: string): string {
+  return (str || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n+/g, '\n')
+    .trim();
+}
+
+function flexibleReplace(source: string, search: string, replacement: string): string {
+  if (!source || !search) return source;
+  
+  // 1. Match exato direto
+  if (source.includes(search)) {
+    return source.replace(search, replacement);
+  }
+
+  // 2. Match sem espaços extras nas pontas
+  const cleanSearch = search.trim();
+  if (source.includes(cleanSearch)) {
+    return source.replace(cleanSearch, replacement);
+  }
+
+  // 3. Match flexível por palavras-chave de início e fim
+  const normSearch = normalizeForMatching(search);
+  const searchWords = normSearch.split(/\s+/).filter(w => w.length > 2);
+  if (searchWords.length >= 2) {
+    const firstWord = searchWords[0];
+    const lastWord = searchWords[searchWords.length - 1];
+
+    let firstPos = source.indexOf(firstWord);
+    let lastPos = source.indexOf(lastWord, firstPos > -1 ? firstPos : 0);
+
+    if (firstPos !== -1 && lastPos !== -1 && lastPos > firstPos && (lastPos - firstPos) < search.length * 2.5) {
+      const endPos = lastPos + lastWord.length;
+      return source.substring(0, firstPos) + replacement + source.substring(endPos);
+    }
+  }
+
+  // 4. Regex flexível para espaços
+  try {
+    const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    const regex = new RegExp(escaped, 'i');
+    if (regex.test(source)) {
+      return source.replace(regex, replacement);
+    }
+  } catch {}
+
+  return source;
+}
+
+function flexibleInsertAfter(source: string, target: string, insertion: string): string {
+  if (!source || !target || !insertion) return source;
+
+  const idx = source.indexOf(target);
+  if (idx !== -1) {
+    const insertPos = idx + target.length;
+    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+  }
+
+  const cleanTarget = target.trim();
+  const cleanIdx = source.indexOf(cleanTarget);
+  if (cleanIdx !== -1) {
+    const insertPos = cleanIdx + cleanTarget.length;
+    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+  }
+
+  return source + '\n\n' + insertion;
+}
+
+export function applyArtifactPatches(originalDoc: string, aiResponseText: string): { updatedText: string; appliedCount: number; cleanResponse: string } {
+  let doc = originalDoc;
+  let appliedCount = 0;
+
+  // Regex para capturar blocos de patch
+  const patchRegex = /```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*([\s\S]*?)```/g;
+  let match;
+
+  while ((match = patchRegex.exec(aiResponseText)) !== null) {
+    const block = match[1];
+
+    // Padrão 1: <<<SEARCH ... === ... >>>
+    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>/g;
+    let srMatch;
+    while ((srMatch = searchReplaceRegex.exec(block)) !== null) {
+      const search = srMatch[1].trim();
+      const replace = srMatch[2].trim();
+      if (search) {
+        const newDoc = flexibleReplace(doc, search, replace);
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
+      }
+    }
+
+    // Padrão 2: SEARCH: ... REPLACE: ...
+    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$))/gi;
+    let lsrMatch;
+    while ((lsrMatch = labeledSRRegex.exec(block)) !== null) {
+      const search = lsrMatch[1].trim();
+      const replace = lsrMatch[2].trim();
+      if (search) {
+        const newDoc = flexibleReplace(doc, search, replace);
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
+      }
+    }
+
+    // Padrão 3: <<<AFTER ... === ... >>> ou AFTER: ... INSERT: ...
+    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    let aiMatch;
+    while ((aiMatch = afterInsertRegex.exec(block)) !== null) {
+      const target = (aiMatch[1] || aiMatch[3] || '').trim();
+      const insert = (aiMatch[2] || aiMatch[4] || '').trim();
+      if (target && insert) {
+        const newDoc = flexibleInsertAfter(doc, target, insert);
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
+      }
+    }
+
+    // Padrão 4: <<<REMOVE ... >>> ou REMOVE: ...
+    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)\s*>>>|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    let rMatch;
+    while ((rMatch = removeRegex.exec(block)) !== null) {
+      const target = (rMatch[1] || rMatch[2] || '').trim();
+      if (target) {
+        const newDoc = flexibleReplace(doc, target, '');
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
+      }
+    }
+  }
+
+  // Remove os blocos de código de patch da resposta amigável para o chat
+  let cleanResponse = aiResponseText
+    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*[\s\S]*?```/g, '')
+    .trim();
+
+  if (!cleanResponse) {
+    cleanResponse = "✅ As alterações solicitadas foram aplicadas com sucesso no artefato da petição.";
+  }
+
+  return {
+    updatedText: doc,
+    appliedCount,
+    cleanResponse
+  };
+}
+
 function buildOrHistory(history: any[]): any[] {
   let totalChars = 0;
   const resultMessages: any[] = [];
@@ -4947,46 +5103,52 @@ ${ragTruncated}`;
     if (draftContent) {
       console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION') {
-          // Correção pontual — REESCREVE A PETIÇÃO INTEIRA aplicando a correção, para não quebrar a persistência e UI
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo toda a estrutura, provas e citações idênticas à versão anterior, mas aplique a alteração ou remoção solicitada.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
+Você está atuando como Editor Jurídico de Elite no Artefato/Petição já existente.
+O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
 
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
+DIRETRIZES DO EDITOR CIRÚRGICO:
+1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogado de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
+2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
 
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
-[FIM DA REFERÊNCIA]
+Substituição de trecho ou parágrafo:
+\`\`\`artifact_patch
+<<<SEARCH
+[Trecho original exato da petição que deve ser substituído]
+===
+[Novo trecho fundamentado com redação de elite e citações completas]
+>>>
+\`\`\`
 
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+Inserção de novo tópico ou parágrafo:
+\`\`\`artifact_patch
+<<<AFTER
+[Trecho ou título da seção imediatamente anterior ao ponto de inserção]
+===
+[Novo tópico ou parágrafo completo a ser inserido]
+>>>
+\`\`\`
+
+Remoção de trecho:
+\`\`\`artifact_patch
+<<<REMOVE
+[Trecho exato a ser removido da petição]
+>>>
+\`\`\`
+
+[ARTEFATO BASE ATUAL]
+${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+[FIM DO ARTEFATO BASE]
+
+[ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        } else if (revisionIntent === 'ADDITION') {
-          // Adição — REESCREVE A PETIÇÃO INTEIRA aplicando a adição
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
-O usuário pediu para ACRESCENTAR algo. REESCREVA a petição por completo, mantendo a estrutura da versão anterior, mas inserindo o novo argumento, tópico ou parágrafo no local apropriado.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
-
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
-[FIM DA REFERÊNCIA]
-
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
-${message}`;
-        } else if (revisionIntent === 'FULL_REGENERATION') {
-          // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
-O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+      } else if (revisionIntent === 'FULL_REGENERATION') {
+        // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
+O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
@@ -5000,7 +5162,7 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        }
+      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
@@ -5230,9 +5392,28 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // FIX#12: salvar draft sempre que output > 5000 chars (não apenas em isGenerationRequest)
-      // Mas NUNCA salvar relatórios de auditoria (isReportRequest) como petition_draft, para evitar conflitos de revisão
-      if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
+      // Salvar draft e emitir artifactUpdate se houve patch cirúrgico ou nova versão
+      if (draftContent && (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION')) {
+        const patchResult = applyArtifactPatches(draftContent, fullResponseText);
+        if (patchResult.appliedCount > 0) {
+          console.log(`[Dr.Michel] Patch cirúrgico aplicado com sucesso: ${patchResult.appliedCount} alterações.`);
+          if (sessionId) {
+            try {
+              await supabaseAdmin.from('ai_conversations').upsert({
+                id: `draft_dr_michel_${sessionId}`,
+                lawyer_type: 'petition_draft',
+                title: 'DrMichel',
+                date: new Date().toISOString(),
+                auth_id: (req as any).user?.id || null,
+                messages: [{ role: 'assistant', content: patchResult.updatedText }]
+              });
+            } catch (e) {
+              console.error("Erro salvando petition_draft após patch (DrMichel):", e);
+            }
+          }
+          res.write(`data: ${JSON.stringify({ artifactUpdate: patchResult.updatedText, patchApplied: true })}\n\n`);
+        }
+      } else if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_michel_${sessionId}`,
@@ -5632,43 +5813,51 @@ ${ragTruncated}`;
     if (draftContent) {
       console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura original, provas e citações idênticas, mas aplique a alteração ou remoção solicitada.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
+Você está atuando como Editora Jurídica de Elite Previdenciária no Artefato/Petição já existente.
+O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
 
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
+DIRETRIZES DO EDITOR CIRÚRGICO:
+1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogada previdenciarista de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
+2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
 
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
-[FIM DA REFERÊNCIA]
+Substituição de trecho ou parágrafo:
+\`\`\`artifact_patch
+<<<SEARCH
+[Trecho original exato da petição que deve ser substituído]
+===
+[Novo trecho fundamentado com redação previdenciária de elite, cálculos e citações completas]
+>>>
+\`\`\`
 
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+Inserção de novo tópico ou parágrafo:
+\`\`\`artifact_patch
+<<<AFTER
+[Trecho ou título da seção imediatamente anterior ao ponto de inserção]
+===
+[Novo tópico, preliminar ou parágrafo previdenciário completo a ser inserido]
+>>>
+\`\`\`
+
+Remoção de trecho:
+\`\`\`artifact_patch
+<<<REMOVE
+[Trecho exato a ser removido da petição]
+>>>
+\`\`\`
+
+[ARTEFATO BASE ATUAL]
+${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+[FIM DO ARTEFATO BASE]
+
+[ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        } else if (revisionIntent === 'ADDITION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
-O usuário pediu para ACRESCENTAR algo à peça já existente. REESCREVA a petição inteira e completa integrando organicamente o novo parágrafo ou tópico.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
-
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
-[FIM DA REFERÊNCIA]
-
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
-${message}`;
-        } else if (revisionIntent === 'FULL_REGENERATION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
-O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+      } else if (revisionIntent === 'FULL_REGENERATION') {
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
+O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
@@ -5682,7 +5871,7 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        }
+      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
@@ -5944,8 +6133,28 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // FIX#12: salvar draft sempre que output > 5000 chars (evita salvar relatórios isReportRequestLuana como draft)
-      if (sessionId && fullResponseText.length > 5000 && !isReportRequestLuana) {
+      // Salvar draft e emitir artifactUpdate se houve patch cirúrgico ou nova versão
+      if (draftContent && (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION')) {
+        const patchResult = applyArtifactPatches(draftContent, fullResponseText);
+        if (patchResult.appliedCount > 0) {
+          console.log(`[Dra.Luana] Patch cirúrgico aplicado com sucesso: ${patchResult.appliedCount} alterações.`);
+          if (sessionId) {
+            try {
+              await supabaseAdmin.from('ai_conversations').upsert({
+                id: `draft_dra_luana_${sessionId}`,
+                lawyer_type: 'petition_draft',
+                title: 'DraLuana',
+                date: new Date().toISOString(),
+                auth_id: (req as any).user?.id || null,
+                messages: [{ role: 'assistant', content: patchResult.updatedText }]
+              });
+            } catch (e) {
+              console.error("Erro salvando petition_draft após patch (DraLuana):", e);
+            }
+          }
+          res.write(`data: ${JSON.stringify({ artifactUpdate: patchResult.updatedText, patchApplied: true })}\n\n`);
+        }
+      } else if (sessionId && fullResponseText.length > 5000 && !isReportRequestLuana) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dra_luana_${sessionId}`,
@@ -6264,43 +6473,51 @@ REGRAS DE OURO:
     if (draftContent) {
       console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
-      if (revisionIntent === 'POINT_CORRECTION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO CORREÇÃO PONTUAL — REESCREVA A PETIÇÃO INTEIRA]
-O usuário solicitou uma correção ou remoção pontual. REESCREVA a petição por completo, mantendo a estrutura, as provas e as citações da versão anterior, aplicando apenas a alteração ou remoção solicitada.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
+      if (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') {
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
+Você está atuando como Editor Jurídico de Elite Civil/Consumidor no Artefato/Petição já existente.
+O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
 
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL (NUNCA escreva frases como "Prezado(a) colega...", "Com base no relatório...", "Segue a versão corrigida...", "Certo, irei retirar...").
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-3. Mantenha o artefato de peça 100% limpo como um documento pronto para protocolo.
+DIRETRIZES DO EDITOR CIRÚRGICO:
+1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogado de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
+2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
 
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça truncada ...]' : ''}
-[FIM DA REFERÊNCIA]
+Substituição de trecho ou parágrafo:
+\`\`\`artifact_patch
+<<<SEARCH
+[Trecho original exato da petição que deve ser substituído]
+===
+[Novo trecho fundamentado com redação civil/consumidor de elite e citações completas]
+>>>
+\`\`\`
 
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
+Inserção de novo tópico ou parágrafo:
+\`\`\`artifact_patch
+<<<AFTER
+[Trecho ou título da seção imediatamente anterior ao ponto de inserção]
+===
+[Novo tópico, preliminar ou parágrafo completo a ser inserido]
+>>>
+\`\`\`
+
+Remoção de trecho:
+\`\`\`artifact_patch
+<<<REMOVE
+[Trecho exato a ser removido da petição]
+>>>
+\`\`\`
+
+[ARTEFATO BASE ATUAL]
+${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+[FIM DO ARTEFATO BASE]
+
+[ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        } else if (revisionIntent === 'ADDITION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO ADIÇÃO — REESCREVA A PETIÇÃO INTEIRA]
-O usuário pediu para ACRESCENTAR algo à peça. REESCREVA a petição inteira e completa integrando o novo parágrafo ou tópico apropriadamente.
-NÃO devolva apenas o trecho. Devolva a petição inteira e completa.
-
-[REGRA ABSOLUTA DE FORMATAÇÃO E LIMPEZA DE ARTEFATO]
-1. É TERMINANTEMENTE PROIBIDO INCLUIR QUALQUER SAUDAÇÃO, PREÂMBULO OU RESUMO CONVERSACIONAL.
-2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
-
-[PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua ...]' : ''}
-[FIM DA REFERÊNCIA]
-
-[MUDANÇAS SOLICITADAS PELO USUÁRIO]
-${message}`;
-        } else if (revisionIntent === 'FULL_REGENERATION') {
-          const draftParaRegen = draftContent.substring(0, 200000);
-          finalMessage += `\n\n[MODO NOVA VERSÃO — REESCREVER COM MELHORIAS]
-O usuário pediu uma NOVA versão. REESCREVA do zero incorporando as mudanças solicitadas.
+      } else if (revisionIntent === 'FULL_REGENERATION') {
+        const draftParaRegen = draftContent.substring(0, 200000);
+        finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
+O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
 Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica.
 
@@ -6314,7 +6531,7 @@ ${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — man
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
 ${message}`;
-        }
+      }
     }
 
     const currentMessageParts: any[] = [{ text: finalMessage }];
@@ -6546,9 +6763,28 @@ REGRAS ABSOLUTAS:
         res.write(`data: ${JSON.stringify({ max_tokens: true })}\n\n`);
       }
       
-      // Salva draft
-      // FIX#12: salvar draft sempre que output > 5000 chars (evita salvar relatórios isReportRequest como draft)
-      if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
+      // Salvar draft e emitir artifactUpdate se houve patch cirúrgico ou nova versão
+      if (draftContent && (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION')) {
+        const patchResult = applyArtifactPatches(draftContent, fullResponseText);
+        if (patchResult.appliedCount > 0) {
+          console.log(`[Dr.FelixCastro] Patch cirúrgico aplicado com sucesso: ${patchResult.appliedCount} alterações.`);
+          if (sessionId) {
+            try {
+              await supabaseAdmin.from('ai_conversations').upsert({
+                id: `draft_dr_felix_castro_${sessionId}`,
+                lawyer_type: 'petition_draft',
+                title: 'DrFelixCastro',
+                date: new Date().toISOString(),
+                auth_id: (req as any).user?.id || null,
+                messages: [{ role: 'assistant', content: patchResult.updatedText }]
+              });
+            } catch (e) {
+              console.error("Erro salvando petition_draft após patch (DrFelixCastro):", e);
+            }
+          }
+          res.write(`data: ${JSON.stringify({ artifactUpdate: patchResult.updatedText, patchApplied: true })}\n\n`);
+        }
+      } else if (sessionId && fullResponseText.length > 5000 && !isReportRequest) {
         try {
           await supabaseAdmin.from('ai_conversations').upsert({
             id: `draft_dr_felix_castro_${sessionId}`,

@@ -144,6 +144,43 @@ export const supabaseService = {
     });
   },
 
+  async saveDraft(draftId: string, lawyerType: string, content: string) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .upsert({
+          id: draftId,
+          lawyer_type: 'petition_draft',
+          title: lawyerType,
+          date: new Date().toISOString(),
+          messages: [{ role: 'assistant', content }]
+        });
+      if (error) console.warn('Aviso salvando draft no Supabase:', error);
+      return data;
+    } catch (e) {
+      console.warn('Erro ao salvar draft no Supabase:', e);
+      return null;
+    }
+  },
+
+  async getDraft(draftId: string): Promise<string | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .select('messages')
+        .eq('id', draftId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data.messages?.[0]?.content || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
   async deleteAIConversation(id: string) {
     const supabase = getSupabase();
     if (!supabase) return null;

@@ -21,7 +21,15 @@ import {
   SparklesIcon as Sparkles,
   ScissorsIcon as Scissors,
   ShieldExclamationIcon as ShieldExclamation,
-  ArrowsPointingOutIcon as Maximize2
+  ArrowsPointingOutIcon as Maximize2,
+  ArrowUturnLeftIcon as Undo,
+  ArrowUturnRightIcon as Redo,
+  BookmarkIcon as Pin,
+  DocumentCheckIcon as Save,
+  PencilSquareIcon as EditSquare,
+  BoltIcon as Bolt,
+  EyeIcon as Eye,
+  ArrowPathRoundedSquareIcon as RefreshCw
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -221,8 +229,20 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
+  // Estados do Editor de Artefato Estático & Cirúrgico
+  const [artifactTab, setArtifactTab] = useState<'preview' | 'edit'>('preview');
+  const [editableArtifactText, setEditableArtifactText] = useState<string>('');
+  const [artifactHistory, setArtifactHistory] = useState<string[]>([]);
+  const [artifactHistoryIndex, setArtifactHistoryIndex] = useState<number>(-1);
+  const [isArtifactPinned, setIsArtifactPinned] = useState<boolean>(true);
+  const [artifactQuickCommand, setArtifactQuickCommand] = useState<string>('');
+  const [artifactUpdatePulse, setArtifactUpdatePulse] = useState<boolean>(false);
+  const [artifactSaveSuccess, setArtifactSaveSuccess] = useState<boolean>(false);
+  const [selectedTextSnippet, setSelectedTextSnippet] = useState<string>('');
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const artifactSheetRef = useRef<HTMLDivElement>(null);
   
   const sessionsRef = useRef(sessions);
   const pendingSyncRef = useRef<Set<string>>(new Set());
@@ -887,6 +907,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       let isFinished = false;
       let resumeCount = 0;
       let isArtifactActive = false;
+      let receivedArtifactUpdate: string | null = null;
       const MAX_RESUMES = 3;
 
       while (!isFinished && resumeCount <= MAX_RESUMES) {
@@ -1013,6 +1034,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     setProgressText(data.status);
                     continue;
                   }
+
+                  if (data.artifactUpdate) {
+                    console.log(`[SSE ARTIFACT UPDATE] Recebido patch do documento (${data.artifactUpdate.length} chars)`);
+                    receivedArtifactUpdate = data.artifactUpdate;
+                    setEditableArtifactText(data.artifactUpdate);
+                    setArtifactUpdatePulse(true);
+                    setTimeout(() => setArtifactUpdatePulse(false), 2500);
+                  }
                   
                   if (data.text) {
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
@@ -1023,7 +1052,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                       setStreamingAsArtifact(true);
                       setActiveArtifactId('streaming');
                     }
-                  } else {
+                  } else if (!data.artifactUpdate) {
                     console.log("[SSE UNKNOWN] Recebido objeto JSON sem text/status:", data);
                   }
                 }
@@ -1061,21 +1090,51 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
 
+      // Limpar blocos de código de artifact_patch do texto para a conversa ficar elegante e focada no parecer
+      let displayContent = fullText || "Desculpe, não consegui gerar uma resposta.";
+      if (receivedArtifactUpdate) {
+        displayContent = displayContent.replace(/```(?:artifact_patch|patch)?[\s\S]*?```/gi, '').trim();
+        if (!displayContent) {
+          displayContent = "✅ **Alteração aplicada com sucesso ao Artefato!** O documento foi atualizado cirurgicamente com a modificação solicitada mantendo todas as demais seções intactas.";
+        }
+      }
+
       const assistantMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: fullText || "Desculpe, não consegui gerar uma resposta.",
+        content: displayContent,
         timestamp: new Date().toISOString()
       };
 
-      if (isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) {
-        setStreamingAsArtifact(false);
-        setActiveArtifactId(assistantMsg.id);
-      }
+      if (receivedArtifactUpdate) {
+        // Atualiza a mensagem do artefato anterior na conversa para que o documento fique sincronizado
+        setSessions(prev => prev.map(s => {
+          if (s.id !== sessionId) return s;
+          const updatedMessages = [...s.messages];
+          for (let i = updatedMessages.length - 1; i >= 0; i--) {
+            if (isArtifactContent(updatedMessages[i].content)) {
+              updatedMessages[i] = {
+                ...updatedMessages[i],
+                content: receivedArtifactUpdate!
+              };
+              break;
+            }
+          }
+          return {
+            ...s,
+            messages: [...updatedMessages, assistantMsg]
+          };
+        }));
+      } else {
+        if (isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) {
+          setStreamingAsArtifact(false);
+          setActiveArtifactId(assistantMsg.id);
+        }
 
-      setSessions(prev => prev.map(s => 
-        s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
-      ));
+        setSessions(prev => prev.map(s => 
+          s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
+        ));
+      }
     } catch (error: any) {
       if (timeoutId) clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
@@ -1577,6 +1636,116 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         title: `${persona.petitionTitlePrefix} - ${new Date().toLocaleDateString('pt-BR')}`,
         content: formattedContent
       });
+    }
+  };
+
+  // Sincroniza editableArtifactText quando activeArtifactId muda
+  useEffect(() => {
+    if (activeArtifactId && activeArtifactId !== 'streaming') {
+      const msg = currentSession?.messages.find(m => m.id === activeArtifactId);
+      if (msg) {
+        const cleaned = cleanPetitionDocument(msg.content);
+        setEditableArtifactText(cleaned);
+        setArtifactHistory(prev => {
+          if (prev.length === 0 || prev[prev.length - 1] !== cleaned) {
+            return [...prev, cleaned];
+          }
+          return prev;
+        });
+        setArtifactHistoryIndex(prev => prev === -1 ? 0 : prev);
+      }
+    }
+  }, [activeArtifactId, currentSession?.messages]);
+
+  const handleSaveManualArtifact = async () => {
+    if (!editableArtifactText || !currentSessionId) return;
+    
+    // Atualiza a mensagem no estado local da sessão
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentSessionId) return s;
+      const updatedMessages = s.messages.map(m => {
+        if (m.id === activeArtifactId) {
+          return { ...m, content: editableArtifactText };
+        }
+        return m;
+      });
+      return { ...s, messages: updatedMessages };
+    }));
+
+    // Adiciona ao histórico de undo/redo
+    setArtifactHistory(prev => [...prev, editableArtifactText]);
+    setArtifactHistoryIndex(prev => prev + 1);
+
+    // Salva no Supabase na tabela ai_conversations como draft
+    try {
+      const draftId = `draft_${persona.aiName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${currentSessionId}`;
+      await supabaseService.saveDraft(draftId, persona.displayName, editableArtifactText);
+    } catch (e) {
+      console.warn("Aviso salvando draft manual:", e);
+    }
+
+    setArtifactSaveSuccess(true);
+    setTimeout(() => setArtifactSaveSuccess(false), 2000);
+  };
+
+  const handleUndoArtifact = () => {
+    if (artifactHistoryIndex > 0) {
+      const newIndex = artifactHistoryIndex - 1;
+      setArtifactHistoryIndex(newIndex);
+      const targetText = artifactHistory[newIndex];
+      setEditableArtifactText(targetText);
+      if (activeArtifactId && currentSessionId) {
+        setSessions(prev => prev.map(s => {
+          if (s.id !== currentSessionId) return s;
+          return {
+            ...s,
+            messages: s.messages.map(m => m.id === activeArtifactId ? { ...m, content: targetText } : m)
+          };
+        }));
+      }
+    }
+  };
+
+  const handleRedoArtifact = () => {
+    if (artifactHistoryIndex < artifactHistory.length - 1) {
+      const newIndex = artifactHistoryIndex + 1;
+      setArtifactHistoryIndex(newIndex);
+      const targetText = artifactHistory[newIndex];
+      setEditableArtifactText(targetText);
+      if (activeArtifactId && currentSessionId) {
+        setSessions(prev => prev.map(s => {
+          if (s.id !== currentSessionId) return s;
+          return {
+            ...s,
+            messages: s.messages.map(m => m.id === activeArtifactId ? { ...m, content: targetText } : m)
+          };
+        }));
+      }
+    }
+  };
+
+  const handleQuickAiEdit = async (customInstruction?: string) => {
+    const instructionText = customInstruction || artifactQuickCommand;
+    if (!instructionText.trim() || isLoading) return;
+
+    let promptToSend = instructionText.trim();
+    if (selectedTextSnippet) {
+      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nTRECHO SELECIONADO A MODIFICAR:\n"${selectedTextSnippet}"\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${instructionText}`;
+    } else {
+      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${instructionText}`;
+    }
+
+    setArtifactQuickCommand('');
+    setSelectedTextSnippet('');
+    await handleSendMessage(promptToSend);
+  };
+
+  const handleDocumentMouseUp = () => {
+    if (typeof window === 'undefined') return;
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 10) {
+      const selected = selection.toString().trim();
+      setSelectedTextSnippet(selected);
     }
   };
 
@@ -2192,62 +2361,129 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         </div>
       </div>
         
-        {/* ARTIFACT AREA (RIGHT PANEL) */}
+        {/* ARTIFACT AREA (RIGHT PANEL) - STATIC EDITOR & PREVIEW */}
         {activeArtifactId && (
-          <div className="fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0">
+          <div className={`fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0 transition-all duration-300 ${artifactUpdatePulse ? 'ring-4 ring-emerald-500/50' : ''}`}>
             {(() => {
               const rawContent = activeArtifactId === 'streaming' 
                 ? streamingMessage 
-                : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || '';
-              const content = cleanPetitionDocument(rawContent);
+                : currentSession?.messages.find(m => m.id === activeArtifactId)?.content || editableArtifactText;
+              const content = cleanPetitionDocument(editableArtifactText || rawContent);
+              const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+              const charCount = content.length;
+
               return (
                 <>
                   {/* ARTIFACT HEADER */}
-                  <div className="px-4 py-3 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between bg-white dark:bg-bordeaux-950 shadow-sm z-20 shrink-0">
+                  <div className="px-4 py-2.5 border-b border-slate-200 dark:border-gold-500/20 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-bordeaux-950 shadow-sm z-20 shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
                       <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight truncate">
-                          {getArtifactTitle(content)}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight truncate">
+                            {getArtifactTitle(content)}
+                          </h3>
+                          {artifactUpdatePulse && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 animate-pulse flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-emerald-500" />
+                              Patch Aplicado!
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          {getArtifactTypeInfo(content).panelSubtitle}
+                          {getArtifactTypeInfo(content).panelSubtitle} • {wordCount} palavras ({charCount} caracteres)
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => copyToClipboard(content, 'artifact')}
-                        className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
-                        title="Copiar Texto"
-                      >
-                        {copiedId === 'artifact' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                        <span className="hidden sm:inline">Copiar</span>
-                      </button>
+                      {/* TAB SWITCHER */}
+                      <div className="flex items-center bg-slate-100 dark:bg-bordeaux-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-bordeaux-800">
+                        <button
+                          onClick={() => setArtifactTab('preview')}
+                          className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${artifactTab === 'preview' ? 'bg-white dark:bg-bordeaux-950 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                          title="Visualizar documento formatado"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Visualizar</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setArtifactTab('edit');
+                            if (!editableArtifactText) setEditableArtifactText(content);
+                          }}
+                          className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${artifactTab === 'edit' ? 'bg-white dark:bg-bordeaux-950 text-slate-800 dark:text-white shadow-xs' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                          title="Editar texto manualmente"
+                        >
+                          <EditSquare className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Editar</span>
+                        </button>
+                      </div>
 
-                      <button
-                        onClick={() => generateDocx(content)}
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                        title="Baixar Word (.docx)"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">DOCX</span>
-                      </button>
+                      {artifactTab === 'edit' && (
+                        <>
+                          <button
+                            onClick={handleUndoArtifact}
+                            disabled={artifactHistoryIndex <= 0}
+                            className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900 rounded-lg transition-colors disabled:opacity-40"
+                            title="Desfazer alteração"
+                          >
+                            <Undo className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleRedoArtifact}
+                            disabled={artifactHistoryIndex >= artifactHistory.length - 1}
+                            className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900 rounded-lg transition-colors disabled:opacity-40"
+                            title="Refazer alteração"
+                          >
+                            <Redo className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleSaveManualArtifact}
+                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1 shadow-sm ${artifactSaveSuccess ? 'bg-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'}`}
+                            title="Salvar alterações manuais"
+                          >
+                            {artifactSaveSuccess ? <Check className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+                            <span>{artifactSaveSuccess ? 'Salvo!' : 'Salvar'}</span>
+                          </button>
+                        </>
+                      )}
 
-                      <button
-                        onClick={() => handleOpenInEditor(content)}
-                        className="px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                        title="Abrir no Editor Completo"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Editor</span>
-                      </button>
+                      {artifactTab === 'preview' && (
+                        <>
+                          <button
+                            onClick={() => copyToClipboard(content, 'artifact')}
+                            className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-bordeaux-900 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
+                            title="Copiar Texto"
+                          >
+                            {copiedId === 'artifact' ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                            <span className="hidden sm:inline">Copiar</span>
+                          </button>
 
-                      <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900 mx-1"></div>
+                          <button
+                            onClick={() => generateDocx(content)}
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            title="Baixar Word (.docx)"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">DOCX</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenInEditor(content)}
+                            className="px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            title="Abrir no Editor Completo"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Editor</span>
+                          </button>
+                        </>
+                      )}
+
+                      <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900 mx-0.5"></div>
 
                       <button
                         onClick={() => setActiveArtifactId(null)}
@@ -2259,23 +2495,133 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     </div>
                   </div>
 
-                  {/* ARTIFACT DOCUMENT SHEET */}
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth relative">
-                    <div className="max-w-3xl mx-auto bg-white dark:bg-bordeaux-950/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-2xl p-6 sm:p-12 min-h-full font-inter text-slate-800 dark:text-slate-100 prose prose-slate dark:prose-invert max-w-none
-                                    prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
-                                    prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                                    prose-p:leading-[1.75] prose-p:text-slate-700 dark:prose-p:text-slate-200
-                                    prose-strong:text-slate-900 dark:prose-strong:text-white prose-strong:font-semibold
-                                    prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
-                                    prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg">
-                      <div dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }} />
+                  {/* POPUP FLUTUANTE DE TRECHO SELECIONADO */}
+                  {selectedTextSnippet && (
+                    <div className="bg-emerald-900 text-white px-3 py-2 text-xs flex items-center justify-between gap-2 shadow-md border-b border-emerald-700 shrink-0 animate-fade-in">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Sparkles className="w-4 h-4 text-gold-400 shrink-0" />
+                        <span className="truncate">
+                          Trecho selecionado ({selectedTextSnippet.length} carac.): <strong className="italic">"{selectedTextSnippet.slice(0, 45)}..."</strong>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => {
+                            const cmd = prompt('Qual alteração você deseja aplicar neste trecho específico?');
+                            if (cmd) handleQuickAiEdit(cmd);
+                          }}
+                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 rounded text-white font-bold text-[11px]"
+                        >
+                          ⚡ Editar com IA
+                        </button>
+                        <button
+                          onClick={() => setSelectedTextSnippet('')}
+                          className="p-0.5 hover:bg-emerald-800 rounded text-slate-300"
+                        >
+                          <XMark className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                      {activeArtifactId === 'streaming' && (
-                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-bordeaux-900 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                          <span>Redigindo peça jurídica em tempo real...</span>
+                  {/* ARTIFACT CONTENT CONTAINER */}
+                  <div className="flex-1 overflow-y-auto p-3 sm:p-6 scroll-smooth relative" ref={artifactSheetRef}>
+                    {artifactTab === 'preview' ? (
+                      <div 
+                        onMouseUp={handleDocumentMouseUp}
+                        className="max-w-3xl mx-auto bg-white dark:bg-bordeaux-950/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-xl p-6 sm:p-12 min-h-full font-inter text-slate-800 dark:text-slate-100 prose prose-slate dark:prose-invert max-w-none
+                                        prose-headings:font-bold prose-headings:text-slate-900 dark:prose-headings:text-slate-100
+                                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                                        prose-p:leading-[1.75] prose-p:text-slate-700 dark:prose-p:text-slate-200
+                                        prose-strong:text-slate-900 dark:prose-strong:text-white prose-strong:font-semibold
+                                        prose-blockquote:border-l-4 prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/50 dark:prose-blockquote:bg-emerald-950/20
+                                        prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg"
+                      >
+                        <div dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }} />
+
+                        {activeArtifactId === 'streaming' && (
+                          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-bordeaux-900 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                            <span>Redigindo peça jurídica em tempo real...</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="max-w-3xl mx-auto h-full flex flex-col">
+                        <textarea
+                          value={editableArtifactText}
+                          onChange={(e) => setEditableArtifactText(e.target.value)}
+                          className="w-full flex-1 min-h-[500px] p-4 font-mono text-xs sm:text-sm bg-white dark:bg-bordeaux-950/90 border border-slate-200 dark:border-gold-500/20 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 shadow-inner resize-y leading-relaxed"
+                          placeholder="Conteúdo do artefato editável..."
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI SURGICAL EDITOR BOTTOM BAR */}
+                  <div className="p-3 bg-white dark:bg-bordeaux-950 border-t border-slate-200 dark:border-gold-500/20 shrink-0">
+                    <div className="max-w-3xl mx-auto space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={artifactQuickCommand}
+                            onChange={(e) => setArtifactQuickCommand(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleQuickAiEdit();
+                              }
+                            }}
+                            placeholder={selectedTextSnippet ? `Modificar trecho selecionado: "${selectedTextSnippet.slice(0, 30)}..."` : "Instrução cirúrgica para a IA no artefato (ex: Corrigir polo passivo, adicionar tutela...)"}
+                            disabled={isLoading}
+                            className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-bordeaux-900/60 border border-slate-200 dark:border-gold-500/20 rounded-lg text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                          />
+                          <Sparkles className="w-4 h-4 text-emerald-500 absolute left-3 top-2.5 pointer-events-none" />
                         </div>
-                      )}
+                        <button
+                          onClick={() => handleQuickAiEdit()}
+                          disabled={!artifactQuickCommand.trim() || isLoading}
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all shrink-0"
+                          title="Aplicar correção cirúrgica no artefato"
+                        >
+                          <Bolt className="w-4 h-4 text-gold-400" />
+                          <span>Aplicar Cirurgia</span>
+                        </button>
+                      </div>
+
+                      {/* QUICK ACTION CHIPS */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+                        <span className="text-slate-400 font-medium shrink-0">Atalhos:</span>
+                        <button
+                          onClick={() => handleQuickAiEdit("Corrija o cabeçalho e endereçamento do juízo competente.")}
+                          disabled={isLoading}
+                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                        >
+                          🏛️ Corrigir Endereçamento
+                        </button>
+                        <button
+                          onClick={() => handleQuickAiEdit("Adicione preliminar de concessão da Gratuidade da Justiça com base no art. 98 do CPC.")}
+                          disabled={isLoading}
+                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                        >
+                          ⚖️ Adicionar Gratuidade
+                        </button>
+                        <button
+                          onClick={() => handleQuickAiEdit("Inclua pedido expresso de Tutela de Urgência de Natureza Antecipada com fundamento no art. 300 do CPC.")}
+                          disabled={isLoading}
+                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                        >
+                          ⚡ Tutela de Urgência
+                        </button>
+                        <button
+                          onClick={() => handleQuickAiEdit("Ajuste a fundamentação e o valor pleiteado a título de Danos Morais.")}
+                          disabled={isLoading}
+                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                        >
+                          💰 Ajustar Danos Morais
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </>
