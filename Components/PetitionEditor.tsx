@@ -532,6 +532,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   const [contentChanged, setContentChanged] = useState(0);
 
   const editor = useEditor({
+    content: initialPetition?.content || '',
     extensions: [
       StarterKit.configure({
         paragraph: false,
@@ -549,7 +550,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         keepAttributes: false,
       }),
       ListItem,
-      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -594,12 +594,27 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }, [topBottomMargin, leftRightMargin, editor]);
 
   const loadedPetitionIdRef = React.useRef<string | null>(null);
+  const loadedPetitionContentRef = React.useRef<string | null>(null);
 
   useEffect(() => {
+    console.log('[PetitionEditor] useEffect triggered:', { 
+      hasInitialPetition: !!initialPetition, 
+      id: initialPetition?.id, 
+      contentLength: initialPetition?.content?.length,
+      initialClientId, 
+      hasEditor: !!editor 
+    });
+    
     if (editor) {
       if (initialPetition) {
-        if (loadedPetitionIdRef.current !== initialPetition.id) {
-          editor.commands.setContent(initialPetition.content);
+        if (loadedPetitionIdRef.current !== initialPetition.id || loadedPetitionContentRef.current !== initialPetition.content) {
+          console.log('[PetitionEditor] Setting new content. Length:', initialPetition.content?.length);
+          try { 
+            editor.commands.setContent(initialPetition.content); 
+            console.log('[PetitionEditor] setContent executed successfully.');
+          } catch (e) { 
+            console.error('[PetitionEditor] setContent failed:', e); 
+          }
           setTitle(initialPetition.title);
           setCategory(initialPetition.category);
           setType(initialPetition.type);
@@ -612,11 +627,35 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           if (!client) {
             client = (clients || []).find(c => c.petitions?.some(p => p.id === initialPetition.id));
           }
+          
+          // Deduzir o cliente pelo texto da petição (caso não tenha vindo vinculado)
+          if (!client && clients && clients.length > 0 && initialPetition.content) {
+            const rawText = initialPetition.content.toLowerCase();
+            const potentialClients = clients.filter(c => {
+               if (!c.name) return false;
+               const nameParts = c.name.trim().split(/\s+/).filter(p => p.length > 1);
+               if (nameParts.length < 2) return false;
+               return rawText.includes(c.name.toLowerCase());
+            });
+            
+            if (potentialClients.length === 1) {
+              client = potentialClients[0];
+            } else if (potentialClients.length > 1) {
+              client = potentialClients.sort((a, b) => {
+                 const indexA = rawText.indexOf(a.name.toLowerCase());
+                 const indexB = rawText.indexOf(b.name.toLowerCase());
+                 // O que aparecer primeiro ganha
+                 return indexA - indexB;
+              })[0];
+            }
+          }
+
           if (client) {
             setSelectedClient(client);
           }
           
           loadedPetitionIdRef.current = initialPetition.id;
+          loadedPetitionContentRef.current = initialPetition.content;
         }
       } else {
         if (loadedPetitionIdRef.current !== null) {
@@ -626,6 +665,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           setType('concrete');
           setSelectedClient(null);
           loadedPetitionIdRef.current = null;
+          loadedPetitionContentRef.current = null;
         }
       }
     }

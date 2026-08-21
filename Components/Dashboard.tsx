@@ -1264,6 +1264,7 @@ export default function Dashboard({
     };
 
   const handleOpenPetition = (petition: any, clientId?: string) => {
+console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId });
       setActivePetition(petition);
       setActivePetitionClientId(clientId || null);
       
