@@ -78,13 +78,14 @@ interface ChatSession {
   messages: Message[];
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
+  clientId?: string;
 }
 
 interface PersonaChatProps {
   persona: PersonaConfig;
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
-  onOpenPetition?: (petition: { title: string; content: string }) => void;
+  onOpenPetition?: (petition: any, clientId?: string) => void;
   customLaws?: any[];
 }
 
@@ -1736,7 +1737,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       };
       
       setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg], clientId: fullClient.id } : s
       ));
 
       const documentsList = documentsToImport.map((d: any) => ({
@@ -1788,9 +1789,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const formattedContent = markdownToHtml(cleaned);
 
       onOpenPetition({
+        id: activeArtifactId || `temp-${Date.now()}`,
         title: `${persona.petitionTitlePrefix} - ${new Date().toLocaleDateString('pt-BR')}`,
-        content: formattedContent
-      });
+        content: formattedContent,
+        category: 'Petição inicial',
+        type: 'concrete',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      } as any, currentSession?.clientId);
     }
   };
 
