@@ -894,7 +894,7 @@ function detectRevisionIntent(message: string, hasDraft: boolean): RevisionInten
 
   const isFullRegen = /(refaz|refaça|refaca|gera (de )?novo|reescrev|nova vers[ãa]o|fazer (a |outra )?(pe[çc]a|peti[çc][ãa]o)|gerar (a |outra |nova )?(pe[çc]a|peti[çc][ãa]o))/i.test(msg);
   const isAddition = /(acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar)/i.test(msg);
-  const isPointCorrection = /(corrig|ajust|substitui|troca|mud[ae] (o |a |no |na )?t[óo]pico|altera (o |a |no |na )|retir|remov|apagu|exclui|delet|tirar|retirar|remover|abaixo das assinaturas|depois das assinaturas|antes das assinaturas)/i.test(msg);
+  const isPointCorrection = /(corrig|ajust|substitu|troqu|troc[ae]|mud[ae]|alter[ae]|retir|remov|apag|exclua|exclui|delet|tirar|retirar|remover|coloc|coloqu|atualiz|modific|repar|insir|abaixo das assinaturas|depois das assinaturas|antes das assinaturas)/i.test(msg);
   if (isFullRegen) return 'FULL_REGENERATION';
   if (isPointCorrection) return 'POINT_CORRECTION';
   if (isAddition) return 'ADDITION';
@@ -4864,7 +4864,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
                                message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
-    if (isExplicitSurgical && draftContent) {
+    if (isExplicitSurgical && draftContent && revisionIntent !== 'FULL_REGENERATION') {
       revisionIntent = 'POINT_CORRECTION';
     }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
