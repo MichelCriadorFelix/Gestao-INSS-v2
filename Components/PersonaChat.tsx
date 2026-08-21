@@ -753,7 +753,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       const isLegalDoubt = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos)\b/i.test(messageText);
       
-      const isRevision = /\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[CORREÇÃO CIRÚRGICA]") || messageText.includes("[CORRECAO CIRURGICA]") || messageText.includes("[GERAÇÃO MODULAR]") || messageText.includes("[GERACAO MODULAR]");
+      const isRevision = /\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[CORREÇÃO CIRÚRGICA") || messageText.includes("[CORRECAO CIRURGICA") || messageText.includes("[GERAÇÃO MODULAR") || messageText.includes("[GERACAO MODULAR") || messageText.includes("TRECHO SELECIONADO A MODIFICAR");
 
       const shouldSendRag = isReportOrPeca || isLegalDoubt || isRevision;
 

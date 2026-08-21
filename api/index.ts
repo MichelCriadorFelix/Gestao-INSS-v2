@@ -804,10 +804,19 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[DÚVIDA]";
   }
   
-  if (msgLower.includes("[geração modular]") || msgLower.includes("[geracao modular]") || msgLower.includes("[correção cirúrgica]") || msgLower.includes("[correcao cirurgica]")) {
+  if (
+    msgLower.includes("[geração modular") ||
+    msgLower.includes("[geracao modular") ||
+    msgLower.includes("[correção cirúrgica") ||
+    msgLower.includes("[correcao cirurgica") ||
+    msgLower.includes("trecho selecionado a modificar") ||
+    msgLower.includes("[correção no artefato") ||
+    msgLower.includes("[correcao no artefato")
+  ) {
+    console.log("[Detector] Fast-path EDIÇÃO CIRÚRGICA / MODULAR -> [GERAÇÃO]");
     return "[GERAÇÃO]";
   }
-    if (msgLower.includes("[validação e auditoria]") || msgLower.includes("[validacao e auditoria]")) {
+  if (msgLower.includes("[validação e auditoria]") || msgLower.includes("[validacao e auditoria]")) {
     return "[DÚVIDA]";
   }
 
@@ -3137,17 +3146,19 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
          console.log(msg1); 
          if(onStatus) onStatus(msg1);
       } else {
-         // FASE C: Aumentado para 3000ms para failover não disparar Quota Exceeded excessivo
-         delay = 3000; 
+         // FASE C: Espaçamento de failover para recuperação suave de taxa de requisições
+         delay = 3500; 
          
-         if (errorMessage.includes('Quota exceeded') && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+         if ((errorMessage.includes('Quota exceeded') || isOverloaded) && nextFailures > Math.min(keys.length, 5) && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
-             const msg3 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota esgotada no ${currentModel} após tentar múltiplos projetos. Trocando modelo...`; console.log(msg3); if(onStatus) onStatus(msg3);
-         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1 && !params.model) {
+             const nextModelName = MODEL_HIERARCHY[nextModelIndex];
+             const msg3 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Cota/Taxa atingida no ${currentModel} após tentar múltiplos projetos. Alternando para ${nextModelName}...`; console.log(msg3); if(onStatus) onStatus(msg3);
+         } else if (nextFailures > keys.length && nextModelIndex < MODEL_HIERARCHY.length - 1) {
              nextModelIndex++;
              nextFailures = 0;
-             const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Muitas falhas no ${currentModel}. Trocando modelo...`; console.log(msg4); if(onStatus) onStatus(msg4);
+             const nextModelName = MODEL_HIERARCHY[nextModelIndex];
+             const msg4 = `[Tentativa ${MAX_RETRIES - retries}] Alternando para modelo resiliente ${nextModelName}...`; console.log(msg4); if(onStatus) onStatus(msg4);
          } else {
              const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
              const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
@@ -4867,7 +4878,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
                                message.includes("[CORREÇÃO CIRÚRGICA") || 
                                message.includes("[CORRECAO CIRURGICA") || 
                                message.includes("[GERAÇÃO MODULAR") || 
-                               message.includes("[GERACAO MODULAR");
+                               message.includes("[GERACAO MODULAR") ||
+                               message.includes("TRECHO SELECIONADO A MODIFICAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgical && draftContent && revisionIntent !== 'FULL_REGENERATION') {
@@ -4876,7 +4888,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
     const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
-    const intent = await detectUserIntent(message);
+    const intent = (isExplicitSurgical || isRevisionRequested) ? "[GERAÇÃO]" : await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
     
     // Identificar relatórios e auditorias de forma consolidada e precoce
@@ -5545,7 +5557,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                                     message.includes("[CORREÇÃO CIRÚRGICA") || 
                                     message.includes("[CORRECAO CIRURGICA") || 
                                     message.includes("[GERAÇÃO MODULAR") || 
-                                    message.includes("[GERACAO MODULAR");
+                                    message.includes("[GERACAO MODULAR") ||
+                                    message.includes("TRECHO SELECIONADO A MODIFICAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgicalLuana && draftContent) {
@@ -5555,7 +5568,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
     // 1. DETECÇÃO DE INTENÇÃO (ARCHITECTURE PADRÃO OURO) - Pilar 1
-    const intent = await detectUserIntent(message);
+    const intent = (isExplicitSurgicalLuana || isRevisionRequested) ? "[GERAÇÃO]" : await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
     
     const isReportRequestLuana = msgUpper.includes("GERAR RELATÓRIO") || 
