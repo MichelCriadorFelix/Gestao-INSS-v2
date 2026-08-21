@@ -735,8 +735,19 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const AGENT_AREAS = persona.agentAreas;
       let ragContext = '';
 
-      // FASE B1: Determinar se enviaremos RAG
+      const isExplicitSurgicalEdit = 
+        messageText.includes('[CORREÇÃO CIRÚRGICA') || 
+        messageText.includes('[CORRECAO CIRURGICA') || 
+        messageText.includes('TRECHO SELECIONADO A MODIFICAR') ||
+        messageText.includes('[CORREÇÃO NO ARTEFATO') ||
+        messageText.includes('[CORRECAO NO ARTEFATO');
+
+      // Se for uma edição cirúrgica pontual de trecho selecionado, verificamos se o usuário pediu especificamente leis/RAG ou menção a documentos
+      const mentionsLawsOrRag = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(messageText);
+      const mentionsDocsOrOcr = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(messageText);
+
       // RAG é terminantemente ignorado em fases de Tomada de Ciência, Auditoria de Documentos, Dossiês ou Validações de documentos
+      // E também em edições cirúrgicas pontuais onde o usuário NÃO pediu fundamentação/lei nova
       const isScienceOrAudit = 
         messageText.includes('[FASE DE TOMADA DE CIÊNCIA]') || 
         messageText.includes('[FASE DE TOMADA DE CIENCIA]') ||
@@ -753,11 +764,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
       const isLegalDoubt = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos)\b/i.test(messageText);
       
-      const isRevision = /\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[CORREÇÃO CIRÚRGICA") || messageText.includes("[CORRECAO CIRURGICA") || messageText.includes("[GERAÇÃO MODULAR") || messageText.includes("[GERACAO MODULAR") || messageText.includes("TRECHO SELECIONADO A MODIFICAR");
+      const isRevision = (/\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[GERAÇÃO MODULAR") || messageText.includes("[GERACAO MODULAR")) && !isExplicitSurgicalEdit;
 
-      const shouldSendRag = isReportOrPeca || isLegalDoubt || isRevision;
+      const shouldSendRag = isReportOrPeca || isLegalDoubt || (isRevision && !isExplicitSurgicalEdit) || (isExplicitSurgicalEdit && mentionsLawsOrRag);
 
-      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isScienceOrAudit: ${isScienceOrAudit}, isReportOrPeca: ${isReportOrPeca}, isLegalDoubt: ${isLegalDoubt}, isRevision: ${isRevision})`);
+      // Economia de tokens máxima na Edição Cirúrgica: só envia docSummaries se o usuário fez menção explícita a dados de documento/OCR
+      const effectiveDocSummaries = (isExplicitSurgicalEdit && !mentionsDocsOrOcr) ? '' : docSummaries;
+
+      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isExplicitSurgical: ${isExplicitSurgicalEdit}, mentionsLaws: ${mentionsLawsOrRag}, mentionsDocs: ${mentionsDocsOrOcr})`);
 
       try {
         if (!shouldSendRag) {
@@ -1035,7 +1049,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
         const fetchPayload = {
           message: currentMessage,
-          documentContext: docSummaries ? `${docSummaries.substring(0, 500)}... [Truncated for Console log, real length: ${docSummaries.length}]` : null,
+          documentContext: effectiveDocSummaries ? `${effectiveDocSummaries.substring(0, 500)}... [Truncated for Console log, real length: ${effectiveDocSummaries.length}]` : null,
           historyCount: resumeCount === 0 ? compressedHistory.length : 'resumed',
           imagesCount: resumeCount === 0 ? (images || []).length : 0,
           filesCount: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).length || 0) : 0,
@@ -1056,13 +1070,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: currentMessage,
-              documentContext: docSummaries,
-              history: resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }],
+              documentContext: effectiveDocSummaries || undefined,
+              history: isExplicitSurgicalEdit ? [] : (resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }]),
               images: resumeCount === 0 ? (images || []) : [],
               files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
               ragContext: (shouldSendRag || resumeCount > 0) ? ragContext : undefined, // FASE B2: Só envia se pertinente, mantém no resume
-              customLaws,
+              customLaws: isExplicitSurgicalEdit && !mentionsLawsOrRag ? undefined : customLaws,
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
               petitionLength,

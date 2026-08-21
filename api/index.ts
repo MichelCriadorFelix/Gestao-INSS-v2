@@ -5029,7 +5029,10 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
       }
     }
 
-    if (documentContext && !activeDocCache) {
+    const mentionsDocsOrOcr = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
+    const shouldSkipDocumentContext = isExplicitSurgical && !mentionsDocsOrOcr;
+
+    if (documentContext && !activeDocCache && !shouldSkipDocumentContext) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
@@ -5759,7 +5762,10 @@ O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO 
       }
     }
 
-    if (documentContext && !activeDocCache) {
+    const mentionsDocsOrOcrLuana = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
+    const shouldSkipDocumentContextLuana = isExplicitSurgicalLuana && !mentionsDocsOrOcrLuana;
+
+    if (documentContext && !activeDocCache && !shouldSkipDocumentContextLuana) {
       const originalDocSize = documentContext.length;
       const compressed = smartTruncate(documentContext, maxDocCtxChars);
       if (compressed.length < originalDocSize) {
