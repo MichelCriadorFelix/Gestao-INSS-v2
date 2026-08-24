@@ -370,8 +370,18 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   useEffect(() => {
     const onWindowPaste = (e: ClipboardEvent) => {
       const activeEl = document.activeElement as HTMLElement | null;
+      // Se o foco estiver no input cirúrgico do artefato ou na folha do artefato
+      if (activeEl && (activeEl.id === 'artifact-surgical-input' || activeEl.closest('#artifact-panel-container'))) {
+        handleArtifactPasteFiles(e.clipboardData, e);
+        return;
+      }
       // Permite colar se estiver no chat ou fora de inputs alheios
       if (activeEl && (activeEl.tagName === 'INPUT' || (activeEl.tagName === 'TEXTAREA' && activeEl.id !== persona.inputId))) {
+        return;
+      }
+      // Se o painel do artefato estiver aberto e o mouse estiver sobre ele ou o foco não for o input principal
+      if (activeArtifactId && !activeEl?.closest(`#${persona.inputId}`)) {
+        handleArtifactPasteFiles(e.clipboardData, e);
         return;
       }
       handlePasteFiles(e.clipboardData, e);
@@ -379,7 +389,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
     window.addEventListener('paste', onWindowPaste);
     return () => window.removeEventListener('paste', onWindowPaste);
-  }, [persona.inputId]);
+  }, [persona.inputId, activeArtifactId]);
   
   // Estados do Editor de Artefato Estático & Cirúrgico
   const [artifactTab, setArtifactTab] = useState<'preview' | 'edit'>('preview');
@@ -388,14 +398,77 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [artifactHistoryIndex, setArtifactHistoryIndex] = useState<number>(-1);
   const [isArtifactPinned, setIsArtifactPinned] = useState<boolean>(true);
   const [artifactQuickCommand, setArtifactQuickCommand] = useState<string>('');
+  const [artifactAttachedFiles, setArtifactAttachedFiles] = useState<File[]>([]);
   const [artifactUpdatePulse, setArtifactUpdatePulse] = useState<boolean>(false);
   const [artifactSaveSuccess, setArtifactSaveSuccess] = useState<boolean>(false);
   const [selectedTextSnippet, setSelectedTextSnippet] = useState<string>('');
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const artifactFileInputRef = useRef<HTMLInputElement>(null);
   const artifactSheetRef = useRef<HTMLDivElement>(null);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V) no Artefato
+  const handleArtifactPasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault: () => void }) => {
+    if (!clipboardData) return;
+    const items = clipboardData.items;
+    const files = clipboardData.files;
+    const newImageFiles: File[] = [];
+
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+            const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+            const file = new File([blob], `Print_${now.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${timeStr}.${ext}`, { type: blob.type || 'image/png' });
+            newImageFiles.push(file);
+          }
+        }
+      }
+    } else if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f.type.startsWith('image/')) {
+          newImageFiles.push(f);
+        }
+      }
+    }
+
+    if (newImageFiles.length > 0) {
+      setArtifactAttachedFiles(prev => [...prev, ...newImageFiles]);
+      const hasText = clipboardData.getData('text/plain');
+      if (!hasText && eventToPrevent) {
+        eventToPrevent.preventDefault();
+      }
+    }
+  };
+
+  const handleArtifactFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+    const fileList = Array.from(files);
+    const largeFiles = fileList.filter(f => f.size > MAX_FILE_SIZE);
+    
+    if (largeFiles.length > 0) {
+      alert(`Os seguintes arquivos são muito grandes (> 20MB): ${largeFiles.map(f => f.name).join(', ')}.`);
+      return;
+    }
+
+    setArtifactAttachedFiles(prev => [...prev, ...fileList]);
+    if (artifactFileInputRef.current) {
+      artifactFileInputRef.current.value = '';
+    }
+  };
+
+  const removeArtifactAttachedFile = (index: number) => {
+    setArtifactAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
   
   const sessionsRef = useRef(sessions);
   const pendingSyncRef = useRef<Set<string>>(new Set());
@@ -2031,18 +2104,67 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   const handleQuickAiEdit = async (customInstruction?: string) => {
     const instructionText = customInstruction || artifactQuickCommand;
-    if (!instructionText.trim() || isLoading) return;
+    const hasArtifactAttachments = artifactAttachedFiles.length > 0;
+    
+    if ((!instructionText.trim() && !hasArtifactAttachments) || isLoading || isUploading) return;
 
     let promptToSend = instructionText.trim();
-    if (selectedTextSnippet) {
-      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nTRECHO SELECIONADO A MODIFICAR:\n"${selectedTextSnippet}"\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${instructionText}`;
-    } else {
-      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${instructionText}`;
+    if (!promptToSend && hasArtifactAttachments) {
+      promptToSend = "Analise as evidências / prints anexados e aplique as atualizações e correções necessárias no artefato da peça.";
     }
 
-    setArtifactQuickCommand('');
-    setSelectedTextSnippet('');
-    await handleSendMessage(promptToSend);
+    if (selectedTextSnippet) {
+      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nTRECHO SELECIONADO A MODIFICAR:\n"${selectedTextSnippet}"\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
+    } else {
+      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
+    }
+
+    if (hasArtifactAttachments) {
+      const filesToProcess = [...artifactAttachedFiles];
+      setArtifactAttachedFiles([]);
+      setArtifactQuickCommand('');
+      setSelectedTextSnippet('');
+      setIsUploading(true);
+      setProgress(0);
+      setProgressText('Iniciando processamento dos prints/anexos do artefato...');
+
+      try {
+        let activeSessionId = currentSessionId;
+        if (!activeSessionId) {
+          const newSession: ChatSession = {
+            id: generateId(),
+            title: `Correção Artefato: ${filesToProcess[0]?.name || 'Prints'}`,
+            messages: [],
+            date: new Date().toLocaleDateString('pt-BR'),
+            documents: []
+          };
+          setSessions([newSession, ...sessions]);
+          setCurrentSessionId(newSession.id);
+          activeSessionId = newSession.id;
+        }
+
+        const readingMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: `Iniciando leitura e extração visual de **${filesToProcess.length} print(s)/anexo(s)** para atualização cirúrgica do documento. Por favor, aguarde...`,
+          timestamp: new Date().toISOString()
+        };
+
+        setSessions(prev => prev.map(s => 
+          s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
+        ));
+
+        await processFilesPhased(filesToProcess, activeSessionId, 0, 0, undefined, promptToSend);
+      } catch (error: any) {
+        console.error("Erro ao processar anexos do artefato:", error);
+        alert(`Erro ao processar anexos: ${error.message}`);
+        setIsUploading(false);
+      }
+    } else {
+      setArtifactQuickCommand('');
+      setSelectedTextSnippet('');
+      await handleSendMessage(promptToSend);
+    }
   };
 
   const handleDocumentMouseUp = () => {
@@ -2777,7 +2899,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         
         {/* ARTIFACT AREA (RIGHT PANEL) - STATIC EDITOR & PREVIEW */}
         {activeArtifactId && (
-          <div className={`fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0 transition-all duration-300 ${artifactUpdatePulse ? 'ring-4 ring-emerald-500/50' : ''}`}>
+          <div 
+            id="artifact-panel-container"
+            onPaste={(e) => handleArtifactPasteFiles(e.clipboardData, e)}
+            className={`fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0 transition-all duration-300 ${artifactUpdatePulse ? 'ring-4 ring-emerald-500/50' : ''}`}
+          >
             {(() => {
               const rawContent = activeArtifactId === 'streaming' 
                 ? streamingMessage 
@@ -2975,27 +3101,95 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   {/* AI SURGICAL EDITOR BOTTOM BAR */}
                   <div className="p-3 bg-white dark:bg-bordeaux-950 border-t border-slate-200 dark:border-gold-500/20 shrink-0">
                     <div className="max-w-3xl mx-auto space-y-2">
+                      {/* PRINTS / ANEXOS PENDENTES DO ARTEFATO */}
+                      {artifactAttachedFiles.length > 0 && (
+                        <div className="p-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200/80 dark:border-gold-500/15 rounded-lg flex flex-wrap gap-2 items-center animate-fade-in">
+                          {artifactAttachedFiles.map((file, idx) => {
+                            const isImg = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
+                            return (
+                              <div 
+                                key={`${file.name}-${idx}`} 
+                                className="flex items-center gap-1.5 px-2 py-0.5 bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/25 rounded-md shadow-2xs text-[11px] font-medium text-slate-800 dark:text-slate-200 group"
+                              >
+                                {isImg ? (
+                                  <Photo className="w-3 h-3 text-emerald-600 dark:text-gold-400 shrink-0" />
+                                ) : (
+                                  <FileText className="w-3 h-3 text-emerald-600 dark:text-gold-400 shrink-0" />
+                                )}
+                                <span className="max-w-[140px] truncate font-semibold" title={file.name}>
+                                  {file.name}
+                                </span>
+                                {isImg && (
+                                  <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[8px] px-1 py-0.2 rounded font-bold uppercase">
+                                    Print
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-slate-400">
+                                  ({formatFileSize(file.size)})
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeArtifactAttachedFile(idx)}
+                                  className="p-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-sm transition-colors"
+                                  title="Remover anexo"
+                                >
+                                  <XMark className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2">
+                        {/* Hidden file input for artifact */}
+                        <input 
+                          type="file" 
+                          multiple 
+                          accept="application/pdf,text/plain,image/*,.png,.jpg,.jpeg,.webp"
+                          ref={artifactFileInputRef} 
+                          onChange={handleArtifactFileSelection} 
+                          className="hidden" 
+                        />
+                        
+                        <button
+                          type="button"
+                          onClick={() => artifactFileInputRef.current?.click()}
+                          disabled={isLoading || isUploading}
+                          className={`p-2 rounded-lg border transition-all ${artifactAttachedFiles.length > 0 ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400' : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-bordeaux-900 border-slate-200 dark:border-gold-500/20'}`}
+                          title="Anexar print ou documento para aplicar correção cirúrgica (ou cole com Ctrl+V)"
+                        >
+                          <Paperclip className="w-4 h-4" />
+                        </button>
+
                         <div className="relative flex-1">
                           <input
+                            id="artifact-surgical-input"
                             type="text"
                             value={artifactQuickCommand}
                             onChange={(e) => setArtifactQuickCommand(e.target.value)}
+                            onPaste={(e) => handleArtifactPasteFiles(e.clipboardData, e)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
                                 handleQuickAiEdit();
                               }
                             }}
-                            placeholder={selectedTextSnippet ? `Modificar trecho selecionado: "${selectedTextSnippet.slice(0, 30)}..."` : "Instrução cirúrgica para a IA no artefato (ex: Corrigir polo passivo, adicionar tutela...)"}
-                            disabled={isLoading}
+                            placeholder={
+                              artifactAttachedFiles.length > 0 
+                                ? "Escreva instruções sobre os prints/documentos ou clique em Aplicar Cirurgia..." 
+                                : (selectedTextSnippet 
+                                    ? `Modificar trecho: "${selectedTextSnippet.slice(0, 30)}..." (Cole prints com Ctrl+V)` 
+                                    : "Instrução cirúrgica (ex: Corrigir polo passivo, adicionar tutela...) ou Cole prints com Ctrl+V")
+                            }
+                            disabled={isLoading || isUploading}
                             className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-bordeaux-900/60 border border-slate-200 dark:border-gold-500/20 rounded-lg text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                           />
                           <Sparkles className="w-4 h-4 text-emerald-500 absolute left-3 top-2.5 pointer-events-none" />
                         </div>
                         <button
                           onClick={() => handleQuickAiEdit()}
-                          disabled={!artifactQuickCommand.trim() || isLoading}
+                          disabled={(!artifactQuickCommand.trim() && artifactAttachedFiles.length === 0) || isLoading || isUploading}
                           className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all shrink-0"
                           title="Aplicar correção cirúrgica no artefato"
                         >
