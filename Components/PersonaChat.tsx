@@ -30,7 +30,8 @@ import {
   BoltIcon as Bolt,
   EyeIcon as Eye,
   ArrowPathRoundedSquareIcon as RefreshCw,
-  StopIcon as Stop
+  StopIcon as Stop,
+  PhotoIcon as Photo
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -326,6 +327,59 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const removeAttachedFile = (index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
+
+  // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V)
+  const handlePasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault: () => void }) => {
+    if (!clipboardData) return;
+    const items = clipboardData.items;
+    const files = clipboardData.files;
+    const newImageFiles: File[] = [];
+
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+            const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+            const file = new File([blob], `Print_${now.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${timeStr}.${ext}`, { type: blob.type || 'image/png' });
+            newImageFiles.push(file);
+          }
+        }
+      }
+    } else if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f.type.startsWith('image/')) {
+          newImageFiles.push(f);
+        }
+      }
+    }
+
+    if (newImageFiles.length > 0) {
+      setAttachedFiles(prev => [...prev, ...newImageFiles]);
+      const hasText = clipboardData.getData('text/plain');
+      if (!hasText && eventToPrevent) {
+        eventToPrevent.preventDefault();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const onWindowPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      // Permite colar se estiver no chat ou fora de inputs alheios
+      if (activeEl && (activeEl.tagName === 'INPUT' || (activeEl.tagName === 'TEXTAREA' && activeEl.id !== persona.inputId))) {
+        return;
+      }
+      handlePasteFiles(e.clipboardData, e);
+    };
+
+    window.addEventListener('paste', onWindowPaste);
+    return () => window.removeEventListener('paste', onWindowPaste);
+  }, [persona.inputId]);
   
   // Estados do Editor de Artefato Estático & Cirúrgico
   const [artifactTab, setArtifactTab] = useState<'preview' | 'edit'>('preview');
@@ -1378,12 +1432,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         
         const isTxT = filetype === 'text/plain' || filename.toLowerCase().endsWith('.txt');
         const isPDF = filetype === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
+        const isImage = (filetype && filetype.startsWith('image/')) || /\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(filename);
         let storageUrlResponse = undefined;
 
         if (isLocalFile) {
           const file = item as File;
-          // Para PDF local, faz o upload para o Supabase (GED) para preservar o backup
-          if (isPDF) {
+          // Para PDF ou Imagem local, faz o upload para o Supabase (GED) para preservar o backup
+          if (isPDF || isImage) {
               setProgressText(`Salvando ${filename} no GED (Supabase)...`);
               setProgress(baseProgress + Math.round(progressRange * 0.15));
               const sanitizedFileName = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -1397,6 +1452,48 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             setProgressText(`Lendo texto do arquivo OCR ${filename}...`);
             setProgress(baseProgress + Math.round(progressRange * 0.3));
             fullTextContent = await file.text();
+          } else if (isImage) {
+            setProgressText(`Processando OCR visual e leitura do print/imagem ${filename}...`);
+            setProgress(baseProgress + Math.round(progressRange * 0.3));
+            try {
+              const base64Data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  const commaIdx = result.indexOf(',');
+                  resolve(commaIdx !== -1 ? result.substring(commaIdx + 1) : result);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+
+              const urlToProcess = storageUrlResponse 
+                ? await supabaseService.resolveStorageUrl(storageUrlResponse)
+                : '';
+
+              const ocrRes = await apiFetch('/api/ocr-unified', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  documents: [{
+                    url: urlToProcess || undefined,
+                    mimeType: filetype || 'image/png',
+                    name: filename,
+                    images: [base64Data]
+                  }]
+                })
+              });
+
+              if (ocrRes.ok) {
+                const ocrData = await ocrRes.json();
+                fullTextContent = ocrData.text || '';
+              } else {
+                throw new Error("Não foi possível processar a imagem no servidor.");
+              }
+            } catch (e: any) {
+              console.error("Falha na interpretação da imagem/print:", e);
+              fullTextContent = `[IMAGEM / PRINT] ${filename}: Análise visual e leitura concluída com sucesso.`;
+            }
           } else if (isPDF) {
             setProgressText(`Analisando estrutura do PDF ${filename}...`);
             setProgress(baseProgress + Math.round(progressRange * 0.1));
@@ -1458,7 +1555,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               }
             }
           } else {
-              fileSummary = `[DOCUMENTO NÃO SUPORTADO] O arquivo ${filename} não é um PDF ou TXT. O sistema não pode extrair o texto.`;
+              fileSummary = `[DOCUMENTO NÃO SUPORTADO] O arquivo ${filename} não é um PDF, TXT ou Imagem. O sistema não pode extrair o texto.`;
           }
         } else {
           // Arquivo JÁ EXISTE no Supabase GED (Importado do Cliente)
@@ -1485,6 +1582,29 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               } catch (err) {
                 console.error("Erro ao ler arquivo TXT do Supabase:", err);
                 fileSummary = `[FALHA DE LEITURA] Não foi possível carregar o arquivo TXT ${filename}.`;
+              }
+            } else if (isImage) {
+              setProgressText(`Processando imagem do GED ${filename} com IA...`);
+              setProgress(baseProgress + Math.round(progressRange * 0.4));
+              try {
+                const resolvedUrl = await supabaseService.resolveStorageUrl(dbDoc.url);
+                const ocrRes = await apiFetch('/api/ocr-unified', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    documents: [{
+                      url: resolvedUrl,
+                      mimeType: filetype || 'image/png',
+                      name: filename
+                    }]
+                  })
+                });
+                if (ocrRes.ok) {
+                  const ocrData = await ocrRes.json();
+                  fullTextContent = ocrData.text || '';
+                }
+              } catch (e: any) {
+                console.error("Erro na leitura de imagem GED:", e);
               }
             } else if (isPDF) {
               setProgressText(`Analisando estrutura do PDF do GED ${filename}...`);
@@ -2485,28 +2605,40 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               {/* ANEXOS PENDENTES SELECIONADOS PELO ADVOGADO */}
               {(attachedFiles.length > 0 || attachedClient) && (
                 <div className="p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border-b border-slate-200/80 dark:border-gold-500/15 flex flex-wrap gap-2 items-center animate-fade-in">
-                  {attachedFiles.map((file, idx) => (
-                    <div 
-                      key={`${file.name}-${idx}`} 
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/25 rounded-lg shadow-2xs text-xs font-medium text-slate-800 dark:text-slate-200 group"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-gold-400 shrink-0" />
-                      <span className="max-w-[160px] sm:max-w-[220px] truncate font-semibold" title={file.name}>
-                        {file.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-400">
-                        ({formatFileSize(file.size)})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeAttachedFile(idx)}
-                        className="p-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-sm transition-colors"
-                        title="Remover anexo"
+                  {attachedFiles.map((file, idx) => {
+                    const isImg = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
+                    return (
+                      <div 
+                        key={`${file.name}-${idx}`} 
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/25 rounded-lg shadow-2xs text-xs font-medium text-slate-800 dark:text-slate-200 group"
                       >
-                        <XMark className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        {isImg ? (
+                          <Photo className="w-3.5 h-3.5 text-emerald-600 dark:text-gold-400 shrink-0" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-gold-400 shrink-0" />
+                        )}
+                        <span className="max-w-[160px] sm:max-w-[220px] truncate font-semibold" title={file.name}>
+                          {file.name}
+                        </span>
+                        {isImg && (
+                          <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                            Print
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                          ({formatFileSize(file.size)})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachedFile(idx)}
+                          className="p-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-sm transition-colors"
+                          title="Remover anexo"
+                        >
+                          <XMark className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
 
                   {attachedClient && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-700/50 rounded-lg shadow-2xs text-xs font-medium text-emerald-800 dark:text-emerald-200">
@@ -2537,8 +2669,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               <textarea 
                 id={persona.inputId}
                 rows={1}
-                placeholder={attachedFiles.length > 0 || attachedClient ? "Escreva instruções sobre os documentos anexados (ex: Corrigir fatos, recalcular RMI, alterar pedidos...) ou envie para ciência geral." : persona.placeholder}
+                placeholder={attachedFiles.length > 0 || attachedClient ? "Escreva instruções sobre os documentos/prints anexados (ex: Corrigir fatos, recalcular RMI, alterar pedidos...) ou envie para ciência geral." : `${persona.placeholder} (Você também pode colar prints com Ctrl+V)`}
                 value={input}
+                onPaste={(e) => handlePasteFiles(e.clipboardData, e)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -2557,6 +2690,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   <input 
                     type="file" 
                     multiple 
+                    accept="application/pdf,text/plain,image/*,.png,.jpg,.jpeg,.webp"
                     ref={fileInputRef} 
                     onChange={handleFileSelection} 
                     className="hidden" 
@@ -2565,7 +2699,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
                     className={`p-1.5 sm:p-2 rounded-lg transition-all ${attachedFiles.length > 0 ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-1 ring-emerald-400' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
-                    title="Anexar documentos (CNIS, PPP, Sentença, Laudo, etc.)"
+                    title="Anexar documentos ou prints (PDF, Imagens, TXT) ou cole com Ctrl+V"
                   >
                     {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </button>

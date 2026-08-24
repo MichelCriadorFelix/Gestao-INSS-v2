@@ -554,85 +554,103 @@ app.post("/api/ocr-unified", async (req, res) => {
       const doc = documents[i];
       const docHeader = `--- INÍCIO DO DOCUMENTO ${i + 1}: ${doc.name} ---`;
 
-      // 1. PROCESSAMENTO DE ELITE VIA OPENROUTER COM IMAGENS EXTRAÍDAS
-      if (false && apiKey && doc.images && Array.isArray(doc.images) && doc.images.length > 0) {
-        console.log(`[OCR SERVERLESS OPENROUTER] Extraindo OCR de ${doc.images.length} páginas de imagem via OpenRouter para ${doc.name}...`);
+      // 1. PROCESSAMENTO DE IMAGENS / PRINTS / SCAN COM VISÃO NATIVA DO GEMINI OU OPENROUTER
+      if (doc.images && Array.isArray(doc.images) && doc.images.length > 0) {
+        console.log(`[OCR SERVERLESS] Extraindo OCR/Visão de ${doc.images.length} imagem(ns)/print(s) para ${doc.name}...`);
         let extractedText = "";
 
         for (let p = 0; p < doc.images.length; p++) {
-          const base64Img = doc.images[p];
+          const rawImg = doc.images[p];
+          const base64Data = rawImg.startsWith("data:") ? rawImg.split(",")[1] : rawImg;
           const pageNum = p + 1;
+          const pageMime = (doc.mimeType && doc.mimeType.startsWith('image/')) ? doc.mimeType : 'image/png';
           let pageText = "";
-          let attempts = 0;
-          const maxPageRetries = 3;
 
-          while (attempts < maxPageRetries) {
-            try {
-              const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                  "Authorization": `Bearer ${apiKey}`,
-                  "Content-Type": "application/json",
-                  "HTTP-Referer": "https://gestao-inss-juridico.app",
-                  "X-Title": "Felix & Castro Advocacia"
-                },
-                body: JSON.stringify({
-                  model: "google/gemini-2.0-flash-001", // Modelo Flash 2.0 via OpenRouter
-                  messages: [
-                    {
-                      role: "user",
-                      content: [
-                        {
-                          type: "text",
-                          text: `Você é um perito em extração de texto (OCR) de documentos jurídicos, médicos e previdenciários.
-Extraia integralmente o texto desta página (${pageNum}). 
-Mantenha fidelidade absoluta a NOMES, CPFs, VALORES, DATAS e NÚMEROS DE PROCESSO.
-Não omita nenhum detalhe técnico.`
-                        },
-                        {
-                          type: "image_url",
-                          image_url: {
-                            url: base64Img.startsWith("data:") ? base64Img : `data:image/jpeg;base64,${base64Img}`
-                          }
-                        }
-                      ]
+          // Tenta via Gemini nativo primeiro
+          try {
+            const promptText = `Você é um perito em extração de texto (OCR), análise visual e leitura de prints e documentos jurídicos/médicos/administrativos.
+Extraia integralmente todo o conteúdo visual e textual desta imagem (página/print ${pageNum}).
+DIRETRIZES:
+1. LISTAS DE ARQUIVOS/PASTAS: Se for um print de tela do Windows Explorer, GED, pastas ou sistemas processuais com nomes de arquivos numerados ou tabelados (ex: "Doc. 1 - Procuração", "Doc. 18 - Declaração de Benefício"), transcreva cada linha de arquivo com nome completo, extensão e dados associados.
+2. DADOS PREVIDENCIÁRIOS/JURÍDICOS: Preserve com rigor absoluto CPFs, CNIS, NB (Número de Benefício), CIDs, Nomes Completos, Datas, Valores e Varas.
+3. TABELAS/EXTRATOS: Transcreva tabelas e extratos em formato estruturado claro ("Chave: Valor" ou linha a linha).
+4. FIDELIDADE: Não omita nenhum detalhe técnico visível.`;
+
+            const resp = await callGemini({
+              model: "gemini-3.6-flash",
+              contents: {
+                role: "user",
+                parts: [
+                  { text: promptText },
+                  {
+                    inlineData: {
+                      mimeType: pageMime,
+                      data: base64Data
                     }
-                  ],
-                  temperature: 0.1
-                })
-              });
+                  }
+                ]
+              },
+              config: { temperature: 0.1, maxOutputTokens: 16383 }
+            });
 
-              if (orRes.ok) {
-                const data = await orRes.json();
-                pageText = data.choices?.[0]?.message?.content || "";
-                break; // Sucesso
-              } else {
-                const errText = await orRes.text();
-                if (orRes.status === 429 || errText.includes("cota") || errText.includes("limit")) {
-                   console.log(`[OCR RETRY] Limite atingido na página ${pageNum}. Aguardando 3 segundos (Tentativa ${attempts+1})...`);
-                   await new Promise(r => setTimeout(r, 3000));
-                   attempts++;
-                   continue;
+            pageText = resp.text || "";
+          } catch (geminiVisionErr: any) {
+            console.error(`[OCR VISION GEMINI ERR] Falha no Gemini para a imagem ${pageNum}:`, geminiVisionErr?.message || geminiVisionErr);
+
+            // Fallback para OpenRouter se disponível
+            if (apiKey) {
+              try {
+                const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://gestao-inss-juridico.app",
+                    "X-Title": "Felix & Castro Advocacia"
+                  },
+                  body: JSON.stringify({
+                    model: "google/gemini-2.0-flash-001",
+                    messages: [
+                      {
+                        role: "user",
+                        content: [
+                          {
+                            type: "text",
+                            text: `Extraia integralmente o texto e todos os dados visíveis deste print/imagem (página ${pageNum}). Se for lista de arquivos, cite todos os nomes com precisão.`
+                          },
+                          {
+                            type: "image_url",
+                            image_url: {
+                              url: rawImg.startsWith("data:") ? rawImg : `data:${pageMime};base64,${rawImg}`
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    temperature: 0.1
+                  })
+                });
+
+                if (orRes.ok) {
+                  const data = await orRes.json();
+                  pageText = data.choices?.[0]?.message?.content || "";
                 }
-                throw new Error(`Erro OR (status ${orRes.status}): ${errText}`);
+              } catch (orErr) {
+                console.error(`Erro no fallback OpenRouter para imagem ${pageNum}:`, orErr);
               }
-            } catch (pageErr) {
-              console.error(`Erro na página ${pageNum}:`, pageErr);
-              attempts++;
-              await new Promise(r => setTimeout(r, 2000));
             }
           }
-          
+
           if (!pageText) {
-            console.warn(`[OCR WARNING] Falha após retries na página ${pageNum}.`);
-            pageText = `[Página ${pageNum} ilegível ou erro de processamento]`;
+            console.warn(`[OCR WARNING] Falha na extração de texto do print/imagem ${pageNum}.`);
+            pageText = `[Print/Imagem ${pageNum}: Não foi possível ler o texto ou a imagem está ilegível]`;
           }
 
-          extractedText += `[PÁGINA ${pageNum}]\n${pageText}\n\n`;
+          extractedText += doc.images.length > 1 ? `[IMAGEM / PÁGINA ${pageNum}]\n${pageText}\n\n` : `${pageText}\n\n`;
         }
 
         if (!extractedText.trim()) {
-           throw new Error(`Nenhum texto pôde ser extraído do documento ${doc.name} via Vision API.`);
+          throw new Error(`Nenhum texto pôde ser extraído do print/imagem ${doc.name} via Vision.`);
         }
 
         unifiedText += `${docHeader}\n${extractedText}\n\n`;
