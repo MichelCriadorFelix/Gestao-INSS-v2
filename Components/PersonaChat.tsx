@@ -312,6 +312,20 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
+  // Anexos pendentes para envio junto com a instrução do usuário
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachedClient, setAttachedClient] = useState<any | null>(null);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+  
   // Estados do Editor de Artefato Estático & Cirúrgico
   const [artifactTab, setArtifactTab] = useState<'preview' | 'edit'>('preview');
   const [editableArtifactText, setEditableArtifactText] = useState<string>('');
@@ -1333,7 +1347,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     activeSessionId: string, 
     startFileIndex = 0, 
     startPageIndex = 0,
-    clientToUpdate?: any
+    clientToUpdate?: any,
+    customUserPrompt?: string
   ) => {
     let currentIdx = startFileIndex;
     const processedDocs: ChatDocument[] = [];
@@ -1588,7 +1603,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const finalMsg: Message = {
         id: generateId(),
         role: 'assistant',
-        content: `✅ **Auditoria de Documentos Concluída.** Analisando e lendo meticulosamente todos os ${fileArray.length} arquivo(s) integrados para tomar a ciência de forma consolidada. Por favor, aguarde...`,
+        content: `✅ **Auditoria de Documentos Concluída.** Analisando e lendo meticulosamente todos os ${fileArray.length} arquivo(s) integrados para uso inteligente da IA.`,
         timestamp: new Date().toISOString()
       };
       
@@ -1596,17 +1611,23 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         s.id === activeSessionId ? { ...s, messages: [...s.messages, finalMsg] } : s
       ));
 
-      // Trigger automatic consolidated real AI "Tomada de Ciência"
-      const isFabricia = persona.aiName === 'fabricia';
-      const docListText = processedDocs.map((d, idx) => `${idx + 1}. **${d.name}** (${d.fullText?.length || 0} caracteres lidos)`).join('\n');
-      
-      const scienceInstruction = isFabricia
-        ? `[FASE DE TOMADA DE CIÊNCIA]\nTomei ciência do material abaixo integrado à sessão:\n\n${docListText}\n\nPor favor, confirme de forma simples e direta que os documentos foram lidos e estão sob controle da secretaria para as providências de atendimento. Cite brevemente os principais dados identificados (nomes, CPFs, e peças) e coloque-se à disposição dizendo que aguarda o próximo comando.`
-        : `[FASE DE TOMADA DE CIÊNCIA DETALHADA]\nTomei ciência do material abaixo integrado à sessão:\n\n${docListText}\n\nPor favor, realize a leitura atenta de todos esses materiais integrados e faça um resumo executivo de ciência consolidado, mapeando de forma estruturada as seguintes informações cruciais:\n- **Dados e Qualificação das Partes**\n- **Datas de Marcos Temporais**\n- **CIDs ou Laudos de Saúde** (se houver)\n- **OABs, Valores das Causas e Pontos Críticos**\n\nAgradeça no final em seu nome profissional e confirme se está pronta para gerar relatórios técnicos de auditoria ou minutas iniciais de excelência para o caso.`;
+      if (customUserPrompt && customUserPrompt.trim()) {
+        setTimeout(() => {
+          handleSendMessage(customUserPrompt.trim());
+        }, 300);
+      } else {
+        // Trigger automatic consolidated real AI "Tomada de Ciência"
+        const isFabricia = persona.aiName === 'fabricia';
+        const docListText = processedDocs.map((d, idx) => `${idx + 1}. **${d.name}** (${d.fullText?.length || 0} caracteres lidos)`).join('\n');
         
-      setTimeout(() => {
-        handleSendMessage(scienceInstruction);
-      }, 300);
+        const scienceInstruction = isFabricia
+          ? `[FASE DE TOMADA DE CIÊNCIA]\nTomei ciência do material abaixo integrado à sessão:\n\n${docListText}\n\nPor favor, confirme de forma simples e direta que os documentos foram lidos e estão sob controle da secretaria para as providências de atendimento. Cite brevemente os principais dados identificados (nomes, CPFs, e peças) e coloque-se à disposição dizendo que aguarda o próximo comando.`
+          : `[FASE DE TOMADA DE CIÊNCIA DETALHADA]\nTomei ciência do material abaixo integrado à sessão:\n\n${docListText}\n\nPor favor, realize a leitura atenta de todos esses materiais integrados e faça um resumo executivo de ciência consolidado, mapeando de forma estruturada as seguintes informações cruciais:\n- **Dados e Qualificação das Partes**\n- **Datas de Marcos Temporais**\n- **CIDs ou Laudos de Saúde** (se houver)\n- **OABs, Valores das Causas e Pontos Críticos**\n\nAgradeça no final em seu nome profissional e confirme se está pronta para gerar relatórios técnicos de auditoria ou minutas iniciais de excelência para o caso.`;
+          
+        setTimeout(() => {
+          handleSendMessage(scienceInstruction);
+        }, 300);
+      }
 
     } catch (error: any) {
       console.error("Erro ao processar arquivos:", error);
@@ -1639,121 +1660,123 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     // Verificar se algum arquivo excede o limite do servidor (Aceitamos até 20MB via Storage bypass)
     const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-    const largeFiles = Array.from(files).filter(f => f.size > MAX_FILE_SIZE);
+    const fileList = Array.from(files);
+    const largeFiles = fileList.filter(f => f.size > MAX_FILE_SIZE);
     
     if (largeFiles.length > 0) {
       alert(`Os seguintes arquivos são muito grandes (> 20MB): ${largeFiles.map(f => f.name).join(', ')}. Por favor, reduza o tamanho desses arquivos.`);
       return;
     }
 
-    setIsUploading(true);
-    setProgress(0);
-    setProgressText('Iniciando processamento...');
-    
-    try {
-      let activeSessionId = currentSessionId;
-      
-      if (!activeSessionId) {
-        const newSession: ChatSession = {
-          id: generateId(),
-          title: 'Nova Conversa',
-          messages: [],
-          date: new Date().toLocaleDateString('pt-BR'),
-          documents: []
-        };
-        setSessions([newSession, ...sessions]);
-        setCurrentSessionId(newSession.id);
-        activeSessionId = newSession.id;
-      }
-
-      const fileArray = Array.from(files);
-      
-      // Inform user we are reading the files
-      const readingMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: `Estou iniciando a **Auditoria Detalhada** de ${fileArray.length} arquivo(s). Vou realizar a leitura nativa e integral de cada documento a partir do banco de dados para garantir máxima precisão técnica. Por favor, aguarde...`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
-      ));
-
-      await processFilesPhased(fileArray, activeSessionId);
-    } catch (error: any) {
-      console.error("Erro ao processar arquivos:", error);
-      alert(`Erro ao ler os arquivos: ${error.message}`);
-      setIsUploading(false);
+    setAttachedFiles(prev => [...prev, ...fileList]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const handleImportClient = async (client: any) => {
     setIsClientModalOpen(false);
-    setIsUploading(true);
-    setProgress(0);
-    setProgressText(`Buscando detalhes de ${client.name}...`);
-
     try {
       // Fetch full details including documents
       const fullClient = await supabaseService.getClientDetails(client.id);
-      
       const documentsToImport = persona.aiName === 'fabricia' ? (fullClient?.narrativeCertificates || []) : (fullClient?.documents || []);
 
       if (!fullClient || documentsToImport.length === 0) {
-          alert(`Este cliente não possui ${persona.aiName === 'fabricia' ? 'certidões narratórias' : 'documentos'} cadastrados.`);
-          setIsUploading(false);
-          return;
+        alert(`Este cliente não possui ${persona.aiName === 'fabricia' ? 'certidões narratórias' : 'documentos'} cadastrados.`);
+        return;
       }
 
-      setProgressText(`Preparando dossiê de ${fullClient.name}...`);
-      
-      let activeSessionId = currentSessionId;
-      
-      if (!activeSessionId) {
-        const newSession: ChatSession = {
-          id: generateId(),
-          title: `Dossiê: ${fullClient.name}`,
-          messages: [],
-          date: new Date().toLocaleDateString('pt-BR'),
-          documents: []
-        };
-        setSessions([newSession, ...sessions]);
-        setCurrentSessionId(newSession.id);
-        activeSessionId = newSession.id;
-      }
-
-      const readingMsg: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: `Importando dossiê do cliente **${fullClient.name}**. Vou realizar a **Auditoria Detalhada** de ${persona.aiName === 'fabricia' ? 'todas as certidões narratórias' : 'todos os documentos do GED'} a partir do nosso banco de dados, garantindo ciência integral e mapeamento técnico de cada folha. Por favor, aguarde...`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setSessions(prev => prev.map(s => 
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg], clientId: fullClient.id } : s
-      ));
-
-      const documentsList = documentsToImport.map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        type: d.type || 'application/pdf',
-        url: d.url,
-        ocrText: d.ocrText,
-        summary: d.summary
-      }));
-
-      await processFilesPhased(documentsList, activeSessionId, 0, 0, fullClient);
+      setAttachedClient(fullClient);
     } catch (error) {
-      console.error("Error importing client:", error);
-      alert("Erro ao importar cliente.");
-      setIsUploading(false);
+      console.error("Error selecting client:", error);
+      alert("Erro ao selecionar cliente.");
+    }
+  };
+
+  const handleSendButtonClick = async () => {
+    const hasAttachments = attachedFiles.length > 0 || !!attachedClient;
+    const currentText = input.trim();
+
+    if (!currentText && !hasAttachments) return;
+    if (isLoading || isUploading) return;
+
+    if (hasAttachments) {
+      const filesToProcess = [...attachedFiles];
+      const clientToProcess = attachedClient;
+      const userPrompt = currentText;
+
+      // Limpar os anexos pendentes e a caixa de texto
+      setAttachedFiles([]);
+      setAttachedClient(null);
+      setInput('');
+      const textarea = document.getElementById(persona.inputId);
+      if (textarea) textarea.style.height = 'auto';
+
+      setIsUploading(true);
+      setProgress(0);
+      setProgressText('Iniciando processamento dos anexos...');
+
+      try {
+        let activeSessionId = currentSessionId;
+        if (!activeSessionId) {
+          const defaultTitle = userPrompt 
+            ? (userPrompt.slice(0, 30) + '...') 
+            : (clientToProcess ? `Dossiê: ${clientToProcess.name}` : (filesToProcess[0]?.name || 'Nova Conversa'));
+          
+          const newSession: ChatSession = {
+            id: generateId(),
+            title: defaultTitle,
+            messages: [],
+            date: new Date().toLocaleDateString('pt-BR'),
+            documents: [],
+            clientId: clientToProcess?.id
+          };
+          setSessions([newSession, ...sessions]);
+          setCurrentSessionId(newSession.id);
+          activeSessionId = newSession.id;
+        } else if (clientToProcess?.id) {
+          setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, clientId: clientToProcess.id } : s));
+        }
+
+        let allDocsList: any[] = [...filesToProcess];
+        if (clientToProcess) {
+          const clientDocs = persona.aiName === 'fabricia' ? (clientToProcess.narrativeCertificates || []) : (clientToProcess.documents || []);
+          const formattedClientDocs = clientDocs.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            type: d.type || 'application/pdf',
+            url: d.url,
+            ocrText: d.ocrText,
+            summary: d.summary
+          }));
+          allDocsList = [...allDocsList, ...formattedClientDocs];
+        }
+
+        const readingMsg: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: `Iniciando a auditoria e integração de **${allDocsList.length} documento(s)**. O conteúdo está sendo extraído e indexado para uso inteligente da IA. Por favor, aguarde...`,
+          timestamp: new Date().toISOString()
+        };
+
+        setSessions(prev => prev.map(s => 
+          s.id === activeSessionId ? { ...s, messages: [...s.messages, readingMsg] } : s
+        ));
+
+        await processFilesPhased(allDocsList, activeSessionId, 0, 0, clientToProcess, userPrompt);
+      } catch (error: any) {
+        console.error("Erro ao processar anexos:", error);
+        alert(`Erro ao processar arquivos: ${error.message}`);
+        setIsUploading(false);
+      }
+    } else {
+      handleSendMessage(currentText);
     }
   };
 
@@ -2457,12 +2480,70 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               </button>
             </div>
 
-            <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all">
+            <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all overflow-hidden">
+              {/* ANEXOS PENDENTES SELECIONADOS PELO ADVOGADO */}
+              {(attachedFiles.length > 0 || attachedClient) && (
+                <div className="p-2.5 bg-slate-50 dark:bg-bordeaux-900/40 border-b border-slate-200/80 dark:border-gold-500/15 flex flex-wrap gap-2 items-center animate-fade-in">
+                  {attachedFiles.map((file, idx) => (
+                    <div 
+                      key={`${file.name}-${idx}`} 
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/25 rounded-lg shadow-2xs text-xs font-medium text-slate-800 dark:text-slate-200 group"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-gold-400 shrink-0" />
+                      <span className="max-w-[160px] sm:max-w-[220px] truncate font-semibold" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-400">
+                        ({formatFileSize(file.size)})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachedFile(idx)}
+                        className="p-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-sm transition-colors"
+                        title="Remover anexo"
+                      >
+                        <XMark className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {attachedClient && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-700/50 rounded-lg shadow-2xs text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                      <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span className="max-w-[180px] sm:max-w-[240px] truncate font-semibold" title={attachedClient.name}>
+                        Cliente: {attachedClient.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-600/70 dark:text-emerald-300/70">
+                        ({(persona.aiName === 'fabricia' ? attachedClient.narrativeCertificates?.length : attachedClient.documents?.length) || 0} docs)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachedClient(null)}
+                        className="p-0.5 text-emerald-500 hover:text-rose-600 rounded-sm transition-colors"
+                        title="Remover cliente"
+                      >
+                        <XMark className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <span className="text-[11px] text-emerald-700 dark:text-gold-400/90 font-medium italic ml-auto pr-1">
+                    {attachedFiles.length + (attachedClient ? 1 : 0)} anexo(s) pronto(s) • Escreva algo sobre e envie.
+                  </span>
+                </div>
+              )}
+
               <textarea 
                 id={persona.inputId}
                 rows={1}
-                placeholder={persona.placeholder}
+                placeholder={attachedFiles.length > 0 || attachedClient ? "Escreva instruções sobre os documentos anexados (ex: Corrigir fatos, recalcular RMI, alterar pedidos...) ou envie para ciência geral." : persona.placeholder}
                 value={input}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendButtonClick();
+                  }
+                }}
                 onChange={(e) => {
                   setInput(e.target.value);
                   e.target.style.height = 'auto';
@@ -2476,21 +2557,21 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                     type="file" 
                     multiple 
                     ref={fileInputRef} 
-                    onChange={handleFileUpload} 
+                    onChange={handleFileSelection} 
                     className="hidden" 
                   />
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
-                    title="Anexar documentos (CNIS, PPP, etc.)"
+                    className={`p-1.5 sm:p-2 rounded-lg transition-all ${attachedFiles.length > 0 ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-1 ring-emerald-400' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                    title="Anexar documentos (CNIS, PPP, Sentença, Laudo, etc.)"
                   >
                     {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </button>
                   <button 
                     onClick={() => setIsClientModalOpen(true)}
                     disabled={isUploading}
-                    className="p-1.5 sm:p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all flex items-center gap-1"
+                    className={`p-1.5 sm:p-2 rounded-lg transition-all flex items-center gap-1 ${attachedClient ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-1 ring-emerald-400' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
                     title="Importar Cliente (GED)"
                   >
                     <Users className="w-5 h-5" />
@@ -2541,8 +2622,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                   </button>
                 ) : (
                   <button 
-                    onClick={() => handleSendMessage()}
-                    disabled={!input.trim()}
+                    onClick={handleSendButtonClick}
+                    disabled={!input.trim() && attachedFiles.length === 0 && !attachedClient}
                     className="flex-shrink-0 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:hover:bg-primary-700 text-white p-2.5 rounded-xl shadow-lg shadow-primary-900/40 transition-all active:scale-95"
                     title="Enviar mensagem"
                   >
