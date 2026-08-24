@@ -2599,6 +2599,8 @@ const keyStatusRegistry: Record<string, KeyStatus> = {};
 
 function getAvailableKey(keys: string[], startIndex: number): { key: string, index: number, waitMs: number } {
   let minWait = Infinity;
+  let minWaitIdx = -1;
+  let minWaitKey = '';
   const now = Date.now();
   
   for (let i = 0; i < keys.length; i++) {
@@ -2616,16 +2618,18 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
     const waitTime = status.exhaustedUntil - now;
     if (waitTime < minWait) {
       minWait = waitTime;
+      minWaitIdx = idx;
+      minWaitKey = key;
     }
   }
   
-  if (minWait === Infinity) {
+  if (minWait === Infinity || minWaitIdx === -1) {
     // Todas as chaves ativas estão esgotadas DIARIAMENTE
     return { key: '', index: -1, waitMs: -1 };
   }
   
-  // Estão todas no limite por minuto. Retorna o menor tempo de espera necessário.
-  return { key: '', index: -1, waitMs: minWait };
+  // Estão todas no limite por minuto. Retorna a chave com o menor tempo de espera necessário.
+  return { key: minWaitKey, index: minWaitIdx, waitMs: minWait };
 }
 
 const MODEL_HIERARCHY = [
@@ -2866,8 +2870,10 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     
     const isEmpty = errorMessage.includes('Response was empty');
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
-    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
-    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
+    const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
+    const is503Overloaded = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('Service Unavailable');
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota && !isCacheLimit && !is503Overloaded;
+    const isOverloaded = isRateLimit || isDailyQuota || is503Overloaded;
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
@@ -2876,7 +2882,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     
     if (isInvalidKey) invalidKeys.add(apiKey);
     if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
@@ -3095,8 +3101,10 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     }
     
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
-    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
-    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
+    const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
+    const is503Overloaded = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('Service Unavailable');
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota && !isCacheLimit && !is503Overloaded;
+    const isOverloaded = isRateLimit || isDailyQuota || is503Overloaded;
     const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('NOT_FOUND');
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
@@ -3105,7 +3113,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     
     if (isInvalidKey) invalidKeys.add(apiKey);
     if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
@@ -3122,18 +3130,25 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       let nextFailures = failuresOnCurrentModel + 1;
       
       let errorReason = 'sobrecarga/cota';
-      if (isInvalidKey) errorReason = 'chave inválida';
+      if (is503Overloaded) errorReason = 'servidor Google sobrecarregado (503)';
+      else if (isInvalidKey) errorReason = 'chave inválida';
       else if (isPermissionDenied) errorReason = 'sem permissão/API desativada';
       else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
       else if (isNotFound) errorReason = 'modelo não encontrado (404)';
-        
+
+      let nextParams = { ...params };
+      if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
+        console.warn(`[FAILOVER 503] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
+        nextParams.model = 'gemini-3.5-flash';
+      }
+
       const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
       const msg5 = `[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`; 
       console.log(msg5); 
       if (onStatus) onStatus(msg5);
 
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGeminiStream(params, retries - 1, 0, nextFailures, undefined, onStatus);
+      return callGeminiStream(nextParams, retries - 1, 0, nextFailures, undefined, onStatus);
     }
     
     if (retries === 0) {
@@ -3177,13 +3192,14 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
     const errorMessage = error.message || String(error);
     
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
-    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota;
-    const isOverloaded = isRateLimit || isDailyQuota || errorMessage.includes('503');
+    const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
+    const is503Overloaded = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('Service Unavailable');
+    const isRateLimit = (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('RESOURCE_EXHAUSTED')) && !isDailyQuota && !isCacheLimit && !is503Overloaded;
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found') || errorMessage.includes('unauthorized');
     
     if (isInvalidKey) invalidKeys.add(apiKey);
     if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit || isOverloaded) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
 
     console.error(`Erro ao gerar embedding com a chave ${activeKeyIndex}: ${errorMessage.substring(0, 90)}`);
     
