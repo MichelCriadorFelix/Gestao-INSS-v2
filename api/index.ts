@@ -2633,9 +2633,9 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 }
 
 const MODEL_HIERARCHY = [
-  "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
+  "gemini-3.7-flash",
   "gemini-3-flash-preview"
 ];
 
@@ -3141,7 +3141,10 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       else if (isNotFound) errorReason = 'modelo não encontrado (404)';
 
       let nextParams = { ...params };
-      if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
+      if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
+        console.warn(`[FAILOVER 503] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
+        nextParams.model = 'gemini-3.5-flash';
+      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
         console.warn(`[FAILOVER 503] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.6-flash...`);
         nextParams.model = 'gemini-3.6-flash';
       }
@@ -3618,7 +3621,7 @@ app.post("/api/rag/plan", async (req, res) => {
     try {
       console.log(`[RAG PLAN_API] 2. Invocando modelo de IA para selecionar documentos de ${inventory.length} opções...`);
       const plannerResp = await callGemini({
-        model: "gemini-3.7-flash",
+        model: "gemini-3.6-flash",
         contents: { role: "user", parts: [{ text: plannerInput }] },
         config: {
           systemInstruction: RAG_PLANNER_PROMPT,
@@ -4892,13 +4895,13 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3.7-flash';
-      console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
+      model = 'gemini-3.6-flash';
+      console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqModel = req.body.model || 'gemini-3.6-flash';
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -5577,13 +5580,13 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3.7-flash';
-      console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
+      model = 'gemini-3.6-flash';
+      console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqModel = req.body.model || 'gemini-3.6-flash';
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -5604,11 +5607,11 @@ app.post("/api/dra-luana/chat", async (req, res) => {
         model = getEffectiveModel(reqModel);
         console.log(`[Dra.Luana] Usando modelo solicitado explicitamente: ${model}`);
       } else if (isStorageRequest && !isGenerationRequest) {
-        model = "gemini-3.7-flash";
-        console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3.7-flash' por padrão.");
+        model = "gemini-3.6-flash";
+        console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3.6-flash' por padrão.");
       } else {
-        model = "gemini-3.7-flash";
-        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.7-flash' por padrão.");
+        model = "gemini-3.6-flash";
+        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.6-flash' por padrão.");
       }
     }
 
@@ -6351,13 +6354,13 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
     );
 
-    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3.7-flash';
-      console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
+      model = 'gemini-3.6-flash';
+      console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqModel = req.body.model || 'gemini-3.6-flash';
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -7076,13 +7079,13 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
 
     const isStorageRequest = isStorageIntent || message.includes("Apenas armazene");
 
-    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.7 Flash
+    // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
     if (isStorageRequest) {
       modelProvider = 'gemini';
-      model = 'gemini-3.7-flash';
-      console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.7-flash' nativo.");
+      model = 'gemini-3.6-flash';
+      console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.7-flash';
+      const reqModel = req.body.model || 'gemini-3.6-flash';
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {

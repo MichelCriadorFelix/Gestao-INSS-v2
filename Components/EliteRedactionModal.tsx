@@ -34,7 +34,7 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
           </p>
 
           <button 
-            onClick={() => onConfirm('gemini', 'gemini-3.7-flash')}
+            onClick={() => onConfirm('gemini', 'gemini-3.6-flash')}
             className="w-full text-left p-4 rounded-xl border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 hover:border-emerald-600 transition-all group relative overflow-hidden"
           >
             <div className="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -43,10 +43,24 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
             <div className="flex justify-between items-start relative z-10">
               <div>
                 <h4 className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  Gemini 3.7 Flash (Nativo Google)
+                  Gemini 3.6 Flash (Nativo Google)
                   <span className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-black">Padrão do Escritório</span>
                 </h4>
-                <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">Modelo oficial de altíssima velocidade e precisão para peças jurídicas.</p>
+                <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">Modelo oficial estável de altíssima velocidade e precisão para peças jurídicas.</p>
+              </div>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => onConfirm('gemini', 'gemini-3.5-flash')}
+            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
+                  Gemini 3.5 Flash (Nativo Google)
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">Modelo alternativo de alta confiabilidade e estabilidade.</p>
               </div>
             </div>
           </button>
