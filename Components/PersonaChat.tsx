@@ -328,23 +328,47 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V)
-  const handlePasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault: () => void }) => {
+  // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V) com Desduplicação e Debounce
+  const lastPasteTimeRef = useRef<number>(0);
+  const lastPastedSizeRef = useRef<number>(0);
+
+  const processPastedImages = (
+    clipboardData: DataTransfer | null, 
+    isArtifactTarget: boolean, 
+    eventToPrevent?: { preventDefault?: () => void; stopPropagation?: () => void }
+  ) => {
     if (!clipboardData) return;
+
+    const now = Date.now();
+    // Anti-duplicação: Se o mesmo evento disparou há menos de 450ms, descarta a propagação repetida
+    if (now - lastPasteTimeRef.current < 450) {
+      if (eventToPrevent?.preventDefault) eventToPrevent.preventDefault();
+      if (eventToPrevent?.stopPropagation) eventToPrevent.stopPropagation();
+      return;
+    }
+
     const items = clipboardData.items;
     const files = clipboardData.files;
     const newImageFiles: File[] = [];
+    const seenSizes = new Set<number>();
 
     if (items && items.length > 0) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.type.startsWith('image/')) {
           const blob = item.getAsFile();
-          if (blob) {
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+          if (blob && blob.size > 0 && !seenSizes.has(blob.size)) {
+            // Se for o mesmo tamanho de blob colado em menos de 1 segundo, evita duplicata
+            if (blob.size === lastPastedSizeRef.current && (now - lastPasteTimeRef.current < 1000)) {
+              continue;
+            }
+            seenSizes.add(blob.size);
+            lastPastedSizeRef.current = blob.size;
+
+            const dateObj = new Date();
+            const timeStr = `${dateObj.getHours().toString().padStart(2, '0')}${dateObj.getMinutes().toString().padStart(2, '0')}${dateObj.getSeconds().toString().padStart(2, '0')}`;
             const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
-            const file = new File([blob], `Print_${now.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${timeStr}.${ext}`, { type: blob.type || 'image/png' });
+            const file = new File([blob], `Print_${dateObj.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${timeStr}.${ext}`, { type: blob.type || 'image/png' });
             newImageFiles.push(file);
           }
         }
@@ -352,39 +376,65 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     } else if (files && files.length > 0) {
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        if (f.type.startsWith('image/')) {
+        if (f.type.startsWith('image/') && !seenSizes.has(f.size)) {
+          if (f.size === lastPastedSizeRef.current && (now - lastPasteTimeRef.current < 1000)) {
+            continue;
+          }
+          seenSizes.add(f.size);
+          lastPastedSizeRef.current = f.size;
           newImageFiles.push(f);
         }
       }
     }
 
     if (newImageFiles.length > 0) {
-      setAttachedFiles(prev => [...prev, ...newImageFiles]);
-      const hasText = clipboardData.getData('text/plain');
-      if (!hasText && eventToPrevent) {
-        eventToPrevent.preventDefault();
+      lastPasteTimeRef.current = now;
+      if (eventToPrevent?.preventDefault) eventToPrevent.preventDefault();
+      if (eventToPrevent?.stopPropagation) eventToPrevent.stopPropagation();
+
+      if (isArtifactTarget) {
+        setArtifactAttachedFiles(prev => {
+          // Garante que nenhum arquivo com mesmo nome e tamanho já esteja na lista
+          const existingKeys = new Set(prev.map(p => `${p.name}_${p.size}`));
+          const uniqueNew = newImageFiles.filter(n => !existingKeys.has(`${n.name}_${n.size}`));
+          return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+        });
+      } else {
+        setAttachedFiles(prev => {
+          const existingKeys = new Set(prev.map(p => `${p.name}_${p.size}`));
+          const uniqueNew = newImageFiles.filter(n => !existingKeys.has(`${n.name}_${n.size}`));
+          return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+        });
       }
     }
   };
 
+  const handlePasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+    processPastedImages(clipboardData, false, eventToPrevent);
+  };
+
+  const handleArtifactPasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+    processPastedImages(clipboardData, true, eventToPrevent);
+  };
+
   useEffect(() => {
     const onWindowPaste = (e: ClipboardEvent) => {
+      // Se o evento já foi tratado pelo React onPaste do elemento focado, ignora
+      if (e.defaultPrevented) return;
+
       const activeEl = document.activeElement as HTMLElement | null;
-      // Se o foco estiver no input cirúrgico do artefato ou na folha do artefato
-      if (activeEl && (activeEl.id === 'artifact-surgical-input' || activeEl.closest('#artifact-panel-container'))) {
-        handleArtifactPasteFiles(e.clipboardData, e);
+      
+      // Verifica se o foco atual está no artefato ou no chat
+      const isArtifactTarget = !!(
+        activeEl && (activeEl.id === 'artifact-surgical-input' || activeEl.closest('#artifact-panel-container'))
+      ) || (!!activeArtifactId && !activeEl?.closest(`#${persona.inputId}`));
+
+      // Se estiver em outro input ou textarea alheio do sistema, não interfere
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.id !== persona.inputId && activeEl.id !== 'artifact-surgical-input') {
         return;
       }
-      // Permite colar se estiver no chat ou fora de inputs alheios
-      if (activeEl && (activeEl.tagName === 'INPUT' || (activeEl.tagName === 'TEXTAREA' && activeEl.id !== persona.inputId))) {
-        return;
-      }
-      // Se o painel do artefato estiver aberto e o mouse estiver sobre ele ou o foco não for o input principal
-      if (activeArtifactId && !activeEl?.closest(`#${persona.inputId}`)) {
-        handleArtifactPasteFiles(e.clipboardData, e);
-        return;
-      }
-      handlePasteFiles(e.clipboardData, e);
+
+      processPastedImages(e.clipboardData, isArtifactTarget, e);
     };
 
     window.addEventListener('paste', onWindowPaste);
@@ -408,45 +458,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const artifactFileInputRef = useRef<HTMLInputElement>(null);
   const artifactSheetRef = useRef<HTMLDivElement>(null);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V) no Artefato
-  const handleArtifactPasteFiles = (clipboardData: DataTransfer | null, eventToPrevent?: { preventDefault: () => void }) => {
-    if (!clipboardData) return;
-    const items = clipboardData.items;
-    const files = clipboardData.files;
-    const newImageFiles: File[] = [];
-
-    if (items && items.length > 0) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.startsWith('image/')) {
-          const blob = item.getAsFile();
-          if (blob) {
-            const now = new Date();
-            const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-            const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
-            const file = new File([blob], `Print_${now.toLocaleDateString('pt-BR').replace(/\//g, '-')}_${timeStr}.${ext}`, { type: blob.type || 'image/png' });
-            newImageFiles.push(file);
-          }
-        }
-      }
-    } else if (files && files.length > 0) {
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        if (f.type.startsWith('image/')) {
-          newImageFiles.push(f);
-        }
-      }
-    }
-
-    if (newImageFiles.length > 0) {
-      setArtifactAttachedFiles(prev => [...prev, ...newImageFiles]);
-      const hasText = clipboardData.getData('text/plain');
-      if (!hasText && eventToPrevent) {
-        eventToPrevent.preventDefault();
-      }
-    }
-  };
 
   const handleArtifactFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -2901,7 +2912,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         {activeArtifactId && (
           <div 
             id="artifact-panel-container"
-            onPaste={(e) => handleArtifactPasteFiles(e.clipboardData, e)}
             className={`fixed inset-0 z-50 lg:static lg:z-10 lg:w-1/2 flex flex-col h-full bg-slate-100 dark:bg-bordeaux-950/90 border-l border-slate-200 dark:border-gold-500/20 shadow-2xl overflow-hidden animate-fade-in shrink-0 transition-all duration-300 ${artifactUpdatePulse ? 'ring-4 ring-emerald-500/50' : ''}`}
           >
             {(() => {
