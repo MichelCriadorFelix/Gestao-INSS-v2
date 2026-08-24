@@ -2634,6 +2634,7 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 
 const MODEL_HIERARCHY = [
   "gemini-3.7-flash",
+  "gemini-3.6-flash",
   "gemini-3.5-flash",
   "gemini-3-flash-preview"
 ];
@@ -2645,9 +2646,11 @@ const MODEL_MAPPING: Record<string, string> = {
   "gemini-1.5-pro": "gemini-2.5-flash",
   "gemini-2.5-flash": "gemini-2.5-flash",
   "gemini-3.5-flash": "gemini-3.5-flash",
+  "gemini-3.6-flash": "gemini-3.6-flash",
   "gemini-3.7-flash": "gemini-3.7-flash",
   "gemini-3-flash-preview": "gemini-3-flash-preview",
   "google/gemini-3.5-flash": "gemini-3.5-flash",
+  "google/gemini-3.6-flash": "gemini-3.6-flash",
   "google/gemini-3-flash-preview": "gemini-3-flash-preview"
 };
 
@@ -2657,6 +2660,7 @@ function getEffectiveModel(modelName?: string): string {
   if (mapped) return mapped;
   
   if (modelName.includes('3.7-flash')) return "gemini-3.7-flash";
+  if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
   if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
   if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
   if (modelName.includes('deepseek')) return modelName;
@@ -3138,8 +3142,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
 
       let nextParams = { ...params };
       if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
-        console.warn(`[FAILOVER 503] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
-        nextParams.model = 'gemini-3.5-flash';
+        console.warn(`[FAILOVER 503] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.6-flash...`);
+        nextParams.model = 'gemini-3.6-flash';
       }
 
       const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
