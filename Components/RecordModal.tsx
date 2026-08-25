@@ -1048,62 +1048,134 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   ];
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-bordeaux-950/60 rounded-none md:rounded-2xl shadow-2xl w-full h-full md:h-auto max-w-3xl md:max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-gold-500/20 flex flex-col">
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950/60 sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'}`}>
-                {initialData ? <PencilSquareIcon className="h-6 w-6" /> : <PlusIcon className="h-6 w-6" />}
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                {initialData ? 'Editar Processo' : 'Novo Processo'}
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-full">
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-gold-500/20 px-6 overflow-x-auto no-scrollbar">
-            <button 
-                onClick={() => setActiveTab('info')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-                Informações
-            </button>
-            <button 
-                onClick={() => setActiveTab('history')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'history' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-                <span>Histórico do Caso</span>
-                {formData.eventHistory && formData.eventHistory.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-bold">
-                        {formData.eventHistory.length}
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-bordeaux-950 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] h-full sm:h-auto flex flex-col border border-slate-200 dark:border-gold-500/20 overflow-hidden">
+        {/* Fixed Header & Tabs Container - Never Scrolls Away */}
+        <div className="shrink-0 bg-white dark:bg-bordeaux-950 border-b border-slate-100 dark:border-gold-500/20 z-10">
+          <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 dark:border-gold-500/10">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${initialData ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400' : 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400'}`}>
+                  {initialData ? <PencilSquareIcon className="h-6 w-6" /> : <PlusIcon className="h-6 w-6" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                      {initialData ? 'Editar Processo' : 'Novo Processo'}
+                  </h3>
+                  {formData.name && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900/60 text-slate-700 dark:text-slate-200 font-bold max-w-[200px] truncate hidden sm:inline-block">
+                      {formData.name}
                     </span>
-                )}
-            </button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Gerencie informações cadastrais, histórico, documentos anexos e petições.
+                </p>
+              </div>
+            </div>
             <button 
-                onClick={() => setActiveTab('docs')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'docs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              onClick={onClose} 
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-2 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-xl"
+              title="Fechar Janela"
             >
-                Documentos ({formData.documents?.length || 0})
+              <XMarkIcon className="h-6 w-6" />
             </button>
-            <button 
-                onClick={() => setActiveTab('petitions')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'petitions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-                Petições ({formData.petitions?.length || 0})
-            </button>
-            <button 
-                onClick={() => setActiveTab('certidao')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'certidao' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-                Certidão Narratória ({formData.narrativeCertificates?.length || 0})
-            </button>
+          </div>
+
+          {/* Prominent Fixed Tabs Bar */}
+          <div className="flex items-center gap-1 px-6 pt-2 overflow-x-auto no-scrollbar bg-slate-50/70 dark:bg-bordeaux-900/20">
+              <button 
+                  type="button"
+                  onClick={() => setActiveTab('info')}
+                  className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === 'info' 
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400 bg-white dark:bg-bordeaux-950 rounded-t-lg shadow-sm' 
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+              >
+                  <span>📋 Informações</span>
+              </button>
+
+              <button 
+                  type="button"
+                  onClick={() => setActiveTab('history')}
+                  className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === 'history' 
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400 bg-white dark:bg-bordeaux-950 rounded-t-lg shadow-sm' 
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+              >
+                  <span>⏳ Histórico do Caso</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    activeTab === 'history'
+                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                      {formData.eventHistory?.length || 0}
+                  </span>
+              </button>
+
+              <button 
+                  type="button"
+                  onClick={() => setActiveTab('docs')}
+                  className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === 'docs' 
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400 bg-white dark:bg-bordeaux-950 rounded-t-lg shadow-sm' 
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+              >
+                  <span>📁 Documentos</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    activeTab === 'docs'
+                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                      {formData.documents?.length || 0}
+                  </span>
+              </button>
+
+              <button 
+                  type="button"
+                  onClick={() => setActiveTab('petitions')}
+                  className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === 'petitions' 
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400 bg-white dark:bg-bordeaux-950 rounded-t-lg shadow-sm' 
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+              >
+                  <span>⚖️ Petições</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    activeTab === 'petitions'
+                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                      {formData.petitions?.length || 0}
+                  </span>
+              </button>
+
+              <button 
+                  type="button"
+                  onClick={() => setActiveTab('certidao')}
+                  className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+                    activeTab === 'certidao' 
+                      ? 'border-primary-600 text-primary-600 dark:text-primary-400 bg-white dark:bg-bordeaux-950 rounded-t-lg shadow-sm' 
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+              >
+                  <span>📜 Certidão Narratória</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    activeTab === 'certidao'
+                      ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}>
+                      {formData.narrativeCertificates?.length || 0}
+                  </span>
+              </button>
+          </div>
         </div>
         
-        <div className="p-8">
+        {/* Scrollable Content Body */}
+        <div className="p-6 md:p-8 overflow-y-auto flex-1 bg-white dark:bg-bordeaux-950/50">
             {activeTab === 'info' ? (
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-6">
                 {fields.map((field) => {
