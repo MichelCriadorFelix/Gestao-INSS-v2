@@ -2,7 +2,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 // Use specific version from CDN to ensure stability and match package.json
 const PDFJS_VERSION = '3.11.174';
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+if (typeof window !== 'undefined' && pdfjsLib?.GlobalWorkerOptions) {
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+  } catch (e) {
+    console.warn("Could not set GlobalWorkerOptions.workerSrc:", e);
+  }
+}
 
 export interface PDFPageData {
   pageNumber: number;

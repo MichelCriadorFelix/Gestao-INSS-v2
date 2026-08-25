@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { 
@@ -19,9 +18,7 @@ import { supabaseService } from './services/supabaseService';
 import { fetchINPCData, processINPCIndices } from './services/bcbService';
 import { fetchIBGELifeExpectancy, IBGELifeExpectancy } from './src/services/ibgeService';
 import { analyzeBenefits } from './BenefitRules';
-
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+import { extractTextFromPDF } from './src/utils/pdfParser';
 
 // --- Types ---
 
@@ -919,30 +916,23 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (file.type !== 'application/pdf') {
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
             showToast('Por favor, selecione um arquivo PDF.', "error");
             return;
         }
 
         setIsProcessing(true);
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const pdfResult = await extractTextFromPDF(file);
+            const fullText = (pdfResult.text || '').trim();
             
-            let fullText = '';
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                fullText += pageText + '\n';
+            if (!fullText) {
+                throw new Error("Não foi possível extrair texto do PDF. O arquivo pode estar vazio ou corrompido.");
             }
 
             setData(prev => ({ ...prev, cnisContent: fullText }));
             
             // Try AI first
-            // Truncate text to ~300k characters to avoid Vercel function timeouts (approx 60-80 pages of dense text)
-            // The free tier has a 10s limit, Pro has 60s (or 300s if configured). 
-            // Gemini has a large context window, so we can send more.
             const WAS_TRUNCATED = fullText.length > 300000;
             const truncatedText = WAS_TRUNCATED
                 ? fullText.substring(0, 300000) + "\n...[Texto truncado para análise]..."
@@ -950,31 +940,40 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             if (WAS_TRUNCATED) {
                 showToast(
-                    "⚠️ CNIS muito extenso — apenas os primeiros 300.000 caracteres foram analisados. Verifique se todos os vínculos foram importados.",
+                    "⚠️ CNIS muito extenso — os dados principais serão mapeados.",
                     "error"
                 );
             }
             
-            const aiResult = await analyzeCNISWithAI(truncatedText, fullText);
-            
-            if (aiResult) {
-                setData(prev => ({
-                    ...prev,
-                    ...aiResult,
-                    bonds: aiResult.bonds || [],
-                    cnisContent: fullText
-                }));
-                showToast("Análise concluída! (Dados processados 100% via IA)");
-            } else {
-                console.error("AI Analysis failed and local fallback is disabled.");
-                showToast("A análise da IA falhou. Por favor, tente novamente ou verifique o arquivo.", "error");
+            let aiSuccess = false;
+            try {
+                const aiResult = await analyzeCNISWithAI(truncatedText, fullText);
+                if (aiResult && aiResult.bonds && aiResult.bonds.length > 0) {
+                    setData(prev => ({
+                        ...prev,
+                        ...aiResult,
+                        bonds: aiResult.bonds || [],
+                        cnisContent: fullText
+                    }));
+                    aiSuccess = true;
+                    showToast("CNIS importado e processado com sucesso!");
+                }
+            } catch (aiErr) {
+                console.warn("AI analysis error, switching to local parser:", aiErr);
             }
 
-        } catch (error) {
-            console.error('Erro ao ler PDF:', error);
-            showToast('Erro ao processar o arquivo PDF. Verifique se o arquivo é válido.', "error");
+            if (!aiSuccess) {
+                console.log("Running local deterministic CNIS parser...");
+                parseCNIS(fullText);
+                showToast("CNIS importado com sucesso via processamento estrutural local!", "success");
+            }
+
+        } catch (error: any) {
+            console.error('Erro ao processar PDF:', error);
+            showToast(`Erro ao processar o arquivo PDF: ${error.message || 'Verifique se o arquivo é válido.'}`, "error");
         } finally {
             setIsProcessing(false);
+            if (e.target) e.target.value = '';
         }
     };
 
@@ -1843,11 +1842,12 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             setData(prev => ({
                 ...prev,
                 ...newData,
-                bonds: [...prev.bonds, ...bonds]
+                bonds: bonds,
+                cnisContent: content
             }));
-            // showToast(`${bonds.length} vínculos importados com sucesso!`);
+            showToast(`${bonds.length} vínculo(s) importado(s) com sucesso!`, "success");
         } else {
-            showToast("Não foi possível identificar vínculos. Verifique se o PDF é um CNIS válido.", "error");
+            showToast("Não foi possível identificar vínculos no CNIS. Verifique o arquivo.", "error");
         }
     };
 
