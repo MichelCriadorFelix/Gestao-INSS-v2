@@ -537,6 +537,7 @@ export const supabaseService = {
       total_fee: client.totalFee || 0,
       documents: client.documents || [],
       narrative_certificates: client.narrativeCertificates || [],
+      event_history: client.eventHistory || [],
     };
 
     // Only include petitions if they are provided (prevent overwriting with empty array from summaries)
@@ -546,10 +547,19 @@ export const supabaseService = {
 
     console.log('Salvando cliente no Supabase:', record.id);
 
-    const { data, error } = await supabase
+    // Tentativa com event_history; se a coluna não existir no schema remoto do Supabase, tenta sem a coluna para manter compatibilidade total
+    let { data, error } = await supabase
       .from('clients_v2')
       .upsert(record);
       
+    if (error && error.message?.includes('event_history')) {
+      console.warn('Coluna event_history não encontrada no Supabase, salvando sem a coluna...');
+      delete record.event_history;
+      const retryResult = await supabase.from('clients_v2').upsert(record);
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
     if (error) {
       console.error('Erro detalhado ao salvar cliente no Supabase:', error);
       throw error;
@@ -664,7 +674,8 @@ export const supabaseService = {
       totalFee: data.total_fee,
       documents: data.documents || [],
       petitions: data.petitions || [],
-      narrativeCertificates: data.narrative_certificates || []
+      narrativeCertificates: data.narrative_certificates || [],
+      eventHistory: data.event_history || []
     };
   },
 

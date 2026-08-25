@@ -39,6 +39,20 @@ export interface Petition {
   lastModified: string;
 }
 
+export interface ClientEventHistory {
+  id: string;
+  clientId: string;
+  eventType: 'perícia_médica' | 'perícia_social' | 'audiência' | 'prorrogação' | 'dcb' | '90_dias' | 'mandado_segurança' | 'atendimento' | 'cadastro' | 'observação' | 'outro';
+  title: string;
+  date?: string; // Data em que o evento ocorreu ou estava agendado (ex: 21/08/2026 ou 2026-08-21)
+  time?: string; // Horário (ex: 10:30)
+  location?: string; // Local / Vara / Agência do INSS
+  status: 'concluído' | 'remarcado' | 'pendente' | 'cancelado' | 'registrado';
+  notes?: string; // "O que aconteceu" / Observações / Ata
+  performedBy?: string; // Quem registrou (Dr. Michel, Dra. Luana, Fabrícia, etc.)
+  createdAt: string; // ISO timestamp
+}
+
 export interface ClientRecord {
   id: string;
   name: string;
@@ -81,6 +95,8 @@ export interface ClientRecord {
   narrativeCertificateCount?: number;
   petitions?: Petition[];
   narrativeCertificates?: ScannedDocument[];
+  eventHistory?: ClientEventHistory[];
+  createdAt?: string;
 }
 
 export enum UserRole {
@@ -195,6 +211,8 @@ export interface RecordModalProps {
   initialData?: ClientRecord | null;
   onOpenScanner?: () => void;
   onOpenPetition?: (petition: Petition, clientId?: string) => void;
+  agendaEvents?: AgendaEvent[];
+  user?: User;
 }
 
 export interface MonthlyDetailsModalProps {

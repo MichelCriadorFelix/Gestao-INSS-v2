@@ -2307,6 +2307,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
             onSave={handleSaveClient}
             initialData={currentRecord}
             onOpenPetition={(petition, clientId) => handleOpenPetition(petition, clientId)}
+            agendaEvents={agendaEvents}
+            user={user}
         />
         
         <ContractModal 

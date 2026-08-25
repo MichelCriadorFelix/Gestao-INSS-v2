@@ -7,6 +7,7 @@ import { ClientRecord, RecordModalProps, ScannedDocument } from '../types';
 import { parseDate, addDays, formatDate } from '../utils';
 import { compressPDF, compressImage } from '../utils/compressionUtils';
 import ScannerModal from './ScannerModal';
+import ClientTimeline from './ClientTimeline';
 import { supabaseService } from '../services/supabaseService';
 import { apiFetch } from '../services/apiService';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
@@ -127,13 +128,13 @@ const downloadFileRobust = async (docUrl: string, docName: string) => {
     }
 };
 
-const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, initialData, onOpenPetition }) => {
+const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, initialData, onOpenPetition, agendaEvents, user }) => {
   const [formData, setFormData] = useState<Partial<ClientRecord>>({
       nationality: 'Brasileira',
       maritalStatus: 'Solteiro(a)',
       profession: ''
   });
-  const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'petitions' | 'certidao'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'history' | 'docs' | 'petitions' | 'certidao'>('info');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDocName, setEditDocName] = useState('');
@@ -1064,28 +1065,39 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-gold-500/20 px-6">
+        <div className="flex border-b border-slate-100 dark:border-gold-500/20 px-6 overflow-x-auto no-scrollbar">
             <button 
                 onClick={() => setActiveTab('info')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
                 Informações
             </button>
             <button 
+                onClick={() => setActiveTab('history')}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'history' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+                <span>Histórico do Caso</span>
+                {formData.eventHistory && formData.eventHistory.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-bold">
+                        {formData.eventHistory.length}
+                    </span>
+                )}
+            </button>
+            <button 
                 onClick={() => setActiveTab('docs')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'docs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'docs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
                 Documentos ({formData.documents?.length || 0})
             </button>
             <button 
                 onClick={() => setActiveTab('petitions')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'petitions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'petitions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
                 Petições ({formData.petitions?.length || 0})
             </button>
             <button 
                 onClick={() => setActiveTab('certidao')}
-                className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === 'certidao' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                className={`px-4 py-3 text-sm font-bold border-b-2 transition whitespace-nowrap ${activeTab === 'certidao' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
                 Certidão Narratória ({formData.narrativeCertificates?.length || 0})
             </button>
@@ -1227,6 +1239,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                     </button>
                 </div>
                 </form>
+            ) : activeTab === 'history' ? (
+                <ClientTimeline 
+                    client={formData as ClientRecord}
+                    agendaEvents={agendaEvents}
+                    user={user}
+                    onUpdateHistory={(updatedHistory) => {
+                        const updated = { ...formData, eventHistory: updatedHistory };
+                        setFormData(updated);
+                    }}
+                    onSaveClientDirectly={async (updatedClient) => {
+                        setFormData(updatedClient);
+                        await onSave(updatedClient);
+                    }}
+                />
             ) : activeTab === 'docs' ? (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
