@@ -2415,10 +2415,19 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         let allDocsList: any[] = [...filesToProcess];
         if (clientToProcess) {
           const clientDocs = persona.aiName === 'fabricia' ? (clientToProcess.narrativeCertificates || []) : (clientToProcess.documents || []);
-          const formattedClientDocs = clientDocs.map((d: any) => ({
+          
+          // Isolamento Inteligente do arquivo TXT (Compilado)
+          // Se o cliente possuir algum documento .txt (como o compilado.txt), importamos APENAS os documentos .txt do GED,
+          // evitando puxar outros PDFs gerados automaticamente (Procurações, Declarações de Hipossuficiência, etc.) que poluem o chat.
+          const hasTxt = clientDocs.some((d: any) => d.name?.toLowerCase().endsWith('.txt'));
+          const effectiveClientDocs = hasTxt
+            ? clientDocs.filter((d: any) => d.name?.toLowerCase().endsWith('.txt'))
+            : clientDocs;
+
+          const formattedClientDocs = effectiveClientDocs.map((d: any) => ({
             id: d.id,
             name: d.name,
-            type: d.type || 'application/pdf',
+            type: d.type || (d.name?.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf'),
             url: d.url,
             ocrText: d.ocrText,
             summary: d.summary

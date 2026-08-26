@@ -4,6 +4,7 @@ import LZString from 'lz-string';
 const getSupabase = () => supabase;
 
 let cachedUseSystemForLegal: boolean | null = null;
+let remoteHasEventHistory = true;
 
 const getLegalClient = async () => {
   const primary = getSupabase();
@@ -537,8 +538,11 @@ export const supabaseService = {
       total_fee: client.totalFee || 0,
       documents: client.documents || [],
       narrative_certificates: client.narrativeCertificates || [],
-      event_history: client.eventHistory || [],
     };
+
+    if (remoteHasEventHistory) {
+      record.event_history = client.eventHistory || [];
+    }
 
     // Only include petitions if they are provided (prevent overwriting with empty array from summaries)
     if (client.petitions !== undefined) {
@@ -554,6 +558,7 @@ export const supabaseService = {
       
     if (error && error.message?.includes('event_history')) {
       console.warn('Coluna event_history não encontrada no Supabase, salvando sem a coluna...');
+      remoteHasEventHistory = false;
       delete record.event_history;
       const retryResult = await supabase.from('clients_v2').upsert(record);
       data = retryResult.data;
@@ -574,7 +579,7 @@ export const supabaseService = {
     // Fetch summary including documents (now lightweight with URLs) to show counts
     const { data, error } = await supabase
       .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates');
+      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions');
       
     if (error) {
       console.error('Error fetching clients from Supabase:', error);
@@ -614,11 +619,11 @@ export const supabaseService = {
       referrerName: c.referrer_name,
       referrerPercentage: c.referrer_percentage,
       totalFee: c.total_fee,
-      documents: [],
-      documentCount: 0,
-      petitionCount: 0,
-      narrativeCertificates: [],
-      narrativeCertificateCount: 0
+      documents: c.documents || [],
+      documentCount: (c.documents || []).length,
+      petitionCount: (c.petitions || []).length,
+      narrativeCertificates: c.narrative_certificates || [],
+      narrativeCertificateCount: (c.narrative_certificates || []).length
     }));
   },
 
