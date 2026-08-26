@@ -775,22 +775,33 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
 
 <p style="margin-bottom: 20px; line-height: 1.6;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
 
-<p style="margin-top: 24px; margin-bottom: 40px;">São João de Meriti/RJ, ${currentDate}.</p>
+<p style="margin-top: 24px; margin-bottom: 20px;">São João de Meriti/RJ, ${currentDate}.</p>
 
-<div style="display: flex; flex-direction: column; gap: 24px; text-align: center; margin-top: 30px;">
-<div>
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</p>
-</div>
-<div>
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</p>
-</div>
-<div>
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">${clientName} - CPF: ${clientCPF} (CONTRATANTE)</p>
-</div>
-</div>`;
+<table style="width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 12px;">
+  <thead>
+    <tr style="border-bottom: 1px solid #000;">
+      <th style="border-right: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 65%;">IDENTIFICAÇÃO:</th>
+      <th style="padding: 6px 10px; text-align: left; font-weight: bold; width: 35%;">ASSINATURA:</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #000;">
+      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
+      <td style="padding: 10px; height: 35px;"></td>
+    </tr>
+    <tr style="border-bottom: 1px solid #000;">
+      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
+      <td style="padding: 10px; height: 35px;"></td>
+    </tr>
+    <tr>
+      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">
+        ${clientName} - CPF: ${clientCPF} (CONTRATANTE)
+        ${isMinor ? `<br/><span style="font-size: 11px; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
+      </td>
+      <td style="padding: 10px; height: 35px;"></td>
+    </tr>
+  </tbody>
+</table>`;
       }
 
       return '';
@@ -1183,6 +1194,116 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
           } else {
               doc.text(clientName, pageWidth / 2, cursorY + 5, { align: "center" });
           }
+      } else if (type === 'contrato_honorarios') {
+          // TÍTULO
+          doc.setFont("times", "bold");
+          doc.setFontSize(14);
+          doc.text("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS", pageWidth / 2, 30, { align: "center" });
+          
+          doc.setFontSize(10);
+          doc.setFont("times", "normal");
+          
+          let cursorY = 42;
+          
+          let contratanteQualif = "";
+          if (isMinor) {
+              const repName = formData.legalRepresentative?.toUpperCase() || "________________";
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
+              const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
+              const repProf = formData.legalRepresentativeProfession || "do lar";
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              contratanteQualif = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, neste ato representado(a) por ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, inscrito(a) no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}, doravante denominado(a) CONTRATANTE;`;
+          } else {
+              contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) CONTRATANTE;`;
+          }
+
+          cursorY = drawFullyJustifiedBlock("CONTRATANTE:", contratanteQualif, cursorY);
+          
+          const contratadosQualif = `Os advogados LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados CONTRATADOS.`;
+          cursorY = drawFullyJustifiedBlock("CONTRATADOS:", contratadosQualif, cursorY);
+
+          const introText = `Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:`;
+          cursorY = drawFullyJustifiedBlock("", introText, cursorY);
+
+          const c1Text = `O presente contrato tem como objeto a prestação de serviços advocatícios pelos CONTRATADOS em favor do(a) CONTRATANTE, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA PRIMEIRA – DO OBJETO\n", c1Text, cursorY);
+
+          const c2Text = `O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS\n", c2Text, cursorY);
+
+          const c21Text = `(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.\n( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.`;
+          cursorY = drawFullyJustifiedBlock("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):\n", c21Text, cursorY);
+
+          const c22Text = `(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.\n(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.`;
+          cursorY = drawFullyJustifiedBlock("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):\n", c22Text, cursorY);
+
+          const c23Text = `As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).`;
+          cursorY = drawFullyJustifiedBlock("2.3. ", c23Text, cursorY);
+
+          const c3Text = `Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA TERCEIRA – DAS DESPESAS\n", c3Text, cursorY);
+
+          const c4Text = `4.1. Dos CONTRATADOS: Atuar com zelo e diligência na defesa dos interesses do(a) CONTRATANTE, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.\n4.2. Do(a) CONTRATANTE: Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos CONTRATADOS.`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES\n", c4Text, cursorY);
+
+          const c5Text = `O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) CONTRATANTE sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA QUINTA – DA RESCISÃO\n", c5Text, cursorY);
+
+          const c6Text = `Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.`;
+          cursorY = drawFullyJustifiedBlock("CLÁUSULA SEXTA – DO FORO\n", c6Text, cursorY);
+
+          const endText = `E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.`;
+          cursorY = drawFullyJustifiedBlock("", endText, cursorY);
+
+          cursorY += 4;
+          doc.text(`São João de Meriti/RJ, ${currentDate}.`, margin, cursorY);
+
+          cursorY += 8;
+
+          if (cursorY + 45 > pageHeight - margin) {
+              doc.addPage();
+              cursorY = 30;
+          }
+
+          // DESENHAR TABELA DE ASSINATURAS
+          const tableX = margin;
+          const tableW = maxLineWidth;
+          const col1W = tableW * 0.65;
+          const headerH = 7;
+          const rowH = 9;
+
+          doc.setLineWidth(0.3);
+          doc.setDrawColor(0);
+
+          const tableTopY = cursorY;
+          const totalTableH = headerH + (rowH * 3);
+
+          // Borda externa
+          doc.rect(tableX, tableTopY, tableW, totalTableH);
+          // Divisória vertical
+          doc.line(tableX + col1W, tableTopY, tableX + col1W, tableTopY + totalTableH);
+
+          // Divisórias horizontais
+          doc.line(tableX, tableTopY + headerH, tableX + tableW, tableTopY + headerH);
+          doc.line(tableX, tableTopY + headerH + rowH, tableX + tableW, tableTopY + headerH + rowH);
+          doc.line(tableX, tableTopY + headerH + (rowH * 2), tableX + tableW, tableTopY + headerH + (rowH * 2));
+
+          // Textos do cabeçalho
+          doc.setFont("times", "bold");
+          doc.setFontSize(9);
+          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 5);
+          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 5);
+
+          // Linhas da tabela
+          doc.setFontSize(8.5);
+          let rY = tableTopY + headerH;
+          
+          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 6);
+          rY += rowH;
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 6);
+          rY += rowH;
+          doc.text(`${clientName} - CPF: ${clientCPF} (CONTRATANTE)`, tableX + 3, rY + 6);
       }
 
       const pdfBase64 = doc.output('datauristring');
@@ -1190,6 +1311,7 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
       if (type === 'procuracao') docName = 'Procuração (Gerada)';
       if (type === 'hipossuficiencia') docName = 'Hipossuficiência (Gerada)';
       if (type === 'renuncia') docName = 'Termo de Renúncia (Gerado)';
+      if (type === 'contrato_honorarios') docName = 'Contrato de Honorários (Gerado)';
 
       const newDoc: ScannedDocument = {
           id: Math.random().toString(36).substr(2, 9),
