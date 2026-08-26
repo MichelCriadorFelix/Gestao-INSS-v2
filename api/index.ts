@@ -7362,8 +7362,8 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     // Se o usuário pedir para gerar peça, o system prompt redireciona para Dr. Michel/Luana.
     const isGenerationRequest = false; // Fabrícia não gera petições
 
-    // Fabrícia deve ser BREVE por padrão (1-200 palavras)
-    let maxOutputTokens = 600;
+    // Fabrícia deve ser concisa mas ter espaço para responder sobre CRM/Agenda/Contratos sem truncar.
+    let maxOutputTokens = 1500;
     // minimal é o nível mais baixo disponível no 3.5 — velocidade máxima para respostas curtas
     let thinkingConfig: any = undefined;
 
@@ -7427,6 +7427,10 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
 2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
    - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
    - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
+3. FORMATO DE APRESENTAÇÃO HUMANO E AMIGÁVEL:
+   - Apresente todas as informações de agenda, contratos e clientes em português humano fluido, de forma organizada (listas com marcadores ou pequenos tópicos).
+   - É terminantemente proibido exibir propriedades de código ou JSON bruto como "| status: pending" ou "id: a4zinr50u".
+   - A regra de "Citação Direta" e a proibição de paráfrase da Regra de Ouro aplicam-se apenas a documentos técnicos (laudos, petições) e leis. Para os dados do CRM (agenda, compromissos, clientes, contratos), você DEVE escrever de forma natural, calorosa, amigável e conversacional para o advogado chefe.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -7445,11 +7449,10 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
 
     const REINFORCEMENT_PROMPT = `
     [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
-    Lembre-se que você é a secretária, não a advogada. 
-    Linguagem: Acolhedora, humana e clara. Use emojis com moderação.
-    LIMITE DE TAMANHO: Sua resposta DEVE ter entre 1 e 200 palavras. Seja concisa e vá direto ao ponto.
-    FORMATO: Gere APENAS o conteúdo que será enviado ao cliente ou o dado solicitado.
-    PROIBIDO: Nunca adicione seções direcionadas a advogados, meta-comentários ou feedbacks internos (ex: "Doutores...", "Como posso ajudar a equipe?") na sua resposta.`;
+    Você é a Secretária Fabrícia. Se o advogado te pedir dados do sistema (agenda, compromissos, contratos, clientes), responda com um texto de excelente qualidade, organizado, formatado em tópicos/tabelas amigáveis e totalmente em português humano.
+    PROIBIDO: Nunca exiba campos internos de código ou JSON bruto como "| status: pending" ou "id: a4zinr50u". Converta tudo em linguagem natural, clara, amigável e profissional para o Dr. Michel, Dra. Luana ou Dr. Felix (ex: "O contrato do cliente Vanderli está pendente de assinatura" ou "Temos um compromisso agendado para...").
+    Se o pedido for para redigir uma mensagem de WhatsApp para enviar a um cliente, gere o texto pronto da mensagem com tom acolhedor e humanizado.
+    Seja concisa e resolutiva, mantendo a postura de uma secretária de alta performance.`;
 
     // FIX#8: sanitizar histórico
     const sanitizedHistory = sanitizeHistory(history);
