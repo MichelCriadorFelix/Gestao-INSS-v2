@@ -737,73 +737,73 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) <strong>CONTRATANTE</strong>;`;
           }
 
-          return `<h2 class="no-indent" style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
+          return `<h2 class="no-indent" style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
 
-<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">Pelo presente instrumento particular, de um lado:</p>
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">Pelo presente instrumento particular, de um lado:</p>
 
-<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>CONTRATANTE:</strong> ${contratanteQualif}</p>
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>CONTRATANTE:</strong> ${contratanteQualif}</p>
 
-<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">E de outro lado:</p>
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">E de outro lado:</p>
 
-<p class="no-indent" style="margin-bottom: 14px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>CONTRATADOS:</strong> Os advogados <strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados <strong>CONTRATADOS</strong>.</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>CONTRATADOS:</strong> Os advogados <strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados <strong>CONTRATADOS</strong>.</p>
 
-<p class="no-indent" style="margin-bottom: 18px; text-align: justify; line-height: 1.6; font-size: 11pt;">Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:</p>
+<p class="no-indent" style="margin-bottom: 8px; text-align: justify; line-height: 1.35; font-size: 9pt;">Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA PRIMEIRA – DO OBJETO</p>
-<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA PRIMEIRA – DO OBJETO</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</p>
-<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</p>
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 10.5pt; margin-top: 10px; margin-bottom: 4px;">2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</p>
-<p class="no-indent" style="margin-left: 16px; margin-bottom: 4px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
-<p class="no-indent" style="margin-left: 16px; margin-bottom: 10px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</p>
+<p class="no-indent" style="margin-left: 14px; margin-bottom: 2px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="margin-left: 14px; margin-bottom: 5px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 10.5pt; margin-top: 10px; margin-bottom: 4px;">2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>
-<p class="no-indent" style="margin-left: 16px; margin-bottom: 4px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>
-<p class="no-indent" style="margin-left: 16px; margin-bottom: 10px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>
+<p class="no-indent" style="margin-left: 14px; margin-bottom: 2px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="margin-left: 14px; margin-bottom: 5px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
 
-<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA TERCEIRA – DAS DESPESAS</p>
-<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA TERCEIRA – DAS DESPESAS</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES</p>
-<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>4.1. Dos CONTRATADOS:</strong> Atuar com zelo e diligência na defesa dos interesses do(a) <strong>CONTRATANTE</strong>, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.</p>
-<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>4.2. Do(a) CONTRATANTE:</strong> Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos <strong>CONTRATADOS</strong>.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES</p>
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>4.1. Dos CONTRATADOS:</strong> Atuar com zelo e diligência na defesa dos interesses do(a) <strong>CONTRATANTE</strong>, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>4.2. Do(a) CONTRATANTE:</strong> Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos <strong>CONTRATADOS</strong>.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA QUINTA – DA RESCISÃO</p>
-<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA QUINTA – DA RESCISÃO</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA SEXTA – DO FORO</p>
-<p class="no-indent" style="margin-bottom: 16px; text-align: justify; line-height: 1.6; font-size: 11pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEXTA – DO FORO</p>
+<p class="no-indent" style="margin-bottom: 8px; text-align: justify; line-height: 1.35; font-size: 9pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privileged que seja.</p>
 
-<p class="no-indent" style="margin-bottom: 20px; line-height: 1.6; font-size: 11pt;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
+<p class="no-indent" style="margin-bottom: 8px; line-height: 1.35; font-size: 9pt;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
 
-<p class="no-indent" style="margin-top: 20px; margin-bottom: 16px; font-size: 11pt;">São João de Meriti/RJ, ${currentDate}.</p>
+<p class="no-indent" style="margin-top: 8px; margin-bottom: 10px; font-size: 9pt;">São João de Meriti/RJ, ${currentDate}.</p>
 
-<table style="width: 100%; border-collapse: collapse; margin-top: 16px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 11px;">
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 9pt;">
   <thead>
     <tr style="border-bottom: 1px solid #000; background-color: #f8fafc;">
-      <th style="border-right: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 65%;">IDENTIFICAÇÃO:</th>
-      <th style="padding: 6px 10px; text-align: left; font-weight: bold; width: 35%;">ASSINATURA:</th>
+      <th style="border-right: 1px solid #000; padding: 4px 8px; text-align: left; font-weight: bold; width: 65%;">IDENTIFICAÇÃO:</th>
+      <th style="padding: 4px 8px; text-align: left; font-weight: bold; width: 35%;">ASSINATURA:</th>
     </tr>
   </thead>
   <tbody>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
-      <td style="padding: 8px 10px; height: 32px;"></td>
+      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
+      <td style="padding: 6px 8px; height: 48px;"></td>
     </tr>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
-      <td style="padding: 8px 10px; height: 32px;"></td>
+      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
+      <td style="padding: 6px 8px; height: 48px;"></td>
     </tr>
     <tr>
-      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">
+      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">
         ${clientName} - CPF: ${clientCPF} (CONTRATANTE)
-        ${isMinor ? `<br/><span style="font-size: 10px; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
+        ${isMinor ? `<br/><span style="font-size: 8.5pt; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
       </td>
-      <td style="padding: 8px 10px; height: 32px;"></td>
+      <td style="padding: 6px 8px; height: 48px;"></td>
     </tr>
   </tbody>
 </table>`;
@@ -861,7 +861,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       const clientProfession = formData.profession || "profissão";
       const isMinor = !!formData.legalRepresentative;
 
-      let cursorY = 25;
+      let cursorY = type === 'contrato_honorarios' ? 15 : 25;
 
       // Helper universal para escrever texto formatado e gerenciar quebra de páginas com precisão
       const writeText = (
@@ -1034,7 +1034,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           }
 
       } else if (type === 'contrato_honorarios') {
-          writeText("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS", { fontStyle: 'bold', fontSize: 13, align: 'center', marginBottom: 10 });
+          writeText("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS", { fontStyle: 'bold', fontSize: 11, align: 'center', marginBottom: 6 });
           
           let contratanteQualif = "";
           if (isMinor) {
@@ -1049,57 +1049,57 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) CONTRATANTE;`;
           }
 
-          writeText("Pelo presente instrumento particular, de um lado:", { fontSize: 10, align: 'justify', marginBottom: 2 });
-          writeText(`CONTRATANTE: ${contratanteQualif}`, { fontSize: 10, align: 'justify', marginBottom: 2 });
-          writeText("E de outro lado:", { fontSize: 10, align: 'justify', marginBottom: 2 });
-          writeText(`CONTRATADOS: Os advogados LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados CONTRATADOS.`, { fontSize: 10, align: 'justify', marginBottom: 3 });
-          writeText("Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:", { fontSize: 10, align: 'justify', marginBottom: 4 });
+          writeText("Pelo presente instrumento particular, de um lado:", { fontSize: 9, align: 'justify', marginBottom: 1.5 });
+          writeText(`CONTRATANTE: ${contratanteQualif}`, { fontSize: 9, align: 'justify', marginBottom: 1.5 });
+          writeText("E de outro lado:", { fontSize: 9, align: 'justify', marginBottom: 1.5 });
+          writeText(`CONTRATADOS: Os advogados LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados CONTRATADOS.`, { fontSize: 9, align: 'justify', marginBottom: 2 });
+          writeText("Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
 
-          writeText("CLÁUSULA PRIMEIRA – DO OBJETO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("O presente contrato tem como objeto a prestação de serviços advocatícios pelos CONTRATADOS em favor do(a) CONTRATANTE, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.", { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("CLÁUSULA PRIMEIRA – DO OBJETO", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("O presente contrato tem como objeto a prestação de serviços advocatícios pelos CONTRATADOS em favor do(a) CONTRATANTE, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.", { fontSize: 9, align: 'justify', marginBottom: 2 });
 
-          writeText("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:", { fontSize: 10, align: 'justify', marginBottom: 2 });
+          writeText("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:", { fontSize: 9, align: 'justify', marginBottom: 1.5 });
 
-          writeText("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 9.5, align: 'left', marginTop: 1, marginBottom: 1 });
-          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 1 });
-          writeText("( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 3 });
+          writeText("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
+          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+          writeText("( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 2 });
 
-          writeText("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 9.5, align: 'left', marginTop: 1, marginBottom: 1 });
-          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 1 });
-          writeText("(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 3 });
+          writeText("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
+          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+          writeText("(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 2 });
 
-          writeText("2.3. As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).", { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("2.3. As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).", { fontSize: 9, align: 'justify', marginBottom: 2 });
 
-          writeText("CLÁUSULA TERCEIRA – DAS DESPESAS", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.", { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("CLÁUSULA TERCEIRA – DAS DESPESAS", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.", { fontSize: 9, align: 'justify', marginBottom: 2 });
 
-          writeText("CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("4.1. Dos CONTRATADOS: Atuar com zelo e diligência na defesa dos interesses do(a) CONTRATANTE, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.", { fontSize: 10, align: 'justify', marginBottom: 1 });
-          writeText("4.2. Do(a) CONTRATANTE: Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos CONTRATADOS.", { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("4.1. Dos CONTRATADOS: Atuar com zelo e diligência na defesa dos interesses do(a) CONTRATANTE, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.", { fontSize: 9, align: 'justify', marginBottom: 1 });
+          writeText("4.2. Do(a) CONTRATANTE: Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos CONTRATADOS.", { fontSize: 9, align: 'justify', marginBottom: 2 });
 
-          writeText("CLÁUSULA QUINTA – DA RESCISÃO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) CONTRATANTE sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.", { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("CLÁUSULA QUINTA – DA RESCISÃO", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) CONTRATANTE sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.", { fontSize: 9, align: 'justify', marginBottom: 2 });
 
-          writeText("CLÁUSULA SEXTA – DO FORO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
-          writeText("Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privileged que seja.", { fontSize: 10, align: 'justify', marginBottom: 4 });
+          writeText("CLÁUSULA SEXTA – DO FORO", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
+          writeText("Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
 
-          writeText("E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.", { fontSize: 10, align: 'justify', marginBottom: 4 });
+          writeText("E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
 
-          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 10, align: 'left', marginBottom: 6 });
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 9, align: 'left', marginBottom: 3 });
 
           // Tabela de Assinaturas no Contrato
           const tableX = margin;
           const tableW = maxLineWidth;
           const col1W = tableW * 0.65;
-          const headerH = 6;
-          const rowH = 8;
+          const headerH = 5;
+          const rowH = 13.5;
           const numRows = 3;
           const totalTableH = headerH + (rowH * numRows);
 
-          if (cursorY + totalTableH > pageHeight - 15) {
+          if (cursorY + totalTableH > pageHeight - 12) {
               doc.addPage();
-              cursorY = 25;
+              cursorY = 15;
           }
 
           doc.setLineWidth(0.3);
@@ -1114,22 +1114,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           }
 
           doc.setFont("times", "bold");
-          doc.setFontSize(8.5);
-          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 4.5);
-          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 4.5);
-
           doc.setFontSize(8);
+          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 3.8);
+          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 3.8);
+
+          doc.setFontSize(7.5);
           let rY = tableTopY + headerH;
-          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 5.5);
+          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 3.8);
           rY += rowH;
-          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 5.5);
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 3.8);
           rY += rowH;
           
           let contratanteLabel = `${clientName} - CPF: ${clientCPF} (CONTRATANTE)`;
           if (isMinor) {
               contratanteLabel += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
           }
-          doc.text(contratanteLabel, tableX + 3, rY + 5.5);
+          doc.text(contratanteLabel, tableX + 3, rY + 3.8);
       }
 
       const pdfBase64 = doc.output('datauristring');
