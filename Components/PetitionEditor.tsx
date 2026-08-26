@@ -1149,7 +1149,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
-        pageMargins: isContractDoc ? [45, 40, 45, 40] : [50, 100, 50, 100], // Left, Top, Right, Bottom in points
+        pageMargins: isContractDoc ? [45, 48, 45, 40] : [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
           font: selectedFont,
           fontSize: defaultFontSize,
@@ -1157,34 +1157,32 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           color: '#000000'
         },
         header: function(currentPage: number, pageCount: number) {
-          if (isContractDoc) return null;
           return {
             canvas: [
               {
                 type: 'polyline',
                 closePath: true,
-                color: '#d3545a', // Red
+                color: '#d3545a', // Red bordeaux
                 lineWidth: 0,
-                points: [{x: 50, y: 50}, {x: 195, y: 50}, {x: 200, y: 54}, {x: 50, y: 54}]
+                points: [{x: 50, y: 30}, {x: 195, y: 30}, {x: 200, y: 34}, {x: 50, y: 34}]
               },
               {
                 type: 'polyline',
                 closePath: true,
-                color: '#e6b3b3', // Light red
+                color: '#e6b3b3', // Light rose
                 lineWidth: 0,
-                points: [{x: 200, y: 50}, {x: 545, y: 50}, {x: 545, y: 54}, {x: 205, y: 54}]
+                points: [{x: 200, y: 30}, {x: 545, y: 30}, {x: 545, y: 34}, {x: 205, y: 34}]
               }
             ]
           };
         },
         footer: function(currentPage: number, pageCount: number) {
-          if (isContractDoc) return null;
           return {
             canvas: [
               {
                 type: 'rect',
                 x: 120,
-                y: 30, // Relative to footer top
+                y: 20, // Relative to footer top
                 w: 425,
                 h: 1,
                 color: '#c8a961'

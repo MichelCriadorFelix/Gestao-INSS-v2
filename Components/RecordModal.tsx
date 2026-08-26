@@ -1175,19 +1175,19 @@ ${clauseSecondHTML}
           // Tabela de Assinaturas no Contrato
           const tableX = margin;
           const tableW = maxLineWidth;
-          const col1W = tableW * 0.65;
-          const headerH = 5;
-          const rowH = 13.5;
+          const col1W = tableW * 0.52;
+          const headerH = 5.5;
+          const rowH = 15;
           const numRows = 3;
           const totalTableH = headerH + (rowH * numRows);
 
-          if (cursorY + totalTableH > pageHeight - 12) {
+          if (cursorY + totalTableH > pageHeight - 15) {
               doc.addPage();
-              cursorY = 15;
+              cursorY = 25;
           }
 
           doc.setLineWidth(0.3);
-          doc.setDrawColor(0);
+          doc.setDrawColor(30, 41, 59);
 
           const tableTopY = cursorY;
           doc.rect(tableX, tableTopY, tableW, totalTableH);
@@ -1199,21 +1199,39 @@ ${clauseSecondHTML}
 
           doc.setFont("times", "bold");
           doc.setFontSize(8);
-          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 3.8);
-          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 3.8);
+          doc.text("IDENTIFICAÇÃO DOS SIGNATÁRIOS:", tableX + 3, tableTopY + 4);
+          doc.text("CAMPO PARA ASSINATURA MANUAL:", tableX + col1W + 3, tableTopY + 4);
 
           doc.setFontSize(7.5);
           let rY = tableTopY + headerH;
-          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 3.8);
+          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 4.5);
           rY += rowH;
-          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 3.8);
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 4.5);
           rY += rowH;
           
           let contratanteLabel = `${clientName} - CPF: ${clientCPF} (CONTRATANTE)`;
           if (isMinor) {
               contratanteLabel += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
           }
-          doc.text(contratanteLabel, tableX + 3, rY + 3.8);
+          doc.text(contratanteLabel, tableX + 3, rY + 4.5);
+      }
+
+      // Adiciona o cabeçalho e rodapé padrão do escritório em todas as páginas do PDF
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          
+          // Barra de Cabeçalho (Bordô e Rosa)
+          doc.setFillColor(211, 84, 90); // #d3545a
+          doc.rect(20, 12, 45, 1.2, 'F');
+          
+          doc.setFillColor(230, 179, 179); // #e6b3b3
+          doc.rect(67, 12, 123, 1.2, 'F');
+          
+          // Linha de Rodapé (Dourado)
+          doc.setDrawColor(200, 169, 97); // #c8a961
+          doc.setLineWidth(0.4);
+          doc.line(42, 282, 190, 282);
       }
 
       const pdfBase64 = doc.output('datauristring');
