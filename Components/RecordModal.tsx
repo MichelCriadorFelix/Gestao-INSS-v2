@@ -869,19 +869,42 @@ ${clauseSecondHTML}
       return '';
   };
 
-  const handleOpenInEditor = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', customDocName?: string, customDocUrl?: string, contractClauses?: string[]) => {
+  const handleOpenInEditor = (
+      type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', 
+      customDocName?: string, 
+      customDocUrl?: string, 
+      contractClauses?: string[],
+      ocrText?: string
+  ) => {
       let title = customDocName || 'Documento sem título';
       let htmlContent = '';
+      let effectiveType = type;
 
-      if (type !== 'custom') {
+      if (type === 'custom' && customDocName) {
+          const lowerName = customDocName.toLowerCase();
+          if (lowerName.includes('procuração') || lowerName.includes('procuracao')) {
+              effectiveType = 'procuracao';
+          } else if (lowerName.includes('hipossuficiência') || lowerName.includes('hipossuficiencia') || lowerName.includes('declaração') || lowerName.includes('declaracao')) {
+              effectiveType = 'hipossuficiencia';
+          } else if (lowerName.includes('renúncia') || lowerName.includes('renuncia')) {
+              effectiveType = 'renuncia';
+          } else if (lowerName.includes('contrato')) {
+              effectiveType = 'contrato_honorarios';
+          }
+      }
+
+      if (effectiveType !== 'custom') {
           const titleMap = {
               procuracao: `Procuração Ad Judicia - ${formData.name || 'Cliente'}`,
               hipossuficiencia: `Declaração de Hipossuficiência - ${formData.name || 'Cliente'}`,
               renuncia: `Termo de Renúncia Teto JEF - ${formData.name || 'Cliente'}`,
               contrato_honorarios: `Contrato de Honorários Previdenciários - ${formData.name || 'Cliente'}`
           };
-          title = titleMap[type];
-          htmlContent = getDocumentHTML(type, contractClauses);
+          title = customDocName || titleMap[effectiveType];
+          htmlContent = getDocumentHTML(effectiveType, contractClauses);
+      } else if (ocrText) {
+          htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2>` + 
+              ocrText.split('\n').filter(Boolean).map(p => `<p class="no-indent" style="margin-bottom: 12px; line-height: 1.6;">${p}</p>`).join('');
       } else {
           htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p class="no-indent">Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
       }
@@ -890,7 +913,7 @@ ${clauseSecondHTML}
           id: 'doc_' + Math.random().toString(36).substr(2, 9),
           title,
           content: htmlContent,
-          category: type === 'contrato_honorarios' ? 'Contrato Previdenciário' : 'Documento / Procuração',
+          category: effectiveType === 'contrato_honorarios' ? 'Contrato Previdenciário' : 'Documento / Procuração',
           type: 'concrete' as const,
           lastModified: new Date().toLocaleString('pt-BR')
       };
@@ -1831,7 +1854,7 @@ ${clauseSecondHTML}
                                         </div>
                                         
                                         <button 
-                                            onClick={() => handleOpenInEditor('custom', doc.name, doc.url)}
+                                            onClick={() => handleOpenInEditor('custom', doc.name, doc.url, undefined, doc.ocrText)}
                                             className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg" 
                                             title="Abrir no Editor do Escritório"
                                         >
