@@ -51,7 +51,9 @@ const styles = `
   }
   .ProseMirror table p {
     text-indent: 0 !important;
-    font-size: inherit;
+    font-size: 8.5pt !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
   }
   .ProseMirror ul {
     list-style-type: disc !important;
@@ -87,17 +89,20 @@ const styles = `
     table-layout: fixed;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 1.5rem 0 !important;
+    margin: 1rem 0 !important;
     overflow: hidden;
+    font-size: 8.5pt !important;
   }
   .ProseMirror td, .ProseMirror th {
     min-width: 1rem;
-    border: 1px solid #c8a96180 !important;
-    padding: 6px 10px !important;
+    border: 1px solid #000000 !important;
+    padding: 5px 8px !important;
     vertical-align: middle;
     box-sizing: border-box;
     position: relative;
     text-align: inherit;
+    font-size: 8.5pt !important;
+    line-height: 1.3 !important;
   }
   .ProseMirror th {
     font-weight: bold;
@@ -1125,8 +1130,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 x: 120,
                 y: 30, // Relative to footer top
                 w: 425,
-                h: 2,
-                linearGradient: ['#ffffff', '#800000'] // Fades to dark red
+                h: 1,
+                color: '#c8a961'
               }
             ]
           };

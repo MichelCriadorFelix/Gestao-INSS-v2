@@ -381,14 +381,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
     onSave(formData as ClientRecord);
   };
 
-  const handleRemoveDocument = (docId: string) => {
+  const handleRemoveDocument = async (docId: string) => {
       const updatedDocs = (formData.documents || []).filter(d => d.id !== docId);
-      setFormData({ ...formData, documents: updatedDocs });
+      const updatedFormData = { ...formData, documents: updatedDocs };
+      setFormData(updatedFormData);
+      await onSave(updatedFormData as ClientRecord);
   }
 
-  const handleRemoveCertidao = (docId: string) => {
+  const handleRemoveCertidao = async (docId: string) => {
       const updatedDocs = (formData.narrativeCertificates || []).filter(d => d.id !== docId);
-      setFormData({ ...formData, narrativeCertificates: updatedDocs });
+      const updatedFormData = { ...formData, narrativeCertificates: updatedDocs };
+      setFormData(updatedFormData);
+      await onSave(updatedFormData as ClientRecord);
   }
 
   const handleUnifiedOCR = async () => {
@@ -843,7 +847,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       }
   };
 
-  const generatePDF = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
+  const generatePDF = async (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
       // @ts-ignore
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -1139,16 +1143,31 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       if (type === 'renuncia') docName = 'Termo de Renúncia (Gerado)';
       if (type === 'contrato_honorarios') docName = 'Contrato de Honorários (Gerado)';
 
+      const docId = Math.random().toString(36).substr(2, 9);
+      let finalUrl = pdfBase64;
+
+      try {
+        const clientId = formData.id || 'temp';
+        const storageUrl = await supabaseService.uploadFile('client-documents', `${clientId}/${docId}.pdf`, pdfBase64);
+        if (storageUrl) {
+          finalUrl = storageUrl;
+        }
+      } catch (storageErr) {
+        console.warn("Storage upload for generated PDF failed, falling back to data URI:", storageErr);
+      }
+
       const newDoc: ScannedDocument = {
-          id: Math.random().toString(36).substr(2, 9),
+          id: docId,
           name: docName,
           type: 'application/pdf',
-          url: pdfBase64,
+          url: finalUrl,
           date: new Date().toLocaleDateString('pt-BR')
       };
       
       const updatedDocs = [...(formData.documents || []), newDoc];
-      setFormData({ ...formData, documents: updatedDocs });
+      const updatedFormData = { ...formData, documents: updatedDocs };
+      setFormData(updatedFormData);
+      await onSave(updatedFormData as ClientRecord);
   };
 
   const fields = [
