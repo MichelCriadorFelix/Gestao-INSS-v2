@@ -5168,8 +5168,8 @@ Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EX
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
     }
-    }
-    }
+
+    
 
     if (history.length > 40) history = history.slice(-40);
 
@@ -5960,7 +5960,8 @@ Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EX
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
     }
-    }
+
+    
 
     if (history.length > 40) history = history.slice(-40);
 
@@ -6736,7 +6737,8 @@ Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EX
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
     }
-    }
+
+    
 
     if (history.length > 40) history = history.slice(-40);
 
@@ -7408,7 +7410,8 @@ Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EX
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
     }
-    }
+
+    
 
     if (history.length > 40) history = history.slice(-40);
 

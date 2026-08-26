@@ -31,6 +31,7 @@ import {
   DocumentCheckIcon as Save,
   PencilSquareIcon as EditSquare,
   BoltIcon as Bolt,
+  LightBulbIcon as Lightbulb,
   EyeIcon as Eye,
   ArrowPathRoundedSquareIcon as RefreshCw,
   StopIcon as Stop,

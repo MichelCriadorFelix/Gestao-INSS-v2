@@ -2349,7 +2349,6 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
             initialData={currentRecord}
             onOpenPetition={(petition, clientId) => handleOpenPetition(petition, clientId)}
             agendaEvents={mergedAgendaEvents}
-                    onAgendaAction={handleAgendaAction}
             user={user}
         />
         
