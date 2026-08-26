@@ -776,7 +776,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 <p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
 
 <p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEXTA – DO FORO</p>
-<p class="no-indent" style="margin-bottom: 8px; text-align: justify; line-height: 1.35; font-size: 9pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privileged que seja.</p>
+<p class="no-indent" style="margin-bottom: 8px; text-align: justify; line-height: 1.35; font-size: 9pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
 
 <p class="no-indent" style="margin-bottom: 8px; line-height: 1.35; font-size: 9pt;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
 

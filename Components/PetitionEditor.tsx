@@ -5,6 +5,11 @@ import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import ListItem from '@tiptap/extension-list-item';
 import Paragraph from '@tiptap/extension-paragraph';
+import Heading from '@tiptap/extension-heading';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import TableRow from '@tiptap/extension-table-row';
+import { Table } from '@tiptap/extension-table';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { ResizableImage } from 'tiptap-extension-resizable-image';
@@ -21,6 +26,23 @@ const styles = `
   .ProseMirror p.no-indent {
     text-indent: 0 !important;
   }
+  .ProseMirror p[style*="font-size: 9pt"],
+  .ProseMirror p[style*="font-size:9pt"] {
+    font-size: 9pt !important;
+    line-height: 1.35 !important;
+    margin-bottom: 5px !important;
+  }
+  .ProseMirror p[style*="font-size: 8.5pt"],
+  .ProseMirror p[style*="font-size:8.5pt"] {
+    font-size: 8.5pt !important;
+    line-height: 1.3 !important;
+    margin-bottom: 3px !important;
+  }
+  .ProseMirror h2[style*="font-size: 13px"],
+  .ProseMirror h2[style*="font-size:13px"] {
+    font-size: 13px !important;
+    margin-bottom: 8px !important;
+  }
   .ProseMirror p:has(img) {
     text-indent: 0 !important;
   }
@@ -29,6 +51,7 @@ const styles = `
   }
   .ProseMirror table p {
     text-indent: 0 !important;
+    font-size: inherit;
   }
   .ProseMirror ul {
     list-style-type: disc !important;
@@ -70,7 +93,7 @@ const styles = `
   .ProseMirror td, .ProseMirror th {
     min-width: 1rem;
     border: 1px solid #c8a96180 !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     vertical-align: middle;
     box-sizing: border-box;
     position: relative;
@@ -104,10 +127,6 @@ const PasteImageExtension = ResizableImage.extend({
   },
 });
 
-import { Table } from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
 import { 
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Quote, Undo, Redo, Image as ImageIcon, Table as TableIcon, Save, 
@@ -189,6 +208,14 @@ const CustomParagraph = Paragraph.extend({
           return { 'data-indent': attributes.indent || '2cm' };
         },
       },
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {};
+          return { style: attributes.style };
+        },
+      },
     };
   },
   addKeyboardShortcuts() {
@@ -218,6 +245,70 @@ const CustomParagraph = Paragraph.extend({
           }
         }
         return false;
+      },
+    };
+  },
+});
+
+const CustomHeading = Heading.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {};
+          return { style: attributes.style };
+        },
+      },
+    };
+  },
+});
+
+const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {};
+          return { style: attributes.style };
+        },
+      },
+    };
+  },
+});
+
+const CustomTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {};
+          return { style: attributes.style };
+        },
+      },
+    };
+  },
+});
+
+const CustomTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {};
+          return { style: attributes.style };
+        },
       },
     };
   },
@@ -560,6 +651,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
   const [topBottomMargin, setTopBottomMargin] = useState('3cm');
   const [leftRightMargin, setLeftRightMargin] = useState('2.5cm');
+  const [selectedFontSize, setSelectedFontSize] = useState('12pt');
   const [contentChanged, setContentChanged] = useState(0);
 
   const editor = useEditor({
@@ -567,11 +659,13 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     extensions: [
       StarterKit.configure({
         paragraph: false,
+        heading: false,
         bulletList: false,
         orderedList: false,
         listItem: false,
       }),
       CustomParagraph,
+      CustomHeading,
       BulletList.configure({
         keepMarks: true,
         keepAttributes: false,
@@ -589,9 +683,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         resizable: true,
         allowTableNodeSelection: true,
       }),
-      TableRow,
-      TableHeader,
-      TableCell,
+      CustomTableRow,
+      CustomTableHeader,
+      CustomTableCell,
     ],
     editorProps: {
       attributes: {
@@ -769,33 +863,46 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       rawHtml = rawHtml.replace(/<p><\/p>/g, '<p>&nbsp;</p>');
       rawHtml = rawHtml.replace(/<p><br><\/p>/g, '<p>&nbsp;</p>');
 
+      const isContractDoc = title.toUpperCase().includes('CONTRATO') || 
+                            category.toUpperCase().includes('CONTRATO') ||
+                            title.toUpperCase().includes('PROCURAÇÃO') ||
+                            title.toUpperCase().includes('HIPOSSUFICIÊNCIA') ||
+                            title.toUpperCase().includes('RENÚNCIA') ||
+                            rawHtml.includes('font-size: 9pt') ||
+                            rawHtml.includes('font-size:9pt') ||
+                            rawHtml.includes('font-size: 8.5pt');
+
+      const defaultFontSize = isContractDoc ? 9 : 12;
+      const defaultLineHeight = isContractDoc ? 1.35 : 1.5;
+      const defaultMarginBottom = isContractDoc ? 4 : 12;
+
       // Convert HTML to pdfmake format
       const pdfMakeContent = htmlToPdfmake(rawHtml, {
         defaultStyles: {
           p: {
-            fontSize: 12,
-            lineHeight: 1.5,
+            fontSize: defaultFontSize,
+            lineHeight: defaultLineHeight,
             alignment: 'justify',
-            margin: [0, 0, 0, 12],
+            margin: [0, 0, 0, defaultMarginBottom],
           },
-          h1: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
-          h2: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
-          h3: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
-          h4: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
-          h5: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
-          h6: { fontSize: 12, bold: true, alignment: 'center', margin: [0, 12, 0, 12] },
+          h1: { fontSize: isContractDoc ? 12 : 14, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
+          h2: { fontSize: isContractDoc ? 11 : 12, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
+          h3: { fontSize: isContractDoc ? 10 : 12, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
+          h4: { fontSize: isContractDoc ? 10 : 12, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
+          h5: { fontSize: isContractDoc ? 10 : 12, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
+          h6: { fontSize: isContractDoc ? 10 : 12, bold: true, alignment: 'center', margin: [0, 6, 0, 6] },
           blockquote: {
-            fontSize: 12,
+            fontSize: defaultFontSize,
             italics: true,
             alignment: 'justify',
-            margin: [113, 12, 0, 12], // 113pt is roughly 4cm
+            margin: [113, 6, 0, 6],
           },
-          ul: { margin: [0, 12, 0, 12] },
-          ol: { margin: [0, 12, 0, 12] },
-          li: { fontSize: 12, lineHeight: 1.5 },
-          table: { margin: [0, 12, 0, 12] },
-          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0], fontSize: 10 },
-          td: { margin: [0, 0, 0, 0], fontSize: 10 },
+          ul: { margin: [0, 6, 0, 6] },
+          ol: { margin: [0, 6, 0, 6] },
+          li: { fontSize: defaultFontSize, lineHeight: defaultLineHeight },
+          table: { margin: [0, 6, 0, 6] },
+          th: { bold: true, fillColor: '#ffffff', margin: [0, 0, 0, 0], fontSize: isContractDoc ? 8.5 : 10 },
+          td: { margin: [0, 0, 0, 0], fontSize: isContractDoc ? 8.5 : 10 },
         }
       });
 
@@ -822,7 +929,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           const isTable = node.nodeName === 'TABLE' || inTable;
           
           if (node.nodeName === 'BLOCKQUOTE') {
-            node.margin = [113, 12, 0, 12];
+            node.margin = [113, isContractDoc ? 4 : 12, 0, isContractDoc ? 4 : 12];
           }
 
           if (node.nodeName === 'P') {
@@ -836,24 +943,27 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
                 node.alignment = node.alignment || 'center';
                 node.noWrap = true; // Avoid splitting names to next line in signatures
-                node.fontSize = 10;
+                node.fontSize = isContractDoc ? 8.5 : 10;
               } else {
                 node.alignment = 'left';
-                node.fontSize = 9; // Reduce to 9pt in larger tables to ensure clean, organized fit
+                node.fontSize = isContractDoc ? 8.5 : 9; // Reduce to 8.5pt in contract tables to ensure clean fit
               }
               node.leadingIndent = 0;
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
             } else {
               const isCenterOrRight = node.alignment === 'center' || node.alignment === 'right';
-              const hasNoIndentClass = node.style && (
+              const hasNoIndentClass = isContractDoc || (node.style && (
                 (Array.isArray(node.style) && node.style.includes('no-indent')) || 
                 (typeof node.style === 'string' && node.style === 'no-indent')
-              );
+              ));
               
               if (!isCenterOrRight && !isBlockquote && !hasNoIndentClass) {
                 node.leadingIndent = 56; // Roughly 2cm in points
               } else {
                 node.leadingIndent = 0;
+              }
+              if (isContractDoc && (!node.margin || node.margin[3] > 5)) {
+                node.margin = [0, 0, 0, 4];
               }
             }
           }
@@ -980,11 +1090,11 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       const docDefinition: any = {
         content: pdfMakeContent,
         pageSize: 'A4',
-        pageMargins: [50, 100, 50, 100], // Left, Top, Right, Bottom in points
+        pageMargins: isContractDoc ? [45, 40, 45, 40] : [50, 100, 50, 100], // Left, Top, Right, Bottom in points
         defaultStyle: {
           font: selectedFont,
-          fontSize: 12,
-          lineHeight: 1.5,
+          fontSize: defaultFontSize,
+          lineHeight: defaultLineHeight,
           color: '#000000'
         },
         header: function(currentPage: number, pageCount: number) {
@@ -1351,6 +1461,29 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                   {f.label}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={selectedFontSize}
+              onChange={(e) => {
+                const newSize = e.target.value;
+                setSelectedFontSize(newSize);
+                if (editor) {
+                  editor.chain().focus().updateAttributes('paragraph', { style: `font-size: ${newSize};` }).run();
+                }
+              }}
+              title="Tamanho da Fonte"
+              className="h-8 px-2 text-sm bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-md text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="8pt">8pt (Contrato)</option>
+              <option value="8.5pt">8.5pt</option>
+              <option value="9pt">9pt (Padrão Contrato)</option>
+              <option value="10pt">10pt</option>
+              <option value="11pt">11pt</option>
+              <option value="12pt">12pt (Padrão Petição)</option>
+              <option value="14pt">14pt</option>
+              <option value="16pt">16pt</option>
+              <option value="18pt">18pt</option>
             </select>
 
             <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
