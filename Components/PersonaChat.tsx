@@ -23,6 +23,8 @@ import {
   ScissorsIcon as Scissors,
   ShieldExclamationIcon as ShieldExclamation,
   ArrowsPointingOutIcon as Maximize2,
+  ArrowsPointingInIcon as Minimize2,
+  ArchiveBoxIcon as Archive,
   ArrowUturnLeftIcon as Undo,
   ArrowUturnRightIcon as Redo,
   BookmarkIcon as Pin,
@@ -486,6 +488,20 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
       const target = (rMatch[1] || rMatch[2] || '').trim();
       if (target && doc.includes(target)) {
         doc = doc.replace(target, '');
+        appliedCount++;
+      }
+    }
+  }
+
+  // 5. Fallback estrutural: se nenhum patch formal casou, mas o texto contém uma seção formal da petição
+  if (appliedCount === 0 && originalDoc && aiResponseText.length > 80) {
+    const cleanedAi = cleanPetitionDocument(aiResponseText);
+    const sectionMatch = cleanedAi.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÁ-Ú\s]+|DA\s+[A-ZÁ-Ú\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?)\*{0,2}[:.]?/im);
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1].trim();
+      const sectionRegex = new RegExp(`(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}${sectionName.replace(/\s+/g, '\\s+')}\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos))|$)`, 'i');
+      if (sectionRegex.test(doc)) {
+        doc = doc.replace(sectionRegex, cleanedAi);
         appliedCount++;
       }
     }
@@ -1042,9 +1058,157 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     setEditingSessionId(null);
   };
 
+  const handleApplySnippetToArtifact = (snippetText: string) => {
+    const session = sessions.find(s => s.id === currentSessionId);
+    const activeArtifactMsg = activeArtifactId && activeArtifactId !== 'streaming'
+      ? session?.messages?.find(m => m.id === activeArtifactId)
+      : [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+
+    const currentDoc = editableArtifactText || activeArtifactMsg?.content || '';
+    if (!currentDoc) {
+      alert("Nenhum artefato ativo encontrado para aplicar a alteração.");
+      return;
+    }
+
+    const patchRes = applyLocalArtifactPatches(currentDoc, snippetText);
+    let updated = patchRes.updatedText;
+
+    if (patchRes.appliedCount === 0) {
+      const cleaned = cleanPetitionDocument(snippetText);
+      const closeMatch = currentDoc.match(/(?:Nestes\s+termos|Pede\s+deferimento)/i);
+      if (closeMatch && closeMatch.index) {
+        updated = currentDoc.substring(0, closeMatch.index) + cleaned + '\n\n' + currentDoc.substring(closeMatch.index);
+      } else {
+        updated = currentDoc + '\n\n' + cleaned;
+      }
+    }
+
+    setEditableArtifactText(updated);
+    setArtifactUpdatePulse(true);
+    setTimeout(() => setArtifactUpdatePulse(false), 2500);
+
+    if (activeArtifactMsg) {
+      setSessions(prev => prev.map(s => {
+        if (s.id !== currentSessionId) return s;
+        return {
+          ...s,
+          messages: s.messages.map(m => m.id === activeArtifactMsg.id ? { ...m, content: updated } : m)
+        };
+      }));
+    }
+  };
+
+  const handleCompactHistory = async () => {
+    const session = sessions.find(s => s.id === currentSessionId);
+    if (!session || session.messages.length < 3) {
+      alert("O histórico da conversa ainda é curto para compactação (necessário ao menos 3 mensagens).");
+      return;
+    }
+
+    setIsLoading(true);
+    setProgressText('🗜️ Compactando histórico da conversa e liberando contexto...');
+
+    const activeArtifactMsg = activeArtifactId && activeArtifactId !== 'streaming'
+      ? session.messages.find(m => m.id === activeArtifactId)
+      : [...session.messages].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+
+    const totalBefore = session.messages.length;
+
+    const compactPrompt = `[COMPACTAÇÃO EXECUTIVA DE HISTÓRICO - DIRETRIZ FELIX & CASTRO]
+Você é o Diretor Jurídico da Felix & Castro Advocacia.
+Analise todo o histórico anterior e gere uma SÍNTESE EXECUTIVA ESTRUTURADA DE ALTA DENSIDADE para substituir mensagens antigas, preservando 100% dos dados essenciais do caso.
+
+Estrutura Obrigatória em Markdown:
+### 📌 SÍNTESE EXECUTIVA DO CASO (HISTÓRICO COMPACTADO)
+- **Partes e Objeto:** Qualificação essencial, número do processo, juízo/vara e pedido central.
+- **Fatos e Provas Estabelecidos:** Vínculos, laudos, CIDs, datas-chave e documentos analisados.
+- **Orientações e Estratégia Jurídica:** Teses fixadas, posicionamentos e direcionamentos do advogado.
+- **Estado do Artefato Ativo:** Status da peça atual e próximas etapas.
+
+Responda diretamente com a síntese, de forma concisa, formal e técnica, sem preâmbulos ou saudações.`;
+
+    try {
+      const response = await apiFetch(persona.chatEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: compactPrompt,
+          history: session.messages.slice(-30),
+          modelProvider: selectedModelProvider,
+          model: selectedModel,
+          sessionId: session.id,
+          isCompactRequest: true
+        })
+      });
+
+      if (!response.ok) throw new Error("Falha ao compactar histórico");
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let summaryText = '';
+
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              if (dataStr === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.text) summaryText += data.text;
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      if (!summaryText.trim()) {
+        throw new Error("Não foi possível sintetizar a conversa.");
+      }
+
+      const newMessages: Message[] = [];
+      newMessages.push({
+        id: generateId(),
+        role: 'assistant',
+        content: `🗜️ **Histórico Compactado (${totalBefore} mensagens consolidadas em síntese executiva)**\n\n${summaryText.trim()}`,
+        timestamp: new Date().toISOString()
+      });
+
+      if (activeArtifactMsg) {
+        newMessages.push(activeArtifactMsg);
+        setActiveArtifactId(activeArtifactMsg.id);
+      }
+
+      setSessions(prev => prev.map(s => 
+        s.id === currentSessionId ? { ...s, messages: newMessages } : s
+      ));
+
+      setArtifactUpdatePulse(true);
+      setTimeout(() => setArtifactUpdatePulse(false), 2000);
+    } catch (err: any) {
+      console.error("Compact error:", err);
+      alert(`Erro ao compactar: ${err.message || 'Tente novamente.'}`);
+    } finally {
+      setIsLoading(false);
+      setProgressText('');
+    }
+  };
+
   const handleSendMessage = async (overrideInput?: string, images?: string[], skipEliteCheck = false, eliteProviderOverride?: string, eliteModelOverride?: string) => {
     const messageText = overrideInput || input;
     if ((!messageText.trim() && (!images || images.length === 0)) || isLoading) return;
+
+    if (/^\/compact$|^compactar$|^compactar conversa$/i.test(messageText.trim())) {
+      setInput('');
+      handleCompactHistory();
+      return;
+    }
 
     if (/continuar auditoria|retomar auditoria|prosseguir/i.test(messageText) && pendingAudit) {
       resumeAudit();
@@ -2803,6 +2967,19 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                               <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
                             </div>
                           )}
+                        {editableArtifactText && !isArtifactContent(msg.content || '') && (
+                          /(?:DOS\s+REQUERIMENTOS|DO\s+DIREITO|DOS\s+FATOS|DA\s+TUTELA|DO\s+PEDIDO|PEDE\s+DEFERIMENTO|OAB\/|AO\s+JUÍZO|Segue\s+o\s+trecho|alteração|correção|modificação|trecho|patch)/i.test(msg.content || '')
+                        ) && (
+                          <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-bordeaux-800/60 flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => handleApplySnippetToArtifact(msg.content || '')}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all hover:scale-105 active:scale-95"
+                              title="Mesclar e atualizar esta alteração no artefato ativo"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Aplicar Alteração no Artefato
+                            </button>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => copyToClipboard(msg.content || '', msg.id)}
@@ -3027,6 +3204,16 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               >
                 <Loader2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                 Refazer do Zero
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCompactHistory()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 dark:bg-bordeaux-900/60 dark:hover:bg-bordeaux-800/80 dark:text-gold-400 dark:border-gold-500/30 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Compactar Histórico (/compact) para liberar contexto preservando o caso"
+              >
+                <Minimize2 className="w-3.5 h-3.5 text-slate-600 dark:text-gold-400" />
+                Compactar Histórico (/compact)
               </button>
             </div>
 

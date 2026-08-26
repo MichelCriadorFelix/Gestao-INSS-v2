@@ -823,6 +823,15 @@ async function detectUserIntent(message: string): Promise<string> {
   }
   
   if (
+    msgLower.includes("[compactação executiva") ||
+    msgLower.includes("[compactacao executiva") ||
+    msgLower.includes("/compact")
+  ) {
+    console.log("[Detector de Intenção] Fast-path [COMPACTAÇÃO EXECUTIVA] -> [CASUAL]");
+    return "[CASUAL]";
+  }
+
+  if (
     msgLower.includes("[geração modular") ||
     msgLower.includes("[geracao modular") ||
     msgLower.includes("[correção cirúrgica") ||
@@ -5179,7 +5188,8 @@ O usuário solicitou uma alteração, correção ou adição pontual. NÃO reesc
 
 DIRETRIZES DO EDITOR CIRÚRGICO:
 1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogado de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
-2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+2. Em seguida, emita OBRIGATORIAMENTE a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+⚠️ REGRA DE OURO: É TERMINANTEMENTE PROIBIDO enviar o trecho corrigido solto em texto corrido ou dizer "Segue o trecho alterado" sem o bloco \`\`\`artifact_patch com <<<SEARCH e ===. O sistema depende EXCLUSIVAMENTE deste bloco delimitado para atualizar o artefato visual em tempo real!
 
 Substituição de trecho ou parágrafo:
 \`\`\`artifact_patch
@@ -5925,7 +5935,8 @@ O usuário solicitou uma alteração, correção ou adição pontual. NÃO reesc
 
 DIRETRIZES DO EDITOR CIRÚRGICO:
 1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogada previdenciarista de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
-2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+2. Em seguida, emita OBRIGATORIAMENTE a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+⚠️ REGRA DE OURO: É TERMINANTEMENTE PROIBIDO enviar o trecho corrigido solto em texto corrido ou dizer "Segue o trecho alterado" sem o bloco \`\`\`artifact_patch com <<<SEARCH e ===. O sistema depende EXCLUSIVAMENTE deste bloco delimitado para atualizar o artefato visual em tempo real!
 
 Substituição de trecho ou parágrafo:
 \`\`\`artifact_patch
@@ -6615,7 +6626,8 @@ O usuário solicitou uma alteração, correção ou adição pontual. NÃO reesc
 
 DIRETRIZES DO EDITOR CIRÚRGICO:
 1. Apresente no início da resposta um parecer executivo conciso, claro e fundamentado (1 a 3 parágrafos curtos) em tom de colega advogado de alto nível, explicando objetivamente o que foi corrigido ou adicionado.
-2. Em seguida, emita a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+2. Em seguida, emita OBRIGATORIAMENTE a alteração cirúrgica em um ou mais blocos \`\`\`artifact_patch usando os formatos abaixo:
+⚠️ REGRA DE OURO: É TERMINANTEMENTE PROIBIDO enviar o trecho corrigido solto em texto corrido ou dizer "Segue o trecho alterado" sem o bloco \`\`\`artifact_patch com <<<SEARCH e ===. O sistema depende EXCLUSIVAMENTE deste bloco delimitado para atualizar o artefato visual em tempo real!
 
 Substituição de trecho ou parágrafo:
 \`\`\`artifact_patch

@@ -15,7 +15,19 @@ const styles = `
   .ProseMirror-selectednode {
     outline: 2px solid #4285f4;
   }
+  .ProseMirror p {
+    text-indent: 2cm;
+  }
+  .ProseMirror p.no-indent {
+    text-indent: 0 !important;
+  }
   .ProseMirror p:has(img) {
+    text-indent: 0 !important;
+  }
+  .ProseMirror blockquote p {
+    text-indent: 0 !important;
+  }
+  .ProseMirror table p {
     text-indent: 0 !important;
   }
   .ProseMirror ul {
@@ -32,6 +44,9 @@ const styles = `
     margin-bottom: 0.5rem !important;
     display: list-item !important;
   }
+  .ProseMirror li p {
+    text-indent: 0 !important;
+  }
   .ProseMirror strong {
     font-weight: bold !important;
   }
@@ -42,6 +57,7 @@ const styles = `
     font-weight: bold !important;
     margin-top: 1.5rem !important;
     margin-bottom: 1rem !important;
+    text-indent: 0 !important;
   }
   .ProseMirror table {
     border-collapse: collapse;
@@ -96,7 +112,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Quote, Undo, Redo, Image as ImageIcon, Table as TableIcon, Save, 
   Trash2, Layout, ChevronLeft, ChevronDown, Search, Plus, FileDown, User, X, Settings, Palette, Scale,
-  Phone, Mail, Instagram, Upload, Check, FileText as FileTextIcon
+  Phone, Mail, Instagram, Upload, Check, FileText as FileTextIcon, Indent, Outdent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pdfMake from 'pdfmake/build/pdfmake';
@@ -161,20 +177,35 @@ const CustomParagraph = Paragraph.extend({
       indent: {
         default: '2cm',
         parseHTML: element => {
-          if (element.classList.contains('no-indent')) return '0';
+          if (element.classList.contains('no-indent') || element.getAttribute('data-indent') === '0' || element.style.textIndent === '0px' || element.style.textIndent === '0') return '0';
+          if (element.getAttribute('data-indent')) return element.getAttribute('data-indent');
+          if (element.style.textIndent) return element.style.textIndent;
           return '2cm';
         },
         renderHTML: attributes => {
           if (attributes.indent === '0' || attributes.indent === 0) {
-            return { class: 'no-indent' };
+            return { class: 'no-indent', 'data-indent': '0' };
           }
-          return {};
+          return { 'data-indent': attributes.indent || '2cm' };
         },
       },
     };
   },
   addKeyboardShortcuts() {
     return {
+      Tab: () => {
+        // Se estiver em tabela ou lista, preserva o comportamento nativo
+        if (this.editor.isActive('table') || this.editor.isActive('bulletList') || this.editor.isActive('orderedList')) {
+          return false;
+        }
+        return this.editor.chain().focus().updateAttributes(this.name, { indent: '2cm' }).run();
+      },
+      'Shift-Tab': () => {
+        if (this.editor.isActive('table') || this.editor.isActive('bulletList') || this.editor.isActive('orderedList')) {
+          return false;
+        }
+        return this.editor.chain().focus().updateAttributes(this.name, { indent: '0' }).run();
+      },
       Backspace: () => {
         const { empty, $anchor } = this.editor.state.selection;
         const isAtStart = $anchor.pos === $anchor.start();
@@ -182,8 +213,8 @@ const CustomParagraph = Paragraph.extend({
         if (empty && isAtStart) {
           const node = $anchor.parent;
           if (node.type.name === this.name && node.attrs.indent !== 0 && node.attrs.indent !== '0') {
-            this.editor.commands.updateAttributes(this.name, { indent: 0 });
-            return true; // prevent default backspace behavior
+            this.editor.commands.updateAttributes(this.name, { indent: '0' });
+            return true; // remove o recuo do parágrafo
           }
         }
         return false;
@@ -1369,6 +1400,21 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               onClick={() => editor.chain().focus().setTextAlign('justify').run()}
               active={editor.isActive({ textAlign: 'justify' })}
               icon={<AlignJustify className="w-4 h-4" />}
+            />
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
+
+            <ToolbarButton 
+              onClick={() => editor.chain().focus().updateAttributes('paragraph', { indent: '0' }).run()}
+              active={editor.isActive('paragraph') && (editor.getAttributes('paragraph').indent === '0' || editor.getAttributes('paragraph').indent === 0)}
+              icon={<Outdent className="w-4 h-4" />}
+              title="Sem Recuo de Parágrafo (0cm) [Shift+Tab ou Backspace no início]"
+            />
+            <ToolbarButton 
+              onClick={() => editor.chain().focus().updateAttributes('paragraph', { indent: '2cm' }).run()}
+              active={editor.isActive('paragraph') && (editor.getAttributes('paragraph').indent !== '0' && editor.getAttributes('paragraph').indent !== 0)}
+              icon={<Indent className="w-4 h-4" />}
+              title="Recuo de Parágrafo (2cm) [Tecla Tab]"
             />
 
             <div className="w-px h-6 bg-slate-200 dark:bg-bordeaux-900/40 mx-1" />
