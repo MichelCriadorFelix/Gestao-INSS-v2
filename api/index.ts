@@ -5150,9 +5150,13 @@ REGRAS DE OURO:
     // Limite de segurança: 40 mensagens (historico expandido conforme regra do projeto)
     // Previne edge cases extremos sem sacrificar contexto normal
     
+    
+    
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+[COMANDOS DO SISTEMA]:
+Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -5163,6 +5167,8 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       if (systemState.clients && systemState.clients.length > 0) {
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
+    }
+    }
     }
 
     if (history.length > 40) history = history.slice(-40);
@@ -5937,9 +5943,12 @@ REGRAS DE OURO:
     // Limite de segurança: 40 mensagens (regra inegociável Felix & Castro)
     // Previne edge cases extremos sem sacrificar contexto normal
     
+    
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+[COMANDOS DO SISTEMA]:
+Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -5950,6 +5959,7 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       if (systemState.clients && systemState.clients.length > 0) {
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
+    }
     }
 
     if (history.length > 40) history = history.slice(-40);
@@ -6709,9 +6719,12 @@ REGRAS DE OURO:
     }
 
     
+    
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+[COMANDOS DO SISTEMA]:
+Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -6722,6 +6735,7 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       if (systemState.clients && systemState.clients.length > 0) {
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
+    }
     }
 
     if (history.length > 40) history = history.slice(-40);
@@ -7377,9 +7391,12 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
 
     // Janela de histórico ampliada para a secretária Fabrícia (Regra 40 mensagens)
     
+    
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+[COMANDOS DO SISTEMA]:
+Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -7390,6 +7407,7 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       if (systemState.clients && systemState.clients.length > 0) {
         selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
       }
+    }
     }
 
     if (history.length > 40) history = history.slice(-40);

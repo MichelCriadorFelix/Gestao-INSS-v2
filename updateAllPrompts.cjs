@@ -1,6 +1,8 @@
 const fs = require('fs');
 let content = fs.readFileSync('api/index.ts', 'utf8');
 
+const regex = /if \(systemState && intent !== "\[GERAÇÃO\]"\) \{[\s\S]*?if \(systemState\.clients && systemState\.clients\.length > 0\) \{[\s\S]*?\}[\s\S]*?\}/g;
+
 const injection = `
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += \`\\n\\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
@@ -19,6 +21,5 @@ Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EX
       }
     }`;
 
-// Regex to replace the previous block (matching from if (systemState up to if (history.length)
-content = content.replace(/if \(systemState && intent !== "\[GERAÇÃO\]"\) \{[\s\S]*?if \(systemState\.clients && systemState\.clients\.length > 0\) \{[\s\S]*?\}[\s\S]*?\}/, injection);
+content = content.replace(regex, injection);
 fs.writeFileSync('api/index.ts', content);

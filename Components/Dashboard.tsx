@@ -1113,6 +1113,31 @@ export default function Dashboard({
     return [...agendaEvents, ...filteredVirtual];
   }, [agendaEvents, records]);
 
+  
+  const handleAgendaAction = (payload: any) => {
+      try {
+          if (payload.action === 'resolve') {
+              const eventId = payload.eventId;
+              const existingEvent = agendaEvents.find(e => e.id === eventId);
+              if (existingEvent) {
+                  const updated = agendaEvents.map(e => e.id === eventId ? { ...e, status: 'resolved' as const } : e);
+                  setAgendaEvents(updated);
+                  saveData('agenda', updated);
+              } else if (eventId.startsWith('v-')) {
+                  // create an override for virtual event
+                  const virtualEvent = mergedAgendaEvents.find(e => e.id === eventId);
+                  if (virtualEvent) {
+                      const updated = [...agendaEvents, { ...virtualEvent, status: 'resolved' as const }];
+                      setAgendaEvents(updated);
+                      saveData('agenda', updated);
+                  }
+              }
+          }
+      } catch (e) {
+          console.error("Erro ao processar acao da agenda", e);
+      }
+  };
+
   const handleSaveAgendaEvent = (event: AgendaEvent) => {
       const existing = agendaEvents.find(e => e.id === event.id);
       let updated;
@@ -1741,7 +1766,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
-                    agendaEvents={agendaEvents}
+                    agendaEvents={mergedAgendaEvents}
+                    onAgendaAction={handleAgendaAction}
                     systemClients={records}
                     contracts={contracts}
                   />
@@ -1753,7 +1779,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
-                    agendaEvents={agendaEvents}
+                    agendaEvents={mergedAgendaEvents}
+                    onAgendaAction={handleAgendaAction}
                     systemClients={records}
                     contracts={contracts}
                   />
@@ -1765,7 +1792,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
-                    agendaEvents={agendaEvents}
+                    agendaEvents={mergedAgendaEvents}
+                    onAgendaAction={handleAgendaAction}
                     systemClients={records}
                     contracts={contracts}
                   />
@@ -1777,7 +1805,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
-                    agendaEvents={agendaEvents}
+                    agendaEvents={mergedAgendaEvents}
+                    onAgendaAction={handleAgendaAction}
                     systemClients={records}
                     contracts={contracts}
                   />
@@ -2319,7 +2348,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
             onSave={handleSaveClient}
             initialData={currentRecord}
             onOpenPetition={(petition, clientId) => handleOpenPetition(petition, clientId)}
-            agendaEvents={agendaEvents}
+            agendaEvents={mergedAgendaEvents}
+                    onAgendaAction={handleAgendaAction}
             user={user}
         />
         

@@ -97,6 +97,7 @@ interface PersonaChatProps {
   customLaws?: any[];
   agendaEvents?: any[];
   systemClients?: any[];
+  onAgendaAction?: (payload: any) => void;
   contracts?: any[];
 }
 
@@ -532,7 +533,7 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
   return { updatedText: doc, appliedCount };
 };
 
-const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws, agendaEvents, systemClients, contracts }) => {
+const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws, agendaEvents, systemClients, contracts, onAgendaAction }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -1819,6 +1820,18 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           displayContent = "✅ **Alteração aplicada com sucesso ao Artefato!** O documento foi atualizado cirurgicamente com a modificação solicitada mantendo todas as demais seções intactas.";
         }
       }
+
+      
+      // Process agenda actions
+      const agendaRegex = /\[ACTION:RESOLVE_AGENDA:([^\]]+)\]/g;
+      let match;
+      while ((match = agendaRegex.exec(fullText)) !== null) {
+          const eventId = match[1].trim();
+          if (onAgendaAction) {
+              onAgendaAction({ action: 'resolve', eventId });
+          }
+      }
+      displayContent = displayContent.replace(/\[ACTION:RESOLVE_AGENDA:[^\]]+\]/g, '').trim();
 
       const assistantMsg: Message = {
         id: generateId(),
