@@ -1215,7 +1215,8 @@ function isPetitionComplete(text: string): boolean {
 const SEC_FABRICIA_PROMPT = `Você é a Sec. Fabrícia Felix, a secretária jurídica sênior e chefe de atendimento do escritório Felix & Castro Advocacia Especializada.
 Sua função é ESSENCIALMENTE administrativa e de atendimento ao cliente, você NÃO redige petições jurídicas e NÃO gera teses ou relatórios complexos. Se te pedirem para fazer peças jurídicas (ex: GERAR PEÇA), informe educadamente que essa função é dos doutores Michel ou Luana.
 Sua comunicação deve ser focada EXCLUSIVAMENTE em atender o cliente ou organizar dados internos. NUNCA inclua seções de mensagens ou feedbacks direcionados aos advogados (como "Doutores Michel e Luana...") no corpo da sua resposta se estiver gerando uma mensagem para o cliente.
-REGRA DE OURO (FONTE FECHADA): Você deve usar EXCLUSIVAMENTE as informações contidas nos documentos anexados e na Base de Conhecimento (RAG). É TERMINANTEMENTE PROIBIDO citar leis ou regras que não estejam nesses documentos. Se a informação não foi encontrada, informe que não tem conhecimento sobre o assunto. Toda citação de leis, regras, ou trechos de documentos (laudos, despachos, etc.) deve ser obrigatoriamente CITAÇÃO DIRETA, sendo expressamente proibido fazer paráfrase.
+REGRA DE OURO (FONTE FECHADA): Para questões jurídicas, leis, fundamentações técnicas ou teses, você deve usar EXCLUSIVAMENTE as informações contidas nos documentos anexados e na Base de Conhecimento (RAG). É TERMINANTEMENTE PROIBIDO citar leis ou regras que não estejam nesses documentos. Toda citação de leis, regras, ou trechos de documentos (laudos, despachos, etc.) deve ser obrigatoriamente CITAÇÃO DIRETA, sendo expressamente proibido fazer paráfrase.
+EXCEÇÃO DA REGRA DE OURO E CONCISÃO: Esta regra de citação direta e fonte fechada NÃO se aplica aos dados internos do CRM (Agenda, Contratos, Clientes e Compromissos) que lhe são fornecidos. Para dados administrativos, você DEVE ser extremamente preativa, calorosa, amigável, clara e detalhada. Quando o advogado solicitar informações sobre compromissos, contratos ou clientes, você DEVE listar TODOS os itens correspondentes de forma compreensiva, organizada e detalhada em português humano impecável, sem nunca truncar, ocultar itens ou resumir excessivamente.
 Você tem as seguintes responsabilidades:
 1. Analisar documentos anexados para extrair um resumo prático (andamentos processuais, dados de qualificação, periciais, etc).
 2. Escrever mensagens cordiais, extremamente educadas e claras destinadas a clientes via WhatsApp. Suas mensagens para clientes devem ser formatadas com espaçamento legível, usando emojis com moderação, e NUNCA devem incluir jargões jurídicos confusos sem explicar o significado em parênteses.
@@ -7319,6 +7320,69 @@ app.use((err: any, req: any, res: any, next: any) => {
   });
 });
 
+// Helper function to convert systemState to beautiful human-readable markdown
+function formatSystemStateToHumanReadable(systemState: any): string {
+  if (!systemState) return "";
+  let output = "";
+
+  if (systemState.agenda && systemState.agenda.length > 0) {
+    output += `### COMPROMISSOS E AGENDA DO ESCRITÓRIO:\n`;
+    systemState.agenda.forEach((event: any, idx: number) => {
+      const statusMap: any = {
+        pending: "Pendente ⏳",
+        resolved: "Resolvido/Concluído ✅",
+        cancelled: "Cancelado ❌"
+      };
+      const status = statusMap[event.status] || event.status || "Pendente ⏳";
+      const dateFormatted = event.date ? event.date.split('-').reverse().join('/') : "Data não informada";
+      output += `${idx + 1}. **Compromisso**: ${event.description || event.type || "Sem descrição"}
+   - **ID do evento**: ${event.id}
+   - **Data e Hora**: ${dateFormatted} às ${event.time || "Horário não informado"}
+   - **Cliente**: ${event.clientName || "Não especificado"}
+   - **Status**: ${status}
+   - **Local/Instruções**: ${event.location || event.extraInstructions || "Não informado"}\n\n`;
+    });
+  } else {
+    output += `### COMPROMISSOS E AGENDA DO ESCRITÓRIO:\nNenhum compromisso ou evento agendado no momento.\n\n`;
+  }
+
+  if (systemState.contracts && systemState.contracts.length > 0) {
+    output += `### CONTRATOS E HONORÁRIOS:\n`;
+    systemState.contracts.forEach((contract: any, idx: number) => {
+      const clientName = `${contract.firstName || ""} ${contract.lastName || ""}`.trim() || "Cliente não nomeado";
+      output += `${idx + 1}. **Contrato**: ${clientName}
+   - **ID do contrato**: ${contract.id}
+   - **CPF do Cliente**: ${contract.cpf || "Não informado"}
+   - **Serviço**: ${contract.serviceType || "Não especificado"}
+   - **Advogado Responsável**: Dr(a). ${contract.lawyer || "Não especificado"}
+   - **Status**: ${contract.status || "Pendente"}
+   - **Valor Total**: R$ ${contract.totalFee ? Number(contract.totalFee).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "0,00"}
+   - **Forma de Pagamento**: ${contract.paymentMethod || "Não informado"}\n\n`;
+    });
+  } else {
+    output += `### CONTRATOS E HONORÁRIOS:\nNenhum contrato ativo ou pendente encontrado no momento.\n\n`;
+  }
+
+  if (systemState.clients && systemState.clients.length > 0) {
+    output += `### CADASTRO DE CLIENTES E HISTÓRICOS DE EVENTOS:\n`;
+    systemState.clients.forEach((client: any, idx: number) => {
+      output += `${idx + 1}. **Cliente**: ${client.name || "Não nomeado"} (ID: ${client.id})
+   - **Tipo de Benefício**: ${client.type || "Não especificado"}\n`;
+      if (client.history && client.history.length > 0) {
+        output += `   - **Histórico recente**:\n`;
+        client.history.slice(0, 5).forEach((h: any) => {
+          output += `     * [${h.date || "Sem data"}] ${h.title || "Evento"} (Status: ${h.status || "Registrado"})\n`;
+        });
+      }
+      output += `\n`;
+    });
+  } else {
+    output += `### CADASTRO DE CLIENTES:\nNenhum cliente cadastrado no sistema no momento.\n\n`;
+  }
+
+  return output;
+}
+
 app.post("/api/sec-fabricia/chat", async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -7424,35 +7488,25 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
    - Para alterar o status de um contrato, inclua: [ACTION:UPDATE_CONTRACT:id_do_contrato:STATUS] (Valores de STATUS: 'Pendente', 'Em Andamento' ou 'Concluído').
    - Para alterar o status de um cliente/cadastro, inclua: [ACTION:UPDATE_CLIENT:id_do_cliente:STATUS] (Valores de STATUS: 'Ativo', 'Em Andamento', 'Concluído', 'Arquivado').
    - IMPORTANTE: Emita uma tag para CADA item solicitado na MESMA resposta para atualizações em lote.
-2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
-   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
+2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO COM COMPLETUDE MÁXIMA:
+   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja extremamente proativa, detalhada, completa e exaustiva. Mostre TODOS os compromissos, contratos e dados solicitados que existirem no sistema, sem omitir nada.
    - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
 3. FORMATO DE APRESENTAÇÃO HUMANO E AMIGÁVEL:
-   - Apresente todas as informações de agenda, contratos e clientes em português humano fluido, de forma organizada (listas com marcadores ou pequenos tópicos).
+   - Apresente todas as informações de agenda, contratos e clientes em português humano fluido, de forma organizada (listas com marcadores ou tabelas/tópicos).
    - É terminantemente proibido exibir propriedades de código ou JSON bruto como "| status: pending" ou "id: a4zinr50u".
    - A regra de "Citação Direta" e a proibição de paráfrase da Regra de Ouro aplicam-se apenas a documentos técnicos (laudos, petições) e leis. Para os dados do CRM (agenda, compromissos, clientes, contratos), você DEVE escrever de forma natural, calorosa, amigável e conversacional para o advogado chefe.
 `;
-      if (systemState.agenda && systemState.agenda.length > 0) {
-        selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
-      }
-      if (systemState.contracts && systemState.contracts.length > 0) {
-        selectedSystemPrompt += `CONTRATOS ATIVOS:\n${JSON.stringify(systemState.contracts)}\n\n`;
-      }
-      if (systemState.clients && systemState.clients.length > 0) {
-        selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
-      }
+      selectedSystemPrompt += `\n\n[DADOS DE GESTÃO DO CRM - ENCONTRADOS NO SISTEMA]:\n` + formatSystemStateToHumanReadable(systemState);
     }
-
-    
 
     if (history.length > 40) history = history.slice(-40);
 
     const REINFORCEMENT_PROMPT = `
     [LEMBRETE TÉCNICO - SECRETÁRIA FABRÍCIA]
-    Você é a Secretária Fabrícia. Se o advogado te pedir dados do sistema (agenda, compromissos, contratos, clientes), responda com um texto de excelente qualidade, organizado, formatado em tópicos/tabelas amigáveis e totalmente em português humano.
+    Você é a Secretária Fabrícia. Se o advogado te pedir dados do sistema (agenda, compromissos, contratos, clientes), responda com um texto de excelente qualidade, detalhado, completo, organizado, formatado em tópicos/tabelas amigáveis e totalmente em português humano.
     PROIBIDO: Nunca exiba campos internos de código ou JSON bruto como "| status: pending" ou "id: a4zinr50u". Converta tudo em linguagem natural, clara, amigável e profissional para o Dr. Michel, Dra. Luana ou Dr. Felix (ex: "O contrato do cliente Vanderli está pendente de assinatura" ou "Temos um compromisso agendado para...").
     Se o pedido for para redigir uma mensagem de WhatsApp para enviar a um cliente, gere o texto pronto da mensagem com tom acolhedor e humanizado.
-    Seja concisa e resolutiva, mantendo a postura de uma secretária de alta performance.`;
+    Seja detalhada, completa, exaustiva e preativa, listando de forma impecável tudo o que for de interesse na agenda ou contratos.`;
 
     // FIX#8: sanitizar histórico
     const sanitizedHistory = sanitizeHistory(history);
