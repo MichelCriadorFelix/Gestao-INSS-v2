@@ -1270,7 +1270,20 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       const activeModel = eliteModelOverride || selectedModel;
 
       const session = sessionsRef.current.find(s => s.id === sessionId);
-      const docSummaries = session?.documents?.map(doc => {
+      
+      // Isolamento Inteligente do arquivo TXT (Compilado)
+      // Se houver algum documento .txt (como o compilado de provas do processo),
+      // isolamos o GED para que use APENAS os documentos .txt. Isso evita ler outros PDFs/documentos redundantes.
+      const hasTxtDocument = session?.documents?.some(doc => doc.name?.toLowerCase().endsWith('.txt'));
+      const effectiveDocuments = hasTxtDocument 
+        ? (session?.documents?.filter(doc => doc.name?.toLowerCase().endsWith('.txt')) || [])
+        : (session?.documents || []);
+
+      if (hasTxtDocument) {
+        console.log(`[GED ISOLATION] 🛡️ Detectado arquivo TXT compilado. Isolando GED para ler APENAS o arquivo de texto (${effectiveDocuments.map(d => d.name).join(', ')}).`);
+      }
+
+      const docSummaries = effectiveDocuments.map(doc => {
         const header = `DOCUMENTO: ${doc.name}\n`;
         const summaryPart = doc.summary ? `MAPEAMENTO DA AUDITORIA DETALHADA:\n${doc.summary}\n\n` : '';
         
@@ -1281,7 +1294,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         return `${header}${summaryPart}${fullTextPart}`;
       }).join('\n\n---\n\n') || '';
 
-      console.log(`[DOCUMENTS] Documentos anexados na sessão: ${session?.documents?.length || 0}. Comprimento total do texto: ${docSummaries.length} caracteres.`);
+      console.log(`[DOCUMENTS] Documentos processados no GED (hasTxt: ${hasTxtDocument}): ${effectiveDocuments.length} de ${session?.documents?.length || 0}. Comprimento total: ${docSummaries.length} caracteres.`);
 
       // 1. Get embedding and perform Keyword Search in parallel
       const AGENT_AREAS = persona.agentAreas;
@@ -1611,7 +1624,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           documentContext: effectiveDocSummaries ? `${effectiveDocSummaries.substring(0, 500)}... [Truncated for Console log, real length: ${effectiveDocSummaries.length}]` : null,
           historyCount: resumeCount === 0 ? compressedHistory.length : 'resumed',
           imagesCount: resumeCount === 0 ? (images || []).length : 0,
-          filesCount: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).length || 0) : 0,
+          filesCount: resumeCount === 0 ? (effectiveDocuments.filter(d => d.fileUri).length || 0) : 0,
           modelProvider: eliteProviderOverride || selectedModelProvider,
           model: eliteModelOverride || selectedModel,
           petitionLength,
@@ -1636,7 +1649,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               documentContext: effectiveDocSummaries || undefined,
               history: isExplicitSurgicalEdit ? [] : (resumeCount === 0 ? compressedHistory : [...compressedHistory, { role: 'user', content: messageText }, { role: 'assistant', content: fullText }]),
               images: resumeCount === 0 ? (images || []) : [],
-              files: resumeCount === 0 ? (session?.documents?.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
+              files: resumeCount === 0 ? (effectiveDocuments.filter(d => d.fileUri).map(d => ({ fileUri: d.fileUri, mimeType: d.mimeType })) || []) : [],
               ...(persona.sendMinWage ? { minWage: localStorage.getItem('app_min_wage') || '1621.00' } : {}),
               ragContext: (shouldSendRag || resumeCount > 0) ? ragContext : undefined, // FASE B2: Só envia se pertinente, mantém no resume
               customLaws: isExplicitSurgicalEdit && !mentionsLawsOrRag ? undefined : customLaws,
