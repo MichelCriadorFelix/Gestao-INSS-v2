@@ -11,7 +11,7 @@
       "destination": "/api/index.ts"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api|assets|icon-|pdf.worker.min.js|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

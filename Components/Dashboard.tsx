@@ -138,39 +138,43 @@ export default function Dashboard({
     const supabase = initSupabase();
 
     try {
-        const [remoteClients, remoteContracts] = await Promise.all([
-            supabaseService.getClients(),
-            supabaseService.getContracts()
-        ]);
-
-        setRecords(remoteClients || []);
-        setContracts(remoteContracts || []);
-
-        const remoteCalculations = await supabaseService.getLaborCalculations().catch(() => []);
-        setSavedCalculations(remoteCalculations || []);
-
-        setResolvedAlerts([]);
-
-        const [remoteSocial, remoteMichel, remoteLuana, remoteFelixCastro, remoteFabricia] = await Promise.all([
+        // PERF: Executamos todas as chamadas remotas de forma 100% paralela para carregamento instantâneo (sub-segundo)!
+        const [
+            remoteClients,
+            remoteContracts,
+            remoteLaborCalculations,
+            remoteSocial,
+            remoteMichel,
+            remoteLuana,
+            remoteFelixCastro,
+            remoteFabricia,
+            globalDataResult
+        ] = await Promise.all([
+            supabaseService.getClients().catch(() => []),
+            supabaseService.getContracts().catch(() => []),
+            supabaseService.getLaborCalculations().catch(() => []),
             supabaseService.getCalculations().catch(() => []),
             supabaseService.getAIConversations('michel').catch(() => []),
             supabaseService.getAIConversations('luana').catch(() => []),
             supabaseService.getAIConversations('felix_castro').catch(() => []),
-            supabaseService.getAIConversations('fabricia').catch(() => [])
+            supabaseService.getAIConversations('fabricia').catch(() => []),
+            supabase 
+                ? supabase.from('clients').select('id, data').in('id', [7, 8, 9, 10]) 
+                : Promise.resolve({ data: null, error: null })
         ]);
 
+        setRecords(remoteClients || []);
+        setContracts(remoteContracts || []);
+        setSavedCalculations(remoteLaborCalculations || []);
+        setResolvedAlerts([]);
         setSavedSocialCalculations(remoteSocial || []);
         setDrMichelSessions(remoteMichel || []);
         setDraLuanaSessions(remoteLuana || []);
         setDrFelixCastroSessions(remoteFelixCastro || []);
         setSecFabriciaSessions(remoteFabricia || []);
 
-        // Fetch global data from 'clients' table (used as KV store)
-        if (supabase) {
-          const { data: globalData, error: globalError } = await supabase
-            .from('clients')
-            .select('id, data')
-            .in('id', [7, 8, 9, 10]);
+        const globalData = globalDataResult?.data;
+        const globalError = globalDataResult?.error;
 
         if (!globalError && globalData) {
             const agenda = globalData.find(d => d.id === 7)?.data;
@@ -200,8 +204,7 @@ export default function Dashboard({
                 const localFocus = localStorage.getItem('daily_focus_state');
                 if (localFocus) setDailyFocusState(JSON.parse(localFocus));
             }
-        }
-    } else {
+        } else {
             // Fallback to local storage if global fetch fails or no data in cloud
             const localAgenda = localStorage.getItem('agenda_events');
             if (localAgenda) setAgendaEvents(JSON.parse(localAgenda));
