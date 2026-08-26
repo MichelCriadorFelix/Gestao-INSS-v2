@@ -668,15 +668,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               outorganteText = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}.`;
           }
 
-          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 24px; color: #1e293b;">PROCURAÇÃO AD JUDICIA ET EXTRA</h2>
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>OUTORGANTE:</strong> ${outorganteText}</p>
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>OUTORGADO:</strong> MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF/MF nº 142.805.877-01, e LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e inscrita no CPF sob o nº 113.599.127-89, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, nº 500, apto. 204, Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201.</p>
-<p style="margin-bottom: 24px; text-align: justify; line-height: 1.6;"><strong>PODERES:</strong> Pelo presente instrumento o outorgante confere ao outorgado amplos poderes para o foro em geral, com cláusula ad judicia et extra, para representá-lo nos órgãos públicos e privados, agências do INSS, Juízos, Instâncias ou Tribunais, possibilitando propor ações de direito competentes e defendê-lo até o final da decisão, usando os recursos legais e acompanhando-os, conferindo-lhe ainda poderes especiais para requerer concessão/revisão de benefícios previdenciários, obter cópias de expedientes e processos administrativos, acessar laudos sociais e periciais, acessar e manejar extratos, sistemas e telas do INSS, agendar serviços e atendimentos no INSS, receber valores e dar quitação, levantar valores, incluindo RPVs e precatórios (podendo para tanto assinar declaração de isenção de imposto de renda), obter extratos de contas judiciais, requerer expedição/retificação de certidões, incluindo Certidões de Tempo de Contribuição, obter cópia de documentos, Perfis Profissiográficos Previdenciários e laudos técnicos, obter cópia de documentos médicos e prontuários, firmar compromissos ou acordos, receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, assinar declaração de hipossuficiência econômica e substabelecer a outrem, com ou sem reservas de iguais poderes, para agir em conjunto ou separadamente com o substabelecido.</p>
-<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
-<div style="text-align: center; margin-top: 40px;">
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
-${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+          return `<h2 class="no-indent" style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 24px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">PROCURAÇÃO AD JUDICIA ET EXTRA</h2>
+<p class="no-indent" style="margin-bottom: 14px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>OUTORGANTE:</strong> ${outorganteText}</p>
+<p class="no-indent" style="margin-bottom: 14px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>OUTORGADO:</strong> MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF/MF nº 142.805.877-01, e LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e inscrita no CPF/MF sob o nº 113.599.127-89, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, nº 500, apto. 204, Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201.</p>
+<p class="no-indent" style="margin-bottom: 24px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>PODERES:</strong> Pelo presente instrumento o outorgante confere ao outorgado amplos poderes para o foro em geral, com cláusula ad judicia et extra, para representá-lo nos órgãos públicos e privados, agências do INSS, Juízos, Instâncias ou Tribunais, possibilitando propor ações de direito competentes e defendê-lo até o final da decisão, usando os recursos legais e acompanhando-os, conferindo-lhe ainda poderes especiais para requerer concessão/revisão de benefícios previdenciários, obter cópias de expedientes e processos administrativos, acessar laudos sociais e periciais, acessar e manejar extratos, sistemas e telas do INSS, agendar serviços e atendimentos no INSS, receber valores e dar quitação, levantar valores, incluindo RPVs e precatórios (podendo para tanto assinar declaração de isenção de imposto de renda), obter extratos de contas judiciais, requerer expedição/retificação de certidões, incluindo Certidões de Tempo de Contribuição, obter cópia de documentos, Perfis Profissiográficos Previdenciários e laudos técnicos, obter cópia de documentos médicos e prontuários, firmar compromissos ou acordos, receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, assinar declaração de hipossuficiência econômica e substabelecer a outrem, com ou sem reservas de iguais poderes, para agir em conjunto ou separadamente com o substabelecido.</p>
+<p class="no-indent" style="margin-top: 32px; margin-bottom: 40px; text-align: left; font-size: 11pt;">São João de Meriti/RJ, ${currentDate}.</p>
+<div class="no-indent" style="text-align: center; margin-top: 40px;">
+  <p class="no-indent" style="margin-bottom: 4px;">____________________________________________________</p>
+  <p class="no-indent" style="font-weight: bold; margin-top: 4px; font-size: 11pt;">${clientName}</p>
+  ${isMinor ? `<p class="no-indent" style="font-size: 10pt; color: #475569; margin-top: 2px;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
 </div>`;
       }
 
@@ -694,13 +694,13 @@ ${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${fo
               text = `Eu, ${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
           }
 
-          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 24px; color: #1e293b;">DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA</h2>
-<p style="margin-bottom: 32px; text-align: justify; line-height: 1.8;">${text}</p>
-<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
-<div style="text-align: center; margin-top: 40px;">
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
-${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+          return `<h2 class="no-indent" style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 24px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA</h2>
+<p class="no-indent" style="margin-bottom: 32px; text-align: justify; line-height: 1.8; font-size: 11pt;">${text}</p>
+<p class="no-indent" style="margin-top: 32px; margin-bottom: 40px; text-align: left; font-size: 11pt;">São João de Meriti/RJ, ${currentDate}.</p>
+<div class="no-indent" style="text-align: center; margin-top: 40px;">
+  <p class="no-indent" style="margin-bottom: 4px;">____________________________________________________</p>
+  <p class="no-indent" style="font-weight: bold; margin-top: 4px; font-size: 11pt;">${clientName}</p>
+  ${isMinor ? `<p class="no-indent" style="font-size: 10pt; color: #475569; margin-top: 2px;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
 </div>`;
       }
 
@@ -712,14 +712,14 @@ ${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${fo
               text = `${clientName}, CPF nº ${clientCPF}, renuncia à soma das parcelas vencidas e 12 vincendas que excedem ao teto do Juizado Especial Federal, a fim de permitir o trâmite da presente ação no Juizado Especial Federal, conforme Tema 1.030 do STJ.`;
           }
 
-          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #1e293b;">TERMO DE RENÚNCIA AOS VALORES EXCEDENTES</h2>
-<h3 style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 24px; color: #475569;">AO TETO DO JEF</h3>
-<p style="margin-bottom: 32px; text-align: justify; line-height: 1.8;">${text}</p>
-<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
-<div style="text-align: center; margin-top: 40px;">
-<p>____________________________________________________</p>
-<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
-${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+          return `<h2 class="no-indent" style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 6px; color: #1e293b; text-transform: uppercase;">TERMO DE RENÚNCIA AOS VALORES EXCEDENTES</h2>
+<h3 class="no-indent" style="text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 24px; color: #475569; text-transform: uppercase;">AO TETO DO JEF</h3>
+<p class="no-indent" style="margin-bottom: 32px; text-align: justify; line-height: 1.8; font-size: 11pt;">${text}</p>
+<p class="no-indent" style="margin-top: 32px; margin-bottom: 40px; text-align: left; font-size: 11pt;">São João de Meriti/RJ, ${currentDate}.</p>
+<div class="no-indent" style="text-align: center; margin-top: 40px;">
+  <p class="no-indent" style="margin-bottom: 4px;">____________________________________________________</p>
+  <p class="no-indent" style="font-weight: bold; margin-top: 4px; font-size: 11pt;">${clientName}</p>
+  ${isMinor ? `<p class="no-indent" style="font-size: 10pt; color: #475569; margin-top: 2px;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
 </div>`;
       }
 
@@ -737,68 +737,73 @@ ${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${fo
               contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) <strong>CONTRATANTE</strong>;`;
           }
 
-          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #1e293b;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
-<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;">Pelo presente instrumento particular, de um lado:</p>
-<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CONTRATANTE:</strong> ${contratanteQualif}</p>
-<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;">E de outro lado:</p>
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CONTRATADOS:</strong> Os advogados <strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados <strong>CONTRATADOS</strong>.</p>
-<p style="margin-bottom: 20px; text-align: justify; line-height: 1.6;">Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:</p>
+          return `<h2 class="no-indent" style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
 
-<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA PRIMEIRA – DO OBJETO</strong><br/>
-O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
+<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">Pelo presente instrumento particular, de um lado:</p>
 
-<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</strong><br/>
-O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
+<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>CONTRATANTE:</strong> ${contratanteQualif}</p>
 
-<p style="margin-bottom: 8px; text-align: justify; line-height: 1.6;"><strong>2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</strong><br/>
-( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.<br/>
-( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">E de outro lado:</p>
 
-<p style="margin-bottom: 8px; text-align: justify; line-height: 1.6;"><strong>2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</strong><br/>
-( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.<br/>
-( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
+<p class="no-indent" style="margin-bottom: 14px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>CONTRATADOS:</strong> Os advogados <strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados <strong>CONTRATADOS</strong>.</p>
 
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
+<p class="no-indent" style="margin-bottom: 18px; text-align: justify; line-height: 1.6; font-size: 11pt;">Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:</p>
 
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA TERCEIRA – DAS DESPESAS</strong><br/>
-Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA PRIMEIRA – DO OBJETO</p>
+<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
 
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES</strong><br/>
-<strong>4.1. Dos CONTRATADOS:</strong> Atuar com zelo e diligência na defesa dos interesses do(a) <strong>CONTRATANTE</strong>, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.<br/>
-<strong>4.2. Do(a) CONTRATANTE:</strong> Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos <strong>CONTRATADOS</strong>.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</p>
+<p class="no-indent" style="margin-bottom: 10px; text-align: justify; line-height: 1.6; font-size: 11pt;">O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
 
-<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA QUINTA – DA RESCISÃO</strong><br/>
-O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 10.5pt; margin-top: 10px; margin-bottom: 4px;">2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</p>
+<p class="no-indent" style="margin-left: 16px; margin-bottom: 4px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="margin-left: 16px; margin-bottom: 10px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
 
-<p style="margin-bottom: 20px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA SEXTA – DO FORO</strong><br/>
-Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 10.5pt; margin-top: 10px; margin-bottom: 4px;">2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>
+<p class="no-indent" style="margin-left: 16px; margin-bottom: 4px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>
+<p class="no-indent" style="margin-left: 16px; margin-bottom: 10px; text-align: justify; line-height: 1.5; font-size: 10.5pt;">( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
 
-<p style="margin-bottom: 20px; line-height: 1.6;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
+<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
 
-<p style="margin-top: 24px; margin-bottom: 20px;">São João de Meriti/RJ, ${currentDate}.</p>
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA TERCEIRA – DAS DESPESAS</p>
+<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
 
-<table style="width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 12px;">
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES</p>
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>4.1. Dos CONTRATADOS:</strong> Atuar com zelo e diligência na defesa dos interesses do(a) <strong>CONTRATANTE</strong>, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.</p>
+<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;"><strong>4.2. Do(a) CONTRATANTE:</strong> Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos <strong>CONTRATADOS</strong>.</p>
+
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA QUINTA – DA RESCISÃO</p>
+<p class="no-indent" style="margin-bottom: 12px; text-align: justify; line-height: 1.6; font-size: 11pt;">O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
+
+<p class="no-indent" style="font-weight: bold; font-size: 11pt; margin-top: 14px; margin-bottom: 4px; text-transform: uppercase;">CLÁUSULA SEXTA – DO FORO</p>
+<p class="no-indent" style="margin-bottom: 16px; text-align: justify; line-height: 1.6; font-size: 11pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+
+<p class="no-indent" style="margin-bottom: 20px; line-height: 1.6; font-size: 11pt;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
+
+<p class="no-indent" style="margin-top: 20px; margin-bottom: 16px; font-size: 11pt;">São João de Meriti/RJ, ${currentDate}.</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 16px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 11px;">
   <thead>
-    <tr style="border-bottom: 1px solid #000;">
+    <tr style="border-bottom: 1px solid #000; background-color: #f8fafc;">
       <th style="border-right: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 65%;">IDENTIFICAÇÃO:</th>
       <th style="padding: 6px 10px; text-align: left; font-weight: bold; width: 35%;">ASSINATURA:</th>
     </tr>
   </thead>
   <tbody>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
-      <td style="padding: 10px; height: 35px;"></td>
+      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
+      <td style="padding: 8px 10px; height: 32px;"></td>
     </tr>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
-      <td style="padding: 10px; height: 35px;"></td>
+      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
+      <td style="padding: 8px 10px; height: 32px;"></td>
     </tr>
     <tr>
-      <td style="border-right: 1px solid #000; padding: 10px; font-weight: bold; vertical-align: middle;">
+      <td style="border-right: 1px solid #000; padding: 8px 10px; font-weight: bold; vertical-align: middle;">
         ${clientName} - CPF: ${clientCPF} (CONTRATANTE)
-        ${isMinor ? `<br/><span style="font-size: 11px; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
+        ${isMinor ? `<br/><span style="font-size: 10px; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
       </td>
-      <td style="padding: 10px; height: 35px;"></td>
+      <td style="padding: 8px 10px; height: 32px;"></td>
     </tr>
   </tbody>
 </table>`;
@@ -821,7 +826,7 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
           title = titleMap[type];
           htmlContent = getDocumentHTML(type);
       } else {
-          htmlContent = `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p>Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
+          htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p class="no-indent">Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
       }
 
       const petition = {
@@ -843,7 +848,7 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 25;
+      const margin = 20; // 20mm padronizado
       const maxLineWidth = pageWidth - (margin * 2);
       
       const currentDate = new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -854,190 +859,131 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
       const clientNationality = formData.nationality || "brasileiro(a)";
       const clientMarital = formData.maritalStatus || "estado civil";
       const clientProfession = formData.profession || "profissão";
-      
-      // Lógica para menor impúbere / representante legal
       const isMinor = !!formData.legalRepresentative;
-      
-      // Cores para as linhas decorativas (Tom Vinho/Avermelhado Premium)
-      const decorColor = [140, 20, 20]; 
 
-      // --- Desenhar Linha Decorativa Superior ---
-      doc.setDrawColor(255, 255, 255); // Branco (invisível)
-      doc.setLineWidth(1.5);
-      doc.line(margin, 5, pageWidth - margin, 5); // Aproximado da margem
-      
-      doc.setDrawColor(255, 255, 255); // Branco (invisível)
-      doc.setLineWidth(0.5);
-      doc.line(margin, 6, pageWidth/3, 6); // Aproximado da margem
+      let cursorY = 25;
 
-      // --- Desenhar Linha Decorativa Inferior ---
-      doc.setDrawColor(255, 255, 255); // Branco (invisível)
-      doc.setLineWidth(1.5);
-      doc.line(margin, pageHeight - 5, pageWidth - margin, pageHeight - 5); // Aproximado da margem
-      
-      doc.setDrawColor(255, 255, 255); // Branco (invisível)
-      doc.setLineWidth(2);
-      doc.line(pageWidth - margin - 30, pageHeight - 5, pageWidth - margin, pageHeight - 5); // Aproximado da margem
+      // Helper universal para escrever texto formatado e gerenciar quebra de páginas com precisão
+      const writeText = (
+          text: string, 
+          opts: { 
+              fontStyle?: 'normal' | 'bold' | 'italic', 
+              fontSize?: number, 
+              align?: 'left' | 'center' | 'justify', 
+              marginTop?: number, 
+              marginBottom?: number,
+              indent?: number
+          } = {}
+      ) => {
+          const fontStyle = opts.fontStyle || 'normal';
+          const fontSize = opts.fontSize || 10;
+          const align = opts.align || 'justify';
+          const marginTop = opts.marginTop !== undefined ? opts.marginTop : 0;
+          const marginBottom = opts.marginBottom !== undefined ? opts.marginBottom : 3;
+          const indent = opts.indent || 0;
 
-      // --- Helper para Justificar Texto TOTAL (Full Justify) ---
-      const drawFullyJustifiedBlock = (label: string, text: string, startY: number) => {
-          doc.setFont("times", "bold");
-          doc.text(label, margin, startY);
-          const labelWidth = doc.getTextWidth(label + " ");
-          
-          doc.setFont("times", "normal");
-          const words = text.split(/\s+/); // Separa por qualquer espaço em branco
-          const spaceWidth = doc.getTextWidth(" "); // Largura padrão do espaço
+          doc.setFont("times", fontStyle);
+          doc.setFontSize(fontSize);
+
+          cursorY += marginTop;
+          const effectiveWidth = maxLineWidth - indent;
+          const words = text.split(/\s+/).filter(Boolean);
+          const spaceWidth = doc.getTextWidth(" ");
 
           const lines: string[][] = [];
-          let currentLineWords: string[] = [];
+          let currentLine: string[] = [];
           let currentLineWidth = 0;
 
-          // Define limites
-          const firstLineMaxWidth = maxLineWidth - labelWidth;
-
-          // Algoritmo de Quebra de Linha
-          for (let i = 0; i < words.length; i++) {
-              const word = words[i];
-              const wordWidth = doc.getTextWidth(word);
-              
-              // Limite da linha atual (primeira linha tem recuo)
-              const limit = lines.length === 0 ? firstLineMaxWidth : maxLineWidth;
-
-              // Verifica se a palavra cabe (largura atual + espaço + palavra)
-              if (currentLineWords.length > 0 && currentLineWidth + spaceWidth + wordWidth > limit) {
-                  // Linha cheia, salva e inicia nova
-                  lines.push(currentLineWords);
-                  currentLineWords = [word];
-                  currentLineWidth = wordWidth;
+          for (const word of words) {
+              const wWidth = doc.getTextWidth(word);
+              if (currentLine.length > 0 && currentLineWidth + spaceWidth + wWidth > effectiveWidth) {
+                  lines.push(currentLine);
+                  currentLine = [word];
+                  currentLineWidth = wWidth;
               } else {
-                  // Adiciona palavra à linha atual
-                  if (currentLineWords.length > 0) currentLineWidth += spaceWidth;
-                  currentLineWords.push(word);
-                  currentLineWidth += wordWidth;
+                  if (currentLine.length > 0) currentLineWidth += spaceWidth;
+                  currentLine.push(word);
+                  currentLineWidth += wWidth;
               }
           }
-          // Adiciona a última linha pendente
-          if (currentLineWords.length > 0) lines.push(currentLineWords);
+          if (currentLine.length > 0) lines.push(currentLine);
 
-          // Renderização com Cálculo de Espaçamento Extra
-          let currentY = startY;
-          
-          lines.forEach((lineWords, lineIndex) => {
-              const isLastLine = lineIndex === lines.length - 1;
-              const isFirstLine = lineIndex === 0;
-              
-              const xStart = isFirstLine ? margin + labelWidth : margin;
-              const lineWidthAvailable = isFirstLine ? firstLineMaxWidth : maxLineWidth;
+          const lineHeight = fontSize * 0.45; // altura da linha em mm
 
-              if (isLastLine) {
-                  // Última linha: Alinhamento à Esquerda (padrão normal)
-                  let x = xStart;
-                  lineWords.forEach((word) => {
-                      doc.text(word, x, currentY);
-                      x += doc.getTextWidth(word) + spaceWidth;
+          lines.forEach((lineWords, lineIdx) => {
+              if (cursorY + lineHeight > pageHeight - 20) {
+                  doc.addPage();
+                  cursorY = 25;
+              }
+
+              const isLastLine = lineIdx === lines.length - 1;
+              const startX = margin + indent;
+
+              if (align === 'center') {
+                  doc.text(lineWords.join(" "), pageWidth / 2, cursorY, { align: "center" });
+              } else if (align === 'left' || isLastLine) {
+                  let x = startX;
+                  lineWords.forEach((w) => {
+                      doc.text(w, x, cursorY);
+                      x += doc.getTextWidth(w) + spaceWidth;
                   });
               } else {
-                  // Linhas do meio: Justificação Total (Espalha espaços)
-                  const totalWordsWidth = lineWords.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
+                  // Alinhamento Justificado com distribuição de espaços uniforme
+                  const wordsWidth = lineWords.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
                   const gaps = lineWords.length - 1;
-                  const extraSpace = lineWidthAvailable - totalWordsWidth;
-                  
-                  // Se houver apenas 1 palavra na linha (ex: palavra gigante), não justifica
-                  const spaceSize = gaps > 0 ? extraSpace / gaps : 0;
+                  const extraSpace = gaps > 0 ? (effectiveWidth - wordsWidth) / gaps : 0;
 
-                  let x = xStart;
-                  lineWords.forEach((word, wIdx) => {
-                      doc.text(word, x, currentY);
-                      // Adiciona espaço calculado, exceto após a última palavra
-                      if (wIdx < gaps) {
-                          x += doc.getTextWidth(word) + spaceSize;
-                      }
+                  let x = startX;
+                  lineWords.forEach((w, wIdx) => {
+                      doc.text(w, x, cursorY);
+                      if (wIdx < gaps) x += doc.getTextWidth(w) + extraSpace;
                   });
               }
-              currentY += 6; // Altura da linha
+              cursorY += lineHeight;
           });
 
-          return currentY + 4; // Retorna novo Y com padding
+          cursorY += marginBottom;
       };
 
-      // --- Configuração de Fonte Padrão (Times) ---
-      doc.setFont("times", "normal");
-      
       if (type === 'procuracao') {
-          // TÍTULO - Ajustado Y para caber na página
-          doc.setFont("times", "bold");
-          doc.setFontSize(16);
-          doc.text("PROCURAÇÃO AD JUDICIA ET EXTRA", pageWidth / 2, 30, { align: "center" });
-          
-          doc.setFontSize(12);
-          
-          // Ajustado cursorY inicial para 55 (antes 80) para economizar espaço
-          let cursorY = 55;
-          
-          // Lógica de texto para Representante Legal
+          writeText("PROCURAÇÃO AD JUDICIA ET EXTRA", { fontStyle: 'bold', fontSize: 14, align: 'center', marginBottom: 15 });
+
           let outorganteText = "";
           if (isMinor) {
-              // Texto para menor impúbere conforme solicitado
               const repName = formData.legalRepresentative?.toUpperCase() || "________________";
-              const repNacionality = formData.nationality || "brasileira"; // Assume nationality of parent usually matches or generic
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
               const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
               const repProf = formData.legalRepresentativeProfession || "do lar";
               const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
-              const repAddress = formData.legalRepresentativeAddress || clientAddress; // Usa endereço do rep ou do cliente
-
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
               const isMaleRep = formData.legalRepresentativeGender === 'M';
               const repTitle = isMaleRep ? 'seu genitor' : 'sua genitora';
               const repInscrito = isMaleRep ? 'inscrito' : 'inscrita';
-
-              outorganteText = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito no CPF sob o nº ${clientCPF}, representado por ${repTitle} e outorgante, ${repName}, ${repNacionality}, ${repCivil}, ${repProf} ${repInscrito} no CPF sob o nº ${repCPF} residente e domiciliado à ${repAddress}.`;
+              outorganteText = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, representado(a) por ${repTitle} e outorgante, ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, ${repInscrito} no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}.`;
           } else {
               outorganteText = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}.`;
           }
-          
-          cursorY = drawFullyJustifiedBlock("OUTORGANTE:", outorganteText, cursorY);
 
-          const outorgadoText = `MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF/MF nº 142.805.877-01, e LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e inscrita no CPF sob o nº 113.599.127-89, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, 500, apto. 204 , Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201.`;
-          cursorY = drawFullyJustifiedBlock("OUTORGADO:", outorgadoText, cursorY);
+          writeText(`OUTORGANTE: ${outorganteText}`, { fontStyle: 'normal', fontSize: 11, align: 'justify', marginBottom: 6 });
+          writeText(`OUTORGADO: MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF/MF nº 142.805.877-01, e LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e inscrita no CPF/MF sob o nº 113.599.127-89, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, nº 500, apto. 204, Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201.`, { fontStyle: 'normal', fontSize: 11, align: 'justify', marginBottom: 6 });
+          writeText(`PODERES: Pelo presente instrumento o outorgante confere ao outorgado amplos poderes para o foro em geral, com cláusula ad judicia et extra, para representá-lo nos órgãos públicos e privados, agências do INSS, Juízos, Instâncias ou Tribunais, possibilitando propor ações de direito competentes e defendê-lo até o final da decisão, usando os recursos legais e acompanhando-os, conferindo-lhe ainda poderes especiais para requerer concessão/revisão de benefícios previdenciários, obter cópias de expedientes e processos administrativos, acessar laudos sociais e periciais, acessar e manejar extratos, sistemas e telas do INSS, agendar serviços e atendimentos no INSS, receber valores e dar quitação, levantar valores, incluindo RPVs e precatórios (podendo para tanto assinar declaração de isenção de imposto de renda), obter extratos de contas judiciais, requerer expedição/retificação de certidões, incluindo Certidões de Tempo de Contribuição, obter cópia de documentos, Perfis Profissiográficos Previdenciários e laudos técnicos, obter cópia de documentos médicos e prontuários, firmar compromissos ou acordos, receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, assinar declaração de hipossuficiência econômica e substabelecer a outrem, com ou sem reservas de iguais poderes, para agir em conjunto ou separadamente com o substabelecido.`, { fontStyle: 'normal', fontSize: 11, align: 'justify', marginBottom: 12 });
 
-          const poderesText = `Pelo presente instrumento o outorgante confere ao outorgado amplos poderes para o foro em geral, com cláusula ad judicia et extra, para representá-lo nos órgãos públicos e privados, agências do INSS, Juízos, Instâncias ou Tribunais, possibilitando propor ações de direito competentes e defendê-lo até o final da decisão, usando os recursos legais e acompanhando-os, conferindo-lhe ainda poderes especiais para requerer concessão/revisão de benefícios previdenciários, obter cópias de expedientes e processos administrativos, acessar laudos sociais e periciais, acessar e manejar extratos, sistemas e telas do INSS, agendar serviços e atendimentos no INSS, receber valores e dar quitação, levantar valores, incluindo RPVs e precatórios (podendo para tanto assinar declaração de isenção de imposto de renda), obter extratos de contas judiciais, requerer expedição/retificação de certidões, incluindo Certidões de Tempo de Contribuição, obter cópia de documentos, Perfis Profissiográficos Previdenciários e laudos técnicos, obter cópia de documentos médicos e prontuários, firmar compromissos ou acordos, receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, assinar declaração de hipossuficiência econômica e substabelecer a outrem, com ou sem reservas de iguais poderes, para agir em conjunto ou separadamente com o substabelecido.`;
-          cursorY = drawFullyJustifiedBlock("PODERES:", poderesText, cursorY);
-          
-          // Data e Assinatura com posição dinâmica
-          cursorY += 10;
-          if (cursorY > pageHeight - 50) { doc.addPage(); cursorY = 40; } // Nova página se necessário
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontStyle: 'normal', fontSize: 11, align: 'left', marginTop: 10, marginBottom: 25 });
 
-          doc.setFont("times", "normal");
-          doc.text(`São João de Meriti/RJ, ${currentDate}.`, margin, cursorY);
-          
-          cursorY += 25;
+          if (cursorY + 30 > pageHeight - 20) { doc.addPage(); cursorY = 30; }
           doc.setLineWidth(0.5);
-          doc.setDrawColor(0); // Preto
+          doc.setDrawColor(0);
           doc.line(pageWidth / 2 - 60, cursorY, pageWidth / 2 + 60, cursorY);
-          
           cursorY += 5;
-          doc.setFont("times", "bold");
-          
+          writeText(clientName, { fontStyle: 'bold', fontSize: 11, align: 'center', marginBottom: 0 });
           if (isMinor) {
-              // Assinatura com Representante
-              doc.text(`${clientName}`, pageWidth / 2, cursorY, { align: "center" });
-              doc.text(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, pageWidth / 2, cursorY + 5, { align: "center" });
-          } else {
-              doc.text(clientName, pageWidth / 2, cursorY, { align: "center" });
+              writeText(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, { fontStyle: 'normal', fontSize: 9.5, align: 'center', marginBottom: 0 });
           }
 
       } else if (type === 'hipossuficiencia') {
-          // TÍTULO
-          doc.setFont("times", "bold");
-          doc.setFontSize(16);
-          doc.text("DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA", pageWidth / 2, 50, { align: "center" });
-          
-          doc.setFontSize(12);
-          doc.setFont("times", "normal");
-          
-          let cursorY = 90;
+          writeText("DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA", { fontStyle: 'bold', fontSize: 14, align: 'center', marginBottom: 20 });
+
           let text = "";
-          
           if (isMinor) {
                const isMaleRep = formData.legalRepresentativeGender === 'M';
                const repNacionalidade = isMaleRep ? 'brasileiro' : 'brasileira';
@@ -1049,161 +995,46 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
           } else {
                text = `Eu, ${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
           }
-          
-          // Usando o novo justificador sem label
-          const words = text.split(/\s+/);
-          const spaceWidth = doc.getTextWidth(" ");
-          const lines: string[][] = [];
-          let currentLineWords: string[] = [];
-          let currentLineWidth = 0;
 
-          for (let i = 0; i < words.length; i++) {
-              const word = words[i];
-              const wordWidth = doc.getTextWidth(word);
-              if (currentLineWords.length > 0 && currentLineWidth + spaceWidth + wordWidth > maxLineWidth) {
-                  lines.push(currentLineWords);
-                  currentLineWords = [word];
-                  currentLineWidth = wordWidth;
-              } else {
-                  if (currentLineWords.length > 0) currentLineWidth += spaceWidth;
-                  currentLineWords.push(word);
-                  currentLineWidth += wordWidth;
-              }
-          }
-          if (currentLineWords.length > 0) lines.push(currentLineWords);
+          writeText(text, { fontStyle: 'normal', fontSize: 11, align: 'justify', marginBottom: 15 });
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontStyle: 'normal', fontSize: 11, align: 'left', marginTop: 15, marginBottom: 30 });
 
-          lines.forEach((lineWords, lineIndex) => {
-              const isLastLine = lineIndex === lines.length - 1;
-              if (isLastLine) {
-                  let x = margin;
-                  lineWords.forEach(word => {
-                      doc.text(word, x, cursorY);
-                      x += doc.getTextWidth(word) + spaceWidth;
-                  });
-              } else {
-                  const totalWordsWidth = lineWords.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
-                  const gaps = lineWords.length - 1;
-                  const extraSpace = maxLineWidth - totalWordsWidth;
-                  const spaceSize = gaps > 0 ? extraSpace / gaps : 0;
-                  let x = margin;
-                  lineWords.forEach((word, wIdx) => {
-                      doc.text(word, x, cursorY);
-                      if (wIdx < gaps) x += doc.getTextWidth(word) + spaceSize;
-                  });
-              }
-              cursorY += 7; // Line height maior para declaração
-          });
-          
-          cursorY += 30;
-          
-          // ASSINATURA
-          doc.text(`São João de Meriti/RJ, ${currentDate}.`, margin, cursorY);
-          
-          cursorY += 25;
+          if (cursorY + 30 > pageHeight - 20) { doc.addPage(); cursorY = 30; }
           doc.setLineWidth(0.5);
           doc.setDrawColor(0);
           doc.line(pageWidth / 2 - 60, cursorY, pageWidth / 2 + 60, cursorY);
-          
-          doc.setFont("times", "bold");
-          
+          cursorY += 5;
+          writeText(clientName, { fontStyle: 'bold', fontSize: 11, align: 'center', marginBottom: 0 });
           if (isMinor) {
-              doc.text(`${clientName}`, pageWidth / 2, cursorY + 5, { align: "center" });
-              doc.text(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, pageWidth / 2, cursorY + 10, { align: "center" });
-          } else {
-              doc.text(clientName, pageWidth / 2, cursorY + 5, { align: "center" });
+              writeText(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, { fontStyle: 'normal', fontSize: 9.5, align: 'center', marginBottom: 0 });
           }
 
       } else if (type === 'renuncia') {
-          // TÍTULO
-          doc.setFont("times", "bold");
-          doc.setFontSize(16);
-          doc.text("DA RENÚNCIA AOS VALORES EXCEDENTES", pageWidth / 2, 50, { align: "center" });
-          doc.text("AO TETO DO JEF", pageWidth / 2, 58, { align: "center" });
-          
-          doc.setFontSize(12);
-          doc.setFont("times", "normal");
-          
-          let cursorY = 90;
+          writeText("TERMO DE RENÚNCIA AOS VALORES EXCEDENTES", { fontStyle: 'bold', fontSize: 14, align: 'center', marginBottom: 2 });
+          writeText("AO TETO DO JEF", { fontStyle: 'bold', fontSize: 12, align: 'center', marginBottom: 20 });
+
           let text = "";
-          
           if (isMinor) {
               text = `${clientName}, CPF nº ${clientCPF}, neste ato representado por ${formData.legalRepresentative?.toUpperCase()}, renuncia à soma das parcelas vencidas e 12 vincendas que excedem ao teto do Juizado Especial Federal, a fim de permitir o trâmite da presente ação no Juizado Especial Federal, conforme Tema 1.030 do STJ.`;
           } else {
               text = `${clientName}, CPF nº ${clientCPF}, renuncia à soma das parcelas vencidas e 12 vincendas que excedem ao teto do Juizado Especial Federal, a fim de permitir o trâmite da presente ação no Juizado Especial Federal, conforme Tema 1.030 do STJ.`;
           }
-          
-          // Mesmo justificador manual da hipossuficiência
-          const words = text.split(/\s+/);
-          const spaceWidth = doc.getTextWidth(" ");
-          const lines: string[][] = [];
-          let currentLineWords: string[] = [];
-          let currentLineWidth = 0;
 
-          for (let i = 0; i < words.length; i++) {
-              const word = words[i];
-              const wordWidth = doc.getTextWidth(word);
-              if (currentLineWords.length > 0 && currentLineWidth + spaceWidth + wordWidth > maxLineWidth) {
-                  lines.push(currentLineWords);
-                  currentLineWords = [word];
-                  currentLineWidth = wordWidth;
-              } else {
-                  if (currentLineWords.length > 0) currentLineWidth += spaceWidth;
-                  currentLineWords.push(word);
-                  currentLineWidth += wordWidth;
-              }
-          }
-          if (currentLineWords.length > 0) lines.push(currentLineWords);
+          writeText(text, { fontStyle: 'normal', fontSize: 11, align: 'justify', marginBottom: 15 });
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontStyle: 'normal', fontSize: 11, align: 'left', marginTop: 15, marginBottom: 30 });
 
-          lines.forEach((lineWords, lineIndex) => {
-              const isLastLine = lineIndex === lines.length - 1;
-              if (isLastLine) {
-                  let x = margin;
-                  lineWords.forEach(word => {
-                      doc.text(word, x, cursorY);
-                      x += doc.getTextWidth(word) + spaceWidth;
-                  });
-              } else {
-                  const totalWordsWidth = lineWords.reduce((sum, w) => sum + doc.getTextWidth(w), 0);
-                  const gaps = lineWords.length - 1;
-                  const extraSpace = maxLineWidth - totalWordsWidth;
-                  const spaceSize = gaps > 0 ? extraSpace / gaps : 0;
-                  let x = margin;
-                  lineWords.forEach((word, wIdx) => {
-                      doc.text(word, x, cursorY);
-                      if (wIdx < gaps) x += doc.getTextWidth(word) + spaceSize;
-                  });
-              }
-              cursorY += 7;
-          });
-          
-          cursorY += 30;
-          
-          // ASSINATURA
-          doc.text(`São João de Meriti/RJ, ${currentDate}.`, margin, cursorY);
-          
-          cursorY += 25;
+          if (cursorY + 30 > pageHeight - 20) { doc.addPage(); cursorY = 30; }
           doc.setLineWidth(0.5);
           doc.setDrawColor(0);
           doc.line(pageWidth / 2 - 60, cursorY, pageWidth / 2 + 60, cursorY);
-          
-          doc.setFont("times", "bold");
-          
+          cursorY += 5;
+          writeText(clientName, { fontStyle: 'bold', fontSize: 11, align: 'center', marginBottom: 0 });
           if (isMinor) {
-              doc.text(`${clientName}`, pageWidth / 2, cursorY + 5, { align: "center" });
-              doc.text(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, pageWidth / 2, cursorY + 10, { align: "center" });
-          } else {
-              doc.text(clientName, pageWidth / 2, cursorY + 5, { align: "center" });
+              writeText(`(representado por: ${formData.legalRepresentative?.toUpperCase()})`, { fontStyle: 'normal', fontSize: 9.5, align: 'center', marginBottom: 0 });
           }
+
       } else if (type === 'contrato_honorarios') {
-          // TÍTULO
-          doc.setFont("times", "bold");
-          doc.setFontSize(14);
-          doc.text("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS", pageWidth / 2, 30, { align: "center" });
-          
-          doc.setFontSize(10);
-          doc.setFont("times", "normal");
-          
-          let cursorY = 42;
+          writeText("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS", { fontStyle: 'bold', fontSize: 13, align: 'center', marginBottom: 10 });
           
           let contratanteQualif = "";
           if (isMinor) {
@@ -1218,92 +1049,87 @@ Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro,
               contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) CONTRATANTE;`;
           }
 
-          cursorY = drawFullyJustifiedBlock("CONTRATANTE:", contratanteQualif, cursorY);
-          
-          const contratadosQualif = `Os advogados LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados CONTRATADOS.`;
-          cursorY = drawFullyJustifiedBlock("CONTRATADOS:", contratadosQualif, cursorY);
+          writeText("Pelo presente instrumento particular, de um lado:", { fontSize: 10, align: 'justify', marginBottom: 2 });
+          writeText(`CONTRATANTE: ${contratanteQualif}`, { fontSize: 10, align: 'justify', marginBottom: 2 });
+          writeText("E de outro lado:", { fontSize: 10, align: 'justify', marginBottom: 2 });
+          writeText(`CONTRATADOS: Os advogados LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados CONTRATADOS.`, { fontSize: 10, align: 'justify', marginBottom: 3 });
+          writeText("Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:", { fontSize: 10, align: 'justify', marginBottom: 4 });
 
-          const introText = `Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:`;
-          cursorY = drawFullyJustifiedBlock("", introText, cursorY);
+          writeText("CLÁUSULA PRIMEIRA – DO OBJETO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("O presente contrato tem como objeto a prestação de serviços advocatícios pelos CONTRATADOS em favor do(a) CONTRATANTE, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.", { fontSize: 10, align: 'justify', marginBottom: 3 });
 
-          const c1Text = `O presente contrato tem como objeto a prestação de serviços advocatícios pelos CONTRATADOS em favor do(a) CONTRATANTE, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA PRIMEIRA – DO OBJETO\n", c1Text, cursorY);
+          writeText("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:", { fontSize: 10, align: 'justify', marginBottom: 2 });
 
-          const c2Text = `O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS\n", c2Text, cursorY);
+          writeText("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 9.5, align: 'left', marginTop: 1, marginBottom: 1 });
+          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 1 });
+          writeText("( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 3 });
 
-          const c21Text = `(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.\n( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.`;
-          cursorY = drawFullyJustifiedBlock("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):\n", c21Text, cursorY);
+          writeText("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 9.5, align: 'left', marginTop: 1, marginBottom: 1 });
+          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 1 });
+          writeText("(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.", { fontSize: 9.5, align: 'justify', indent: 4, marginBottom: 3 });
 
-          const c22Text = `(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.\n(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.`;
-          cursorY = drawFullyJustifiedBlock("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):\n", c22Text, cursorY);
+          writeText("2.3. As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).", { fontSize: 10, align: 'justify', marginBottom: 3 });
 
-          const c23Text = `As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).`;
-          cursorY = drawFullyJustifiedBlock("2.3. ", c23Text, cursorY);
+          writeText("CLÁUSULA TERCEIRA – DAS DESPESAS", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.", { fontSize: 10, align: 'justify', marginBottom: 3 });
 
-          const c3Text = `Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA TERCEIRA – DAS DESPESAS\n", c3Text, cursorY);
+          writeText("CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("4.1. Dos CONTRATADOS: Atuar com zelo e diligência na defesa dos interesses do(a) CONTRATANTE, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.", { fontSize: 10, align: 'justify', marginBottom: 1 });
+          writeText("4.2. Do(a) CONTRATANTE: Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos CONTRATADOS.", { fontSize: 10, align: 'justify', marginBottom: 3 });
 
-          const c4Text = `4.1. Dos CONTRATADOS: Atuar com zelo e diligência na defesa dos interesses do(a) CONTRATANTE, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.\n4.2. Do(a) CONTRATANTE: Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos CONTRATADOS.`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES\n", c4Text, cursorY);
+          writeText("CLÁUSULA QUINTA – DA RESCISÃO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) CONTRATANTE sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.", { fontSize: 10, align: 'justify', marginBottom: 3 });
 
-          const c5Text = `O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) CONTRATANTE sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA QUINTA – DA RESCISÃO\n", c5Text, cursorY);
+          writeText("CLÁUSULA SEXTA – DO FORO", { fontStyle: 'bold', fontSize: 10, align: 'left', marginTop: 2, marginBottom: 1 });
+          writeText("Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privileged que seja.", { fontSize: 10, align: 'justify', marginBottom: 4 });
 
-          const c6Text = `Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.`;
-          cursorY = drawFullyJustifiedBlock("CLÁUSULA SEXTA – DO FORO\n", c6Text, cursorY);
+          writeText("E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.", { fontSize: 10, align: 'justify', marginBottom: 4 });
 
-          const endText = `E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.`;
-          cursorY = drawFullyJustifiedBlock("", endText, cursorY);
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 10, align: 'left', marginBottom: 6 });
 
-          cursorY += 4;
-          doc.text(`São João de Meriti/RJ, ${currentDate}.`, margin, cursorY);
-
-          cursorY += 8;
-
-          if (cursorY + 45 > pageHeight - margin) {
-              doc.addPage();
-              cursorY = 30;
-          }
-
-          // DESENHAR TABELA DE ASSINATURAS
+          // Tabela de Assinaturas no Contrato
           const tableX = margin;
           const tableW = maxLineWidth;
           const col1W = tableW * 0.65;
-          const headerH = 7;
-          const rowH = 9;
+          const headerH = 6;
+          const rowH = 8;
+          const numRows = 3;
+          const totalTableH = headerH + (rowH * numRows);
+
+          if (cursorY + totalTableH > pageHeight - 15) {
+              doc.addPage();
+              cursorY = 25;
+          }
 
           doc.setLineWidth(0.3);
           doc.setDrawColor(0);
 
           const tableTopY = cursorY;
-          const totalTableH = headerH + (rowH * 3);
-
-          // Borda externa
           doc.rect(tableX, tableTopY, tableW, totalTableH);
-          // Divisória vertical
           doc.line(tableX + col1W, tableTopY, tableX + col1W, tableTopY + totalTableH);
-
-          // Divisórias horizontais
           doc.line(tableX, tableTopY + headerH, tableX + tableW, tableTopY + headerH);
-          doc.line(tableX, tableTopY + headerH + rowH, tableX + tableW, tableTopY + headerH + rowH);
-          doc.line(tableX, tableTopY + headerH + (rowH * 2), tableX + tableW, tableTopY + headerH + (rowH * 2));
+          for (let r = 1; r < numRows; r++) {
+              doc.line(tableX, tableTopY + headerH + (rowH * r), tableX + tableW, tableTopY + headerH + (rowH * r));
+          }
 
-          // Textos do cabeçalho
           doc.setFont("times", "bold");
-          doc.setFontSize(9);
-          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 5);
-          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 5);
-
-          // Linhas da tabela
           doc.setFontSize(8.5);
+          doc.text("IDENTIFICAÇÃO:", tableX + 3, tableTopY + 4.5);
+          doc.text("ASSINATURA:", tableX + col1W + 3, tableTopY + 4.5);
+
+          doc.setFontSize(8);
           let rY = tableTopY + headerH;
+          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 5.5);
+          rY += rowH;
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 5.5);
+          rY += rowH;
           
-          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 6);
-          rY += rowH;
-          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 6);
-          rY += rowH;
-          doc.text(`${clientName} - CPF: ${clientCPF} (CONTRATANTE)`, tableX + 3, rY + 6);
+          let contratanteLabel = `${clientName} - CPF: ${clientCPF} (CONTRATANTE)`;
+          if (isMinor) {
+              contratanteLabel += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
+          }
+          doc.text(contratanteLabel, tableX + 3, rY + 5.5);
       }
 
       const pdfBase64 = doc.output('datauristring');
