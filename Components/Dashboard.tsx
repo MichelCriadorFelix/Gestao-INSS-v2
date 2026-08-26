@@ -1741,6 +1741,9 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
+                    agendaEvents={agendaEvents}
+                    systemClients={records}
+                    contracts={contracts}
                   />
              ) : currentView === 'dra_luana' ? (
                  <PersonaChat 
@@ -1750,6 +1753,9 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
+                    agendaEvents={agendaEvents}
+                    systemClients={records}
+                    contracts={contracts}
                   />
              ) : currentView === 'dr_felix_castro' ? (
                  <PersonaChat 
@@ -1759,6 +1765,9 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
+                    agendaEvents={agendaEvents}
+                    systemClients={records}
+                    contracts={contracts}
                   />
              ) : currentView === 'sec_fabricia' ? (
                  <PersonaChat 
@@ -1768,13 +1777,16 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
                     customLaws={customLaws}
+                    agendaEvents={agendaEvents}
+                    systemClients={records}
+                    contracts={contracts}
                   />
              ) : currentView === 'legislation' ? (
                   <Legislation customLaws={customLaws} onSaveCustomLaws={handleSaveCustomLaws} />
              ) : currentView === 'agenda' ? (
                  <Agenda 
                     events={mergedAgendaEvents}
-                    clients={records}
+                    systemClients={records}
                     contracts={contracts}
                     user={user}
                     darkMode={darkMode}
@@ -1788,7 +1800,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  />
              ) : currentView === 'petition_editor' ? (
                   <PetitionEditor 
-                     clients={records}
+                     systemClients={records}
                      onBack={() => {
                          setCurrentView('clients');
                          setActivePetition(null);
@@ -1800,7 +1812,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                   />
              ) : currentView === 'labor_calc' ? (
                  <LaborCalc 
-                    clients={records} 
+                    systemClients={records} 
                     contracts={contracts} 
                     savedCalculations={savedCalculations}
                     onSaveCalculation={handleSaveCalculation}
@@ -1808,7 +1820,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  />
              ) : currentView === 'social_calc' ? (
                  <SocialSecurityCalc 
-                    clients={records}
+                    systemClients={records}
                     savedCalculations={savedSocialCalculations}
                     onSaveCalculation={handleSaveSocialCalculation}
                     onUpdateCalculations={(list) => {

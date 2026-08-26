@@ -95,6 +95,9 @@ interface PersonaChatProps {
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: any, clientId?: string) => void;
   customLaws?: any[];
+  agendaEvents?: any[];
+  systemClients?: any[];
+  contracts?: any[];
 }
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -529,7 +532,7 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
   return { updatedText: doc, appliedCount };
 };
 
-const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws }) => {
+const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws, agendaEvents, systemClients, contracts }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -1645,7 +1648,12 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               artifactId: activeArtifactMeta?.idLabel,
               artifactType: activeArtifactMeta?.typeKey,
               artifactTypeLabel: activeArtifactMeta?.config?.label,
-              artifactTitle: activeArtifactMeta?.title
+              artifactTitle: activeArtifactMeta?.title,
+              systemState: {
+                agenda: agendaEvents,
+                clients: systemClients?.map(c => ({ id: c.id, name: c.name, type: c.type, history: c.eventHistory })),
+                contracts: contracts
+              }
             }),
             signal: abortController.signal
           });
@@ -2338,9 +2346,9 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       try {
         let activeSessionId = currentSessionId;
         if (!activeSessionId) {
-          const defaultTitle = userPrompt 
-            ? (userPrompt.slice(0, 30) + '...') 
-            : (clientToProcess ? `Dossiê: ${clientToProcess.name}` : (filesToProcess[0]?.name || 'Nova Conversa'));
+          const defaultTitle = clientToProcess 
+            ? `${clientToProcess.name.split(' ')[0]} - ${userPrompt ? (userPrompt.slice(0, 20) + '...') : 'Dossiê'}`
+            : (userPrompt ? (userPrompt.slice(0, 30) + '...') : (filesToProcess[0]?.name || 'Nova Conversa'));
           
           const newSession: ChatSession = {
             id: generateId(),

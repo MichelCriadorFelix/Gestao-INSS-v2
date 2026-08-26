@@ -4883,7 +4883,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   
   try {
     let currentContents: any[] = [];
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle, systemState } = req.body;
     message = message || "";
 
     // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
@@ -5149,6 +5149,22 @@ REGRAS DE OURO:
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
     // Limite de segurança: 40 mensagens (historico expandido conforme regra do projeto)
     // Previne edge cases extremos sem sacrificar contexto normal
+    
+    if (systemState && intent !== "[GERAÇÃO]") {
+      selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
+Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+`;
+      if (systemState.agenda && systemState.agenda.length > 0) {
+        selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
+      }
+      if (systemState.contracts && systemState.contracts.length > 0) {
+        selectedSystemPrompt += `CONTRATOS ATIVOS:\n${JSON.stringify(systemState.contracts)}\n\n`;
+      }
+      if (systemState.clients && systemState.clients.length > 0) {
+        selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
+      }
+    }
+
     if (history.length > 40) history = history.slice(-40);
 
     // REINFORCEMENT calibrado por intenção — evita ruído de prompt de peça em dúvidas
@@ -5603,7 +5619,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
   try {
     let currentContents: any[] = [];
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle, systemState } = req.body;
     message = message || "";
 
     // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
@@ -5920,6 +5936,22 @@ REGRAS DE OURO:
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
     // Limite de segurança: 40 mensagens (regra inegociável Felix & Castro)
     // Previne edge cases extremos sem sacrificar contexto normal
+    
+    if (systemState && intent !== "[GERAÇÃO]") {
+      selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
+Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+`;
+      if (systemState.agenda && systemState.agenda.length > 0) {
+        selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
+      }
+      if (systemState.contracts && systemState.contracts.length > 0) {
+        selectedSystemPrompt += `CONTRATOS ATIVOS:\n${JSON.stringify(systemState.contracts)}\n\n`;
+      }
+      if (systemState.clients && systemState.clients.length > 0) {
+        selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
+      }
+    }
+
     if (history.length > 40) history = history.slice(-40);
 
     // REFORÇO DE CONTEXTO calibrado por intenção — evita ruído de prompt de peça em dúvidas
@@ -6419,7 +6451,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
   try {
     let currentContents: any[] = [];
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle, systemState } = req.body;
     message = message || "";
 
     // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
@@ -6674,6 +6706,22 @@ REGRAS DE OURO:
 2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
 3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
 4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
+    }
+
+    
+    if (systemState && intent !== "[GERAÇÃO]") {
+      selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
+Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+`;
+      if (systemState.agenda && systemState.agenda.length > 0) {
+        selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
+      }
+      if (systemState.contracts && systemState.contracts.length > 0) {
+        selectedSystemPrompt += `CONTRATOS ATIVOS:\n${JSON.stringify(systemState.contracts)}\n\n`;
+      }
+      if (systemState.clients && systemState.clients.length > 0) {
+        selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
+      }
     }
 
     if (history.length > 40) history = history.slice(-40);
@@ -7242,7 +7290,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
   const heartbeat = setInterval(() => { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); }, 5000);
   
   try {
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, systemState } = req.body;
     message = message || "";
 
     const intent = await detectUserIntent(message);
@@ -7328,6 +7376,22 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     }
 
     // Janela de histórico ampliada para a secretária Fabrícia (Regra 40 mensagens)
+    
+    if (systemState && intent !== "[GERAÇÃO]") {
+      selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
+Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
+`;
+      if (systemState.agenda && systemState.agenda.length > 0) {
+        selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
+      }
+      if (systemState.contracts && systemState.contracts.length > 0) {
+        selectedSystemPrompt += `CONTRATOS ATIVOS:\n${JSON.stringify(systemState.contracts)}\n\n`;
+      }
+      if (systemState.clients && systemState.clients.length > 0) {
+        selectedSystemPrompt += `CLIENTES E HISTÓRICOS (Andamentos/Eventos por Cliente):\n${JSON.stringify(systemState.clients)}\n\n`;
+      }
+    }
+
     if (history.length > 40) history = history.slice(-40);
 
     const REINFORCEMENT_PROMPT = `
