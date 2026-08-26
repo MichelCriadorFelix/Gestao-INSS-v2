@@ -778,7 +778,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 <p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEXTA – DO FORO</p>
 <p class="no-indent" style="margin-bottom: 8px; text-align: justify; line-height: 1.35; font-size: 9pt;">Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
 
-<p class="no-indent" style="margin-bottom: 8px; line-height: 1.35; font-size: 9pt;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
+<p class="no-indent" style="margin-bottom: 8px; line-height: 1.35; font-size: 9pt;">E, por estarem assim justos e contratados, as partes assinam o presente instrumento em 02 (duas) vias de igual teor e forma, para que surta seus jurídicos e legais efeitos.</p>
 
 <p class="no-indent" style="margin-top: 8px; margin-bottom: 10px; font-size: 9pt;">São João de Meriti/RJ, ${currentDate}.</p>
 
@@ -1084,7 +1084,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           writeText("CLÁUSULA SEXTA – DO FORO", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
           writeText("Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
 
-          writeText("E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
+          writeText("E, por estarem assim justos e contratados, as partes assinam o presente instrumento em 02 (duas) vias de igual teor e forma, para que surta seus jurídicos e legais efeitos.", { fontSize: 9, align: 'justify', marginBottom: 2.5 });
 
           writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 9, align: 'left', marginBottom: 3 });
 
