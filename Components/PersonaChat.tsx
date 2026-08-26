@@ -101,27 +101,45 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
 const isReportContent = (content: string = ''): boolean => {
-  if (!content || content.length < 250) return false;
+  if (!content || content.trim().length < 350) return false;
+  const trimmed = content.trim();
 
-  const hasReportHeader = /(?:RELATÓRIO\s+DE\s+ANÁLISE|RELATÓRIO\s+DO\s+PROCESSO|AUDITORIA\s+PROCESSUAL|RELATÓRIO\s+PREVIDENCIÁRIO|RELATÓRIO\s+TRABALHISTA|RELATÓRIO\s+JURÍDICO|COMPILADO\s+INTEGRAL\s+DO\s+PROCESSO|RELATÓRIO\s+DE\s+AUDITORIA)/i.test(content);
-  const hasReportSections = /(?:1\.\s*STATUS\s+DA\s+LEITURA|STATUS\s+DA\s+LEITURA)/i.test(content) &&
-    /(?:DOCUMENTOS\s+ANALISADOS|RESUMO\s+DOS\s+FATOS|PARECER\s+DE\s+VIABILIDADE|DIAGNÓSTICO\s+JURÍDICO|CÁLCULO\s+ESTIMADO|ORIENTAÇÃO\s+DE\s+REDAÇÃO)/i.test(content);
+  const hasReportHeader = /(?:^|\n)(?:#+\s*)?(?:RELATÓRIO\s+DE\s+ANÁLISE|RELATÓRIO\s+DO\s+PROCESSO|AUDITORIA\s+PROCESSUAL|RELATÓRIO\s+PREVIDENCIÁRIO|RELATÓRIO\s+TRABALHISTA|RELATÓRIO\s+JURÍDICO|COMPILADO\s+INTEGRAL\s+DO\s+PROCESSO|RELATÓRIO\s+DE\s+AUDITORIA)/i.test(trimmed);
+  const hasReportSections = /(?:STATUS\s+DA\s+LEITURA|DOCUMENTOS\s+ANALISADOS)/i.test(trimmed) &&
+    /(?:RESUMO\s+DOS\s+FATOS|PARECER\s+DE\s+VIABILIDADE|DIAGNÓSTICO\s+JURÍDICO|CÁLCULO\s+ESTIMADO|ORIENTAÇÃO\s+DE\s+REDAÇÃO)/i.test(trimmed);
 
   return hasReportHeader || hasReportSections;
 };
 
 const isPetitionContent = (content: string = ''): boolean => {
-  if (!content || content.length < 350) return false;
+  if (!content || content.trim().length < 450) return false;
 
   if (isReportContent(content)) return false;
 
-  const hasPetitionHeader = /(?:AO|EXCELENTÍSSIMO|AO\s+DOUTO|ILUSTRÍSSIMO)\s+(?:JUÍZO|JUIZ|TRIBUNAL|DESEMBARGADOR|MINISTRO|DELEGADO|GERENTE|INSS)/i.test(content) ||
-    /(?:PETIÇÃO\s+INICIAL|CONTESTAÇÃO|RECURSO\s+INOMINADO|AGRAVO\s+DE\s+INSTRUMENTO|APELAÇÃO|EMBARGOS\s+DE\s+DECLARAÇÃO|MANDADO\s+DE\s+SEGURANÇA|NOTIFICAÇÃO\s+EXTRAJUDICIAL|PARECER\s+JURÍDICO|REQUERIMENTO\s+ADMINISTRATIVO|MEMORIAIS\s+PROCEDIMENTAIS|HABEAS\s+DATA|HABEAS\s+CORPUS)/i.test(content);
+  const trimmed = content.trim();
 
-  const hasFatos = /(?:DOS\s+FATOS|I\s*-\s*DOS\s+FATOS|I\.\s*DOS\s+FATOS)/i.test(content);
-  const hasDireitoOuPedidos = /(?:DO\s+DIREITO|DOS\s+PEDIDOS|DO\s+MÉRITO|DOS\s+REQUERIMENTOS|DA\s+FUNDAMENTAÇÃO)/i.test(content);
+  // Se a mensagem começar com saudações, conversação ou conselhos casuais, não é uma petição isolada
+  const isConversationalIntro = /^(?:Calma|Sim,|Não,|Com certeza|Olá|Prezado|Caro|Doutor|Dr\.|Colega|Veja bem|Veja,|Entendi|Nesse caso|Sobre a sua dúvida|Você pode|Você deve|Recomendo|A orientação|Não há motivo|Tudo bem|Fique tranquilo)/i.test(trimmed);
 
-  return hasPetitionHeader || (hasFatos && hasDireitoOuPedidos);
+  // Cabeçalho forense formal no início da peça (primeiros 350 caracteres)
+  const first350 = trimmed.slice(0, 350);
+  const hasHeaderAtStart = /(?:^|\n)(?:#+\s*)?(?:AO\s+JUÍZO|EXCELENTÍSSIMO|ILUSTRÍSSIMO|ILMO|AO\s+DOUTO|AO\s+TRIBUNAL)\s+/i.test(first350) ||
+    /(?:^|\n)(?:#+\s*)?(?:PETIÇÃO\s+INICIAL|CONTESTAÇÃO|RECURSO\s+INOMINADO|AGRAVO\s+DE\s+INSTRUMENTO|APELAÇÃO|EMBARGOS\s+DE\s+DECLARAÇÃO|MANDADO\s+DE\s+SEGURANÇA|NOTIFICAÇÃO\s+EXTRAJUDICIAL|PARECER\s+JURÍDICO|REQUERIMENTO\s+ADMINISTRATIVO|MEMORIAIS|MANIFESTAÇÃO\s+INTERCORRENTE|QUESITOS\s+PERICIAIS)/i.test(first350);
+
+  // Fecho forense formal
+  const hasPetitionClosing = /(?:Nestes\s+termos|Pede\s+deferimento|Termos\s+em\s+que\s+pede|Espera\s+deferimento|OAB\/(?:[A-Z]{2})?\s*\d+|MICHEL\s+SANTOS\s+FELIX|LUANA\s+(?:DE\s+OLIVEIRA\s+)?CASTRO)/i.test(trimmed);
+
+  // Seções estruturais
+  const hasFatos = /(?:DOS\s+FATOS|I\s*-\s*DOS\s+FATOS|I\.\s*DOS\s+FATOS)/i.test(trimmed);
+  const hasDireitoOuPedidos = /(?:DO\s+DIREITO|DOS\s+PEDIDOS|DO\s+MÉRITO|DOS\s+REQUERIMENTOS|DA\s+FUNDAMENTAÇÃO|DA\s+TUTELA)/i.test(trimmed);
+  const hasFormalSections = (hasFatos && hasDireitoOuPedidos) || (/(?:DOS\s+PEDIDOS|DOS\s+REQUERIMENTOS)/i.test(trimmed) && hasPetitionClosing);
+
+  if (isConversationalIntro) {
+    // Se começou conversando, só é artefato se contiver a peça inteira formal com cabeçalho, seções, fecho e texto robusto
+    return (hasHeaderAtStart || hasFormalSections) && hasPetitionClosing && trimmed.length > 900;
+  }
+
+  return (hasHeaderAtStart && (hasPetitionClosing || hasFormalSections || trimmed.length > 550)) || (hasFormalSections && hasPetitionClosing);
 };
 
 export type ArtifactTypeKey = 
