@@ -4842,8 +4842,16 @@ app.post("/api/dr-michel/chat", async (req, res) => {
   
   try {
     let currentContents: any[] = [];
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
     message = message || "";
+
+    // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
+    if (artifactId || artifactTypeLabel || artifactTitle) {
+      const artifactMetaHeader = `[CONTEXTO DO ARTEFATO ATIVO: ID ${artifactId || 'ART-01'} | NATUREZA: ${artifactTypeLabel || artifactType || 'Peça'} | TÍTULO: "${artifactTitle || 'Petição'}"]\n`;
+      if (!message.includes("[CONTEXTO DO ARTEFATO ATIVO") && !message.includes("[ALVO DE OPERAÇÃO NO ARTEFATO")) {
+        message = artifactMetaHeader + message;
+      }
+    }
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
     let draftContent = req.body.artifactContent || req.body.draftContent || "";
@@ -5524,8 +5532,16 @@ app.post("/api/dra-luana/chat", async (req, res) => {
 
   try {
     let currentContents: any[] = [];
-    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
+    let { message, history, images, minWage = '1621.00', files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
     message = message || "";
+
+    // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
+    if (artifactId || artifactTypeLabel || artifactTitle) {
+      const artifactMetaHeader = `[CONTEXTO DO ARTEFATO ATIVO: ID ${artifactId || 'ART-01'} | NATUREZA: ${artifactTypeLabel || artifactType || 'Peça'} | TÍTULO: "${artifactTitle || 'Petição'}"]\n`;
+      if (!message.includes("[CONTEXTO DO ARTEFATO ATIVO") && !message.includes("[ALVO DE OPERAÇÃO NO ARTEFATO")) {
+        message = artifactMetaHeader + message;
+      }
+    }
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
     let draftContent = req.body.artifactContent || req.body.draftContent || "";
@@ -6302,8 +6318,16 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
 
   try {
     let currentContents: any[] = [];
-    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex } = req.body;
+    let { message, history, images, files, ragContext, documentContext, modelProvider, model, keyIndex, customLaws, sessionId, petitionLength, cachedContent, cacheKeyIndex, artifactId, artifactType, artifactTypeLabel, artifactTitle } = req.body;
     message = message || "";
+
+    // Injeção de Identificação Única do Artefato e Natureza da Peça se presente
+    if (artifactId || artifactTypeLabel || artifactTitle) {
+      const artifactMetaHeader = `[CONTEXTO DO ARTEFATO ATIVO: ID ${artifactId || 'ART-01'} | NATUREZA: ${artifactTypeLabel || artifactType || 'Peça'} | TÍTULO: "${artifactTitle || 'Petição'}"]\n`;
+      if (!message.includes("[CONTEXTO DO ARTEFATO ATIVO") && !message.includes("[ALVO DE OPERAÇÃO NO ARTEFATO")) {
+        message = artifactMetaHeader + message;
+      }
+    }
 
     // 1. EARLY DRAFT FETCH & REVISION INTENT DETECTION (Prevents generating short/casual pieces during edits)
     let draftContent = req.body.artifactContent || req.body.draftContent || "";

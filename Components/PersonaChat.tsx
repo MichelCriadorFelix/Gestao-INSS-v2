@@ -8,6 +8,7 @@ import {
   PlusIcon as Plus, 
   ChevronLeftIcon as ChevronLeft, 
   ChevronRightIcon as ChevronRight, 
+  ChevronDownIcon as ChevronDown,
   ArrowDownTrayIcon as Download, 
   ArrowPathIcon as Loader2, 
   UsersIcon as Users,
@@ -71,6 +72,8 @@ interface Message {
   timestamp: string;
   attachments?: { name: string; url: string; type: string }[];
   isSystem?: boolean;
+  artifactId?: string;
+  artifactType?: ArtifactTypeKey;
 }
 
 interface ChatSession {
@@ -81,6 +84,7 @@ interface ChatSession {
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
   clientId?: string;
+  artifactTypes?: Record<string, ArtifactTypeKey>;
 }
 
 interface PersonaChatProps {
@@ -118,24 +122,238 @@ const isPetitionContent = (content: string = ''): boolean => {
   return hasPetitionHeader || (hasFatos && hasDireitoOuPedidos);
 };
 
+export type ArtifactTypeKey = 
+  | 'inicial'
+  | 'intercorrente'
+  | 'quesitos'
+  | 'impugnacao'
+  | 'recurso'
+  | 'administrativa'
+  | 'parecer'
+  | 'contrato'
+  | 'geral';
+
+export interface ArtifactTypeConfig {
+  key: ArtifactTypeKey;
+  label: string;
+  shortLabel: string;
+  icon: string;
+  badgeClass: string;
+  pillBg: string;
+  accentColor: string;
+  description: string;
+}
+
+export const ARTIFACT_TYPE_CONFIGS: Record<ArtifactTypeKey, ArtifactTypeConfig> = {
+  inicial: {
+    key: 'inicial',
+    label: 'Petição Inicial',
+    shortLabel: 'Petição Inicial',
+    icon: '📜',
+    badgeClass: 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-300 dark:border-blue-700',
+    pillBg: 'bg-blue-600 text-white',
+    accentColor: 'blue',
+    description: 'Petição Inicial formal completa com qualificação, fatos, fundamentos, tutela de urgência e pedidos'
+  },
+  intercorrente: {
+    key: 'intercorrente',
+    label: 'Manifestação Intercorrente',
+    shortLabel: 'Intercorrente',
+    icon: '⚖️',
+    badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700',
+    pillBg: 'bg-emerald-600 text-white',
+    accentColor: 'emerald',
+    description: 'Manifestação em andamento (ciência de despacho, emenda, juntada de documentos, reiteração)'
+  },
+  quesitos: {
+    key: 'quesitos',
+    label: 'Quesitos Periciais',
+    shortLabel: 'Quesitos',
+    icon: '🩺',
+    badgeClass: 'bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-700',
+    pillBg: 'bg-purple-600 text-white',
+    accentColor: 'purple',
+    description: 'Quesitos periciais técnicos (médicos, contábeis ou de engenharia) para perícia judicial'
+  },
+  impugnacao: {
+    key: 'impugnacao',
+    label: 'Impugnação / Réplica',
+    shortLabel: 'Impugnação / Réplica',
+    icon: '🛡️',
+    badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+    pillBg: 'bg-amber-600 text-white',
+    accentColor: 'amber',
+    description: 'Impugnação à contestação, réplica ou manifestação técnica sobre laudo pericial'
+  },
+  recurso: {
+    key: 'recurso',
+    label: 'Recurso Processual',
+    shortLabel: 'Recurso',
+    icon: '📑',
+    badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border-rose-300 dark:border-rose-700',
+    pillBg: 'bg-rose-600 text-white',
+    accentColor: 'rose',
+    description: 'Recurso Inominado, Apelação, Agravo de Instrumento, Embargos de Declaração'
+  },
+  administrativa: {
+    key: 'administrativa',
+    label: 'Processo Administrativo (INSS/CRPS)',
+    shortLabel: 'Processo Admin. INSS',
+    icon: '🏛️',
+    badgeClass: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/80 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700',
+    pillBg: 'bg-cyan-600 text-white',
+    accentColor: 'cyan',
+    description: 'Requerimento administrativo, recurso ordinário/especial à JR/CRPS, revisão'
+  },
+  parecer: {
+    key: 'parecer',
+    label: 'Parecer / Relatório Jurídico',
+    shortLabel: 'Relatório / Parecer',
+    icon: '📊',
+    badgeClass: 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600',
+    pillBg: 'bg-slate-700 text-white',
+    accentColor: 'slate',
+    description: 'Relatório de análise processual, parecer técnico de viabilidade ou diagnóstico'
+  },
+  contrato: {
+    key: 'contrato',
+    label: 'Contrato / Notificação Extrajudicial',
+    shortLabel: 'Contrato / Notificação',
+    icon: '🖋️',
+    badgeClass: 'bg-pink-100 text-pink-800 dark:bg-pink-950/80 dark:text-pink-300 border-pink-300 dark:border-pink-700',
+    pillBg: 'bg-pink-600 text-white',
+    accentColor: 'pink',
+    description: 'Contrato de honorários, termo de acordo, notificação extrajudicial, procuração'
+  },
+  geral: {
+    key: 'geral',
+    label: 'Peça / Documento Jurídico',
+    shortLabel: 'Doc. Jurídico',
+    icon: '📄',
+    badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700',
+    pillBg: 'bg-emerald-600 text-white',
+    accentColor: 'emerald',
+    description: 'Artefato jurídico geral e peças complementares'
+  }
+};
+
+export const detectArtifactType = (content: string = '', userPrompt: string = ''): ArtifactTypeKey => {
+  if (!content) return 'geral';
+  
+  if (isReportContent(content)) {
+    return 'parecer';
+  }
+
+  const clean = content.toLowerCase();
+  const promptLower = (userPrompt || '').toLowerCase();
+
+  // 1. Quesitos Periciais
+  if (
+    /quesito|quesitos periciais|quesitação|perícia médica|laudo pericial|perita judicial|perito judicial/i.test(clean) &&
+    (/1\.\s*(?:o\s*perito|a\s*autora|o\s*autor|a\s*segurada|queira|informe)|quesitos da parte|reiteração dos quesitos/i.test(clean) || /quesito/i.test(promptLower))
+  ) {
+    return 'quesitos';
+  }
+
+  // 2. Recurso
+  if (
+    /recurso inominado|apelação cível|agravo de instrumento|agravo interno|embargos de declaração|contrarrazões|razões recursais|turma recursal|egrégio tribunal|colenda câmara/i.test(clean) ||
+    /recurso inominado|apelação|agravo|embargos de declaração/i.test(promptLower)
+  ) {
+    return 'recurso';
+  }
+
+  // 3. Impugnação / Réplica
+  if (
+    /impugnação à contestação|impugnação ao laudo|réplica|manifestar-se sobre a contestação|manifestar-se sobre o laudo|contradita/i.test(clean) ||
+    /réplica|impugnação|impugnar/i.test(promptLower)
+  ) {
+    return 'impugnacao';
+  }
+
+  // 4. Manifestação Intercorrente / Ciência / Despacho / Petição Simples
+  if (
+    /ciência do despacho|ciência da decisão|juntada de documentos|especificação de provas|emenda à inicial|reiteração|manifestar-se nos seguintes termos|cumprimento de despacho|manifestação aos autos/i.test(clean) ||
+    /ciência|despacho|juntada|intercorrente|manifestação simples/i.test(promptLower)
+  ) {
+    return 'intercorrente';
+  }
+
+  // 5. Administrativa (INSS/CRPS)
+  if (
+    (/requerimento administrativo|junta de recursos|crps|agência da previdência social|in 128\/2022|recurso ordinário administrativo|pedido de prorrogação/i.test(clean) &&
+    !/ao juízo do|excelentíssimo senhor doutor/i.test(clean)) ||
+    /requerimento administrativo|inss administrativo|recurso crps/i.test(promptLower)
+  ) {
+    return 'administrativa';
+  }
+
+  // 6. Contrato / Notificação
+  if (
+    /notificação extrajudicial|contrato de honorários|contrato de prestação de serviços|procuração ad judicia|termo de renúncia|acordo extrajudicial/i.test(clean) ||
+    /notificação|contrato|procuração/i.test(promptLower)
+  ) {
+    return 'contrato';
+  }
+
+  // 7. Petição Inicial
+  if (
+    /petição inicial|ação previdenciária|ação de concessão|ação de restabelecimento|ação trabalhista|reclamação trabalhista|ação indenizatória|ação ordinária|ação de obrigação/i.test(clean) ||
+    (/dos fatos/i.test(clean) && /do direito/i.test(clean) && /dos pedidos/i.test(clean) && /valor da causa/i.test(clean)) ||
+    /inicial|petição inicial|ajuizar|ingressar com ação/i.test(promptLower)
+  ) {
+    return 'inicial';
+  }
+
+  return 'geral';
+};
+
 const isArtifactContent = (content: string = ''): boolean => {
   return isPetitionContent(content) || isReportContent(content);
 };
 
-export const getArtifactTypeInfo = (content: string = '') => {
-  if (isReportContent(content)) {
-    return {
-      type: 'report',
-      badgeLabel: 'Relatório do Processo',
-      panelSubtitle: 'Relatório do Processo / Análise Jurídica',
-      defaultTitle: 'Relatório de Análise do Processo'
-    };
-  }
+export const getArtifactMeta = (
+  content: string = '',
+  messageId: string = '',
+  messages: Message[] = [],
+  customTypeOverride?: ArtifactTypeKey
+) => {
+  const isReport = isReportContent(content);
+  const typeKey: ArtifactTypeKey = customTypeOverride || (isReport ? 'parecer' : detectArtifactType(content));
+  const config = ARTIFACT_TYPE_CONFIGS[typeKey] || ARTIFACT_TYPE_CONFIGS.geral;
+
+  const artifactMessages = messages.filter(m => m.role === 'assistant' && isArtifactContent(m.content));
+  const index = artifactMessages.findIndex(m => m.id === messageId);
+  const seqNumber = index >= 0 ? index + 1 : (messageId === 'streaming' ? artifactMessages.length + 1 : 1);
+  const idLabel = `#ART-${String(seqNumber).padStart(2, '0')}`;
+  const totalCount = Math.max(artifactMessages.length, seqNumber);
+
+  const title = getArtifactTitle(content);
+  const cleanDoc = cleanPetitionDocument(content);
+  const wordCount = cleanDoc.trim() ? cleanDoc.trim().split(/\s+/).length : 0;
+  const charCount = cleanDoc.length;
+
   return {
-    type: 'petition',
-    badgeLabel: 'Artefato de Peça',
-    panelSubtitle: 'Artefato de Peça Processual',
-    defaultTitle: 'Peça Processual / Documento Jurídico'
+    idLabel,
+    seqNumber,
+    totalCount,
+    typeKey,
+    config,
+    title,
+    wordCount,
+    charCount
+  };
+};
+
+export const getArtifactTypeInfo = (content: string = '', customType?: ArtifactTypeKey) => {
+  const typeKey = customType || (isReportContent(content) ? 'parecer' : detectArtifactType(content));
+  const config = ARTIFACT_TYPE_CONFIGS[typeKey] || ARTIFACT_TYPE_CONFIGS.geral;
+  return {
+    type: typeKey,
+    badgeLabel: `${config.icon} ${config.shortLabel}`,
+    panelSubtitle: `Artefato: ${config.label}`,
+    defaultTitle: config.label,
+    config
   };
 };
 
@@ -143,8 +361,8 @@ const getArtifactTitle = (content: string = '') => {
   if (!content) return "Documento Jurídico";
   const typeInfo = getArtifactTypeInfo(content);
 
-  if (typeInfo.type === 'report') {
-    const reportMatch = content.match(/(?:RELATÓRIO|AUDITORIA|ANÁLISE)[^\n]*/i);
+  if (typeInfo.type === 'parecer' || typeInfo.type === 'geral') {
+    const reportMatch = content.match(/(?:RELATÓRIO|AUDITORIA|ANÁLISE|PARECER)[^\n]*/i);
     if (reportMatch) {
       const clean = reportMatch[0].replace(/[*#_]/g, '').trim();
       if (clean.length > 5 && clean.length < 80) return clean;
@@ -452,6 +670,36 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [artifactUpdatePulse, setArtifactUpdatePulse] = useState<boolean>(false);
   const [artifactSaveSuccess, setArtifactSaveSuccess] = useState<boolean>(false);
   const [selectedTextSnippet, setSelectedTextSnippet] = useState<string>('');
+  const [customArtifactTypes, setCustomArtifactTypes] = useState<Record<string, ArtifactTypeKey>>({});
+  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState<boolean>(false);
+
+  // Sincroniza customArtifactTypes com a sessão atual
+  useEffect(() => {
+    if (currentSessionId) {
+      const currentSess = sessions.find(s => s.id === currentSessionId);
+      if (currentSess?.artifactTypes) {
+        setCustomArtifactTypes(currentSess.artifactTypes);
+      } else {
+        setCustomArtifactTypes({});
+      }
+    }
+  }, [currentSessionId]);
+
+  const handleSetArtifactType = (messageId: string, typeKey: ArtifactTypeKey) => {
+    setCustomArtifactTypes(prev => {
+      const updated = { ...prev, [messageId]: typeKey };
+      if (currentSessionId) {
+        setSessions(prevSessions => prevSessions.map(s => {
+          if (s.id === currentSessionId) {
+            return { ...s, artifactTypes: updated };
+          }
+          return s;
+        }));
+      }
+      return updated;
+    });
+    setIsTypeSelectorOpen(false);
+  };
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1175,10 +1423,17 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       const compressedHistory = compressHistory(session?.messages || []);
       console.log(`[HISTORY COMPRESSION] Histórico filtrado de mensagens de ${session?.messages?.length || 0} para ${compressedHistory.length} após compressão.`);
 
-      // Obter o texto do artefato atualmente ativo para garantir edições cirúrgicas precisas
+      // Obter o texto e metadados do artefato atualmente ativo para garantir edições cirúrgicas precisas
+      const activeArtifactMsg = activeArtifactId && activeArtifactId !== 'streaming' 
+        ? session?.messages?.find(m => m.id === activeArtifactId) 
+        : [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+
       const activeDocText = editableArtifactText || 
-        (activeArtifactId && activeArtifactId !== 'streaming' ? session?.messages?.find(m => m.id === activeArtifactId)?.content : undefined) ||
-        [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content))?.content;
+        activeArtifactMsg?.content;
+
+      const activeArtifactMeta = (activeArtifactMsg && isArtifactContent(activeArtifactMsg.content))
+        ? getArtifactMeta(activeArtifactMsg.content, activeArtifactMsg.id, session?.messages || [], customArtifactTypes[activeArtifactMsg.id])
+        : undefined;
 
       const isSurgicalCorrection = messageText.includes('[CORREÇÃO CIRÚRGICA') || 
                                    messageText.includes('[CORRECAO CIRURGICA') || 
@@ -1213,7 +1468,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
           sessionId: session?.id,
           ragContextLength: ragContext ? ragContext.length : 0,
           hasArtifactContent: !!activeDocText,
-          isArtifactCorrection: isSurgicalCorrection
+          isArtifactCorrection: isSurgicalCorrection,
+          artifactId: activeArtifactMeta?.idLabel,
+          artifactType: activeArtifactMeta?.typeKey,
+          artifactTypeLabel: activeArtifactMeta?.config?.label,
+          artifactTitle: activeArtifactMeta?.title
         };
 
         console.log(`[HTTP POST CHAT] Chamando endpoint: ${persona.chatEndpoint}. Payload:`, fetchPayload);
@@ -1237,7 +1496,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               keyIndex: session?.uploadKeyIndex,
               sessionId: session?.id,
               artifactContent: activeDocText || undefined,
-              isArtifactCorrection: isSurgicalCorrection
+              isArtifactCorrection: isSurgicalCorrection,
+              artifactId: activeArtifactMeta?.idLabel,
+              artifactType: activeArtifactMeta?.typeKey,
+              artifactTypeLabel: activeArtifactMeta?.config?.label,
+              artifactTitle: activeArtifactMeta?.title
             }),
             signal: abortController.signal
           });
@@ -2124,10 +2387,23 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       promptToSend = "Analise as evidências / prints anexados e aplique as atualizações e correções necessárias no artefato da peça.";
     }
 
+    const currentSession = sessions.find(s => s.id === currentSessionId);
+    const activeArtifactMsg = activeArtifactId && activeArtifactId !== 'streaming' 
+      ? currentSession?.messages?.find(m => m.id === activeArtifactId) 
+      : [...(currentSession?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
+
+    const meta = activeArtifactMsg 
+      ? getArtifactMeta(activeArtifactMsg.content, activeArtifactMsg.id, currentSession?.messages || [], customArtifactTypes[activeArtifactMsg.id])
+      : undefined;
+
+    const artifactTargetHeader = meta 
+      ? `[ARTEFATO ALVO: ID ${meta.idLabel} | NATUREZA: ${meta.config.label} | TÍTULO: ${meta.title}]\n\n`
+      : '';
+
     if (selectedTextSnippet) {
-      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nTRECHO SELECIONADO A MODIFICAR:\n"${selectedTextSnippet}"\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
+      promptToSend = `${artifactTargetHeader}[CORREÇÃO CIRÚRGICA NO ARTEFATO ${meta?.idLabel || ''}]\n\nTRECHO SELECIONADO A MODIFICAR:\n"${selectedTextSnippet}"\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
     } else {
-      promptToSend = `[CORREÇÃO CIRÚRGICA NO ARTEFATO]\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
+      promptToSend = `${artifactTargetHeader}[CORREÇÃO CIRÚRGICA NO ARTEFATO ${meta?.idLabel || ''}]\n\nINSTRUÇÃO DE ALTERAÇÃO:\n${promptToSend}`;
     }
 
     if (hasArtifactAttachments) {
@@ -2446,50 +2722,70 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                               )}
 
                               {/* ARTIFACT EMBEDDED CARD */}
-                              <div 
-                                onClick={() => setActiveArtifactId(msg.id)}
-                                className="border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 rounded-xl p-3.5 transition-all shadow-sm cursor-pointer"
-                              >
-                                <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className="p-2.5 bg-emerald-600 text-white rounded-lg shadow-sm shrink-0">
-                                      <FileText className="w-5 h-5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <h4 className="font-bold text-sm text-emerald-900 dark:text-emerald-100 truncate">
-                                          {getArtifactTitle(msg.content)}
-                                        </h4>
-                                        <span className="text-[10px] font-semibold bg-emerald-200/60 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                                          {getArtifactTypeInfo(msg.content).badgeLabel}
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
-                                        ~{Math.round((msg.content || '').split(' ').length)} palavras • Clique para visualizar ao lado
-                                      </p>
-                                    </div>
-                                  </div>
+                              {(() => {
+                                const meta = getArtifactMeta(
+                                  msg.content, 
+                                  msg.id, 
+                                  currentSession.messages, 
+                                  customArtifactTypes[msg.id]
+                                );
+                                const isSelected = activeArtifactId === msg.id;
 
-                                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      onClick={() => setActiveArtifactId(msg.id)}
-                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5"
-                                    >
-                                      <Maximize2 className="w-3.5 h-3.5" /> Ver no Painel
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        generateDocx(msg.content || '');
-                                      }}
-                                      className="px-2.5 py-1.5 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
-                                      title="Baixar Word"
-                                    >
-                                      <Download className="w-3.5 h-3.5 text-emerald-600" /> DOCX
-                                    </button>
+                                return (
+                                  <div 
+                                    onClick={() => setActiveArtifactId(msg.id)}
+                                    className={`border rounded-xl p-3.5 transition-all shadow-sm cursor-pointer ${
+                                      isSelected 
+                                        ? 'border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/60 ring-2 ring-emerald-500/30' 
+                                        : 'border-slate-200 dark:border-bordeaux-800/80 bg-white dark:bg-bordeaux-950/70 hover:border-emerald-400 dark:hover:border-emerald-700/80 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/30'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <div className={`p-2.5 rounded-lg shadow-sm shrink-0 flex items-center justify-center ${meta.config.pillBg}`}>
+                                          <FileText className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <span className="text-[11px] font-mono font-bold bg-slate-900 text-white dark:bg-gold-500 dark:text-bordeaux-950 px-2 py-0.5 rounded shadow-2xs">
+                                              {meta.idLabel}
+                                            </span>
+                                            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${meta.config.badgeClass}`}>
+                                              <span>{meta.config.icon}</span>
+                                              <span>{meta.config.shortLabel}</span>
+                                            </span>
+                                          </div>
+                                          <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">
+                                            {meta.title}
+                                          </h4>
+                                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                            ~{meta.wordCount} palavras ({meta.charCount} caracteres) • Clique para abrir no painel lateral
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => setActiveArtifactId(msg.id)}
+                                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                                        >
+                                          <Maximize2 className="w-3.5 h-3.5" /> Ver no Painel
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            generateDocx(msg.content || '');
+                                          }}
+                                          className="px-2.5 py-1.5 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                                          title="Baixar Word"
+                                        >
+                                          <Download className="w-3.5 h-3.5 text-emerald-600" /> DOCX
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
-                              </div>
+                                );
+                              })()}
                             </div>
                           ) : (
                             <div className="prose prose-slate dark:prose-invert max-w-none prose-sm sm:prose-base
@@ -2922,18 +3218,33 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
               const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
               const charCount = content.length;
 
+              const sessionArtifactMessages = (currentSession?.messages || []).filter(
+                m => m.role === 'assistant' && isArtifactContent(m.content)
+              );
+              const currentArtifactIndex = sessionArtifactMessages.findIndex(m => m.id === activeArtifactId);
+
+              const meta = getArtifactMeta(
+                content, 
+                activeArtifactId || 'current', 
+                currentSession?.messages || [], 
+                activeArtifactId ? customArtifactTypes[activeArtifactId] : undefined
+              );
+
               return (
                 <>
                   {/* ARTIFACT HEADER */}
                   <div className="px-4 py-2.5 border-b border-slate-200 dark:border-gold-500/20 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-bordeaux-950 shadow-sm z-20 shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <div className={`w-8 h-8 rounded-lg text-white flex items-center justify-center shrink-0 shadow-sm ${meta.config.pillBg}`}>
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight truncate">
-                            {getArtifactTitle(content)}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-mono font-bold bg-slate-900 text-white dark:bg-gold-500 dark:text-bordeaux-950 px-2 py-0.5 rounded shadow-2xs">
+                            {meta.idLabel}
+                          </span>
+                          <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-tight truncate max-w-[200px] sm:max-w-xs">
+                            {meta.title}
                           </h3>
                           {artifactUpdatePulse && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 animate-pulse flex items-center gap-1">
@@ -2942,14 +3253,90 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          {getArtifactTypeInfo(content).panelSubtitle} • {wordCount} palavras ({charCount} caracteres)
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {/* SELETOR DE TIPO DE PEÇA */}
+                          <div className="relative">
+                            <button
+                              onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all ${meta.config.badgeClass} hover:opacity-90 cursor-pointer`}
+                              title="Clique para alterar a classificação desta peça/artefato"
+                            >
+                              <span>{meta.config.icon}</span>
+                              <span>{meta.config.label}</span>
+                              <ChevronDown className="w-2.5 h-2.5 opacity-60 ml-0.5" />
+                            </button>
+
+                            {isTypeSelectorOpen && (
+                              <div className="absolute left-0 mt-1 w-56 bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-bordeaux-800 rounded-xl shadow-xl z-50 p-1.5 space-y-0.5 animate-fade-in">
+                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-bordeaux-900 mb-1">
+                                  Classificação da Peça ({meta.idLabel})
+                                </div>
+                                {(Object.entries(ARTIFACT_TYPE_CONFIGS) as [ArtifactTypeKey, typeof ARTIFACT_TYPE_CONFIGS[ArtifactTypeKey]][]).map(([key, config]) => (
+                                  <button
+                                    key={key}
+                                    onClick={() => {
+                                      if (activeArtifactId && activeArtifactId !== 'streaming') {
+                                        handleSetArtifactType(activeArtifactId, key);
+                                      }
+                                    }}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors ${
+                                      meta.typeKey === key 
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold' 
+                                        : 'hover:bg-slate-100 dark:hover:bg-bordeaux-900/60 text-slate-700 dark:text-slate-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span>{config.icon}</span>
+                                      <span>{config.label}</span>
+                                    </div>
+                                    {meta.typeKey === key && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            • {wordCount} palavras ({charCount} carac.)
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {/* NAVEGAÇÃO ENTRE MÚLTIPLOS ARTEFATOS */}
+                      {sessionArtifactMessages.length > 1 && (
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-bordeaux-900/70 p-0.5 rounded-lg border border-slate-200 dark:border-bordeaux-800 text-xs mr-1">
+                          <button
+                            onClick={() => {
+                              if (currentArtifactIndex > 0) {
+                                setActiveArtifactId(sessionArtifactMessages[currentArtifactIndex - 1].id);
+                              }
+                            }}
+                            disabled={currentArtifactIndex <= 0}
+                            className="p-1 hover:bg-white dark:hover:bg-bordeaux-950 rounded text-slate-600 dark:text-slate-300 disabled:opacity-30 transition-colors"
+                            title="Artefato anterior"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 px-1">
+                            {currentArtifactIndex + 1}/{sessionArtifactMessages.length}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (currentArtifactIndex < sessionArtifactMessages.length - 1) {
+                                setActiveArtifactId(sessionArtifactMessages[currentArtifactIndex + 1].id);
+                              }
+                            }}
+                            disabled={currentArtifactIndex >= sessionArtifactMessages.length - 1 || currentArtifactIndex === -1}
+                            className="p-1 hover:bg-white dark:hover:bg-bordeaux-950 rounded text-slate-600 dark:text-slate-300 disabled:opacity-30 transition-colors"
+                            title="Próximo artefato"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
                       {/* TAB SWITCHER */}
                       <div className="flex items-center bg-slate-100 dark:bg-bordeaux-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-bordeaux-800">
                         <button
@@ -3208,37 +3595,140 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
                         </button>
                       </div>
 
-                      {/* QUICK ACTION CHIPS */}
+                      {/* QUICK ACTION CHIPS DINÂMICOS BASEADOS NA TIPOLOGIA */}
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
-                        <span className="text-slate-400 font-medium shrink-0">Atalhos:</span>
-                        <button
-                          onClick={() => handleQuickAiEdit("Corrija o cabeçalho e endereçamento do juízo competente.")}
-                          disabled={isLoading}
-                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
-                        >
-                          🏛️ Corrigir Endereçamento
-                        </button>
-                        <button
-                          onClick={() => handleQuickAiEdit("Adicione preliminar de concessão da Gratuidade da Justiça com base no art. 98 do CPC.")}
-                          disabled={isLoading}
-                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
-                        >
-                          ⚖️ Adicionar Gratuidade
-                        </button>
-                        <button
-                          onClick={() => handleQuickAiEdit("Inclua pedido expresso de Tutela de Urgência de Natureza Antecipada com fundamento no art. 300 do CPC.")}
-                          disabled={isLoading}
-                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
-                        >
-                          ⚡ Tutela de Urgência
-                        </button>
-                        <button
-                          onClick={() => handleQuickAiEdit("Ajuste a fundamentação e o valor pleiteado a título de Danos Morais.")}
-                          disabled={isLoading}
-                          className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
-                        >
-                          💰 Ajustar Danos Morais
-                        </button>
+                        <span className="text-slate-400 font-medium shrink-0">Atalhos ({meta.config.shortLabel}):</span>
+
+                        {meta.typeKey === 'quesitos' && (
+                          <>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione quesitos técnicos objetivos sobre o nexo de causalidade ou concausalidade entre as atividades laborais/doença e a incapacidade.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🩺 Nexo Causal
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione quesito específico para fixação técnica da Data de Início da Incapacidade (DII) e Data de Início da Doença (DID).")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              📅 DII e DID
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione quesito sobre viabilidade de reabilitação profissional e restrições a esforço habitual.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🔄 Reabilitação
+                            </button>
+                          </>
+                        )}
+
+                        {meta.typeKey === 'recurso' && (
+                          <>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione preliminar de nulidade da decisão por cerceamento de defesa diante do indeferimento de prova pericial/testemunhal.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🛑 Cerceamento de Defesa
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Reforce o pedido de concessão de efeito suspensivo e tutela recursal de urgência.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              ⚡ Tutela Recursal
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Reestruture o pedido recursal para pugnar expressamente pela anulação ou total reforma da decisão recorrida.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              ⚖️ Pedido de Reforma
+                            </button>
+                          </>
+                        )}
+
+                        {meta.typeKey === 'intercorrente' && (
+                          <>
+                            <button
+                              onClick={() => handleQuickAiEdit("Ajuste a manifestação para dar formal ciência do despacho e requerer o regular prosseguimento do feito.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              📌 Ciência e Prosseguimento
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione relação e discriminação detalhada dos documentos ora acostados aos autos.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              📎 Juntada de Documentos
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Inclua pedido de reiteração de intimação da parte contrária sob pena de preclusão.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              ⏰ Reiteração de Prazo
+                            </button>
+                          </>
+                        )}
+
+                        {meta.typeKey === 'impugnacao' && (
+                          <>
+                            <button
+                              onClick={() => handleQuickAiEdit("Impugne pontualmente as preliminares e alegações genéricas da defesa do réu.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🛡️ Impugnar Contestação
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Destaque as contradições do laudo pericial em confronto com os atestados e exames médicos dos autos.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🔍 Contradição do Laudo
+                            </button>
+                          </>
+                        )}
+
+                        {/* Atalhos padrão para inicial, administrativa, parecer, contrato e geral */}
+                        {(meta.typeKey === 'inicial' || meta.typeKey === 'geral' || meta.typeKey === 'administrativa' || meta.typeKey === 'parecer' || meta.typeKey === 'contrato') && (
+                          <>
+                            <button
+                              onClick={() => handleQuickAiEdit("Corrija o cabeçalho e endereçamento do juízo competente.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              🏛️ Corrigir Endereçamento
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Adicione preliminar de concessão da Gratuidade da Justiça com base no art. 98 do CPC.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              ⚖️ Adicionar Gratuidade
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Inclua pedido expresso de Tutela de Urgência de Natureza Antecipada com fundamento no art. 300 do CPC.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              ⚡ Tutela de Urgência
+                            </button>
+                            <button
+                              onClick={() => handleQuickAiEdit("Ajuste a fundamentação e o valor pleiteado a título de Danos Morais.")}
+                              disabled={isLoading}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-bordeaux-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-bordeaux-800 whitespace-nowrap transition-colors"
+                            >
+                              💰 Ajustar Danos Morais
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
