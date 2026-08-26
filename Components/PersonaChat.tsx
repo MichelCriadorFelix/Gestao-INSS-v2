@@ -396,7 +396,7 @@ export const cleanPetitionDocument = (rawContent: string = ''): string => {
     if (matchReport && matchReport.index !== undefined && matchReport.index > 0) {
       cleanedReport = rawContent.slice(matchReport.index);
     }
-    const endRegex = /\n\n(?:Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição).*/i;
+    const endRegex = /(?:\n\n|\r?\n)(?:(?:---|\*\*\*|___)\s*)?(?:(?:💡|📌|⚠️|⚖️|\*)?\s*(?:Implicaç(?:ão|ões)|Implantaç(?:ão|ões)|Dica|Orientaç(?:ão|ões)|Observaç(?:ão|ões)|Nota|Comentário|Estratégia|Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição)[\s\S]*)/i;
     cleanedReport = cleanedReport.replace(endRegex, '');
     return cleanedReport.trim();
   }
@@ -409,7 +409,8 @@ export const cleanPetitionDocument = (rawContent: string = ''): string => {
     cleaned = rawContent.slice(match.index);
   }
 
-  const endRegex = /\n\n(?:Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição).*/i;
+  // Remove quaisquer notas, dicas práticas, "Implicação Prática", orientações ou cauda conversacional
+  const endRegex = /(?:\n\n|\r?\n)(?:(?:---|\*\*\*|___)\s*)?(?:(?:💡|📌|⚠️|⚖️|\*)?\s*(?:Implicaç(?:ão|ões)|Implantaç(?:ão|ões)|Dica|Orientaç(?:ão|ões)|Observaç(?:ão|ões)|Nota|Comentário|Estratégia|Espero\s+ter\s+ajudado|Se\s+precisar\s+de\s+mais\s+ajustes|Qualquer\s+dúvida|Estou\s+à\s+disposição|Permaneco\s+à\s+disposição)[\s\S]*)/i;
   cleaned = cleaned.replace(endRegex, '');
 
   return cleaned.trim();

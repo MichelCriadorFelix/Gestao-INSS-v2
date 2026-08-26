@@ -1327,6 +1327,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
    OAB/RJ 226.749
    
    PROIBIDO encerrar a peça com apenas um dos advogados. Os dois SEMPRE assinam juntos.
+   PROIBIDO incluir notas, comentários, "💡 Implicação Prática para o Caso Concreto" ou orientações dentro do corpo da petição. A petição termina rigorosamente na assinatura. Se desejar orientar o advogado, faça-o apenas na mensagem conversacional externa, NUNCA dentro da peça.
 
 🔴 PROIBIDO pedir honorários sucumbenciais em ações no JEF (Juizado Especial Federal). Honorários sucumbenciais apenas na Justiça Comum (Vara Federal).
 
@@ -2024,6 +2025,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
    OAB/RJ 226.749
    
    PROIBIDO encerrar a peça com apenas um dos advogados. Os dois SEMPRE assinam juntos.
+   PROIBIDO incluir notas, comentários, "💡 Implicação Prática para o Caso Concreto" ou orientações dentro do corpo da petição. A petição termina rigorosamente na assinatura. Se desejar orientar o advogado, faça-o apenas na mensagem conversacional externa, NUNCA dentro da peça.
 
 🔴 PROIBIDO interromper a geração para perguntar se deve continuar. Entregue a petição COMPLETA de uma vez.
 
@@ -2315,6 +2317,7 @@ As regras abaixo são invioláveis e prevalecem sobre qualquer outra instrução
    OAB/RJ 226.749
    
    PROIBIDO encerrar a peça com apenas um dos advogados. Os dois SEMPRE assinam juntos.
+   PROIBIDO incluir notas, comentários, "💡 Implicação Prática para o Caso Concreto" ou orientações dentro do corpo da petição. A petição termina rigorosamente na assinatura. Se desejar orientar o advogado, faça-o apenas na mensagem conversacional externa, NUNCA dentro da peça.
 
 🔴 PROIBIDO pedir honorários sucumbenciais em ações no JEC (Juizado Especial Cível) em primeira instância. Honorários sucumbenciais apenas na Vara Cível ou em grau recursal no JEC.
 
