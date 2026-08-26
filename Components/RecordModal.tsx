@@ -832,41 +832,21 @@ ${clauseSecondHTML}
 
 <p class="no-indent" style="margin-top: 8px; margin-bottom: 10px; font-size: 9pt;">São João de Meriti/RJ, ${currentDate}.</p>
 
-<table style="width: 100%; border-collapse: collapse; margin-top: 12px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 9pt;">
-  <thead>
-    <tr style="border-bottom: 1px solid #000; background-color: #f8fafc;">
-      <th style="border-right: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 52%;">IDENTIFICAÇÃO DOS SIGNATÁRIOS:</th>
-      <th style="padding: 6px 10px; text-align: left; font-weight: bold; width: 48%;">CAMPO PARA ASSINATURA MANUAL:</th>
-    </tr>
-  </thead>
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #d1b3b3; font-family: 'Times New Roman', Times, serif; font-size: 8.5pt;">
   <tbody>
-    <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
-        MICHEL SANTOS FELIX<br/>
-        <span style="font-size: 8pt; font-weight: normal; color: #334155;">OAB/RJ: 231.640 (CONTRATADO)</span>
-      </td>
-      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
-        <br/><br/><br/>
-      </td>
+    <tr style="border-bottom: 1px solid #d1b3b3;">
+      <td style="border-right: 1px solid #d1b3b3; padding: 4px 6px; font-weight: bold; width: 50%;">MICHEL SANTOS FELIX</td>
+      <td style="padding: 4px 6px; font-weight: bold; width: 50%;">LUANA DE OLIVEIRA CASTRO PACHECO</td>
     </tr>
-    <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
-        LUANA DE OLIVEIRA CASTRO PACHECO<br/>
-        <span style="font-size: 8pt; font-weight: normal; color: #334155;">OAB/RJ: 226.749 (CONTRATADA)</span>
-      </td>
-      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
-        <br/><br/><br/>
-      </td>
+    <tr style="border-bottom: 1px solid #d1b3b3;">
+      <td style="border-right: 1px solid #d1b3b3; padding: 4px 6px; font-size: 8pt; color: #1e293b;">OAB/RJ: 231.640 (CONTRATADO)</td>
+      <td style="padding: 4px 6px; font-size: 8pt; color: #1e293b;">OAB/RJ: 226.749 (CONTRATADA)</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #d1b3b3;">
+      <td colspan="2" style="padding: 4px 6px; font-weight: bold;">${clientName}</td>
     </tr>
     <tr>
-      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
-        ${clientName}<br/>
-        <span style="font-size: 8pt; font-weight: normal; color: #334155;">CPF: ${clientCPF} (CONTRATANTE)</span>
-        ${isMinor ? `<br/><span style="font-size: 8pt; font-weight: normal; color: #475569;">(Rep. legal: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
-      </td>
-      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
-        <br/><br/><br/>
-      </td>
+      <td colspan="2" style="padding: 4px 6px; font-size: 8pt; color: #1e293b;">CPF: ${clientCPF} (CONTRATANTE)${isMinor ? ` (rep: ${formData.legalRepresentative?.toUpperCase()})` : ''}</td>
     </tr>
   </tbody>
 </table>`;
@@ -1172,14 +1152,13 @@ ${clauseSecondHTML}
 
           writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 9, align: 'left', marginBottom: 3 });
 
-          // Tabela de Assinaturas no Contrato
+          // Tabela de Assinaturas no Contrato (Padrão Petição / Escritório)
           const tableX = margin;
           const tableW = maxLineWidth;
-          const col1W = tableW * 0.52;
-          const headerH = 5.5;
-          const rowH = 15;
-          const numRows = 3;
-          const totalTableH = headerH + (rowH * numRows);
+          const colW = tableW / 2;
+          const rowH = 4.8;
+          const totalRows = 4;
+          const totalTableH = rowH * totalRows;
 
           if (cursorY + totalTableH > pageHeight - 15) {
               doc.addPage();
@@ -1187,33 +1166,37 @@ ${clauseSecondHTML}
           }
 
           doc.setLineWidth(0.3);
-          doc.setDrawColor(30, 41, 59);
+          doc.setDrawColor(209, 179, 179); // #d1b3b3 bordô suave
 
           const tableTopY = cursorY;
           doc.rect(tableX, tableTopY, tableW, totalTableH);
-          doc.line(tableX + col1W, tableTopY, tableX + col1W, tableTopY + totalTableH);
-          doc.line(tableX, tableTopY + headerH, tableX + tableW, tableTopY + headerH);
-          for (let r = 1; r < numRows; r++) {
-              doc.line(tableX, tableTopY + headerH + (rowH * r), tableX + tableW, tableTopY + headerH + (rowH * r));
+          
+          for (let r = 1; r < totalRows; r++) {
+              doc.line(tableX, tableTopY + (rowH * r), tableX + tableW, tableTopY + (rowH * r));
           }
+          doc.line(tableX + colW, tableTopY, tableX + colW, tableTopY + (rowH * 2));
 
           doc.setFont("times", "bold");
-          doc.setFontSize(8);
-          doc.text("IDENTIFICAÇÃO DOS SIGNATÁRIOS:", tableX + 3, tableTopY + 4);
-          doc.text("CAMPO PARA ASSINATURA MANUAL:", tableX + col1W + 3, tableTopY + 4);
+          doc.setFontSize(8.5);
+          doc.text("MICHEL SANTOS FELIX", tableX + 3, tableTopY + 3.4);
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO", tableX + colW + 3, tableTopY + 3.4);
 
-          doc.setFontSize(7.5);
-          let rY = tableTopY + headerH;
-          doc.text("MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 4.5);
-          rY += rowH;
-          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 4.5);
-          rY += rowH;
-          
-          let contratanteLabel = `${clientName} - CPF: ${clientCPF} (CONTRATANTE)`;
+          doc.setFont("times", "normal");
+          doc.setFontSize(8);
+          doc.text("OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, tableTopY + rowH + 3.4);
+          doc.text("OAB/RJ: 226.749 (CONTRATADA)", tableX + colW + 3, tableTopY + rowH + 3.4);
+
+          doc.setFont("times", "bold");
+          doc.setFontSize(8.5);
+          doc.text(clientName, tableX + 3, tableTopY + (rowH * 2) + 3.4);
+
+          doc.setFont("times", "normal");
+          doc.setFontSize(8);
+          let contratanteSub = `CPF: ${clientCPF} (CONTRATANTE)`;
           if (isMinor) {
-              contratanteLabel += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
+              contratanteSub += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
           }
-          doc.text(contratanteLabel, tableX + 3, rY + 4.5);
+          doc.text(contratanteSub, tableX + 3, tableTopY + (rowH * 3) + 3.4);
       }
 
       // Adiciona o cabeçalho e rodapé padrão do escritório em todas as páginas do PDF

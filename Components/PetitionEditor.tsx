@@ -1022,18 +1022,17 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
             if (is2ColSignatureTable) {
               node._isSignatureTable = true;
-              // Give 52% width to IDENTIFICAÇÃO and 48% width to ASSINATURA (~8.5cm wide space for handwriting)
-              node.table.widths = ['52%', '48%'];
+              node.table.widths = ['50%', '50%'];
               node.alignment = 'center';
               node.layout = {
-                hLineWidth: function () { return 1; },
-                vLineWidth: function () { return 1; },
-                hLineColor: function () { return '#1e293b'; },
-                vLineColor: function () { return '#1e293b'; },
-                paddingLeft: function () { return 8; },
-                paddingRight: function () { return 8; },
-                paddingTop: function (i: number) { return i === 0 ? 6 : 14; },
-                paddingBottom: function (i: number) { return i === 0 ? 6 : 14; },
+                hLineWidth: function () { return 0.75; },
+                vLineWidth: function () { return 0.75; },
+                hLineColor: function () { return '#d1b3b3'; },
+                vLineColor: function () { return '#d1b3b3'; },
+                paddingLeft: function () { return 6; },
+                paddingRight: function () { return 6; },
+                paddingTop: function () { return 3; },
+                paddingBottom: function () { return 3; },
               };
             } else {
               // Calculate max text length to determine layout for general tables
