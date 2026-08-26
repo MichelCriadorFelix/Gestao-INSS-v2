@@ -14,14 +14,21 @@ interface AiMemoryRule {
 interface AiMemoryModalProps {
   onClose: () => void;
   personaId: string;
+  initialRule?: string;
 }
 
-export function AiMemoryModal({ onClose, personaId }: AiMemoryModalProps) {
+export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemoryModalProps) {
   const [rules, setRules] = useState<AiMemoryRule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newRule, setNewRule] = useState("");
+  const [newRule, setNewRule] = useState(initialRule);
   const [targetPersona, setTargetPersona] = useState<string>(personaId || "global");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (initialRule) {
+      setNewRule(initialRule);
+    }
+  }, [initialRule]);
 
   useEffect(() => {
     fetchRules();

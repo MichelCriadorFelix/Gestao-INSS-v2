@@ -4635,6 +4635,35 @@ app.get("/api/bcdata/inpc", async (req, res) => {
 // AI MEMORY RULES (Memória Contínua)
 // ====================================================================
 
+async function getActiveMemoryRulesPrompt(personaId: string): Promise<string> {
+  try {
+    const { data: rules } = await supabaseAdmin
+      .from('ai_memory_rules')
+      .select('persona, rule_text')
+      .eq('active', true);
+
+    if (!rules || rules.length === 0) return "";
+
+    const relevantRules = rules.filter((r: any) => r.persona === 'global' || r.persona === personaId);
+    if (relevantRules.length === 0) return "";
+
+    const formatted = relevantRules.map((r: any, idx: number) => {
+      const scope = r.persona === 'global' ? '[DIRETRIZ GLOBAL DO ESCRITÓRIO]' : `[DIRETRIZ ESPECÍFICA - ${personaId.toUpperCase()}]`;
+      return `${idx + 1}. ${scope}: ${r.rule_text}`;
+    }).join('\n');
+
+    return `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MEMÓRIA CONTÍNUA FIXADA PELO ADVOGADO (DIRETRIZES OBRIGATÓRIAS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+As seguintes regras e preferências foram registradas pelo advogado no banco de dados para serem seguidas em TODAS as gerações e análises:
+${formatted}
+⚠️ CUMPRA RIGOROSAMENTE CADA UMA DAS DIRETRIZES ACIMA.\n`;
+  } catch (e) {
+    console.warn("Aviso ao carregar regras de memória da IA:", e);
+    return "";
+  }
+}
+
 app.get("/api/ai-memory-rules", async (req, res) => {
   try {
     const { data: rules, error } = await supabaseAdmin
@@ -5008,6 +5037,19 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
+    }
+
+    selectedSystemPrompt += `\n\n[APRENDIZADO CONTÍNUO - MEMÓRIA DA IA]
+Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR uma diretriz, regra ou padrão de formatação para uso em peças futuras (ex: "guarde na memória que...", "nunca cite...", "sempre inclua..."), você DEVE obrigatoriamente incluir na sua resposta a tag exata:
+[COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
+
+Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+
+    // Injeção de Regras da Memória Contínua (Dr. Michel + Globais)
+    const memoryRulesMichel = await getActiveMemoryRulesPrompt('michel');
+    if (memoryRulesMichel) {
+      selectedSystemPrompt += memoryRulesMichel;
     }
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
@@ -5509,6 +5551,22 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
+      // Extracão de Memória Contínua (Silenciosa)
+      try {
+        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
+        if (memoryCommandMatch && memoryCommandMatch[1]) {
+           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
+           await supabaseAdmin.from('ai_memory_rules').insert({
+               persona: 'michel',
+               rule_text: ruleToSave,
+               active: true
+           });
+           console.log(`[Dr.Michel] Diretriz salva na memória contínua: ${ruleToSave}`);
+        }
+      } catch (e) {
+        console.error("Erro ao salvar diretriz de memória (DrMichel):", e);
+      }
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (err: any) {
@@ -5750,6 +5808,19 @@ O objetivo principal do relatório é dar ao advogado o panorama técnico EXATO 
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez (você tem capacidade nativa para isso). Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo — proibido encher linguiça. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
+    }
+
+    selectedSystemPrompt += `\n\n[APRENDIZADO CONTÍNUO - MEMÓRIA DA IA]
+Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR uma diretriz, regra ou padrão de formatação para uso em peças futuras (ex: "guarde na memória que...", "nunca cite...", "sempre inclua..."), você DEVE obrigatoriamente incluir na sua resposta a tag exata:
+[COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
+
+Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+
+    // Injeção de Regras da Memória Contínua (Dra. Luana + Globais)
+    const memoryRulesLuana = await getActiveMemoryRulesPrompt('luana');
+    if (memoryRulesLuana) {
+      selectedSystemPrompt += memoryRulesLuana;
     }
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
@@ -6287,6 +6358,22 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
+      // Extracão de Memória Contínua (Silenciosa)
+      try {
+        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
+        if (memoryCommandMatch && memoryCommandMatch[1]) {
+           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
+           await supabaseAdmin.from('ai_memory_rules').insert({
+               persona: 'luana',
+               rule_text: ruleToSave,
+               active: true
+           });
+           console.log(`[Dra.Luana] Diretriz salva na memória contínua: ${ruleToSave}`);
+        }
+      } catch (e) {
+        console.error("Erro ao salvar diretriz de memória (DraLuana):", e);
+      }
+
       res.write(`data: [DONE]\n\n`);
       res.end();
     } catch (streamError: any) {
@@ -6485,6 +6572,19 @@ NÃO gere ou reescreva a petição inteira; forneça unicamente este laudo de au
 
     if (model && (model.includes('deepseek') || model.includes('qwen'))) {
       selectedSystemPrompt += `\n\n[INSTRUÇÃO PRIORITÁRIA PARA DEEPSEEK/QWEN]: Você está gerando uma peça jurídica brasileira de elite de Direito do Consumidor ou Direito Civil. IGNORE qualquer template pré-treinado. Siga EXCLUSIVAMENTE a estrutura obrigatória deste prompt. Redija a petição COMPLETA de uma só vez. Densidade real: cada parágrafo deve trazer fato novo, prova nova ou argumento novo. Citações de lei e jurisprudência APENAS quando constantes na Base de Conhecimento (RAG), e SEMPRE em blockquote (>). NUNCA pergunte se deve continuar.`;
+    }
+
+    selectedSystemPrompt += `\n\n[APRENDIZADO CONTÍNUO - MEMÓRIA DA IA]
+Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR uma diretriz, regra ou padrão de formatação para uso em peças futuras (ex: "guarde na memória que...", "nunca cite...", "sempre inclua..."), você DEVE obrigatoriamente incluir na sua resposta a tag exata:
+[COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
+
+Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+
+    // Injeção de Regras da Memória Contínua (Dr. Felix & Castro + Globais)
+    const memoryRulesFelix = await getActiveMemoryRulesPrompt('felix');
+    if (memoryRulesFelix) {
+      selectedSystemPrompt += memoryRulesFelix;
     }
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
@@ -6946,6 +7046,22 @@ REGRAS ABSOLUTAS:
         } catch (e) {
           console.error("Erro salvando petition_draft (DrFelixCastro):", e);
         }
+      }
+
+      // Extracão de Memória Contínua (Silenciosa)
+      try {
+        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
+        if (memoryCommandMatch && memoryCommandMatch[1]) {
+           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
+           await supabaseAdmin.from('ai_memory_rules').insert({
+               persona: 'felix',
+               rule_text: ruleToSave,
+               active: true
+           });
+           console.log(`[Dr.FelixCastro] Diretriz salva na memória contínua: ${ruleToSave}`);
+        }
+      } catch (e) {
+        console.error("Erro ao salvar diretriz de memória (DrFelixCastro):", e);
       }
 
       res.write(`data: [DONE]\n\n`);

@@ -559,6 +559,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
 
   // AI Memory Modal State
   const [showAiMemoryModal, setShowAiMemoryModal] = useState(false);
+  const [initialMemoryRule, setInitialMemoryRule] = useState("");
+  const [memoryModalPersona, setMemoryModalPersona] = useState("");
 
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
@@ -2627,8 +2629,13 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       
       {showAiMemoryModal && (
         <AiMemoryModal 
-          onClose={() => setShowAiMemoryModal(false)} 
-          personaId={persona.aiName} 
+          onClose={() => {
+             setShowAiMemoryModal(false);
+             setInitialMemoryRule("");
+             setMemoryModalPersona("");
+          }} 
+          personaId={memoryModalPersona || persona.aiName} 
+          initialRule={initialMemoryRule}
         />
       )}
       
@@ -2655,7 +2662,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               <Plus className="w-5 h-5" /> Nova
             </button>
             <button
-              onClick={() => setShowAiMemoryModal(true)}
+              onClick={() => {
+                setMemoryModalPersona(persona.aiName);
+                setInitialMemoryRule("");
+                setShowAiMemoryModal(true);
+              }}
               className="px-3 bg-white dark:bg-bordeaux-900/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl shadow-sm hover:bg-emerald-50 dark:hover:bg-bordeaux-900 hover:scale-105 transition-all outline-none flex items-center justify-center"
               title="Memória da IA (Treinamento)"
             >
@@ -2824,15 +2835,39 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               </div>
             ) : (
               <div className="max-w-3xl mx-auto space-y-6 px-1 sm:px-2">
-                {currentSession.messages.map(msg => (
+                {currentSession.messages.map(msg => {
+                  let cleanedContent = msg.content || '';
+                  
+                  let memorySuggestionText = '';
+                  const hasSuggestion = cleanedContent.includes('[SUGESTAO_MEMORIA:');
+                  if (hasSuggestion) {
+                    const match = cleanedContent.match(/\[SUGESTAO_MEMORIA:\s*(.*?)\]/);
+                    if (match && match[1]) {
+                      memorySuggestionText = match[1].replace(/["']/g, "");
+                      cleanedContent = cleanedContent.replace(match[0], '').trim();
+                    }
+                  }
+
+                  let memoryCommandText = '';
+                  const hasCommand = cleanedContent.includes('[COMANDO_SALVAR_MEMORIA:');
+                  if (hasCommand) {
+                    const match = cleanedContent.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
+                    if (match && match[1]) {
+                      memoryCommandText = match[1].replace(/["']/g, "");
+                      cleanedContent = cleanedContent.replace(match[0], '').trim();
+                    }
+                  }
+
+                  // Use cleanedContent em vez de msg.content para a renderização abaixo
+                  return (
                   <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
                     {msg.role === 'user' ? (
                       // BUBBLE DO USUÁRIO — estilo Claude
                       <div className="max-w-[85%] bg-slate-100 dark:bg-bordeaux-900/40 rounded-2xl rounded-tr-md px-5 py-3.5 shadow-sm">
                         <div className="text-[15px] leading-relaxed text-slate-800 dark:text-slate-100 whitespace-pre-wrap font-inter">
-                          {(msg.content || '').length > 3000
-                            ? (msg.content || '').substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
-                            : (msg.content || '')}
+                          {cleanedContent.length > 3000
+                            ? cleanedContent.substring(0, 800) + '\n\n[... conteúdo longo ocultado ...]'
+                            : cleanedContent}
                         </div>
                         <div className="flex justify-end mt-1.5">
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
@@ -2855,19 +2890,19 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                             </span>
                           </div>
 
-                          {isArtifactContent(msg.content) ? (
+                          {isArtifactContent(cleanedContent) ? (
                             <div className="space-y-3">
                               {/* Intro text if any */}
-                              {msg.content.split('\n\n').length > 1 && !msg.content.trim().startsWith('EXCELENTÍSSIMO') && !msg.content.trim().startsWith('AO JUÍZO') && (
+                              {cleanedContent.split('\n\n').length > 1 && !cleanedContent.trim().startsWith('EXCELENTÍSSIMO') && !cleanedContent.trim().startsWith('AO JUÍZO') && (
                                 <div className="prose prose-slate dark:prose-invert max-w-none prose-sm font-inter">
-                                  <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content.split('\n\n')[0] || '') }} />
+                                  <div dangerouslySetInnerHTML={{ __html: markdownToHtml(cleanedContent.split('\n\n')[0] || '') }} />
                                 </div>
                               )}
 
                               {/* ARTIFACT EMBEDDED CARD */}
                               {(() => {
                                 const meta = getArtifactMeta(
-                                  msg.content, 
+                                  cleanedContent, 
                                   msg.id, 
                                   currentSession.messages, 
                                   customArtifactTypes[msg.id]
@@ -2917,7 +2952,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            generateDocx(msg.content || '');
+                                            generateDocx(cleanedContent);
                                           }}
                                           className="px-2.5 py-1.5 bg-white dark:bg-bordeaux-900 border border-slate-200 dark:border-emerald-800/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
                                           title="Baixar Word"
@@ -2943,32 +2978,62 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                                             prose-a:text-emerald-600 dark:prose-a:text-emerald-400 prose-a:no-underline hover:prose-a:underline
                                             prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:font-bold
                                             font-inter">
-                              <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
+                              <div dangerouslySetInnerHTML={{ __html: markdownToHtml(cleanedContent) }} />
                             </div>
                           )}
+
+                          {/* UI SUGERIR MEMÓRIA */}
+                          {memorySuggestionText && (
+                            <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
+                              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
+                                <Lightbulb className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">💡 Sugestão de Aprendizado</p>
+                                <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{memorySuggestionText}</p>
+                              </div>
+                              <button 
+                                onClick={() => { setMemoryModalPersona(persona.aiName); setInitialMemoryRule(memorySuggestionText); setShowAiMemoryModal(true); }}
+                                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                              >
+                                ✨ Salvar Regra
+                              </button>
+                            </div>
+                          )}
+
+                          {/* UI COMANDO MEMÓRIA SUCESSO */}
+                          {memoryCommandText && (
+                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
+                               <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                               <div className="text-sm text-emerald-800 dark:text-emerald-200">
+                                 <span className="font-bold">Diretriz gravada com sucesso:</span> {memoryCommandText}
+                               </div>
+                            </div>
+                          )}
+
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => copyToClipboard(msg.content || '', msg.id)}
+                            onClick={() => copyToClipboard(cleanedContent, msg.id)}
                             className="p-1.5 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-md transition-colors"
                             title="Copiar"
                           >
                             {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
                           </button>
                           {(
-                            /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(msg.content || '') ||
-                            (msg.content || '').length > 1000
+                            /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(cleanedContent) ||
+                            cleanedContent.length > 1000
                           ) && (
                             <>
                               <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900/60 mx-1"></div>
                               <button
-                                onClick={() => generateDocx(msg.content || '')}
+                                onClick={() => generateDocx(cleanedContent)}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors"
                                 title="Baixar Word"
                               >
                                 <Download className="w-3.5 h-3.5" /> Word
                               </button>
                               <button
-                                onClick={() => handleOpenInEditor(msg.content || '')}
+                                onClick={() => handleOpenInEditor(cleanedContent)}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 fc-btn-primary text-cream-50 rounded-md text-xs font-semibold transition-colors shadow-sm"
                                 title="Editor"
                               >
@@ -2981,7 +3046,8 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
               {isLoading && (
                 <div className="w-full flex gap-3 sm:gap-4">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
