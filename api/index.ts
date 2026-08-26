@@ -5155,8 +5155,15 @@ REGRAS DE OURO:
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
-[COMANDOS DO SISTEMA]:
-Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
+[COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
+1. ATUALIZAÇÃO EM LOTE NA AGENDA, CONTRATOS E CLIENTES:
+   - Para resolver compromissos da agenda, inclua: [ACTION:RESOLVE_AGENDA:id_do_evento]
+   - Para alterar o status de um contrato, inclua: [ACTION:UPDATE_CONTRACT:id_do_contrato:STATUS] (Valores de STATUS: 'Pendente', 'Em Andamento' ou 'Concluído').
+   - Para alterar o status de um cliente/cadastro, inclua: [ACTION:UPDATE_CLIENT:id_do_cliente:STATUS] (Valores de STATUS: 'Ativo', 'Em Andamento', 'Concluído', 'Arquivado').
+   - IMPORTANTE: Emita uma tag para CADA item solicitado na MESMA resposta para atualizações em lote.
+2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
+   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
+   - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -5947,8 +5954,15 @@ REGRAS DE OURO:
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
-[COMANDOS DO SISTEMA]:
-Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
+[COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
+1. ATUALIZAÇÃO EM LOTE NA AGENDA, CONTRATOS E CLIENTES:
+   - Para resolver compromissos da agenda, inclua: [ACTION:RESOLVE_AGENDA:id_do_evento]
+   - Para alterar o status de um contrato, inclua: [ACTION:UPDATE_CONTRACT:id_do_contrato:STATUS] (Valores de STATUS: 'Pendente', 'Em Andamento' ou 'Concluído').
+   - Para alterar o status de um cliente/cadastro, inclua: [ACTION:UPDATE_CLIENT:id_do_cliente:STATUS] (Valores de STATUS: 'Ativo', 'Em Andamento', 'Concluído', 'Arquivado').
+   - IMPORTANTE: Emita uma tag para CADA item solicitado na MESMA resposta para atualizações em lote.
+2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
+   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
+   - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -6724,8 +6738,15 @@ REGRAS DE OURO:
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
-[COMANDOS DO SISTEMA]:
-Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
+[COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
+1. ATUALIZAÇÃO EM LOTE NA AGENDA, CONTRATOS E CLIENTES:
+   - Para resolver compromissos da agenda, inclua: [ACTION:RESOLVE_AGENDA:id_do_evento]
+   - Para alterar o status de um contrato, inclua: [ACTION:UPDATE_CONTRACT:id_do_contrato:STATUS] (Valores de STATUS: 'Pendente', 'Em Andamento' ou 'Concluído').
+   - Para alterar o status de um cliente/cadastro, inclua: [ACTION:UPDATE_CLIENT:id_do_cliente:STATUS] (Valores de STATUS: 'Ativo', 'Em Andamento', 'Concluído', 'Arquivado').
+   - IMPORTANTE: Emita uma tag para CADA item solicitado na MESMA resposta para atualizações em lote.
+2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
+   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
+   - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;
@@ -7397,8 +7418,15 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     if (systemState && intent !== "[GERAÇÃO]") {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
-[COMANDOS DO SISTEMA]:
-Para atualizar ou resolver um evento da agenda mediante solicitação, inclua EXATAMENTE este comando na sua resposta (onde id_do_evento é a string do id fornecido): [ACTION:RESOLVE_AGENDA:id_do_evento]. Você pode emitir múltiplos comandos se necessário.
+[COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
+1. ATUALIZAÇÃO EM LOTE NA AGENDA, CONTRATOS E CLIENTES:
+   - Para resolver compromissos da agenda, inclua: [ACTION:RESOLVE_AGENDA:id_do_evento]
+   - Para alterar o status de um contrato, inclua: [ACTION:UPDATE_CONTRACT:id_do_contrato:STATUS] (Valores de STATUS: 'Pendente', 'Em Andamento' ou 'Concluído').
+   - Para alterar o status de um cliente/cadastro, inclua: [ACTION:UPDATE_CLIENT:id_do_cliente:STATUS] (Valores de STATUS: 'Ativo', 'Em Andamento', 'Concluído', 'Arquivado').
+   - IMPORTANTE: Emita uma tag para CADA item solicitado na MESMA resposta para atualizações em lote.
+2. FOCO ESTRITAMENTE OPERACIONAL E ADMINISTRATIVO:
+   - Ao responder sobre agenda, lista de contratos, dados de clientes ou atualizações de CRM, seja OBJETIVO, SUCINTO, DIRETO e ADMINISTRATIVO.
+   - NUNCA adicione pareceres jurídicos longos, fundamentações teóricas, citações de artigos de lei (ex: Art. 59 da Lei 8.213/91), doutrinas ou rotinas de monitoramento processual, A MENOS QUE o advogado solicite expressamente uma fundamentação jurídica ou análise técnica do caso.
 `;
       if (systemState.agenda && systemState.agenda.length > 0) {
         selectedSystemPrompt += `AGENDA (Eventos e Compromissos):\n${JSON.stringify(systemState.agenda)}\n\n`;

@@ -1118,23 +1118,44 @@ export default function Dashboard({
       try {
           if (payload.action === 'resolve') {
               const eventId = payload.eventId;
-              const existingEvent = agendaEvents.find(e => e.id === eventId);
-              if (existingEvent) {
-                  const updated = agendaEvents.map(e => e.id === eventId ? { ...e, status: 'resolved' as const } : e);
-                  setAgendaEvents(updated);
+              setAgendaEvents(prevEvents => {
+                  let updated: AgendaEvent[];
+                  const existingEvent = prevEvents.find(e => e.id === eventId);
+                  if (existingEvent) {
+                      updated = prevEvents.map(e => e.id === eventId ? { ...e, status: 'resolved' as const } : e);
+                  } else if (eventId.startsWith('v-')) {
+                      // create an override for virtual event
+                      const virtualEvent = mergedAgendaEvents.find(e => e.id === eventId);
+                      if (virtualEvent) {
+                          updated = [...prevEvents, { ...virtualEvent, status: 'resolved' as const }];
+                      } else {
+                          updated = prevEvents;
+                      }
+                  } else {
+                      updated = prevEvents;
+                  }
                   saveData('agenda', updated);
-              } else if (eventId.startsWith('v-')) {
-                  // create an override for virtual event
-                  const virtualEvent = mergedAgendaEvents.find(e => e.id === eventId);
-                  if (virtualEvent) {
-                      const updated = [...agendaEvents, { ...virtualEvent, status: 'resolved' as const }];
-                      setAgendaEvents(updated);
-                      saveData('agenda', updated);
+                  return updated;
+              });
+          } else if (payload.action === 'update_contract') {
+              const { contractId, status } = payload;
+              if (contractId && status) {
+                  handleUpdateContractStatus(contractId, status);
+              }
+          } else if (payload.action === 'update_client') {
+              const { clientId, status } = payload;
+              if (clientId && status) {
+                  const client = records.find(r => r.id === clientId);
+                  if (client) {
+                      const updatedClient = { ...client, status };
+                      const updatedClients = records.map(r => r.id === clientId ? updatedClient : r);
+                      setRecords(updatedClients);
+                      saveData('clients', updatedClients, updatedClient);
                   }
               }
           }
       } catch (e) {
-          console.error("Erro ao processar acao da agenda", e);
+          console.error("Erro ao processar acao de CRM", e);
       }
   };
 

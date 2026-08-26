@@ -1823,7 +1823,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       }
 
       
-      // Process agenda actions
+      // Process CRM / agenda / contract actions
       const agendaRegex = /\[ACTION:RESOLVE_AGENDA:([^\]]+)\]/g;
       let match;
       while ((match = agendaRegex.exec(fullText)) !== null) {
@@ -1833,6 +1833,26 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           }
       }
       displayContent = displayContent.replace(/\[ACTION:RESOLVE_AGENDA:[^\]]+\]/g, '').trim();
+
+      const contractRegex = /\[ACTION:UPDATE_CONTRACT:([^:]+):([^\]]+)\]/g;
+      while ((match = contractRegex.exec(fullText)) !== null) {
+          const contractId = match[1].trim();
+          const status = match[2].trim();
+          if (onAgendaAction) {
+              onAgendaAction({ action: 'update_contract', contractId, status });
+          }
+      }
+      displayContent = displayContent.replace(/\[ACTION:UPDATE_CONTRACT:[^\]]+\]/g, '').trim();
+
+      const clientRegex = /\[ACTION:UPDATE_CLIENT:([^:]+):([^\]]+)\]/g;
+      while ((match = clientRegex.exec(fullText)) !== null) {
+          const clientId = match[1].trim();
+          const status = match[2].trim();
+          if (onAgendaAction) {
+              onAgendaAction({ action: 'update_client', clientId, status });
+          }
+      }
+      displayContent = displayContent.replace(/\[ACTION:UPDATE_CLIENT:[^\]]+\]/g, '').trim();
 
       const assistantMsg: Message = {
         id: generateId(),
