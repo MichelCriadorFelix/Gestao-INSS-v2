@@ -641,7 +641,193 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, petitions: updatedPetitions });
   }
 
-  const generatePDF = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia') => {
+  const getDocumentHTML = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
+      const currentDate = new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
+      const clientName = formData.name?.toUpperCase() || "__________________________";
+      const clientCPF = formData.cpf || "___.___.___-__";
+      const clientAddress = formData.address || "__________________________";
+      const clientNationality = formData.nationality || "brasileiro(a)";
+      const clientMarital = formData.maritalStatus || "estado civil";
+      const clientProfession = formData.profession || "profissão";
+      const isMinor = !!formData.legalRepresentative;
+
+      if (type === 'procuracao') {
+          let outorganteText = "";
+          if (isMinor) {
+              const repName = formData.legalRepresentative?.toUpperCase() || "________________";
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
+              const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
+              const repProf = formData.legalRepresentativeProfession || "do lar";
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              const isMaleRep = formData.legalRepresentativeGender === 'M';
+              const repTitle = isMaleRep ? 'seu genitor' : 'sua genitora';
+              const repInscrito = isMaleRep ? 'inscrito' : 'inscrita';
+              outorganteText = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, representado(a) por ${repTitle} e outorgante, ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, ${repInscrito} no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}.`;
+          } else {
+              outorganteText = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}.`;
+          }
+
+          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 24px; color: #1e293b;">PROCURAÇÃO AD JUDICIA ET EXTRA</h2>
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>OUTORGANTE:</strong> ${outorganteText}</p>
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>OUTORGADO:</strong> MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF/MF nº 142.805.877-01, e LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ sob o nº 226.749 e inscrita no CPF sob o nº 113.599.127-89, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, nº 500, apto. 204, Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201.</p>
+<p style="margin-bottom: 24px; text-align: justify; line-height: 1.6;"><strong>PODERES:</strong> Pelo presente instrumento o outorgante confere ao outorgado amplos poderes para o foro em geral, com cláusula ad judicia et extra, para representá-lo nos órgãos públicos e privados, agências do INSS, Juízos, Instâncias ou Tribunais, possibilitando propor ações de direito competentes e defendê-lo até o final da decisão, usando os recursos legais e acompanhando-os, conferindo-lhe ainda poderes especiais para requerer concessão/revisão de benefícios previdenciários, obter cópias de expedientes e processos administrativos, acessar laudos sociais e periciais, acessar e manejar extratos, sistemas e telas do INSS, agendar serviços e atendimentos no INSS, receber valores e dar quitação, levantar valores, incluindo RPVs e precatórios (podendo para tanto assinar declaração de isenção de imposto de renda), obter extratos de contas judiciais, requerer expedição/retificação de certidões, incluindo Certidões de Tempo de Contribuição, obter cópia de documentos, Perfis Profissiográficos Previdenciários e laudos técnicos, obter cópia de documentos médicos e prontuários, firmar compromissos ou acordos, receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, assinar declaração de hipossuficiência econômica e substabelecer a outrem, com ou sem reservas de iguais poderes, para agir em conjunto ou separadamente com o substabelecido.</p>
+<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
+<div style="text-align: center; margin-top: 40px;">
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
+${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+</div>`;
+      }
+
+      if (type === 'hipossuficiencia') {
+          let text = "";
+          if (isMinor) {
+              const isMaleRep = formData.legalRepresentativeGender === 'M';
+              const repNacionalidade = isMaleRep ? 'brasileiro' : 'brasileira';
+              const repInscrito = isMaleRep ? 'inscrito' : 'inscrita';
+              const repDomiciliado = isMaleRep ? 'domiciliado' : 'domiciliada';
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              text = `Eu, ${formData.legalRepresentative?.toUpperCase()}, ${repNacionalidade}, representante legal de ${clientName}, ${repInscrito} no CPF sob o nº ${repCPF}, residente e ${repDomiciliado} à ${repAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
+          } else {
+              text = `Eu, ${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, DECLARO para os devidos fins de direito que não possuo condições de arcar com as custas processuais e despesas judiciais sem causar prejuízos ao meu próprio sustento e ao da minha família, nos termos dos arts. 98 a 102 da Lei 13.105/2015.`;
+          }
+
+          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 24px; color: #1e293b;">DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA</h2>
+<p style="margin-bottom: 32px; text-align: justify; line-height: 1.8;">${text}</p>
+<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
+<div style="text-align: center; margin-top: 40px;">
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
+${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+</div>`;
+      }
+
+      if (type === 'renuncia') {
+          let text = "";
+          if (isMinor) {
+              text = `${clientName}, CPF nº ${clientCPF}, neste ato representado por ${formData.legalRepresentative?.toUpperCase()}, renuncia à soma das parcelas vencidas e 12 vincendas que excedem ao teto do Juizado Especial Federal, a fim de permitir o trâmite da presente ação no Juizado Especial Federal, conforme Tema 1.030 do STJ.`;
+          } else {
+              text = `${clientName}, CPF nº ${clientCPF}, renuncia à soma das parcelas vencidas e 12 vincendas que excedem ao teto do Juizado Especial Federal, a fim de permitir o trâmite da presente ação no Juizado Especial Federal, conforme Tema 1.030 do STJ.`;
+          }
+
+          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #1e293b;">TERMO DE RENÚNCIA AOS VALORES EXCEDENTES</h2>
+<h3 style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 24px; color: #475569;">AO TETO DO JEF</h3>
+<p style="margin-bottom: 32px; text-align: justify; line-height: 1.8;">${text}</p>
+<p style="margin-top: 32px; margin-bottom: 48px;">São João de Meriti/RJ, ${currentDate}.</p>
+<div style="text-align: center; margin-top: 40px;">
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">${clientName}</p>
+${isMinor ? `<p style="font-size: 13px; color: #64748b;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</p>` : ''}
+</div>`;
+      }
+
+      if (type === 'contrato_honorarios') {
+          let contratanteQualif = "";
+          if (isMinor) {
+              const repName = formData.legalRepresentative?.toUpperCase() || "________________";
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
+              const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
+              const repProf = formData.legalRepresentativeProfession || "do lar";
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              contratanteQualif = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, neste ato representado(a) por ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, inscrito(a) no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}, doravante denominado(a) <strong>CONTRATANTE</strong>;`;
+          } else {
+              contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) <strong>CONTRATANTE</strong>;`;
+          }
+
+          return `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #1e293b;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
+<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;">Pelo presente instrumento particular, de um lado:</p>
+<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CONTRATANTE:</strong> ${contratanteQualif}</p>
+<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;">E de outro lado:</p>
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CONTRATADOS:</strong> Os advogados <strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ sob o nº 226.749 e no CPF sob o nº 113.599.127-89, e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF sob o nº 142.805.877-01, ambos com endereço eletrônico felixecastroadv@gmail.com e escritório profissional sito na Av. Prefeito José de Amorim, nº 500, Ap. 204, Vilar dos Teles, São João de Meriti/RJ, CEP 25555-201, doravante denominados <strong>CONTRATADOS</strong>.</p>
+<p style="margin-bottom: 20px; text-align: justify; line-height: 1.6;">Têm entre si, justo e contratado, o presente Contrato de Honorários Advocatícios, mediante as cláusulas e condições seguintes:</p>
+
+<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA PRIMEIRA – DO OBJETO</strong><br/>
+O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
+
+<p style="margin-bottom: 12px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</strong><br/>
+O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
+
+<p style="margin-bottom: 8px; text-align: justify; line-height: 1.6;"><strong>2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</strong><br/>
+( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.<br/>
+( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
+
+<p style="margin-bottom: 8px; text-align: justify; line-height: 1.6;"><strong>2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</strong><br/>
+( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.<br/>
+( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
+
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
+
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA TERCEIRA – DAS DESPESAS</strong><br/>
+Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
+
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA QUARTA – DAS OBRIGAÇÕES DAS PARTES</strong><br/>
+<strong>4.1. Dos CONTRATADOS:</strong> Atuar com zelo e diligência na defesa dos interesses do(a) <strong>CONTRATANTE</strong>, prestando informações sobre o andamento do processo sempre que solicitado ou quando houver movimentação relevante.<br/>
+<strong>4.2. Do(a) CONTRATANTE:</strong> Fornecer todas as informações e documentos necessários para a defesa de seus interesses, bem como comparecer aos atos processuais que exigirem sua presença, sempre que solicitado pelos <strong>CONTRATADOS</strong>.</p>
+
+<p style="margin-bottom: 16px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA QUINTA – DA RESCISÃO</strong><br/>
+O presente contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante comunicação escrita. Em caso de rescisão unilateral por parte do(a) <strong>CONTRATANTE</strong> sem justa causa antes do término dos serviços, serão devidos honorários proporcionais ao trabalho já realizado, além do reembolso das despesas.</p>
+
+<p style="margin-bottom: 20px; text-align: justify; line-height: 1.6;"><strong>CLÁUSULA SEXTA – DO FORO</strong><br/>
+Fica eleito o foro da Comarca de São João de Meriti, Estado do Rio de Janeiro, para dirimir quaisquer dúvidas oriundas do presente contrato, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+
+<p style="margin-bottom: 20px; line-height: 1.6;">E por estarem assim justos e contratados, as partes assinam o presente em 02 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.</p>
+
+<p style="margin-top: 24px; margin-bottom: 40px;">São João de Meriti/RJ, ${currentDate}.</p>
+
+<div style="display: flex; flex-direction: column; gap: 24px; text-align: center; margin-top: 30px;">
+<div>
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</p>
+</div>
+<div>
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</p>
+</div>
+<div>
+<p>____________________________________________________</p>
+<p style="font-weight: bold; margin-top: 4px;">${clientName} - CPF: ${clientCPF} (CONTRATANTE)</p>
+</div>
+</div>`;
+      }
+
+      return '';
+  };
+
+  const handleOpenInEditor = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', customDocName?: string, customDocUrl?: string) => {
+      let title = customDocName || 'Documento sem título';
+      let htmlContent = '';
+
+      if (type !== 'custom') {
+          const titleMap = {
+              procuracao: `Procuração Ad Judicia - ${formData.name || 'Cliente'}`,
+              hipossuficiencia: `Declaração de Hipossuficiência - ${formData.name || 'Cliente'}`,
+              renuncia: `Termo de Renúncia Teto JEF - ${formData.name || 'Cliente'}`,
+              contrato_honorarios: `Contrato de Honorários Previdenciários - ${formData.name || 'Cliente'}`
+          };
+          title = titleMap[type];
+          htmlContent = getDocumentHTML(type);
+      } else {
+          htmlContent = `<h2 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p>Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
+      }
+
+      const petition = {
+          id: 'doc_' + Math.random().toString(36).substr(2, 9),
+          title,
+          content: htmlContent,
+          category: type === 'contrato_honorarios' ? 'Contrato Previdenciário' : 'Documento / Procuração',
+          type: 'concrete' as const,
+          lastModified: new Date().toLocaleString('pt-BR')
+      };
+
+      if (onOpenPetition) {
+          onOpenPetition(petition, formData.id);
+      }
+  };
+
+  const generatePDF = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
       // @ts-ignore
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -1383,19 +1569,118 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
-                        <button onClick={() => generatePDF('procuracao')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
-                            <DocumentTextIcon className="h-5 w-5 text-blue-500" />
-                            Gerar Procuração
-                        </button>
-                        <button onClick={() => generatePDF('hipossuficiencia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
-                            <ScaleIcon className="h-5 w-5 text-purple-500" />
-                            Gerar Declaração
-                        </button>
-                        <button onClick={() => generatePDF('renuncia')} className="flex items-center justify-center gap-2 p-3 bg-slate-100 dark:bg-bordeaux-900/40 rounded-xl hover:bg-slate-200 dark:hover:bg-bordeaux-900/60 transition text-xs font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-gold-500/15">
-                            <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-500" />
-                            Gerar Renúncia
-                        </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                        {/* Procuração */}
+                        <div className="flex flex-col p-3 bg-slate-50 dark:bg-bordeaux-900/40 rounded-xl border border-slate-200 dark:border-gold-500/15 justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                                <DocumentTextIcon className="h-5 w-5 text-blue-500 shrink-0" />
+                                <span>Procuração</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenInEditor('procuracao')}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
+                                    title="Abrir no Editor do Escritório"
+                                >
+                                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => generatePDF('procuracao')}
+                                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[11px] font-bold transition"
+                                    title="Baixar PDF direto"
+                                >
+                                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                    PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Declaração */}
+                        <div className="flex flex-col p-3 bg-slate-50 dark:bg-bordeaux-900/40 rounded-xl border border-slate-200 dark:border-gold-500/15 justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                                <ScaleIcon className="h-5 w-5 text-purple-500 shrink-0" />
+                                <span>Declaração</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenInEditor('hipossuficiencia')}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
+                                    title="Abrir no Editor do Escritório"
+                                >
+                                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => generatePDF('hipossuficiencia')}
+                                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[11px] font-bold transition"
+                                    title="Baixar PDF direto"
+                                >
+                                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                    PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Renúncia */}
+                        <div className="flex flex-col p-3 bg-slate-50 dark:bg-bordeaux-900/40 rounded-xl border border-slate-200 dark:border-gold-500/15 justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                                <ClipboardDocumentCheckIcon className="h-5 w-5 text-green-500 shrink-0" />
+                                <span>Renúncia Teto</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenInEditor('renuncia')}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
+                                    title="Abrir no Editor do Escritório"
+                                >
+                                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => generatePDF('renuncia')}
+                                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-[11px] font-bold transition"
+                                    title="Baixar PDF direto"
+                                >
+                                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                    PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Contrato de Honorários Previdenciário */}
+                        <div className="flex flex-col p-3 bg-amber-50/70 dark:bg-amber-950/20 rounded-xl border border-amber-300/40 dark:border-amber-500/20 justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                                <DocumentTextIcon className="h-5 w-5 text-amber-600 shrink-0" />
+                                <span>Contrato Honorários</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenInEditor('contrato_honorarios')}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
+                                    title="Abrir Contrato de Honorários Previdenciário no Editor"
+                                >
+                                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => generatePDF('contrato_honorarios')}
+                                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-200 dark:bg-amber-900/60 hover:bg-amber-300 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 rounded-lg text-[11px] font-bold transition"
+                                    title="Baixar PDF do Contrato"
+                                >
+                                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                    PDF
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-3">
@@ -1471,6 +1756,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                             )}
                                         </div>
                                         
+                                        <button 
+                                            onClick={() => handleOpenInEditor('custom', doc.name, doc.url)}
+                                            className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg" 
+                                            title="Abrir no Editor do Escritório"
+                                        >
+                                            <PencilSquareIcon className="h-5 w-5" />
+                                        </button>
                                         <button 
                                             onClick={() => downloadFileRobust(doc.url, doc.name)}
                                             className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg" 
