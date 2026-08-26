@@ -882,7 +882,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       const defaultMarginBottom = isContractDoc ? 4 : 12;
 
       // Convert HTML to pdfmake format
-      const pdfMakeContent = htmlToPdfmake(rawHtml, {
+      let pdfMakeContent: any = htmlToPdfmake(rawHtml, {
         defaultStyles: {
           p: {
             fontSize: defaultFontSize,
@@ -911,18 +911,25 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         }
       });
 
-      // Recursively remove any 'font' property to force pdfmake to use defaultStyle font
-      const removeFontProperty = (obj: any) => {
+      if (!Array.isArray(pdfMakeContent)) {
+        pdfMakeContent = [pdfMakeContent];
+      }
+
+      // Recursively remove any 'font' property & sanitize non-array canvas properties
+      const sanitizePdfMakeNodes = (obj: any) => {
         if (Array.isArray(obj)) {
-          obj.forEach(removeFontProperty);
+          obj.forEach(sanitizePdfMakeNodes);
         } else if (obj !== null && typeof obj === 'object') {
           if (obj.font) {
             delete obj.font;
           }
-          Object.values(obj).forEach(removeFontProperty);
+          if (obj.canvas && !Array.isArray(obj.canvas)) {
+            delete obj.canvas;
+          }
+          Object.values(obj).forEach(sanitizePdfMakeNodes);
         }
       };
-      removeFontProperty(pdfMakeContent);
+      sanitizePdfMakeNodes(pdfMakeContent);
 
       // Apply text-indent to paragraphs
       const applyIndent = (nodes: any[], inBlockquote = false, inTable = false, isSmallTable = false) => {
@@ -1103,6 +1110,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           color: '#000000'
         },
         header: function(currentPage: number, pageCount: number) {
+          if (isContractDoc) return null;
           return {
             canvas: [
               {
@@ -1123,6 +1131,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           };
         },
         footer: function(currentPage: number, pageCount: number) {
+          if (isContractDoc) return null;
           return {
             canvas: [
               {

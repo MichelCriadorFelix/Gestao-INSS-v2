@@ -142,6 +142,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [activeTagMenu, setActiveTagMenu] = useState<string | null>(null);
   const [isGeneratingOCR, setIsGeneratingOCR] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false); // UX: feedback visível durante o upload de anexos
+  
+  // Modal de seleção de cláusulas do contrato
+  const [isContractSelectorOpen, setIsContractSelectorOpen] = useState(false);
+  const [contractTargetAction, setContractTargetAction] = useState<'editor' | 'pdf' | null>(null);
+  const [selectedContractClauses, setSelectedContractClauses] = useState<string[]>(['definitivo_judicial']);
+
+  const handleContractClick = (action: 'editor' | 'pdf') => {
+      setContractTargetAction(action);
+      setIsContractSelectorOpen(true);
+  };
+
+  const handleConfirmContractGeneration = async () => {
+      const action = contractTargetAction;
+      const clauses = selectedContractClauses.length > 0 ? selectedContractClauses : ['definitivo_judicial'];
+      setIsContractSelectorOpen(false);
+      
+      if (action === 'editor') {
+          handleOpenInEditor('contrato_honorarios', undefined, undefined, clauses);
+      } else if (action === 'pdf') {
+          await generatePDF('contrato_honorarios', clauses);
+      }
+      setContractTargetAction(null);
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certidaoFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -645,7 +668,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, petitions: updatedPetitions });
   }
 
-  const getDocumentHTML = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
+  const getDocumentHTML = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios', contractClauses: string[] = ['definitivo_judicial']) => {
       const currentDate = new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
       const clientName = formData.name?.toUpperCase() || "__________________________";
       const clientCPF = formData.cpf || "___.___.___-__";
@@ -741,6 +764,40 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, doravante denominado(a) <strong>CONTRATANTE</strong>;`;
           }
 
+          let clauseSecondHTML = `<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</p>
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>`;
+
+          let subIdx = 1;
+          const showMultiple = contractClauses.length > 1;
+
+          if (contractClauses.includes('definitivo_judicial') || contractClauses.includes('definitivo_adm')) {
+              clauseSecondHTML += `<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.${subIdx}. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):</p>`;
+              if (contractClauses.includes('definitivo_adm')) {
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
+              }
+              if (contractClauses.includes('definitivo_judicial')) {
+                  const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
+              }
+              subIdx++;
+          }
+
+          if (contractClauses.includes('temporario_judicial') || contractClauses.includes('temporario_adm')) {
+              clauseSecondHTML += `<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.${subIdx}. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>`;
+              if (contractClauses.includes('temporario_adm')) {
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>`;
+              }
+              if (contractClauses.includes('temporario_judicial')) {
+                  const letter = contractClauses.includes('temporario_adm') ? 'b)' : 'a)';
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>`;
+              }
+              subIdx++;
+          }
+
+          if (showMultiple) {
+              clauseSecondHTML += `<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>2.${subIdx}.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>`;
+          }
+
           return `<h2 class="no-indent" style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS PREVIDENCIÁRIOS</h2>
 
 <p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">Pelo presente instrumento particular, de um lado:</p>
@@ -756,18 +813,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 <p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA PRIMEIRA – DO OBJETO</p>
 <p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">O presente contrato tem como objeto a prestação de serviços advocatícios pelos <strong>CONTRATADOS</strong> em favor do(a) <strong>CONTRATANTE</strong>, visando à concessão e/ou revisão de benefício previdenciário junto ao Instituto Nacional do Seguro Social (INSS), seja na esfera administrativa ou judicial.</p>
 
-<p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS</p>
-<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.35; font-size: 9pt;">O(A) <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:</p>
-
-<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):</p>
-<p class="no-indent" style="margin-left: 14px; margin-bottom: 2px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
-<p class="no-indent" style="margin-left: 14px; margin-bottom: 5px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( <strong>X</strong> ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>
-
-<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>
-<p class="no-indent" style="margin-left: 14px; margin-bottom: 2px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>
-<p class="no-indent" style="margin-left: 14px; margin-bottom: 5px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">( &nbsp; ) b) <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>
-
-<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;"><strong>2.3.</strong> As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).</p>
+${clauseSecondHTML}
 
 <p class="no-indent" style="font-weight: bold; font-size: 9pt; margin-top: 6px; margin-bottom: 2px; text-transform: uppercase;">CLÁUSULA TERCEIRA – DAS DESPESAS</p>
 <p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.35; font-size: 9pt;">Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) <strong>CONTRATANTE</strong>, não estando incluídas nos honorários ora contratados. Os <strong>CONTRATADOS</strong> se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.</p>
@@ -816,7 +862,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       return '';
   };
 
-  const handleOpenInEditor = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', customDocName?: string, customDocUrl?: string) => {
+  const handleOpenInEditor = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', customDocName?: string, customDocUrl?: string, contractClauses?: string[]) => {
       let title = customDocName || 'Documento sem título';
       let htmlContent = '';
 
@@ -828,7 +874,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               contrato_honorarios: `Contrato de Honorários Previdenciários - ${formData.name || 'Cliente'}`
           };
           title = titleMap[type];
-          htmlContent = getDocumentHTML(type);
+          htmlContent = getDocumentHTML(type, contractClauses);
       } else {
           htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p class="no-indent">Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
       }
@@ -847,7 +893,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       }
   };
 
-  const generatePDF = async (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios') => {
+  const generatePDF = async (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios', contractClauses: string[] = ['definitivo_judicial']) => {
       // @ts-ignore
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -1065,15 +1111,36 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           writeText("CLÁUSULA SEGUNDA – DOS HONORÁRIOS ADVOCATÍCIOS", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
           writeText("O(A) CONTRATANTE pagará aos CONTRATADOS, a título de honorários advocatícios, os valores e condições estabelecidas a seguir:", { fontSize: 9, align: 'justify', marginBottom: 1.5 });
 
-          writeText("2.1. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BENEFÍCIO DE PRESTAÇÃO CONTINUADA – BPC, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
-          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
-          writeText("( X ) b) Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 2 });
+          let subIdx = 1;
+          const showMultiple = contractClauses.length > 1;
 
-          writeText("2.2. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):", { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
-          writeText("(   ) a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
-          writeText("(   ) b) Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 2 });
+          if (contractClauses.includes('definitivo_judicial') || contractClauses.includes('definitivo_adm')) {
+              writeText(`2.${subIdx}. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):`, { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
+              if (contractClauses.includes('definitivo_adm')) {
+                  writeText("a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+              }
+              if (contractClauses.includes('definitivo_judicial')) {
+                  const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
+                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
+              }
+              subIdx++;
+          }
 
-          writeText("2.3. As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).", { fontSize: 9, align: 'justify', marginBottom: 2 });
+          if (contractClauses.includes('temporario_judicial') || contractClauses.includes('temporario_adm')) {
+              writeText(`2.${subIdx}. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):`, { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
+              if (contractClauses.includes('temporario_adm')) {
+                  writeText("a) Na esfera administrativa: Os CONTRATADOS farão jus a 01 (um) salário do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+              }
+              if (contractClauses.includes('temporario_judicial')) {
+                  const letter = contractClauses.includes('temporario_adm') ? 'b)' : 'a)';
+                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
+              }
+              subIdx++;
+          }
+
+          if (showMultiple) {
+              writeText(`2.${subIdx}. As partes convencionam que os honorários estabelecidos nas Cláusulas 2.1 e 2.2 não são cumulativos, aplicando-se o maior valor devido em caso de transição entre esferas (administrativa para judicial).`, { fontSize: 9, align: 'justify', marginBottom: 2 });
+          }
 
           writeText("CLÁUSULA TERCEIRA – DAS DESPESAS", { fontStyle: 'bold', fontSize: 9, align: 'left', marginTop: 1.5, marginBottom: 0.8 });
           writeText("Todas as despesas judiciais e/ou administrativas (custas, taxas, emolumentos, deslocamentos, cópias, certidões, perícias, etc.) necessárias ao andamento do processo serão de responsabilidade exclusiva do(a) CONTRATANTE, não estando incluídas nos honorários ora contratados. Os CONTRATADOS se obrigam a prestar contas de toda e qualquer despesa realizada, mediante apresentação de comprovantes.", { fontSize: 9, align: 'justify', marginBottom: 2 });
@@ -1630,7 +1697,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                             <div className="flex items-center gap-1.5 mt-1">
                                 <button 
                                     type="button" 
-                                    onClick={() => handleOpenInEditor('contrato_honorarios')}
+                                    onClick={() => handleContractClick('editor')}
                                     className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
                                     title="Abrir Contrato de Honorários Previdenciário no Editor"
                                 >
@@ -1639,7 +1706,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                                 </button>
                                 <button 
                                     type="button" 
-                                    onClick={() => generatePDF('contrato_honorarios')}
+                                    onClick={() => handleContractClick('pdf')}
                                     className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-200 dark:bg-amber-900/60 hover:bg-amber-300 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 rounded-lg text-[11px] font-bold transition"
                                     title="Baixar PDF do Contrato"
                                 >
@@ -1895,6 +1962,152 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
                 </div>
             ) : null}
       </div>
+
+      {/* Modal de Seleção de Cláusulas do Contrato de Honorários */}
+      {isContractSelectorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-bordeaux-950 border border-slate-200 dark:border-gold-500/30 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="px-6 py-4 bg-slate-900 text-white dark:bg-bordeaux-900 flex items-center justify-between border-b border-gold-500/20">
+              <div className="flex items-center gap-2">
+                <DocumentTextIcon className="h-5 w-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">Opções do Contrato de Honorários</h3>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsContractSelectorOpen(false)}
+                className="text-slate-400 hover:text-white transition"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                <span className="font-bold text-amber-600 dark:text-amber-400 shrink-0">💡 Dica:</span>
+                <p>Selecione <strong>até 2 cláusulas</strong> de cobrança. As não selecionadas serão omitidas do texto final para economizar espaço e caber em 1 página com o quadro de assinaturas.</p>
+              </div>
+
+              <div className="space-y-2.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Cláusulas de Benefício (Selecione no máximo 2):
+                </p>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${selectedContractClauses.includes('definitivo_judicial') ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 text-amber-950 dark:text-amber-100' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
+                  <input 
+                    type="checkbox"
+                    checked={selectedContractClauses.includes('definitivo_judicial')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (selectedContractClauses.length < 2) {
+                          setSelectedContractClauses([...selectedContractClauses, 'definitivo_judicial']);
+                        }
+                      } else {
+                        setSelectedContractClauses(selectedContractClauses.filter(c => c !== 'definitivo_judicial'));
+                      }
+                    }}
+                    disabled={!selectedContractClauses.includes('definitivo_judicial') && selectedContractClauses.length >= 2}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-bold block text-slate-900 dark:text-white">Definitivo - Esfera Judicial</span>
+                    2 salários do benefício concedido (Aposentadorias, BPC, Pensão por Morte)
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${selectedContractClauses.includes('definitivo_adm') ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 text-amber-950 dark:text-amber-100' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
+                  <input 
+                    type="checkbox"
+                    checked={selectedContractClauses.includes('definitivo_adm')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (selectedContractClauses.length < 2) {
+                          setSelectedContractClauses([...selectedContractClauses, 'definitivo_adm']);
+                        }
+                      } else {
+                        setSelectedContractClauses(selectedContractClauses.filter(c => c !== 'definitivo_adm'));
+                      }
+                    }}
+                    disabled={!selectedContractClauses.includes('definitivo_adm') && selectedContractClauses.length >= 2}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-bold block text-slate-900 dark:text-white">Definitivo - Esfera Administrativa</span>
+                    2 salários do benefício concedido no INSS
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${selectedContractClauses.includes('temporario_judicial') ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 text-amber-950 dark:text-amber-100' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
+                  <input 
+                    type="checkbox"
+                    checked={selectedContractClauses.includes('temporario_judicial')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (selectedContractClauses.length < 2) {
+                          setSelectedContractClauses([...selectedContractClauses, 'temporario_judicial']);
+                        }
+                      } else {
+                        setSelectedContractClauses(selectedContractClauses.filter(c => c !== 'temporario_judicial'));
+                      }
+                    }}
+                    disabled={!selectedContractClauses.includes('temporario_judicial') && selectedContractClauses.length >= 2}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-bold block text-slate-900 dark:text-white">Temporário - Esfera Judicial</span>
+                    30% sobre os atrasados + sucumbência (Incapacidade, Auxílio-Acidente, Salário-Maternidade)
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${selectedContractClauses.includes('temporario_adm') ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 text-amber-950 dark:text-amber-100' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
+                  <input 
+                    type="checkbox"
+                    checked={selectedContractClauses.includes('temporario_adm')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (selectedContractClauses.length < 2) {
+                          setSelectedContractClauses([...selectedContractClauses, 'temporario_adm']);
+                        }
+                      } else {
+                        setSelectedContractClauses(selectedContractClauses.filter(c => c !== 'temporario_adm'));
+                      }
+                    }}
+                    disabled={!selectedContractClauses.includes('temporario_adm') && selectedContractClauses.length >= 2}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="text-xs leading-relaxed">
+                    <span className="font-bold block text-slate-900 dark:text-white">Temporário - Esfera Administrativa</span>
+                    1 salário do benefício pretendido no INSS
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {selectedContractClauses.length} de 2 selecionadas
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsContractSelectorOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmContractGeneration}
+                  disabled={selectedContractClauses.length === 0}
+                  className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition"
+                >
+                  {contractTargetAction === 'editor' ? 'Abrir no Editor' : 'Gerar PDF'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onSave={handleScannerSave} />
     </div>
     </div>
