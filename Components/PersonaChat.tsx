@@ -1058,46 +1058,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     setEditingSessionId(null);
   };
 
-  const handleApplySnippetToArtifact = (snippetText: string) => {
-    const session = sessions.find(s => s.id === currentSessionId);
-    const activeArtifactMsg = activeArtifactId && activeArtifactId !== 'streaming'
-      ? session?.messages?.find(m => m.id === activeArtifactId)
-      : [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
-
-    const currentDoc = editableArtifactText || activeArtifactMsg?.content || '';
-    if (!currentDoc) {
-      alert("Nenhum artefato ativo encontrado para aplicar a alteração.");
-      return;
-    }
-
-    const patchRes = applyLocalArtifactPatches(currentDoc, snippetText);
-    let updated = patchRes.updatedText;
-
-    if (patchRes.appliedCount === 0) {
-      const cleaned = cleanPetitionDocument(snippetText);
-      const closeMatch = currentDoc.match(/(?:Nestes\s+termos|Pede\s+deferimento)/i);
-      if (closeMatch && closeMatch.index) {
-        updated = currentDoc.substring(0, closeMatch.index) + cleaned + '\n\n' + currentDoc.substring(closeMatch.index);
-      } else {
-        updated = currentDoc + '\n\n' + cleaned;
-      }
-    }
-
-    setEditableArtifactText(updated);
-    setArtifactUpdatePulse(true);
-    setTimeout(() => setArtifactUpdatePulse(false), 2500);
-
-    if (activeArtifactMsg) {
-      setSessions(prev => prev.map(s => {
-        if (s.id !== currentSessionId) return s;
-        return {
-          ...s,
-          messages: s.messages.map(m => m.id === activeArtifactMsg.id ? { ...m, content: updated } : m)
-        };
-      }));
-    }
-  };
-
   const handleCompactHistory = async () => {
     const session = sessions.find(s => s.id === currentSessionId);
     if (!session || session.messages.length < 3) {
@@ -2967,19 +2927,6 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                               <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content || '') }} />
                             </div>
                           )}
-                        {editableArtifactText && !isArtifactContent(msg.content || '') && (
-                          /(?:DOS\s+REQUERIMENTOS|DO\s+DIREITO|DOS\s+FATOS|DA\s+TUTELA|DO\s+PEDIDO|PEDE\s+DEFERIMENTO|OAB\/|AO\s+JUÍZO|Segue\s+o\s+trecho|alteração|correção|modificação|trecho|patch)/i.test(msg.content || '')
-                        ) && (
-                          <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-bordeaux-800/60 flex items-center gap-2 flex-wrap">
-                            <button
-                              onClick={() => handleApplySnippetToArtifact(msg.content || '')}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all hover:scale-105 active:scale-95"
-                              title="Mesclar e atualizar esta alteração no artefato ativo"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" /> Aplicar Alteração no Artefato
-                            </button>
-                          </div>
-                        )}
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => copyToClipboard(msg.content || '', msg.id)}
