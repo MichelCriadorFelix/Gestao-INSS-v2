@@ -915,7 +915,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         pdfMakeContent = [pdfMakeContent];
       }
 
-      // Recursively remove any 'font' property & sanitize non-array canvas properties
+      // Recursively remove invalid properties & sanitize non-array canvas / border properties
       const sanitizePdfMakeNodes = (obj: any) => {
         if (Array.isArray(obj)) {
           obj.forEach(sanitizePdfMakeNodes);
@@ -925,6 +925,16 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           }
           if (obj.canvas && !Array.isArray(obj.canvas)) {
             delete obj.canvas;
+          }
+          if ('noWrap' in obj) {
+            delete obj.noWrap;
+          }
+          if (obj.border && !Array.isArray(obj.border)) {
+            if (obj.border === 'none' || obj.border === false) {
+              obj.border = [false, false, false, false];
+            } else {
+              delete obj.border;
+            }
           }
           Object.values(obj).forEach(sanitizePdfMakeNodes);
         }
@@ -954,7 +964,6 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               if (isSmallTable) {
                 // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
                 node.alignment = node.alignment || 'center';
-                node.noWrap = true; // Avoid splitting names to next line in signatures
                 node.fontSize = isContractDoc ? 8.5 : 10;
               } else {
                 node.alignment = 'left';
@@ -983,81 +992,122 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
             const colCount = node.table.body[0].length;
             
-            // Calculate max text length to determine if it's a signature table or data table
-            const colTextLengths = Array(colCount).fill(0);
-            let maxTotalLen = 0;
+            // Collect text across table to check if it's a signature table
+            let allTableText = '';
             node.table.body.forEach((row: any[]) => {
               if (row && Array.isArray(row)) {
-                row.forEach((cell: any, colIdx: number) => {
-                  if (cell && colIdx < colCount) {
-                    let textLen = 0;
-                    const getLength = (c: any) => {
-                      if (!c) return;
-                      if (typeof c === 'string') {
-                        textLen += c.trim().length;
-                      } else if (typeof c.text === 'string') {
-                        textLen += c.text.trim().length;
-                      } else if (Array.isArray(c.text)) {
-                        c.text.forEach(getLength);
-                      } else if (Array.isArray(c.stack)) {
-                        c.stack.forEach(getLength);
-                      } else if (c.stack && typeof c.stack === 'object') {
-                        getLength(c.stack);
-                      } else if (c.text && typeof c.text === 'object') {
-                        getLength(c.text);
-                      }
-                    };
-                    getLength(cell);
-                    if (textLen > colTextLengths[colIdx]) {
-                      colTextLengths[colIdx] = textLen;
-                    }
-                    if (textLen > maxTotalLen) {
-                      maxTotalLen = textLen;
-                    }
-                  }
+                row.forEach((cell: any) => {
+                  const checkText = (c: any): string => {
+                    if (!c) return '';
+                    if (typeof c === 'string') return c;
+                    if (typeof c.text === 'string') return c.text;
+                    if (Array.isArray(c.text)) return c.text.map(checkText).join(' ');
+                    if (Array.isArray(c.stack)) return c.stack.map(checkText).join(' ');
+                    if (c.stack && typeof c.stack === 'object') return checkText(c.stack);
+                    return '';
+                  };
+                  allTableText += ' ' + checkText(cell).toUpperCase();
                 });
               }
             });
 
-            // Heuristic for signature table: <= 3 columns and no cell has long text
-            const isSignatureTable = colCount <= 3 && maxTotalLen < 60;
-            node._isSignatureTable = isSignatureTable;
+            // Explicitly detect 2-column signature / identification box tables
+            const is2ColSignatureTable = colCount === 2 && (
+              allTableText.includes('ASSINATURA') ||
+              allTableText.includes('IDENTIFICAÇÃO') ||
+              allTableText.includes('SIGNATÁRIO') ||
+              allTableText.includes('CONTRATADO') ||
+              allTableText.includes('CONTRATANTE')
+            );
 
-            if (isSignatureTable) {
-              // Signatures and small tables: stretch equally across margin to margin
-              node.table.widths = Array(colCount).fill('*');
+            if (is2ColSignatureTable) {
+              node._isSignatureTable = true;
+              // Give 52% width to IDENTIFICAÇÃO and 48% width to ASSINATURA (~8.5cm wide space for handwriting)
+              node.table.widths = ['52%', '48%'];
               node.alignment = 'center';
+              node.layout = {
+                hLineWidth: function () { return 1; },
+                vLineWidth: function () { return 1; },
+                hLineColor: function () { return '#1e293b'; },
+                vLineColor: function () { return '#1e293b'; },
+                paddingLeft: function () { return 8; },
+                paddingRight: function () { return 8; },
+                paddingTop: function (i: number) { return i === 0 ? 6 : 14; },
+                paddingBottom: function (i: number) { return i === 0 ? 6 : 14; },
+              };
             } else {
-              // Larger tables or tables with long text: Dynamically allocate widths to prevent overflow.
-              // Find the index of the column with the maximum content length
-              const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
-              
-              const widths = Array(colCount).fill('auto');
-              widths[maxLenIdx] = '*';
-              
-              // Also check if any other column is significant and has long text, can also be '*' if needed, but keep a balance
-              let starsUsed = 1;
-              for (let i = 0; i < colCount; i++) {
-                if (i !== maxLenIdx && colTextLengths[i] > 18 && starsUsed < 2) {
-                  widths[i] = '*';
-                  starsUsed++;
+              // Calculate max text length to determine layout for general tables
+              const colTextLengths = Array(colCount).fill(0);
+              let maxTotalLen = 0;
+              node.table.body.forEach((row: any[]) => {
+                if (row && Array.isArray(row)) {
+                  row.forEach((cell: any, colIdx: number) => {
+                    if (cell && colIdx < colCount) {
+                      let textLen = 0;
+                      const getLength = (c: any) => {
+                        if (!c) return;
+                        if (typeof c === 'string') {
+                          textLen += c.trim().length;
+                        } else if (typeof c.text === 'string') {
+                          textLen += c.text.trim().length;
+                        } else if (Array.isArray(c.text)) {
+                          c.text.forEach(getLength);
+                        } else if (Array.isArray(c.stack)) {
+                          c.stack.forEach(getLength);
+                        } else if (c.stack && typeof c.stack === 'object') {
+                          getLength(c.stack);
+                        } else if (c.text && typeof c.text === 'object') {
+                          getLength(c.text);
+                        }
+                      };
+                      getLength(cell);
+                      if (textLen > colTextLengths[colIdx]) {
+                        colTextLengths[colIdx] = textLen;
+                      }
+                      if (textLen > maxTotalLen) {
+                        maxTotalLen = textLen;
+                      }
+                    }
+                  });
                 }
+              });
+
+              // Borderless signature lists or small tables
+              const isSmallTable = colCount <= 3 && maxTotalLen < 40;
+              node._isSignatureTable = isSmallTable;
+
+              if (isSmallTable) {
+                // Signatures and small tables: stretch equally across margin to margin
+                node.table.widths = Array(colCount).fill('*');
+                node.alignment = 'center';
+                node.layout = 'noBorders';
+              } else {
+                // Larger tables or tables with long text: Dynamically allocate widths
+                const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
+                
+                const widths = Array(colCount).fill('auto');
+                widths[maxLenIdx] = '*';
+                
+                let starsUsed = 1;
+                for (let i = 0; i < colCount; i++) {
+                  if (i !== maxLenIdx && colTextLengths[i] > 18 && starsUsed < 2) {
+                    widths[i] = '*';
+                    starsUsed++;
+                  }
+                }
+                node.table.widths = widths;
+                node.layout = {
+                  hLineWidth: function () { return 1; },
+                  vLineWidth: function () { return 1; },
+                  hLineColor: function () { return '#d1b3b3'; }, // Light burgundy/brown
+                  vLineColor: function () { return '#d1b3b3'; },
+                  paddingLeft: function () { return 4; },
+                  paddingRight: function () { return 4; },
+                  paddingTop: function () { return 4; },
+                  paddingBottom: function () { return 4; },
+                };
               }
-              node.table.widths = widths;
             }
-            
-            // For signature tables (<= 3 columns), center the table by adding padding margins if possible
-            // or rely on auto alignment.
-            node.layout = {
-              hLineWidth: function () { return 1; },
-              vLineWidth: function () { return 1; },
-              hLineColor: function () { return '#d1b3b3'; }, // Light burgundy/brown
-              vLineColor: function () { return '#d1b3b3'; },
-              paddingLeft: function () { return 4; },
-              paddingRight: function () { return 4; },
-              paddingTop: function () { return 4; },
-              paddingBottom: function () { return 4; },
-            };
           }
 
           if (node.nodeName === 'IMG' || node.image) {
@@ -1078,10 +1128,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
             node.table.body.forEach((row: any[]) => {
               row.forEach((cell: any) => {
                 if (cell && typeof cell === 'object') {
-                  if (isSignatureTable) {
-                    // For signature tables, ensure noWrap so it fits exactly on a single line!
-                    cell.noWrap = true;
-                  } else {
+                  if (!isSignatureTable) {
                     // Explicitly prevent cell noWrap so columns format properly and never overflow the PDF limits
                     delete cell.noWrap;
                   }
@@ -1097,7 +1144,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       applyIndent(pdfMakeContent as any[]);
 
       // Load fonts into VFS if not already present
-      const vfs = (pdfMake as any).vfs || {};
+      const vfs = (pdfMake as any).vfs || (pdfFonts as any).pdfMake?.vfs || (pdfFonts as any).vfs || {};
       
       const docDefinition: any = {
         content: pdfMakeContent,
@@ -1148,8 +1195,9 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       };
 
       const pdfFontsConfig: Record<string, any> = { ...PDF_FONT_CONFIGS };
+      const cleanFileName = (title || 'Documento').replace(/[/\\?%*:|"<>]/g, '-');
 
-      (pdfMake as any).createPdf(docDefinition).download(`${title}.pdf`);
+      (pdfMake as any).createPdf(docDefinition, undefined, pdfFontsConfig, vfs).download(`${cleanFileName}.pdf`);
       setIsSaving(false);
 
     } catch (error: any) {

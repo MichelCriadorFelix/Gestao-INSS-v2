@@ -832,28 +832,41 @@ ${clauseSecondHTML}
 
 <p class="no-indent" style="margin-top: 8px; margin-bottom: 10px; font-size: 9pt;">São João de Meriti/RJ, ${currentDate}.</p>
 
-<table style="width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 9pt;">
+<table style="width: 100%; border-collapse: collapse; margin-top: 12px; border: 1px solid #000; font-family: 'Times New Roman', Times, serif; font-size: 9pt;">
   <thead>
     <tr style="border-bottom: 1px solid #000; background-color: #f8fafc;">
-      <th style="border-right: 1px solid #000; padding: 4px 8px; text-align: left; font-weight: bold; width: 65%;">IDENTIFICAÇÃO:</th>
-      <th style="padding: 4px 8px; text-align: left; font-weight: bold; width: 35%;">ASSINATURA:</th>
+      <th style="border-right: 1px solid #000; padding: 6px 10px; text-align: left; font-weight: bold; width: 52%;">IDENTIFICAÇÃO DOS SIGNATÁRIOS:</th>
+      <th style="padding: 6px 10px; text-align: left; font-weight: bold; width: 48%;">CAMPO PARA ASSINATURA MANUAL:</th>
     </tr>
   </thead>
   <tbody>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">MICHEL SANTOS FELIX - OAB/RJ: 231.640 (CONTRATADO)</td>
-      <td style="padding: 6px 8px; height: 48px;"></td>
+      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
+        MICHEL SANTOS FELIX<br/>
+        <span style="font-size: 8pt; font-weight: normal; color: #334155;">OAB/RJ: 231.640 (CONTRATADO)</span>
+      </td>
+      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
+        <br/><br/><br/>
+      </td>
     </tr>
     <tr style="border-bottom: 1px solid #000;">
-      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">LUANA DE OLIVEIRA CASTRO PACHECO - OAB/RJ: 226.749 (CONTRATADA)</td>
-      <td style="padding: 6px 8px; height: 48px;"></td>
+      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
+        LUANA DE OLIVEIRA CASTRO PACHECO<br/>
+        <span style="font-size: 8pt; font-weight: normal; color: #334155;">OAB/RJ: 226.749 (CONTRATADA)</span>
+      </td>
+      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
+        <br/><br/><br/>
+      </td>
     </tr>
     <tr>
-      <td style="border-right: 1px solid #000; padding: 6px 8px; font-weight: bold; vertical-align: top;">
-        ${clientName} - CPF: ${clientCPF} (CONTRATANTE)
-        ${isMinor ? `<br/><span style="font-size: 8.5pt; font-weight: normal; color: #475569;">(representado por: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
+      <td style="border-right: 1px solid #000; padding: 12px 10px; font-weight: bold; vertical-align: middle;">
+        ${clientName}<br/>
+        <span style="font-size: 8pt; font-weight: normal; color: #334155;">CPF: ${clientCPF} (CONTRATANTE)</span>
+        ${isMinor ? `<br/><span style="font-size: 8pt; font-weight: normal; color: #475569;">(Rep. legal: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
       </td>
-      <td style="padding: 6px 8px; height: 48px;"></td>
+      <td style="padding: 12px 10px; height: 50px; min-height: 50px; vertical-align: middle;">
+        <br/><br/><br/>
+      </td>
     </tr>
   </tbody>
 </table>`;
