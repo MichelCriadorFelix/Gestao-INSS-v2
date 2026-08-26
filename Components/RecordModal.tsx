@@ -668,7 +668,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
       setFormData({ ...formData, petitions: updatedPetitions });
   }
 
-  const getDocumentHTML = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios', contractClauses: string[] = ['definitivo_judicial']) => {
+  const getDocumentHTML = (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'contrato_geral', contractClauses: string[] = ['definitivo_judicial']) => {
       const currentDate = new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
       const clientName = formData.name?.toUpperCase() || "__________________________";
       const clientCPF = formData.cpf || "___.___.___-__";
@@ -866,11 +866,91 @@ ${clauseSecondHTML}
 </table>`;
       }
 
+      if (type === 'contrato_geral') {
+          let contratanteQualif = "";
+          if (isMinor) {
+              const repName = formData.legalRepresentative?.toUpperCase() || "________________";
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
+              const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
+              const repProf = formData.legalRepresentativeProfession || "do lar";
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              contratanteQualif = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, neste ato representado(a) por ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, inscrito(a) no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}, por força do presente contrato passa a ser denominado <strong>CONTRATANTES</strong>.`;
+          } else {
+              contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, por força do presente contrato passa a ser denominado <strong>CONTRATANTES</strong>.`;
+          }
+
+          return `<h2 class="no-indent" style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">CONTRATO DE HONORÁRIOS ADVOCATÍCIOS</h2>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${contratanteQualif}</p>
+
+<p class="no-indent" style="margin-bottom: 5px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>LUANA DE OLIVEIRA CASTRO PACHECO</strong>, inscrita na OAB/RJ Nº 226.749 e inscrita no CPF sob o nº: 113.599.127-89 e <strong>MICHEL SANTOS FELIX</strong>, inscrito na OAB/RJ sob o nº 231.640 e no CPF nº 142.805.877-01, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, 500, apto. 204 , Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201, doravante designados <strong>CONTRATADOS</strong>.</p>
+
+<p class="no-indent" style="margin-bottom: 6px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">Por este instrumento e mediante outorga do mandato respectivo, o abaixo assinado autoriza os <strong>CONTRATADOS</strong> a ajuizar e acompanhar <strong>PROCESSOS ADMINISTRATIVOS E JUDICIAIS</strong>, até o trânsito em julgado da decisão, bem assim, na fase de execução. Praticar todos os atos inerentes ao exercício da advocacia e aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, bem como os especificados no <strong>INSTRUMENTO PROCURATÓRIO</strong>.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA PRIMEIRA:</strong> o <strong>CONTRATANTE</strong> pagará aos <strong>CONTRATADOS</strong>, honorários advocatícios no percentual de 30% (trinta por cento), incidente sobre o valor atribuído à <strong>AÇÃO AJUIZADA</strong>, sobretudo em caso de acordo.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>PARÁGRAFO PRIMEIRO:</strong> Os honorários de sucumbência pertencem aos <strong>CONTRATADOS</strong>. Caso haja morte ou incapacidade civil, seus sucessores ou representante legal receberão os honorários na proporção do trabalho realizado.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA SEGUNDA:</strong> As informações processuais serão disponibilizadas pelos <strong>CONTRATADOS</strong> para o <strong>CONTRATANTE</strong>, via internet (e-mail) ou telefone, sendo certo que o atendimento direto pelos advogados deverá ser realizado mediante prévio agendamento.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA TERCEIRA:</strong> Considerar-se-á vencido e imediatamente exigível o valor total dos honorários, no caso da <strong>CONTRATANTE</strong> firmar acordo com a parte ex-adversa sem o aval dos <strong>CONTRATADOS</strong>, ou, ainda, no caso de desistir da demanda por qualquer motivo que independa da vontade de sua patrona, hipótese em que o percentual de honorários incidirá sobre o valor firmado no acordo.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA QUARTA:</strong> Em caso de rescisão unilateral do presente contrato a outra parte deverá ser notificada com antecedência máxima de 10 (dez) dias, quitando os honorários pactuados no caso do contratante; e mediante o acompanhamento do processo até o final deste prazo.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA QUINTA:</strong> Não havendo êxito na demanda, não serão cobrados os honorários advocatícios de que trata a CLÁUSULA PRIMEIRA deste contrato.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA SEXTA:</strong> O <strong>CONTRATANTE</strong> tem ciência que terá que arcar com eventuais custas processuais.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA SÉTIMA:</strong> O <strong>CONTRATANTE</strong> declara aceitar as condições estabelecidas neste instrumento, ciente de se tratar de obrigação de meio. Todavia, os <strong>CONTRATADOS</strong> têm o dever de cumprir fielmente os prazos processuais e se empenhar para a boa condução da causa, sob pena de responsabilizar-se por danos e perdas, oriundos da falta de diligência na execução do objeto do presente contrato.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA OITAVA:</strong> As partes acordam que facultará aos <strong>CONTRATADOS</strong>, o direito de realizarem a cobrança dos honorários por todos os meios admittedos em direito.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA NONA:</strong> O prazo de duração do presente contrato é o mesmo da duração do processo, limitado a 2 (dois) anos após o trânsito em julgado.</p>
+
+<p class="no-indent" style="margin-bottom: 4px; text-align: justify; line-height: 1.3; font-size: 8.5pt;"><strong>CLÁUSULA DÉCIMA:</strong> Fica eleito o foro desta Cidade, para dirimirem quaisquer dúvidas concernentes ao presente instrumento.</p>
+
+<p class="no-indent" style="margin-top: 6px; margin-bottom: 8px; font-size: 8.5pt;">São João de Meriti/RJ, ${currentDate}.</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 8px; border: 1px solid #1e293b; font-family: 'Times New Roman', Times, serif; font-size: 8.5pt;">
+  <thead>
+    <tr style="border-bottom: 1px solid #1e293b; background-color: #f8fafc;">
+      <th style="border-right: 1px solid #1e293b; padding: 4px 8px; text-align: left; font-weight: bold; width: 52%;">IDENTIFICAÇÃO DOS SIGNATÁRIOS:</th>
+      <th style="padding: 4px 8px; text-align: left; font-weight: bold; width: 48%;">CAMPO PARA ASSINATURA MANUAL:</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #1e293b;">
+      <td style="border-right: 1px solid #1e293b; padding: 5px 8px; font-weight: bold; vertical-align: middle;">
+        MICHEL SANTOS FELIX<br/>
+        <span style="font-size: 7.5pt; font-weight: normal; color: #334155;">OAB/RJ: 231.640 (CONTRATADO)</span>
+      </td>
+      <td style="padding: 5px 8px; height: 28px; vertical-align: middle;"></td>
+    </tr>
+    <tr style="border-bottom: 1px solid #1e293b;">
+      <td style="border-right: 1px solid #1e293b; padding: 5px 8px; font-weight: bold; vertical-align: middle;">
+        LUANA DE OLIVEIRA CASTRO PACHECO<br/>
+        <span style="font-size: 7.5pt; font-weight: normal; color: #334155;">OAB/RJ: 226.749 (CONTRATADA)</span>
+      </td>
+      <td style="padding: 5px 8px; height: 28px; vertical-align: middle;"></td>
+    </tr>
+    <tr>
+      <td style="border-right: 1px solid #1e293b; padding: 5px 8px; font-weight: bold; vertical-align: middle;">
+        ${clientName}<br/>
+        <span style="font-size: 7.5pt; font-weight: normal; color: #334155;">CPF: ${clientCPF} (CONTRATANTE)</span>
+        ${isMinor ? `<br/><span style="font-size: 7.5pt; font-weight: normal; color: #475569;">(Rep. legal: ${formData.legalRepresentative?.toUpperCase()})</span>` : ''}
+      </td>
+      <td style="padding: 5px 8px; height: 28px; vertical-align: middle;"></td>
+    </tr>
+  </tbody>
+</table>`;
+      }
+
       return '';
   };
 
   const handleOpenInEditor = (
-      type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'custom', 
+      type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'contrato_geral' | 'custom', 
       customDocName?: string, 
       customDocUrl?: string, 
       contractClauses?: string[],
@@ -888,6 +968,8 @@ ${clauseSecondHTML}
               effectiveType = 'hipossuficiencia';
           } else if (lowerName.includes('renúncia') || lowerName.includes('renuncia')) {
               effectiveType = 'renuncia';
+          } else if (lowerName.includes('contrato') && (lowerName.includes('geral') || lowerName.includes('gerais') || lowerName.includes('advocatício') || lowerName.includes('advocatacio') || lowerName.includes('trabalhista') || lowerName.includes('cível') || lowerName.includes('civel') || lowerName.includes('consumidor'))) {
+              effectiveType = 'contrato_geral';
           } else if (lowerName.includes('contrato')) {
               effectiveType = 'contrato_honorarios';
           }
@@ -898,7 +980,8 @@ ${clauseSecondHTML}
               procuracao: `Procuração Ad Judicia - ${formData.name || 'Cliente'}`,
               hipossuficiencia: `Declaração de Hipossuficiência - ${formData.name || 'Cliente'}`,
               renuncia: `Termo de Renúncia Teto JEF - ${formData.name || 'Cliente'}`,
-              contrato_honorarios: `Contrato de Honorários Previdenciários - ${formData.name || 'Cliente'}`
+              contrato_honorarios: `Contrato de Honorários Previdenciários - ${formData.name || 'Cliente'}`,
+              contrato_geral: `Contrato de Honorários Advocatícios Geral - ${formData.name || 'Cliente'}`
           };
           title = customDocName || titleMap[effectiveType];
           htmlContent = getDocumentHTML(effectiveType, contractClauses);
@@ -906,14 +989,14 @@ ${clauseSecondHTML}
           htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2>` + 
               ocrText.split('\n').filter(Boolean).map(p => `<p class="no-indent" style="margin-bottom: 12px; line-height: 1.6;">${p}</p>`).join('');
       } else {
-          htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p class="no-indent">Documento de ${formData.name || 'Cliente'} do processo previdenciário.</p>`;
+          htmlContent = `<h2 class="no-indent" style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px;">${title}</h2><p class="no-indent">Documento de ${formData.name || 'Cliente'}.</p>`;
       }
 
       const petition = {
           id: 'doc_' + Math.random().toString(36).substr(2, 9),
           title,
           content: htmlContent,
-          category: effectiveType === 'contrato_honorarios' ? 'Contrato Previdenciário' : 'Documento / Procuração',
+          category: (effectiveType === 'contrato_honorarios' || effectiveType === 'contrato_geral') ? 'Contrato de Honorários' : 'Documento / Procuração',
           type: 'concrete' as const,
           lastModified: new Date().toLocaleString('pt-BR')
       };
@@ -923,7 +1006,7 @@ ${clauseSecondHTML}
       }
   };
 
-  const generatePDF = async (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios', contractClauses: string[] = ['definitivo_judicial']) => {
+  const generatePDF = async (type: 'procuracao' | 'hipossuficiencia' | 'renuncia' | 'contrato_honorarios' | 'contrato_geral', contractClauses: string[] = ['definitivo_judicial']) => {
       // @ts-ignore
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -1190,6 +1273,97 @@ ${clauseSecondHTML}
           writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 9, align: 'left', marginBottom: 3 });
 
           // Tabela de Assinaturas no Contrato (Identificação dos Signatários + Campo para Assinatura Manual)
+          const tableX = margin;
+          const tableW = maxLineWidth;
+          const col1W = tableW * 0.52;
+          const headerH = 5;
+          const rowH = 8.5;
+          const numRows = 3;
+          const totalTableH = headerH + (rowH * numRows);
+
+          if (cursorY + totalTableH > pageHeight - 15) {
+              doc.addPage();
+              cursorY = 25;
+          }
+
+          doc.setLineWidth(0.3);
+          doc.setDrawColor(30, 41, 59);
+
+          const tableTopY = cursorY;
+          doc.rect(tableX, tableTopY, tableW, totalTableH);
+          doc.line(tableX + col1W, tableTopY, tableX + col1W, tableTopY + totalTableH);
+          doc.line(tableX, tableTopY + headerH, tableX + tableW, tableTopY + headerH);
+          for (let r = 1; r < numRows; r++) {
+              doc.line(tableX, tableTopY + headerH + (rowH * r), tableX + tableW, tableTopY + headerH + (rowH * r));
+          }
+
+          doc.setFont("times", "bold");
+          doc.setFontSize(8);
+          doc.text("IDENTIFICAÇÃO DOS SIGNATÁRIOS:", tableX + 3, tableTopY + 3.6);
+          doc.text("CAMPO PARA ASSINATURA MANUAL:", tableX + col1W + 3, tableTopY + 3.6);
+
+          let rY = tableTopY + headerH;
+          doc.setFont("times", "bold");
+          doc.setFontSize(8);
+          doc.text("MICHEL SANTOS FELIX", tableX + 3, rY + 3.2);
+          doc.setFont("times", "normal");
+          doc.setFontSize(7.5);
+          doc.text("OAB/RJ: 231.640 (CONTRATADO)", tableX + 3, rY + 6.6);
+
+          rY += rowH;
+          doc.setFont("times", "bold");
+          doc.setFontSize(8);
+          doc.text("LUANA DE OLIVEIRA CASTRO PACHECO", tableX + 3, rY + 3.2);
+          doc.setFont("times", "normal");
+          doc.setFontSize(7.5);
+          doc.text("OAB/RJ: 226.749 (CONTRATADA)", tableX + 3, rY + 6.6);
+
+          rY += rowH;
+          doc.setFont("times", "bold");
+          doc.setFontSize(8);
+          doc.text(clientName, tableX + 3, rY + 3.2);
+          doc.setFont("times", "normal");
+          doc.setFontSize(7.5);
+          let contratanteSub = `CPF: ${clientCPF} (CONTRATANTE)`;
+          if (isMinor) {
+              contratanteSub += ` (rep: ${formData.legalRepresentative?.toUpperCase()})`;
+          }
+          doc.text(contratanteSub, tableX + 3, rY + 6.6);
+      } else if (type === 'contrato_geral') {
+          writeText("CONTRATO DE HONORÁRIOS ADVOCATÍCIOS", { fontStyle: 'bold', fontSize: 11, align: 'center', marginBottom: 5 });
+
+          let contratanteQualif = "";
+          if (isMinor) {
+              const repName = formData.legalRepresentative?.toUpperCase() || "________________";
+              const repNacionality = formData.legalRepresentativeNationality || formData.nationality || "brasileira";
+              const repCivil = formData.legalRepresentativeMaritalStatus || "solteira";
+              const repProf = formData.legalRepresentativeProfession || "do lar";
+              const repCPF = formData.legalRepresentativeCpf || "___.___.___-__";
+              const repAddress = formData.legalRepresentativeAddress || clientAddress;
+              contratanteQualif = `${clientName}, menor impúbere, ${clientNationality}, pensionista, inscrito(a) no CPF sob o nº ${clientCPF}, neste ato representado(a) por ${repName}, ${repNacionality}, ${repCivil}, ${repProf}, inscrito(a) no CPF sob o nº ${repCPF}, residente e domiciliado(a) à ${repAddress}, por força do presente contrato passa a ser denominado CONTRATANTES.`;
+          } else {
+              contratanteQualif = `${clientName}, ${clientNationality}, ${clientMarital}, ${clientProfession}, inscrito(a) no CPF sob o nº ${clientCPF}, residente e domiciliado(a) à ${clientAddress}, por força do presente contrato passa a ser denominado CONTRATANTES.`;
+          }
+
+          writeText(`CONTRATANTE: ${contratanteQualif}`, { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText(`CONTRATADOS: LUANA DE OLIVEIRA CASTRO PACHECO, inscrita na OAB/RJ Nº 226.749 e inscrita no CPF sob o nº: 113.599.127-89 e MICHEL SANTOS FELIX, inscrito na OAB/RJ sob o nº 231.640 e no CPF nº 142.805.877-01, com endereço eletrônico felixecastroadv@gmail.com, e endereço profissional sito na Av. Prefeito José de Amorim, 500, apto. 204 , Jardim Meriti – São João de Meriti/RJ, CEP 25.555-201, doravante designados CONTRATADOS.`, { fontSize: 8.5, align: 'justify', marginBottom: 2 });
+          writeText(`Por este instrumento e mediante outorga do mandato respectivo, o abaixo assinado autoriza os CONTRATADOS a ajuizar e acompanhar PROCESSOS ADMINISTRATIVOS E JUDICIAIS, até o trânsito em julgado da decisão, bem assim, na fase de execução. Praticar todos os atos inerentes ao exercício da advocacia e aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, bem como os especificados no INSTRUMENTO PROCURATÓRIO.`, { fontSize: 8.5, align: 'justify', marginBottom: 2 });
+
+          writeText("CLÁUSULA PRIMEIRA: o CONTRATANTE pagará aos CONTRATADOS, honorários advocatícios no percentual de 30% (trinta por cento), incidente sobre o valor atribuído à AÇÃO AJUIZADA, sobretudo em caso de acordo.", { fontSize: 8.5, align: 'justify', marginBottom: 1 });
+          writeText("PARÁGRAFO PRIMEIRO: Os honorários de sucumbência pertencem aos CONTRATADOS. Caso haja morte ou incapacidade civil, seus sucessores ou representante legal receberão os honorários na proporção do trabalho realizado.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA SEGUNDA: As informações processuais serão disponibilizadas pelos CONTRATADOS para o CONTRATANTE, via internet (e-mail) ou telefone, sendo certo que o atendimento direto pelos advogados deverá ser realizado mediante prévio agendamento.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA TERCEIRA: Considerar-se-á vencido e imediatamente exigível o valor total dos honorários, no caso da CONTRATANTE firmar acordo com a parte ex-adversa sem o aval dos CONTRATADOS, ou, ainda, no caso de desistir da demanda por qualquer motivo que independa da vontade de sua patrona, hipótese em que o percentual de honorários incidirá sobre o valor firmado no acordo.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA QUARTA: Em caso de rescisão unilateral do presente contrato a outra parte deverá ser notificada com antecedência máxima de 10 (dez) dias, quitando os honorários pactuados no caso do contratante; e mediante o acompanhamento do processo até o final deste prazo.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA QUINTA: Não havendo êxito na demanda, não serão cobrados os honorários advocatícios de que trata a CLÁUSULA PRIMEIRA deste contrato.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA SEXTA: O CONTRATANTE tem ciência que terá que arcar com eventuais custas processuais.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA SÉTIMA: O CONTRATANTE declara aceitar as condições estabelecidas neste instrumento, ciente de se tratar de obrigação de meio. Todavia, os CONTRATADOS têm o dever de cumprir fielmente os prazos processuais e se empenhar para a boa condução da causa, sob pena de responsabilizar-se por danos e perdas, oriundos da falta de diligência na execução do objeto do presente contrato.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA OITAVA: As partes acordam que facultará aos CONTRATADOS, o direito de realizarem a cobrança dos honorários por todos os meios admitidos em direito.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA NONA: O prazo de duração do presente contrato é o mesmo da duração do processo, limitado a 2 (dois) anos após o trânsito em julgado.", { fontSize: 8.5, align: 'justify', marginBottom: 1.5 });
+          writeText("CLÁUSULA DÉCIMA: Fica eleito o foro desta Cidade, para dirimirem quaisquer dúvidas concernentes ao presente instrumento.", { fontSize: 8.5, align: 'justify', marginBottom: 2 });
+
+          writeText(`São João de Meriti/RJ, ${currentDate}.`, { fontSize: 8.5, align: 'left', marginBottom: 3 });
+
+          // Tabela de Assinaturas no Contrato
           const tableX = margin;
           const tableW = maxLineWidth;
           const col1W = tableW * 0.52;
@@ -1666,7 +1840,7 @@ ${clauseSecondHTML}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
                         {/* Procuração */}
                         <div className="flex flex-col p-3 bg-slate-50 dark:bg-bordeaux-900/40 rounded-xl border border-slate-200 dark:border-gold-500/15 justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -1755,7 +1929,7 @@ ${clauseSecondHTML}
                         <div className="flex flex-col p-3 bg-amber-50/70 dark:bg-amber-950/20 rounded-xl border border-amber-300/40 dark:border-amber-500/20 justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
                                 <DocumentTextIcon className="h-5 w-5 text-amber-600 shrink-0" />
-                                <span>Contrato Honorários</span>
+                                <span>Contrato Previdência</span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-1">
                                 <button 
@@ -1771,7 +1945,35 @@ ${clauseSecondHTML}
                                     type="button" 
                                     onClick={() => handleContractClick('pdf')}
                                     className="flex items-center justify-center gap-1 py-1.5 px-2 bg-amber-200 dark:bg-amber-900/60 hover:bg-amber-300 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 rounded-lg text-[11px] font-bold transition"
-                                    title="Baixar PDF do Contrato"
+                                    title="Baixar PDF do Contrato Previdenciário"
+                                >
+                                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                                    PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Contrato de Honorários Geral (Cível / Trabalhista / Consumidor) */}
+                        <div className="flex flex-col p-3 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-300/40 dark:border-emerald-500/20 justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                                <DocumentTextIcon className="h-5 w-5 text-emerald-600 shrink-0" />
+                                <span className="truncate" title="Contrato Geral (Trabalhista, Consumidor, Cível)">Contrato Geral</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleOpenInEditor('contrato_geral')}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition"
+                                    title="Abrir Contrato de Honorários Geral no Editor"
+                                >
+                                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                                    Editor
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => generatePDF('contrato_geral')}
+                                    className="flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-200 dark:bg-emerald-900/60 hover:bg-emerald-300 dark:hover:bg-emerald-900 text-emerald-900 dark:text-emerald-200 rounded-lg text-[11px] font-bold transition"
+                                    title="Baixar PDF do Contrato Geral"
                                 >
                                     <ArrowDownTrayIcon className="h-3.5 w-3.5" />
                                     PDF
