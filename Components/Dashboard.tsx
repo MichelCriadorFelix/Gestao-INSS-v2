@@ -1786,7 +1786,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
              ) : currentView === 'agenda' ? (
                  <Agenda 
                     events={mergedAgendaEvents}
-                    systemClients={records}
+                    clients={records}
                     contracts={contracts}
                     user={user}
                     darkMode={darkMode}
@@ -1800,7 +1800,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  />
              ) : currentView === 'petition_editor' ? (
                   <PetitionEditor 
-                     systemClients={records}
+                     clients={records}
                      onBack={() => {
                          setCurrentView('clients');
                          setActivePetition(null);
@@ -1812,7 +1812,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                   />
              ) : currentView === 'labor_calc' ? (
                  <LaborCalc 
-                    systemClients={records} 
+                    clients={records} 
                     contracts={contracts} 
                     savedCalculations={savedCalculations}
                     onSaveCalculation={handleSaveCalculation}
@@ -1820,7 +1820,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  />
              ) : currentView === 'social_calc' ? (
                  <SocialSecurityCalc 
-                    systemClients={records}
+                    clients={records}
                     savedCalculations={savedSocialCalculations}
                     onSaveCalculation={handleSaveSocialCalculation}
                     onUpdateCalculations={(list) => {
