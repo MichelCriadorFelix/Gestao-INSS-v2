@@ -5119,18 +5119,43 @@ Retorne estritamente um JSON no seguinte formato (sem formatação markdown extr
 
     const keys = getApiKeys();
     if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
-    const ai = new GoogleGenAI({ apiKey: keys[0] });
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
+    
+    let text = "{}";
+    let lastError: any = null;
+    
+    for (let i = 0; i < Math.min(keys.length, 3); i++) {
+      try {
+        const idx = (currentKeyIndex + i) % keys.length;
+        const ai = new GoogleGenAI({ apiKey: keys[idx] });
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-3.7-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json"
+          }
+        });
+        
+        text = response.text || "{}";
+        break; // Sucesso! Sai do loop
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Análise] Falha com chave ${i}, tentando próxima...`, err.message);
       }
-    });
-
-    let text = response.text || "{}";
+    }
+    
+    if (text === "{}" && lastError) {
+      throw lastError;
+    }
+    
     text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    const result = JSON.parse(text);
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (parseErr) {
+      console.error("Erro no parse do JSON da análise:", parseErr, text);
+      result = { contradictions: [], duplicates: [], improvements: [] };
+    }
     res.json(result);
   } catch (error: any) {
     console.error("Erro na análise de regras:", error);
