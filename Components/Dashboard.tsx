@@ -104,10 +104,16 @@ export default function Dashboard({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
   const [activePetitionClientId, setActivePetitionClientId] = useState<string | null>(null);
+  const [marketingInitialData, setMarketingInitialData] = useState<any>(null);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const handleOpenMarketing = (marketingData: any) => {
+    setMarketingInitialData(marketingData);
+    setCurrentView('marketing');
+  };
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const handleEditClient = async (record: ClientRecord) => {
@@ -1789,6 +1795,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1802,6 +1809,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1815,6 +1823,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={drFelixCastroSessions} 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1828,6 +1837,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={secFabriciaSessions} 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -2194,7 +2204,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
              ) : currentView === 'knowledge_base' ? (
                  <KnowledgeBase />
              ) : currentView === 'marketing' ? (
-                 <MarketingGenerator darkMode={darkMode} user={user} />
+                 <MarketingGenerator darkMode={darkMode} user={user} initialData={marketingInitialData} onClearInitialData={() => setMarketingInitialData(null)} />
              ) : (
                  <>
                     <FinancialStats contracts={contracts} />

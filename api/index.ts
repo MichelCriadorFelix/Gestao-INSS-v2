@@ -4619,37 +4619,61 @@ app.post("/api/marketing/generate-image", async (req, res) => {
   }
 });
 
+const CURRENT_SYSTEM_YEAR_KNOWLEDGE = `
+[BASE DE ATUALIZAÇÃO TEMPORAL E ECONÔMICA VIGENTE - OBRIGATÓRIA]
+- ANO ATUAL DO SISTEMA: 2026.
+- SALÁRIO MÍNIMO VIGENTE (2026): R$ 1.621,00.
+- HISTÓRICO DE SALÁRIOS MÍNIMOS:
+  * 2026: R$ 1.621,00 (Vigente atual)
+  * 2025: R$ 1.518,00
+  * 2024: R$ 1.412,00
+  * 2023: R$ 1.320,00 (a partir de maio) / R$ 1.302,00 (jan-abr)
+  * 2022: R$ 1.212,00
+  * 2021: R$ 1.100,00
+  * 2020: R$ 1.045,00
+- TETO PREVIDENCIÁRIO DO INSS (2026): R$ 8.157,41.
+- BPC/LOAS (2026): R$ 1.621,00 mensais (1 salário mínimo vigente). Limite de renda per capita de 1/4 do salário mínimo (R$ 405,25) relativizado pelo STF (Tema 669) para dedução de medicamentos, fraldas, tratamentos e despesas médicas essenciais.
+- REGRAS PREVIDENCIÁRIAS VIGENTES EM 2026:
+  * Idade Mínima Progressiva: Mulheres 59 anos e 6 meses (+ 30 anos de contribuição); Homens 64 anos e 6 meses (+ 35 anos de contribuição).
+  * Regra de Pontos: Mulheres 93 pontos; Homens 103 pontos.
+  * Aposentadoria por Idade Urbana: Mulher 62 anos; Homem 65 anos (15 anos de carência/contribuição).
+  * Contribuições abaixo do mínimo (art. 195, §14 da CF e Portaria MPS/MF): podem ser ajustadas via Complementação (DARF), Agrupamento ou Aproveitamento de Excedente no mesmo ano civil.
+- PROIBIÇÃO ABSOLUTA DE DADOS DESATUALIZADOS: NUNCA trate o salário mínimo de 2024 (R$ 1.412,00) ou 2025 (R$ 1.518,00) como o valor vigente atual. O valor vigente atual é R$ 1.621,00. Use linguagem familiar, acolhedora, humana e clara para o público que lê no Instagram.
+`;
+
 app.post("/api/marketing/generate", async (req, res) => {
   try {
     const { topic, persona, mode = 'full', currentData, strategy = 'educacional', assetDescription } = req.body;
     if (!topic) return res.status(400).json({ error: "Topic is required" });
 
     const personaDesc = persona === 'michel' 
-      ? 'Dr. Michel Felix: Estilo direto, estratégico.'
-      : 'Dra. Luana Castro: Estilo acolhedor, empático.';
+      ? 'Dr. Michel Felix: Estilo direto, estratégico, empático e de alta autoridade.'
+      : 'Dra. Luana Castro: Estilo acolhedor, humanizado, empático e didático.';
 
     let strategyDesc = "";
     if (mode !== 'strategies') {
-      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional.";
-      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta.";
+      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional e Didática.";
+      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta de Direitos e Urgência.";
       else strategyDesc = strategy;
     }
 
     const assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
     let prompt = "";
-    let maxOutputTokens = 2048;
+    let maxOutputTokens = 8192;
 
     if (mode === 'strategies') {
-      maxOutputTokens = 1024;
+      maxOutputTokens = 4096;
       prompt = `Você é o principal estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
 Gere EXATAMENTE 4 a 5 opções distintas de estratégias e ângulos de abordagem para um post sobre o tema: "${topic}".
 Persona do Advogado: ${personaDesc}
 
 Cada estratégia deve ter um foco diferente (ex: 1. Alerta de Risco/Urgência; 2. Passo a Passo Educativo de Solução; 3. Mito vs Verdade ou Alerta de CNIS; 4. Análise Prática de Caso / Consequência Financeira; 5. Guia Prático para o Segurado).
 
 IMPORTANTE: 
-- "title": Nome claro e atrativo da estratégia (Ex: "1. Alerta de Risco: Perda de Aposentadoria", "2. Passo a Passo: Como Regularizar no CNIS").
-- "description": Resumo conciso de 1 ou 2 frases explicando o gancho, a dor do cliente e como o post abordará o tema. NÃO coloque textos de petição ou legendas inteiras aqui.
+- "title": Nome claro e atrativo da estratégia (Ex: "1. Alerta de Risco: Perda de Aposentadoria", "2. Passo a Passo: Como Regularizar no CNIS em 2026").
+- "description": Resumo conciso de 1 ou 2 frases explicando o gancho, a dor do cliente e como o post abordará o tema com dados atuais. NÃO coloque textos de petição ou legendas inteiras aqui.
 
 Responda ESTRITAMENTE em formato JSON puro no esquema:
 {
@@ -4662,7 +4686,7 @@ Responda ESTRITAMENTE em formato JSON puro no esquema:
   ]
 }`;
     } else if (mode === 'caption') {
-      maxOutputTokens = 1024;
+      maxOutputTokens = 8192;
       const currentContext = currentData ? `
 DADOS DO POST ATUAL:
 - Tag/Público: ${currentData.audienceTag || 'Direito Previdenciário'}
@@ -4672,60 +4696,69 @@ DADOS DO POST ATUAL:
 ` : '';
 
       prompt = `Você é o principal redator e estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
-Gere uma Legenda de Instagram de ALTA AUTORIDADE, EDUCATIVA e CONCISA sobre o tema: "${topic}".
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+Gere uma Legenda de Instagram de ALTA AUTORIDADE, EDUCATIVA, FAMILIAR e CONCISA sobre o tema: "${topic}".
 Persona: ${personaDesc}
 ${currentContext}
 
 REQUISITOS RIGOROSOS DE ESTRUTURA E TAMANHO:
-1. LIMITE RIGOROSO DO INSTAGRAM: A legenda inteira DEVE ter entre 1.300 e 1.700 caracteres no total (MÁXIMO ABSOLUTO 1.850 caracteres, contando espaços, emojis e hashtags).
+1. LIMITE RIGOROSO DO INSTAGRAM: A legenda inteira DEVE ter entre 1.200 e 1.600 caracteres no total (MÁXIMO ABSOLUTO 1.800 caracteres, contando espaços, emojis e hashtags).
 2. CONCISÃO E COMPLETUDE: Redija todo o conteúdo (do início ao fim) de forma enxuta, elegante e direta para caber integralmente no limite sem que falte nenhuma informação crucial.
-3. ESTRUTURA DA LEGENDA:
+3. ATUALIDADE: Use SEMPRE os valores vigentes de 2026 (Salário mínimo de R$ 1.621,00). Nunca cite valores antigos (como R$ 1.412,00) como atuais.
+4. LINGUAGEM FAMILIAR E HUMANA: Fale com clareza, empatia e proximidade da pessoa comum/segurado, traduzindo regras jurídicas em soluções práticas.
+5. ESTRUTURA DA LEGENDA:
    - Gancho inicial impactante com a dor real do segurado (1 parágrafo curto).
    - Explicação clara da regra jurídica (ex: EC 103/2019, art. 195, § 14 da CF ou Lei 8.213/91).
    - Principais riscos da falta de regularização (perda de carência, tempo de contribuição e indeferimento de benefício).
    - As soluções práticas explicadas de forma didática e direta (Complementação, Agrupamento, Uso de Excedente).
    - Chamada ética e institucional para ação (ex: salvar o post ou compartilhar com quem contribui para o INSS).
    - 6 a 8 hashtags relevantes no final.
-4. FORMATAÇÃO: Parágrafos curtos, linhas em branco entre eles e emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 👉 📌).
+6. FORMATAÇÃO: Parágrafos curtos, linhas em branco entre eles e emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 👉 📌).
 
 Responda ESTRITAMENTE em formato JSON puro no esquema:
 { "caption": "string" }`;
     } else if (mode === 'template') {
-      maxOutputTokens = 1024;
+      maxOutputTokens = 4096;
       prompt = `Você é o principal designer e redator de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
 Gere os textos completos e de alto impacto para a ARTE VISUAL de um post sobre: "${topic}".
 Persona: ${personaDesc}
 Estratégia: ${strategyDesc}
 ${assetContext}
 
 DIRETRIZES PARA OS CAMPOS DA ARTE:
-1. "audienceTag": Nicho ou público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA").
-2. "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?").
-3. "highlight": Alerta de alto impacto em 5 a 12 palavras (Ex: "⚠️ Meses abaixo do piso NÃO contam para tempo de aposentadoria nem carência!").
-4. "points": 3 ou 4 itens com palavra-chave em caixa alta seguida de explicação prática (Ex: "1) COMPLEMENTAÇÃO: Pague a diferença via DARF para validar a competência.").
-5. "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e verifique seu extrato do CNIS!").
+1. "audienceTag": Nicho ou público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA 2026", "BPC/LOAS | SEQUELAS DE AVC").
+2. "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?", "Sequelas de AVC dão direito ao BPC?").
+3. "highlight": Alerta de alto impacto em 5 a 12 palavras (Ex: "⚠️ Meses abaixo do piso (R$ 1.621) NÃO contam para tempo nem carência!").
+4. "points": 3 ou 4 itens com palavra-chave em caixa alta seguida de explicação prática e familiar (Ex: "1) COMPLEMENTAÇÃO: Pague a diferença via DARF para validar a competência.").
+5. "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e confira seu extrato do CNIS!").
 
 Responda ESTRITAMENTE em formato JSON puro no esquema:
 { "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
-      maxOutputTokens = 2048;
+      maxOutputTokens = 8192;
       const marketingInstructions = `
 DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
-1. CAMPO "audienceTag": Identifique o nicho/público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA").
+1. CAMPO "audienceTag": Identifique o nicho/público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA 2026", "BPC/LOAS | PESSOA COM DEFICIÊNCIA").
 2. CAMPO "title": Título persuasivo e direto com 3 a 7 palavras.
-3. CAMPO "highlight": Alerta de alto impacto em 5 a 12 palavras.
-4. CAMPO "points": 3 ou 4 itens com palavra-chave em caixa alta + explicação jurídica prática.
+3. CAMPO "highlight": Alerta de alto impacto em 5 a 12 palavras com dados atuais de 2026.
+4. CAMPO "points": 3 ou 4 itens com palavra-chave em caixa alta + explicação jurídica prática e familiar.
 5. CAMPO "ctaCaption": Chamada institucional curta (sem frases de captação/WhatsApp).
 6. CAMPO "caption" (Legenda do Instagram):
-   - LIMITE RIGOROSO: Entre 1.300 e 1.700 caracteres no total (MÁXIMO 1.850 caracteres com hashtags).
-   - Redija um texto fluido, didático, parágrafos curtos, embasamento legal claro, soluções práticas e 6 a 8 hashtags.
+   - LIMITE RIGOROSO: Entre 1.200 e 1.600 caracteres no total (MÁXIMO 1.800 caracteres com hashtags).
+   - ATUALIDADE 2026: Salário mínimo vigente de R$ 1.621,00, regras de 2026.
+   - Linguagem familiar, acessível, didática e de alta conexão com o leitor.
+   - Parágrafos curtos, embasamento legal claro, soluções práticas e 6 a 8 hashtags.
 7. CAMPO "imagePrompt": Descrição em inglês para imagem profissional de suporte.`;
 
       prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
+    ${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
     Conteúdo completo e de alto valor para Instagram sobre: "${topic}".${assetContext}
     Estratégia Solicitada: ${strategyDesc}
     Persona do Advogado: ${personaDesc}
-    Público: Segurados do INSS, trabalhadores e contribuintes. Linguagem acessível com alta precisão técnica.
+    Público: Segurados do INSS, trabalhadores e contribuintes. Linguagem familiar, acessível com extrema precisão técnica.
     
     ${marketingInstructions}
     
@@ -4740,7 +4773,7 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
       config: { 
         responseMimeType: 'application/json',
         maxOutputTokens,
-        temperature: 0.25
+        temperature: 0.2
       }
     });
 
@@ -4748,6 +4781,89 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
     res.json({ text: cleanedText });
   } catch (error: any) {
     console.error("Marketing error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint para sintetizar conversa do chat e criar post de Marketing instantaneamente
+app.post("/api/marketing/from-chat", async (req, res) => {
+  try {
+    const { messages = [], persona = 'michel', specificContent = '', topicHint = '' } = req.body;
+    
+    // Extrai o contexto relevante das mensagens da conversa
+    const recentMessages = Array.isArray(messages) ? messages.slice(-12) : [];
+    const chatSnippet = recentMessages.map((m: any) => `${m.role === 'user' ? 'Advogado/Usuário' : 'Especialista IA'}: ${m.content}`).join("\n\n");
+    const fullSourceText = specificContent ? `TRECHO ESPECÍFICO SELECIONADO:\n${specificContent}\n\nCONTEXTO GERAL DA CONVERSA:\n${chatSnippet}` : chatSnippet;
+
+    const personaDesc = persona === 'michel' 
+      ? 'Dr. Michel Felix: Direto, estratégico, de alta autoridade e conexão com os segurados.'
+      : 'Dra. Luana Castro: Acolhedora, empática, didática e de fácil entendimento.';
+
+    const prompt = `Você é o estrategista chefe de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+O advogado estava analisando um caso prático / tirando dúvidas no chat do escritório e solicitou transformar este caso real em um post de alto impacto e autoridade para o Instagram.
+
+Persona do Advogado: ${personaDesc}
+${topicHint ? `DICA/SUGESTÃO DE TEMA: ${topicHint}` : ''}
+
+CONVERSA E FATOS DO CASO ANALISADO:
+${fullSourceText || 'Dúvidas gerais de Direito Previdenciário e Trabalhista.'}
+
+SUA MISSÃO:
+1. Identifique o cerne do caso (ex: BPC/LOAS para quem teve AVC e ficou com sequelas, Contribuições abaixo do salário mínimo no CNIS, Aposentadoria por Idade Mínima Progressiva, etc.).
+2. Crie uma postagem COMPLETA e FAMILIAR que fale diretamente à dor do segurado/trabalhador comum que passa por essa mesma situação.
+3. Use SEMPRE os dados econômicos e normativos vigentes de 2026 (Salário mínimo de R$ 1.621,00). Nunca cite valores de 2024 como se fossem de hoje.
+4. Redija textos didáticos, humanos e fáceis de entender para o público leigo, mas com rigor técnico impecável.
+
+ESTRUTURA OBRIGATÓRIA (JSON PURO):
+- "topic": Tema central do post sintetizado (ex: "BPC/LOAS para Sequelas de AVC").
+- "strategy": "educacional" ou "alerta".
+- "audienceTag": Nicho/público em CAIXA ALTA (Ex: "BPC/LOAS | SEQUELAS DE AVC & SAÚDE", "ALERTA CNIS 2026 | APOSENTADORIA").
+- "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Teve AVC e ficou com sequelas?", "Contribuiu abaixo do piso em 2026?").
+- "highlight": Alerta de alto impacto em 5 a 12 palavras que sintetiza o direito (Ex: "⚠️ Sequelas incapacitantes dão direito ao BPC de R$ 1.621 mesmo sem nunca ter pago o INSS!").
+- "points": 3 a 4 itens com palavra-chave em caixa alta e explicação prática e familiar (Ex:
+  "1) NÃO EXIGE CONTRIBUIÇÃO: O BPC/LOAS é um benefício assistencial para baixa renda.",
+  "2) AVALIAÇÃO DA INCAPACIDADE: Laudos e relatórios médicos comprovam o impedimento de longo prazo.",
+  "3) RENDA FAMILIAR: Gastos com medicamentos e terapias podem ser abatidos da conta.",
+  "4) BENEFÍCIO VIGENTE: Valor mensal de 1 salário mínimo (R$ 1.621,00 em 2026).").
+- "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e compartilhe com quem precisa desse apoio!").
+- "caption": Legenda de Instagram de ALTA AUTORIDADE e FAMILIARIDADE.
+  * LIMITE RIGOROSO: Entre 1.300 e 1.700 caracteres (MÁXIMO ABSOLUTO 1.850 caracteres com hashtags).
+  * Gancho empático com a dor real da família/segurado.
+  * Explicação clara e humana dos requisitos legais.
+  * Passo a passo das soluções práticas.
+  * Chamada ética e 6 a 8 hashtags estratégicas no final.
+- "imagePrompt": Prompt em inglês para imagem conceitual de suporte.
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{
+  "topic": "string",
+  "strategy": "string",
+  "audienceTag": "string",
+  "title": "string",
+  "highlight": "string",
+  "points": ["string"],
+  "ctaCaption": "string",
+  "caption": "string",
+  "imagePrompt": "string"
+}`;
+
+    const response = await callGemini({
+      bypassOpenRouter: true,
+      model: 'gemini-3.7-flash',
+      contents: prompt,
+      config: { 
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+        temperature: 0.2
+      }
+    });
+
+    const cleanedText = response.text || "{}";
+    res.json({ text: cleanedText });
+  } catch (error: any) {
+    console.error("Marketing from-chat error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -5179,7 +5295,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma clara e familiar, destacando o público-alvo e a estratégia.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dr. Michel + Globais)
     const memoryRulesMichel = await getActiveMemoryRulesPrompt('michel');
@@ -5979,7 +6102,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma acolhedora, humana e familiar, destacando o público-alvo e a solução jurídica.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dra. Luana + Globais)
     const memoryRulesLuana = await getActiveMemoryRulesPrompt('luana');
@@ -6771,7 +6901,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma clara, empática e familiar, destacando o público-alvo e a orientação jurídica.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dr. Felix & Castro + Globais)
     const memoryRulesFelix = await getActiveMemoryRulesPrompt('felix');

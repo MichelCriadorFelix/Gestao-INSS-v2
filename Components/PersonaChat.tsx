@@ -95,6 +95,7 @@ interface PersonaChatProps {
   initialSessions?: ChatSession[];
   onSaveSessions?: (sessions: ChatSession[]) => void;
   onOpenPetition?: (petition: any, clientId?: string) => void;
+  onOpenMarketing?: (marketingData: any) => void;
   customLaws?: any[];
   agendaEvents?: any[];
   systemClients?: any[];
@@ -534,7 +535,7 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
   return { updatedText: doc, appliedCount };
 };
 
-const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, customLaws, agendaEvents, systemClients, contracts, onAgendaAction }) => {
+const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onSaveSessions, onOpenPetition, onOpenMarketing, customLaws, agendaEvents, systemClients, contracts, onAgendaAction }) => {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions || []);
   const [isLoaded, setIsLoaded] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -542,6 +543,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [streamingAsArtifact, setStreamingAsArtifact] = useState<boolean>(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingMarketing, setIsGeneratingMarketing] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
@@ -2500,6 +2502,73 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     }
   };
 
+  const handleGenerateMarketingFromChat = async (specificContent?: string, topicHint?: string) => {
+    if (!currentSession) return;
+    setIsGeneratingMarketing(true);
+    try {
+      const activePersonaKey = (persona.aiName === 'luana' || persona.displayName?.toLowerCase().includes('luana')) ? 'luana' : 'michel';
+      const response = await apiFetch('/api/marketing/from-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: currentSession.messages || [],
+          persona: activePersonaKey,
+          specificContent: specificContent || '',
+          topicHint: topicHint || currentSession.title || ''
+        })
+      });
+
+      if (!response.ok) throw new Error('Falha ao gerar post do caso');
+      const data = await response.json();
+      
+      let parsed = null;
+      if (data && data.text) {
+        let clean = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        try {
+          parsed = JSON.parse(clean);
+        } catch (e) {
+          const firstBrace = clean.indexOf('{');
+          const lastBrace = clean.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1) {
+            try {
+              parsed = JSON.parse(clean.slice(firstBrace, lastBrace + 1));
+            } catch (e2) {
+              console.error("Error parsing marketing from chat response:", e2);
+            }
+          }
+        }
+      }
+
+      if (parsed) {
+        if (onOpenMarketing) {
+          onOpenMarketing({ 
+            postData: parsed, 
+            topic: parsed.title || topicHint || currentSession.title || 'Tema Jurídico',
+            persona: activePersonaKey,
+            strategy: 'educacional'
+          });
+        } else {
+          // Fallback: Adiciona a mensagem com a tag na conversa
+          const newMsg: Message = {
+            id: generateId(),
+            role: 'assistant',
+            content: `Aqui está o post para o Instagram estruturado a partir da nossa conversa sobre **${parsed.title || 'este caso'}**:\n\n[GERAR_POST_MARKETING: ${JSON.stringify(parsed)}]`,
+            timestamp: new Date().toISOString()
+          };
+          setSessions(prev => prev.map(s => {
+            if (s.id !== currentSessionId) return s;
+            return { ...s, messages: [...s.messages, newMsg] };
+          }));
+        }
+      }
+    } catch (err: any) {
+      console.error('Error generating marketing from chat:', err);
+      alert('Erro ao gerar post de marketing: ' + (err.message || 'Verifique a conexão'));
+    } finally {
+      setIsGeneratingMarketing(false);
+    }
+  };
+
   // Sincroniza editableArtifactText quando activeArtifactId muda
   useEffect(() => {
     if (activeArtifactId && activeArtifactId !== 'streaming') {
@@ -2922,6 +2991,20 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                     }
                   }
 
+                  let marketingPostData: any = null;
+                  const hasMarketingPost = cleanedContent.includes('[GERAR_POST_MARKETING:');
+                  if (hasMarketingPost) {
+                    const match = cleanedContent.match(/\[GERAR_POST_MARKETING:\s*([\s\S]*?)\]\s*$/) || cleanedContent.match(/\[GERAR_POST_MARKETING:\s*([\s\S]*?)\]/);
+                    if (match && match[1]) {
+                      try {
+                        marketingPostData = JSON.parse(match[1].trim());
+                        cleanedContent = cleanedContent.replace(match[0], '').trim();
+                      } catch (e) {
+                        console.error('Error parsing GERAR_POST_MARKETING:', e);
+                      }
+                    }
+                  }
+
                   // Use cleanedContent em vez de msg.content para a renderização abaixo
                   return (
                   <div key={msg.id} className={`group ${msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
@@ -3046,6 +3129,83 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                             </div>
                           )}
 
+                          {/* UI PREVIEW DO POST DE MARKETING GERADO */}
+                          {marketingPostData && (
+                            <div className="mt-4 border border-pink-200 dark:border-pink-900/60 bg-gradient-to-br from-pink-50/70 via-rose-50/40 to-amber-50/30 dark:from-pink-950/40 dark:via-rose-950/30 dark:to-slate-900/50 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3.5">
+                              <div className="flex items-center justify-between gap-3 border-b border-pink-200/60 dark:border-pink-900/40 pb-3 flex-wrap">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white shadow-sm font-bold text-sm shrink-0">
+                                    📸
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-pink-700 dark:text-pink-300 bg-pink-100 dark:bg-pink-900/60 px-2 py-0.5 rounded-full border border-pink-200 dark:border-pink-800">
+                                      {marketingPostData.audienceTag || 'DIREITO PREVIDENCIÁRIO'}
+                                    </span>
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base mt-1">
+                                      {marketingPostData.title}
+                                    </h4>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => onOpenMarketing && onOpenMarketing({ 
+                                    postData: marketingPostData, 
+                                    topic: marketingPostData.title || currentSession?.title || 'Tema Jurídico',
+                                    persona: (persona.aiName === 'luana' || persona.displayName?.toLowerCase().includes('luana')) ? 'luana' : 'michel',
+                                    strategy: 'educacional'
+                                  })}
+                                  className="px-3.5 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+                                  title="Abrir no Canvas de Marketing Jurídico"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                  <span>🎨 Abrir no Marketing (Canvas)</span>
+                                </button>
+                              </div>
+
+                              {marketingPostData.highlight && (
+                                <div className="p-3 bg-amber-50/90 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs font-semibold text-amber-950 dark:text-amber-200 flex items-start gap-2">
+                                  <span className="text-sm shrink-0">💡</span>
+                                  <span>{marketingPostData.highlight}</span>
+                                </div>
+                              )}
+
+                              {marketingPostData.points && marketingPostData.points.length > 0 && (
+                                <div className="space-y-1.5 bg-white/80 dark:bg-slate-900/70 p-3 rounded-xl border border-pink-100 dark:border-slate-800">
+                                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                    <span>📌 Tópicos Principais do Post:</span>
+                                  </p>
+                                  <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                                    {marketingPostData.points.map((pt: string, idx: number) => (
+                                      <li key={idx} className="flex items-start gap-2">
+                                        <span className="text-pink-500 font-bold">•</span>
+                                        <span>{pt}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {marketingPostData.caption && (
+                                <div className="bg-white/60 dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200/70 dark:border-slate-800 text-xs space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                      📝 <span>Legenda para o Instagram:</span>
+                                    </span>
+                                    <button
+                                      onClick={() => copyToClipboard(marketingPostData.caption, `marketing-${msg.id}`)}
+                                      className="text-[11px] font-semibold text-pink-600 dark:text-pink-400 hover:text-pink-700 flex items-center gap-1 px-2 py-0.5 rounded bg-pink-50 dark:bg-pink-950/40 border border-pink-200/60 dark:border-pink-800/50 transition-colors"
+                                    >
+                                      {copiedId === `marketing-${msg.id}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                      <span>Copiar legenda</span>
+                                    </button>
+                                  </div>
+                                  <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap line-clamp-4 hover:line-clamp-none transition-all">
+                                    {marketingPostData.caption}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {/* UI SUGERIR MEMÓRIA */}
                           {memorySuggestionText && (
                             <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
@@ -3082,6 +3242,15 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                             title="Copiar"
                           >
                             {copiedId === msg.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                          </button>
+                          <button
+                            onClick={() => handleGenerateMarketingFromChat(cleanedContent, currentSession?.title)}
+                            disabled={isGeneratingMarketing}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-pink-50 dark:hover:bg-pink-950/40 text-pink-600 dark:text-pink-400 rounded-md text-xs font-semibold transition-colors border border-pink-200/80 dark:border-pink-900/50"
+                            title="Criar post do Instagram sobre esta resposta/caso"
+                          >
+                            {isGeneratingMarketing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            <span>Gerar Post</span>
                           </button>
                           {(
                             /petição|reclamação|excelentíssimo|ao juízo|inicial|contestação|recurso|vossa excelência/i.test(cleanedContent) ||
@@ -3310,6 +3479,17 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               >
                 <Minimize2 className="w-3.5 h-3.5 text-slate-600 dark:text-gold-400" />
                 Compactar Histórico (/compact)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleGenerateMarketingFromChat(undefined, currentSession?.title)}
+                disabled={isGeneratingMarketing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 text-pink-700 border border-pink-200 dark:from-pink-950/40 dark:to-rose-950/40 dark:hover:from-pink-900/50 dark:hover:to-rose-900/50 dark:text-pink-300 dark:border-pink-800/80 transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
+                title="Transformar a conversa deste caso em Post do Instagram (Marketing Jurídico)"
+              >
+                {isGeneratingMarketing ? <Loader2 className="w-3.5 h-3.5 animate-spin text-pink-600 dark:text-pink-400" /> : <Sparkles className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />}
+                📱 Post Instagram do Caso
               </button>
             </div>
 
@@ -3699,6 +3879,16 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Editor</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleGenerateMarketingFromChat(content, currentSession?.title)}
+                            disabled={isGeneratingMarketing}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                            title="Transformar este caso/peça em Post do Instagram"
+                          >
+                            {isGeneratingMarketing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">Gerar Post</span>
                           </button>
                         </>
                       )}

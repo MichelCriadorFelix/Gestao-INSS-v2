@@ -26,6 +26,8 @@ import { User, UserRole } from '../types';
 interface MarketingGeneratorProps {
   darkMode: boolean;
   user: User;
+  initialData?: any;
+  onClearInitialData?: () => void;
 }
 
 interface PostData {
@@ -70,7 +72,7 @@ interface SavedPost {
   strategy?: string;
 }
 
-export default function MarketingGenerator({ darkMode, user }: MarketingGeneratorProps) {
+export default function MarketingGenerator({ darkMode, user, initialData, onClearInitialData }: MarketingGeneratorProps) {
   const [topic, setTopic] = useState('');
   const [strategy, setStrategy] = useState('educacional');
   const [suggestedStrategies, setSuggestedStrategies] = useState<StrategySuggestion[] | null>(null);
@@ -106,6 +108,33 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      if (initialData.topic) setTopic(initialData.topic);
+      if (initialData.persona && (initialData.persona === 'michel' || initialData.persona === 'luana')) {
+        setPersona(initialData.persona);
+      }
+      if (initialData.strategy) setStrategy(initialData.strategy);
+
+      const incomingPost = initialData.postData || (initialData.title ? initialData : null);
+      if (incomingPost) {
+        setPostData({
+          audienceTag: incomingPost.audienceTag || 'DIREITO PREVIDENCIÁRIO',
+          title: incomingPost.title || '',
+          highlight: incomingPost.highlight || '',
+          points: Array.isArray(incomingPost.points) ? incomingPost.points : [],
+          caption: incomingPost.caption || '',
+          ctaCaption: incomingPost.ctaCaption || '📌 Salve e compartilhe com quem precisa!',
+          imagePrompt: incomingPost.imagePrompt || ''
+        });
+      }
+
+      if (onClearInitialData) {
+        onClearInitialData();
+      }
+    }
+  }, [initialData]);
 
   useEffect(() => {
     loadSavedPosts();
@@ -171,6 +200,68 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     blueText: '#003366',
   };
 
+  const safeParseMarketingJson = (rawText: string, expectedMode: string = 'full'): any => {
+    let clean = (rawText || '').trim();
+    if (clean.startsWith('```json')) {
+      clean = clean.replace(/^```json/, '').replace(/```$/, '').trim();
+    } else if (clean.startsWith('```')) {
+      clean = clean.replace(/^```/, '').replace(/```$/, '').trim();
+    }
+
+    // 1. Tenta parse padrão direto
+    try {
+      return JSON.parse(clean);
+    } catch (err1) {
+      console.warn("Standard JSON parse failed, attempting repairs...", err1);
+    }
+
+    // 2. Extração específica para caption se for mode === 'caption'
+    if (expectedMode === 'caption') {
+      const captionMatch = clean.match(/"caption"\s*:\s*"([\s\S]*?)"\s*}/) || 
+                           clean.match(/"caption"\s*:\s*"([\s\S]*)/) ||
+                           clean.match(/"caption"\s*:\s*`([\s\S]*?)`/);
+      if (captionMatch && captionMatch[1]) {
+        let cap = captionMatch[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/"\s*$/, '')
+          .trim();
+        return { caption: cap };
+      }
+    }
+
+    // 3. Tenta localizar o primeiro '{' e último '}'
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        const slice = clean.slice(firstBrace, lastBrace + 1);
+        return JSON.parse(slice);
+      } catch (err2) {
+        // continua
+      }
+    }
+
+    // 4. Reparo para strings truncadas ou aspas não fechadas
+    try {
+      let repaired = clean;
+      if (firstBrace !== -1 && !repaired.startsWith('{')) {
+        repaired = repaired.slice(firstBrace);
+      }
+      const quotes = (repaired.match(/"/g) || []).length;
+      if (quotes % 2 !== 0) {
+        repaired += '"';
+      }
+      if (!repaired.endsWith('}')) {
+        repaired += '}';
+      }
+      return JSON.parse(repaired);
+    } catch (err3) {
+      console.error("All JSON repair attempts failed:", err3, "Raw string was:", rawText);
+      throw new Error("A IA retornou um formato inválido. Tente novamente.");
+    }
+  };
+
   const generateStrategies = async () => {
     if (!topic.trim()) {
       alert('Por favor, digite um tema para o post.');
@@ -198,20 +289,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        let jsonStr = result.text.trim();
-        if (jsonStr.startsWith('```json')) {
-          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
-        }
-        
-        let data;
-        try {
-          data = JSON.parse(jsonStr);
-        } catch (parseError) {
-          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
-          throw new Error("A IA retornou um formato inválido. Tente novamente.");
-        }
+        const data = safeParseMarketingJson(result.text, 'strategies');
         
         if (data.strategies && Array.isArray(data.strategies)) {
           setSuggestedStrategies(data.strategies);
@@ -402,20 +480,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        let jsonStr = result.text.trim();
-        if (jsonStr.startsWith('```json')) {
-          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
-        }
-        
-        let data;
-        try {
-          data = JSON.parse(jsonStr);
-        } catch (parseError) {
-          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
-          throw new Error("A IA retornou um formato inválido. Tente novamente.");
-        }
+        const data = safeParseMarketingJson(result.text, mode);
         
         if (mode === 'full') {
           setPostData(data as PostData);
