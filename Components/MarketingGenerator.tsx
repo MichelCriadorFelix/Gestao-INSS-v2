@@ -72,6 +72,12 @@ interface SavedPost {
   strategy?: string;
 }
 
+// Imagens de Autoridade dos Advogados Titulares (Felix & Castro Advocacia)
+export const OFFICIAL_LAWYER_PHOTOS = {
+  michel: 'https://images.unsplash.com/photo-1556157382-97eda2d62296?q=80&w=800&auto=format&fit=crop', // Dr. Michel Felix
+  luana: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop'   // Dra. Luana Castro
+};
+
 export default function MarketingGenerator({ darkMode, user, initialData, onClearInitialData }: MarketingGeneratorProps) {
   const [topic, setTopic] = useState('');
   const [strategy, setStrategy] = useState('educacional');
@@ -111,6 +117,9 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
 
   useEffect(() => {
     if (initialData) {
+      const targetPersona = (initialData.persona === 'luana' || initialData.persona === 'michel') ? initialData.persona : persona;
+      const targetTopic = initialData.topic || initialData.title || topic;
+
       if (initialData.topic) setTopic(initialData.topic);
       if (initialData.persona && (initialData.persona === 'michel' || initialData.persona === 'luana')) {
         setPersona(initialData.persona);
@@ -128,13 +137,18 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
           ctaCaption: incomingPost.ctaCaption || '📌 Salve e compartilhe com quem precisa!',
           imagePrompt: incomingPost.imagePrompt || ''
         });
+
+        // Define IMEDIATAMENTE a imagem: 1. Imagem do tema na Biblioteca -> 2. Foto oficial do Dr. Michel ou Dra. Luana
+        const { url, asset } = resolvePostImage(targetTopic, targetPersona, libraryAssets, incomingPost.imagePrompt);
+        setUploadedImage(url);
+        setSelectedAsset(asset);
       }
 
       if (onClearInitialData) {
         onClearInitialData();
       }
     }
-  }, [initialData]);
+  }, [initialData, libraryAssets]);
 
   useEffect(() => {
     loadSavedPosts();
@@ -505,17 +519,17 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
               if (existingThemeImage) {
                 setUploadedImage(existingThemeImage.url);
               } else {
-                setUploadedImage(getDefaultImage(topic));
+                setUploadedImage(getDefaultImage(topic, persona));
               }
             }
           } 
-          // 3. Fallback para tema salvo ou imagem padrão
+          // 3. Fallback para tema salvo ou foto oficial do advogado (Dr. Michel / Dra. Luana)
           else {
             const existingThemeImage = await supabaseService.getThemeImage(topic);
             if (existingThemeImage) {
               setUploadedImage(existingThemeImage.url);
             } else {
-              setUploadedImage(getDefaultImage(topic));
+              setUploadedImage(getDefaultImage(topic, persona));
             }
           }
         } else if (mode === 'template' && postData) {
@@ -693,8 +707,8 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
     return currentY;
   };
 
-  const getDefaultImage = (topicStr: string) => {
-    const t = topicStr.toLowerCase();
+  const getDefaultImage = (topicStr: string, currentPersona: 'michel' | 'luana' = persona) => {
+    const t = (topicStr || '').toLowerCase();
     if (t.includes('maternidade') || t.includes('gestante') || t.includes('mãe')) {
       return 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=800&auto=format&fit=crop';
     }
@@ -707,8 +721,8 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
     if (t.includes('rural') || t.includes('lavrador') || t.includes('agricultor') || t.includes('pescador')) {
       return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=800&auto=format&fit=crop';
     }
-    // Default: Professional/Justice
-    return 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=800&auto=format&fit=crop'; 
+    // Default: Foto de Autoridade da Persona Titular (Dr. Michel Felix ou Dra. Luana Castro)
+    return currentPersona === 'luana' ? OFFICIAL_LAWYER_PHOTOS.luana : OFFICIAL_LAWYER_PHOTOS.michel;
   };
 
   const drawCanvas = () => {
@@ -824,7 +838,7 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
     const imgW = Math.max(10, frameW - imgFrameX - imgFrameW);
     const imgH = Math.max(10, frameH - imgFrameY - imgFrameH);
 
-    const imageUrl = uploadedImage || getDefaultImage(topic);
+    const imageUrl = uploadedImage || getDefaultImage(topic, persona);
     
     const img = new Image();
     img.crossOrigin = "anonymous";
