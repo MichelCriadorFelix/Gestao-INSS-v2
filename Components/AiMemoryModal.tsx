@@ -31,6 +31,7 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
   const [submitting, setSubmitting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialRule) {
@@ -121,6 +122,7 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
     if (rules.length === 0) return;
     try {
       setAnalyzing(true);
+      setAnalyzeError(null);
       const res = await apiFetch('/api/ai-memory-rules/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,9 +131,13 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
       if (res.ok) {
         const data = await res.json();
         setAnalysis(data);
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Erro no servidor' }));
+        setAnalyzeError(errData.error || "Servidor indisponível no momento. Tente novamente em alguns segundos.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro na análise", err);
+      setAnalyzeError("Falha ao comunicar com o servidor de análise.");
     } finally {
       setAnalyzing(false);
     }
@@ -269,6 +275,13 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
               {analyzing ? 'Analisando...' : 'Análise Inteligente de Regras'}
             </button>
           </div>
+
+          {analyzeError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+              <AlertTriangle size={16} className="shrink-0 text-red-500" />
+              <span>{analyzeError}</span>
+            </div>
+          )}
 
           {analysis && (
             <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-top-2">

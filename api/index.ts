@@ -5096,57 +5096,39 @@ app.post("/api/ai-memory-rules/analyze", async (req, res) => {
 
     const prompt = `Você é um especialista em lógica e estruturação de prompts de IA jurídica.
 Abaixo está uma lista de regras de memória de uma IA.
-Seu objetivo é encontrar:
+Seu objetivo é analisar rapidamente e encontrar:
 1. Contradições: Regras que dizem o oposto ou entram em conflito.
-2. Duplicações: Regras que dizem a mesma coisa com palavras diferentes.
-3. Melhorias: Regras que estão mal escritas, confusas, ou que poderiam ser mais claras e diretas para a IA entender.
+2. Duplicações: Regras que dizem a mesma coisa ou tratam do mesmo assunto repetidamente.
+3. Melhorias: No máximo 3 regras que estejam confusas, redundantes ou mal estruturadas.
 
 Lista de regras (ID | Persona | Texto):
-${rules.map((r: any) => `${r.id} | ${r.persona} | ${r.rule_text}`).join('\n')}
+${rules.map((r: any) => `${r.id} | ${r.persona} | ${(r.rule_text || '').substring(0, 350)}`).join('\n')}
 
-Retorne estritamente um JSON no seguinte formato (sem formatação markdown extra, apenas o objeto JSON válido):
+Seja extremamente conciso e direto. Retorne estritamente um JSON válido no seguinte formato:
 {
   "contradictions": [
-    { "ruleIds": ["id1", "id2"], "description": "Por que se contradizem e qual a sugestão de resolução" }
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta em 1 frase do conflito" }
   ],
   "duplicates": [
-    { "ruleIds": ["id1", "id2"], "description": "Por que são duplicadas e qual manter" }
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta em 1 frase indicando qual manter" }
   ],
   "improvements": [
-    { "ruleId": "id", "originalText": "texto original", "suggestedText": "texto melhorado", "reason": "motivo da melhoria" }
+    { "ruleId": "id", "originalText": "texto original", "suggestedText": "texto sugerido mais claro", "reason": "motivo em 1 frase" }
   ]
 }`;
 
-    const keys = getApiKeys();
-    if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
-    
-    let text = "{}";
-    let lastError: any = null;
-    
-    for (let i = 0; i < Math.min(keys.length, 3); i++) {
-      try {
-        const idx = (currentKeyIndex + i) % keys.length;
-        const ai = new GoogleGenAI({ apiKey: keys[idx] });
-        
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json"
-          }
-        });
-        
-        text = response.text || "{}";
-        break; // Sucesso! Sai do loop
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Análise] Falha com chave ${i}, tentando próxima...`, err.message);
+    const response = await callGemini({
+      bypassOpenRouter: true,
+      model: "gemini-3.7-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 1500,
+        temperature: 0.1
       }
-    }
-    
-    if (text === "{}" && lastError) {
-      throw lastError;
-    }
+    });
+
+    let text = response.text || "{}";
     
     text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     let result;
