@@ -150,6 +150,8 @@ export default function Dashboard({
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
   // PERF: trava contra cargas simultâneas (ver fetchData)
   const isFetchingRef = useRef(false);
+  // Distingue a 1ª conexão do Realtime de uma RE-conexão (ver .subscribe abaixo)
+  const hasConnectedRef = useRef(false);
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
     setClientFilter(filter);
@@ -444,6 +446,19 @@ export default function Dashboard({
             // aplicam só a linha alterada, e apenas se a tela já tiver sido carregada.
             .on(
                 'postgres_changes',
+                // Contratos: antes NAO havia assinatura — um contrato criado num
+                // dispositivo só aparecia nos outros após recarregar a página.
+                { event: '*', schema: 'public', table: 'contracts_v2' },
+                (payload: any) => {
+                    setContracts(prev => {
+                        const next = applyRowDelta(prev, payload, (r: any) => supabaseService.mapContractRow(r));
+                        scheduleCacheWrite(CACHE_KEYS.contracts, next);
+                        return next;
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
                 { event: '*', schema: 'public', table: 'social_security_calculations' },
                 (payload: any) => {
                     if (!loadedViewsRef.current.has('social_calc')) return;
@@ -469,7 +484,21 @@ export default function Dashboard({
                     })));
                 }
             )
-            .subscribe();
+            .subscribe((status: string) => {
+                // ROBUSTEZ: o Supabase NAO reenvia eventos perdidos enquanto a
+                // conexao esteve caida. Sem isto, uma oscilacao de internet
+                // deixava a tela desatualizada em silencio ate o proximo F5.
+                // Ao RE-conectar, buscamos o estado atual uma vez para ressincronizar.
+                if (status === 'SUBSCRIBED') {
+                    if (hasConnectedRef.current) {
+                        console.log('[REALTIME] Reconectado — ressincronizando dados.');
+                        fetchData();
+                    }
+                    hasConnectedRef.current = true;
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    console.warn(`[REALTIME] Conexao perdida (${status}). Ressincroniza ao voltar.`);
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);

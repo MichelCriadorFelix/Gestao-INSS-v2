@@ -834,7 +834,13 @@ export const supabaseService = {
       throw error;
     }
     
-    return (data || []).map(c => ({
+    return (data || []).map((c: any) => this.mapContractRow(c));
+  },
+
+  // Extraído para que o Realtime aplique a linha alterada com o mesmo formato
+  // da listagem, sem precisar reconsultar a tabela inteira.
+  mapContractRow(c: any) {
+    return {
       id: String(c.id),
       clientId: c.client_id,
       firstName: c.first_name,
@@ -850,7 +856,7 @@ export const supabaseService = {
       createdAt: c.created_at,
       concludedAt: c.concluded_at,
       lawyerSplit: c.lawyer_split ?? 60
-    }));
+    };
   },
 
   async deleteContract(id: string) {
