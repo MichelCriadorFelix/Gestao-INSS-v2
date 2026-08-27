@@ -4636,21 +4636,40 @@ app.post("/api/marketing/generate", async (req, res) => {
     }
 
     const assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
-    let jsonFormat = "";
-    let taskDesc = "";
+    let prompt = "";
 
     if (mode === 'strategies') {
-      taskDesc = `Ideias de abordagens para post sobre: "${topic}".`;
-      jsonFormat = `{ "strategies": [{ "title": "string", "description": "string" }] }`;
-    } else if (mode === 'template') {
-      taskDesc = `Texto completo e de alto impacto para a arte do post sobre: "${topic}".`;
-      jsonFormat = `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
-    } else {
-      taskDesc = `Conteúdo completo e de alto valor para Instagram sobre: "${topic}".`;
-      jsonFormat = `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
-    }
+      prompt = `Você é o principal estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
+Gere EXATAMENTE 4 a 5 opções distintas de estratégias e ângulos de abordagem para um post sobre o tema: "${topic}".
+Persona do Advogado: ${personaDesc}
 
-    const marketingInstructions = `
+Cada estratégia deve ter um foco diferente (ex: 1. Alerta de Risco/Urgência; 2. Passo a Passo Educativo de Solução; 3. Mito vs Verdade ou Alerta de CNIS; 4. Análise Prática de Caso / Consequência Financeira; 5. Guia Prático para o Segurado).
+
+IMPORTANTE: 
+- "title": Nome claro e atrativo da estratégia (Ex: "1. Alerta de Risco: Perda de Aposentadoria", "2. Passo a Passo: Como Regularizar no CNIS").
+- "description": Resumo conciso de 1 ou 2 frases explicando o gancho, a dor do cliente e como o post abordará o tema. NÃO coloque textos de petição ou legendas inteiras aqui.
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{
+  "strategies": [
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" }
+  ]
+}`;
+    } else {
+      const isTemplateOnly = mode === 'template';
+      const taskDesc = isTemplateOnly
+        ? `Texto completo e de alto impacto para a arte do post sobre: "${topic}".`
+        : `Conteúdo completo e de alto valor para Instagram sobre: "${topic}".`;
+
+      const jsonFormat = isTemplateOnly
+        ? `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`
+        : `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
+
+      const marketingInstructions = `
 DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
 1. CAMPO "audienceTag": Identifique de forma clara e profissional o público-alvo ou nicho do tema em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA", "DIREITO PREVIDENCIÁRIO | AUXÍLIO-DOENÇA", "BPC/LOAS | BENEFÍCIO ASSISTENCIAL", "TRABALHADOR RURAL | SEGURADO ESPECIAL").
 2. CAMPO "title": Título persuasivo, forte e direto (pergunta provocativa ou gancho de dor real), com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?", "Seu laudo médico foi ignorado pelo INSS?").
@@ -4668,7 +4687,7 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
    - Use emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 🤝 👉 📌) para guiar a leitura.
    - Finalize SEMPRE com 8 a 12 hashtags relevantes.`;
 
-    const prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
+      prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
     ${taskDesc}${assetContext}
     Tema do Post: "${topic}"
     Estratégia Solicitada: ${strategyDesc}
@@ -4679,6 +4698,7 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
     
     Responda ESTRITAMENTE em formato JSON puro no esquema:
     ${jsonFormat}`;
+    }
 
     const response = await callGemini({
       bypassOpenRouter: true,
