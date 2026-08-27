@@ -5117,7 +5117,9 @@ Retorne estritamente um JSON no seguinte formato (sem formatação markdown extr
   ]
 }`;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    const keys = getApiKeys();
+    if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada.");
+    const ai = new GoogleGenAI({ apiKey: keys[0] });
     const response = await ai.models.generateContent({
       model: "gemini-3.7-flash",
       contents: prompt,
@@ -5126,7 +5128,8 @@ Retorne estritamente um JSON no seguinte formato (sem formatação markdown extr
       }
     });
 
-    const text = response.text || "{}";
+    let text = response.text || "{}";
+    text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
     const result = JSON.parse(text);
     res.json(result);
   } catch (error: any) {
