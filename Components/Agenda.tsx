@@ -50,12 +50,14 @@ interface AgendaProps {
   onTaskResolved?: (task: any) => void;
 }
 
+// Mesma paleta de tipos usada na Manutenção Periódica (DailyFocus.tsx), para o
+// mesmo tipo de compromisso ter a mesma cor em toda a parte do app.
 const EVENT_TYPES = {
-  'audiência': { label: 'Audiência', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800' },
-  'perícia': { label: 'Perícia', color: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800' },
-  'atendimento': { label: 'Atendimento', color: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800' },
-  'prazo': { label: 'Prazo', color: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800' },
-  'outro': { label: 'Outro', color: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-bordeaux-900/40 dark:text-slate-300 dark:border-gold-500/15' }
+  'audiência': { label: 'Audiência', color: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60', dot: 'bg-rose-600' },
+  'perícia': { label: 'Perícia', color: 'bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800/60', dot: 'bg-violet-600' },
+  'atendimento': { label: 'Atendimento', color: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60', dot: 'bg-emerald-600' },
+  'prazo': { label: 'Prazo', color: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60', dot: 'bg-amber-500' },
+  'outro': { label: 'Outro', color: 'bg-cream-100 text-bordeaux-800 border-cream-200 dark:bg-bordeaux-950/50 dark:text-gold-300 dark:border-gold-500/25', dot: 'bg-bordeaux-700' }
 };
 
 const STATUS_LABELS = {
@@ -360,20 +362,23 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
 
   const renderHeader = () => {
     return (
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="fc-page-title text-2xl font-serif font-semibold text-slate-800 dark:text-cream-50 flex items-center gap-2">
-          <CalendarIcon className="h-7 w-7 text-primary-600" />
-          Agenda
-        </h2>
-        <div className="flex items-center gap-4">
-          <button onClick={prevMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 transition-colors">
-            <ChevronLeftIcon className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+      <div className="flex flex-wrap justify-between items-end gap-4 mb-6">
+        <div className="min-w-0">
+          <h2 className="font-serif text-3xl font-bold tracking-tight leading-none text-bordeaux-900 dark:text-cream-50 flex items-center gap-2.5">
+            <CalendarIcon className="h-7 w-7 text-gold-600 dark:text-gold-400" />
+            Agenda
+          </h2>
+          <div className="mt-2 h-px w-16 bg-gradient-to-r from-gold-500 to-transparent" />
+        </div>
+        <div className="flex items-center gap-1 bg-white dark:bg-bordeaux-950/50 rounded-full border border-cream-200 dark:border-gold-500/20 shadow-sm p-1">
+          <button onClick={prevMonth} className="p-2 rounded-full text-bordeaux-700 dark:text-gold-300 hover:bg-cream-100 dark:hover:bg-white/5 transition-colors">
+            <ChevronLeftIcon className="h-5 w-5" />
           </button>
-          <span className="text-lg font-medium text-slate-700 dark:text-slate-200 min-w-[150px] text-center capitalize">
+          <span className="text-sm font-bold text-bordeaux-900 dark:text-cream-50 min-w-[140px] text-center capitalize tracking-wide">
             {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
           </span>
-          <button onClick={nextMonth} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-bordeaux-900/50 transition-colors">
-            <ChevronRightIcon className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+          <button onClick={nextMonth} className="p-2 rounded-full text-bordeaux-700 dark:text-gold-300 hover:bg-cream-100 dark:hover:bg-white/5 transition-colors">
+            <ChevronRightIcon className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -385,12 +390,16 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
     const startDate = startOfWeek(currentDate, { weekStartsOn: 0 });
     for (let i = 0; i < 7; i++) {
       days.push(
-        <div key={i} className="text-center font-semibold text-sm text-slate-500 dark:text-slate-400 py-2 capitalize">
+        <div key={i} className="text-center font-bold text-[11px] uppercase tracking-[0.08em] text-bordeaux-700/70 dark:text-gold-300/70 py-2.5">
           {format(addDays(startDate, i), 'EEEE', { locale: ptBR }).split('-')[0]}
         </div>
       );
     }
-    return <div className="grid grid-cols-7 mb-2">{days}</div>;
+    return (
+      <div className="bg-white dark:bg-bordeaux-950/40 rounded-t-2xl shadow-sm border border-b-0 border-cream-200 dark:border-gold-500/15 pt-1">
+        <div className="grid grid-cols-7 border-b border-cream-200 dark:border-gold-500/15">{days}</div>
+      </div>
+    );
   };
 
   const renderCells = () => {
@@ -422,38 +431,44 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           <div
             key={day.toString()}
             onClick={() => handleDayClick(cloneDay)}
-            className={`min-h-[100px] p-2 border border-slate-100 dark:border-gold-500/20/50 transition-all cursor-pointer relative group
-              ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 dark:bg-bordeaux-950/60/20 text-slate-400' : 'bg-white dark:bg-bordeaux-950/60 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-bordeaux-900/50/50'}
-              ${isSelected ? 'ring-2 ring-inset ring-primary-500 bg-primary-50/30 dark:bg-primary-900/20' : ''}
-              ${hasOverdue ? 'bg-red-50/30 dark:bg-red-900/10' : ''}
+            className={`min-h-[112px] p-2 border-r border-b border-cream-200/80 dark:border-gold-500/10 last:border-r-0 transition-colors cursor-pointer relative
+              ${!isSameMonth(day, monthStart) ? 'bg-cream-50/60 dark:bg-black/10 text-slate-400 dark:text-slate-600' : 'bg-white dark:bg-bordeaux-950/40 text-slate-700 dark:text-slate-200 hover:bg-cream-50/80 dark:hover:bg-white/[0.03]'}
+              ${isSelected ? 'ring-2 ring-inset ring-gold-500 bg-gold-50/30 dark:bg-gold-500/5' : ''}
+              ${hasOverdue ? 'bg-red-50/40 dark:bg-red-950/20' : ''}
             `}
           >
-            <div className="flex justify-between items-start">
-              <span className={`text-sm font-medium h-7 w-7 flex items-center justify-center rounded-full ${isToday ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30' : ''} ${hasOverdue && !isToday ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : ''}`}>
+            <div className="flex justify-between items-start mb-1.5">
+              <span className={`text-[13px] font-bold h-6 w-6 flex items-center justify-center rounded-full transition-colors
+                ${isToday ? 'bg-bordeaux-800 text-cream-50 shadow-sm shadow-bordeaux-900/30' : ''}
+                ${hasOverdue && !isToday ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : ''}
+                ${!isToday && !hasOverdue ? 'text-slate-500 dark:text-slate-400' : ''}
+              `}>
                 {formattedDate}
               </span>
               {dayEvents.length > 0 && (
-                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md ${hasOverdue ? 'bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200' : 'bg-slate-100 text-slate-500 dark:bg-bordeaux-900/40'}`}>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${hasOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' : 'bg-cream-100 text-bordeaux-700 dark:bg-white/5 dark:text-gold-300'}`}>
                   {dayEvents.length}
                 </span>
               )}
             </div>
-            
-            <div className="mt-2 space-y-1 overflow-y-auto max-h-[60px] no-scrollbar">
+
+            <div className="space-y-1 overflow-y-auto max-h-[64px] no-scrollbar">
               {dayEvents.slice(0, 3).map(event => {
                 const isResolved = event.status === 'resolved';
                 const eventDate = parseISO(event.date);
                 const isOverdue = !isResolved && event.status !== 'cancelled' && isBefore(startOfDay(eventDate), startOfDay(new Date()));
-                
+                const typeInfo = EVENT_TYPES[event.type] || EVENT_TYPES.outro;
+
                 return (
-                  <div key={event.id} className={`text-xs px-1.5 py-1 rounded truncate border ${isResolved ? 'opacity-50 line-through' : ''} ${isOverdue ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : EVENT_TYPES[event.type].color}`}>
-                    <span className="font-medium mr-1">{event.time}</span>
-                    {event.clientName || 'Evento'}
+                  <div key={event.id} className={`flex items-center gap-1 text-[11px] px-1.5 py-1 rounded-md truncate border ${isResolved ? 'opacity-45 line-through' : ''} ${isOverdue ? 'border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800' : typeInfo.color}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isOverdue ? 'bg-red-500' : typeInfo.dot}`} />
+                    <span className="font-bold shrink-0">{event.time}</span>
+                    <span className="truncate">{event.clientName || 'Evento'}</span>
                   </div>
                 );
               })}
               {dayEvents.length > 3 && (
-                <div className="text-xs text-center text-slate-500 font-medium">
+                <div className="text-[10px] text-center font-semibold text-bordeaux-600/70 dark:text-gold-400/70">
                   +{dayEvents.length - 3} mais
                 </div>
               )}
@@ -469,7 +484,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
       );
       days = [];
     }
-    return <div className="bg-white dark:bg-bordeaux-950/60 rounded-2xl shadow-sm border border-slate-200 dark:border-gold-500/20 overflow-hidden">{rows}</div>;
+    return <div className="bg-white dark:bg-bordeaux-950/40 rounded-b-2xl shadow-sm border border-t-0 border-cream-200 dark:border-gold-500/15 overflow-hidden">{rows}</div>;
   };
 
   const renderSidePanel = () => {
