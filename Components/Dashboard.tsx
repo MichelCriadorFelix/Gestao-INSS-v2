@@ -144,29 +144,19 @@ export default function Dashboard({
     const supabase = initSupabase();
 
     try {
-        // PERF: Executamos todas as chamadas remotas de forma 100% paralela para carregamento instantâneo (sub-segundo)!
+        // PERF FASE 1: Dados vitais do painel carregados em paralelo ultra-rápido sem saturação
         const [
             remoteClients,
             remoteContracts,
             remoteLaborCalculations,
             remoteSocial,
-            remoteMichel,
-            remoteLuana,
-            remoteFelixCastro,
-            remoteFabricia,
-            globalDataResult
+            globalData
         ] = await Promise.all([
-            supabaseService.getClients().catch(() => []),
+            supabaseService.getClients().catch((e) => { console.error('Erro ao buscar clientes:', e); return []; }),
             supabaseService.getContracts().catch(() => []),
             supabaseService.getLaborCalculations().catch(() => []),
             supabaseService.getCalculations().catch(() => []),
-            supabaseService.getAIConversations('michel').catch(() => []),
-            supabaseService.getAIConversations('luana').catch(() => []),
-            supabaseService.getAIConversations('felix_castro').catch(() => []),
-            supabaseService.getAIConversations('fabricia').catch(() => []),
-            supabase 
-                ? supabase.from('clients').select('id, data').in('id', [7, 8, 9, 10]) 
-                : Promise.resolve({ data: null, error: null })
+            supabaseService.getGlobalSystemData().catch(() => null)
         ]);
 
         setRecords(remoteClients || []);
@@ -174,15 +164,8 @@ export default function Dashboard({
         setSavedCalculations(remoteLaborCalculations || []);
         setResolvedAlerts([]);
         setSavedSocialCalculations(remoteSocial || []);
-        setDrMichelSessions(remoteMichel || []);
-        setDraLuanaSessions(remoteLuana || []);
-        setDrFelixCastroSessions(remoteFelixCastro || []);
-        setSecFabriciaSessions(remoteFabricia || []);
 
-        const globalData = globalDataResult?.data;
-        const globalError = globalDataResult?.error;
-
-        if (!globalError && globalData) {
+        if (globalData) {
             const agenda = globalData.find(d => d.id === 7)?.data;
             if (agenda) setAgendaEvents(agenda);
             else {
@@ -211,7 +194,7 @@ export default function Dashboard({
                 if (localFocus) setDailyFocusState(JSON.parse(localFocus));
             }
         } else {
-            // Fallback to local storage if global fetch fails or no data in cloud
+            // Fallback para localStorage
             const localAgenda = localStorage.getItem('agenda_events');
             if (localAgenda) setAgendaEvents(JSON.parse(localAgenda));
             
@@ -226,6 +209,21 @@ export default function Dashboard({
         }
 
         setIsLoading(false);
+
+        // PERF FASE 2: Carregamento assíncrono em segundo plano das conversas de IA (não bloqueia a tela)
+        setTimeout(() => {
+            Promise.all([
+                supabaseService.getAIConversations('michel').catch(() => []),
+                supabaseService.getAIConversations('luana').catch(() => []),
+                supabaseService.getAIConversations('felix_castro').catch(() => []),
+                supabaseService.getAIConversations('fabricia').catch(() => []),
+            ]).then(([remoteMichel, remoteLuana, remoteFelixCastro, remoteFabricia]) => {
+                setDrMichelSessions(remoteMichel || []);
+                setDraLuanaSessions(remoteLuana || []);
+                setDrFelixCastroSessions(remoteFelixCastro || []);
+                setSecFabriciaSessions(remoteFabricia || []);
+            }).catch(console.warn);
+        }, 150);
     } catch (err: any) {
         console.error("Exception in fetchData:", err);
         setIsLoading(false);

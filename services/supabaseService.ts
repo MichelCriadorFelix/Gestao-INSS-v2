@@ -579,62 +579,158 @@ export const supabaseService = {
     let attempt = 0;
     while (attempt < retries) {
       attempt++;
-      // Fetch summary including documents (now lightweight with URLs) to show counts
-      const { data, error } = await supabase
-        .from('clients_v2')
-        .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions');
-        
-      if (error) {
-        if (attempt >= retries) {
-          console.error('Error fetching clients from Supabase after retries:', error);
-          throw error;
+      try {
+        // Tentativa primária: carregar clientes com resumo de anexos
+        const { data, error } = await supabase
+          .from('clients_v2')
+          .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions');
+          
+        if (error) {
+          console.warn(`[Supabase] Erro ao buscar clientes com campos de anexos (tentativa ${attempt}/${retries}):`, error);
+          // Fallback imediato para modo leve (campos escalares sem JSONs pesados)
+          const { data: lightData, error: lightError } = await supabase
+            .from('clients_v2')
+            .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality');
+            
+          if (!lightError && lightData) {
+            console.log(`[Supabase] Sucesso ao recuperar ${lightData.length} clientes via modo leve (fallback).`);
+            return lightData.map(c => ({
+              id: String(c.id),
+              name: c.name,
+              cpf: c.cpf,
+              password: c.password,
+              nationality: c.nationality,
+              maritalStatus: c.marital_status,
+              profession: c.profession,
+              type: c.type,
+              der: c.der,
+              medExpertiseDate: c.med_expertise_date,
+              socialExpertiseDate: c.social_expertise_date,
+              extensionDate: c.extension_date,
+              dcbDate: c.dcb_date,
+              ninetyDaysDate: c.ninety_days_date,
+              securityMandateDate: c.security_mandate_date,
+              address: c.address,
+              gender: c.gender,
+              legalRepresentative: c.legal_representative,
+              legalRepresentativeGender: c.legal_representative_gender,
+              legalRepresentativeCpf: c.legal_representative_cpf,
+              legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
+              legalRepresentativeProfession: c.legal_representative_profession,
+              legalRepresentativeAddress: c.legal_representative_address,
+              whatsapp: c.whatsapp,
+              legalRepresentativeNationality: c.legal_representative_nationality,
+              isDailyAttention: c.is_daily_attention,
+              isUrgentAttention: c.is_urgent_attention,
+              isArchived: c.is_archived,
+              isReferral: c.is_referral,
+              referrerName: c.referrer_name,
+              referrerPercentage: c.referrer_percentage,
+              totalFee: c.total_fee,
+              documents: [],
+              documentCount: 0,
+              petitionCount: 0,
+              narrativeCertificates: [],
+              narrativeCertificateCount: 0
+            }));
+          }
+
+          if (attempt >= retries) {
+            console.error('Error fetching clients from Supabase after retries:', error);
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 800));
+          continue;
         }
-        console.warn(`[Supabase] Erro ao buscar clientes (tentativa ${attempt}/${retries}). Tentando novamente em 1s...`, error);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        continue; // Retry
+        
+        return (data || []).map(c => {
+          const docs = Array.isArray(c.documents) ? c.documents : [];
+          const peps = Array.isArray(c.petitions) ? c.petitions : [];
+          const ncs = Array.isArray(c.narrative_certificates) ? c.narrative_certificates : [];
+
+          // Remove potenciais strings base64 pesadas em itens de documentos no carregamento da lista
+          const lightDocs = docs.map((d: any) => ({
+            id: d?.id,
+            name: d?.name || d?.title,
+            type: d?.type,
+            date: d?.date,
+            url: d?.url
+          }));
+
+          return {
+            id: String(c.id),
+            name: c.name,
+            cpf: c.cpf,
+            password: c.password,
+            nationality: c.nationality,
+            maritalStatus: c.marital_status,
+            profession: c.profession,
+            type: c.type,
+            der: c.der,
+            medExpertiseDate: c.med_expertise_date,
+            socialExpertiseDate: c.social_expertise_date,
+            extensionDate: c.extension_date,
+            dcbDate: c.dcb_date,
+            ninetyDaysDate: c.ninety_days_date,
+            securityMandateDate: c.security_mandate_date,
+            address: c.address,
+            gender: c.gender,
+            legalRepresentative: c.legal_representative,
+            legalRepresentativeGender: c.legal_representative_gender,
+            legalRepresentativeCpf: c.legal_representative_cpf,
+            legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
+            legalRepresentativeProfession: c.legal_representative_profession,
+            legalRepresentativeAddress: c.legal_representative_address,
+            whatsapp: c.whatsapp,
+            legalRepresentativeNationality: c.legal_representative_nationality,
+            isDailyAttention: c.is_daily_attention,
+            isUrgentAttention: c.is_urgent_attention,
+            isArchived: c.is_archived,
+            isReferral: c.is_referral,
+            referrerName: c.referrer_name,
+            referrerPercentage: c.referrer_percentage,
+            totalFee: c.total_fee,
+            documents: lightDocs,
+            documentCount: docs.length,
+            petitionCount: peps.length,
+            narrativeCertificates: ncs,
+            narrativeCertificateCount: ncs.length
+          };
+        });
+      } catch (err) {
+        console.warn(`[Supabase] Exceção ao buscar clientes (tentativa ${attempt}/${retries}):`, err);
+        if (attempt >= retries) return [];
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
-      
-      return (data || []).map(c => ({
-      id: String(c.id),
-      name: c.name,
-      cpf: c.cpf,
-      password: c.password,
-      nationality: c.nationality,
-      maritalStatus: c.marital_status,
-      profession: c.profession,
-      type: c.type,
-      der: c.der,
-      medExpertiseDate: c.med_expertise_date,
-      socialExpertiseDate: c.social_expertise_date,
-      extensionDate: c.extension_date,
-      dcbDate: c.dcb_date,
-      ninetyDaysDate: c.ninety_days_date,
-      securityMandateDate: c.security_mandate_date,
-      address: c.address,
-      gender: c.gender,
-      legalRepresentative: c.legal_representative,
-      legalRepresentativeGender: c.legal_representative_gender,
-      legalRepresentativeCpf: c.legal_representative_cpf,
-      legalRepresentativeMaritalStatus: c.legal_representative_marital_status,
-      legalRepresentativeProfession: c.legal_representative_profession,
-      legalRepresentativeAddress: c.legal_representative_address,
-      whatsapp: c.whatsapp,
-      legalRepresentativeNationality: c.legal_representative_nationality,
-      isDailyAttention: c.is_daily_attention,
-      isUrgentAttention: c.is_urgent_attention,
-      isArchived: c.is_archived,
-      isReferral: c.is_referral,
-      referrerName: c.referrer_name,
-      referrerPercentage: c.referrer_percentage,
-      totalFee: c.total_fee,
-      documents: c.documents || [],
-      documentCount: (c.documents || []).length,
-      petitionCount: (c.petitions || []).length,
-      narrativeCertificates: c.narrative_certificates || [],
-      narrativeCertificateCount: (c.narrative_certificates || []).length
-    }));
-    } // End of while loop
-    return []; // Return empty if all retries fail
+    }
+    return [];
+  },
+
+  async getGlobalSystemData(retries = 2) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    let attempt = 0;
+    while (attempt <= retries) {
+      attempt++;
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, data')
+          .in('id', [7, 8, 9, 10]);
+
+        if (!error && data) {
+          return data;
+        }
+        console.warn(`[Supabase] Erro ao buscar dados globais (tentativa ${attempt}/${retries + 1}):`, error);
+      } catch (e) {
+        console.warn(`[Supabase] Exceção ao buscar dados globais (tentativa ${attempt}/${retries + 1}):`, e);
+      }
+      if (attempt <= retries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    return null;
   },
 
   async getClientDetails(id: string) {
