@@ -964,10 +964,10 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               if (isSmallTable) {
                 // Keep center alignment if small table (signatures) so they are perfectly aligned in columns
                 node.alignment = node.alignment || 'center';
-                node.fontSize = isContractDoc ? 8.5 : 10;
+                node.fontSize = isContractDoc ? 8.5 : 11;
               } else {
                 node.alignment = 'left';
-                node.fontSize = isContractDoc ? 8.5 : 10; // Reduce to 8.5pt in contract tables to ensure clean fit
+                node.fontSize = isContractDoc ? 8.5 : 11; // Reduce to 8.5pt in contract tables to ensure clean fit
               }
               node.leadingIndent = 0;
               node.margin = [0, 0, 0, 0]; // Remove paragraph margin inside tables
@@ -1035,19 +1035,19 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               node._isSignatureTable = true;
               node.table.widths = Array(colCount).fill('*');
               node.alignment = 'center';
-              node.fontSize = isContractDoc ? 8.5 : 10;
+              node.fontSize = isContractDoc ? 8.5 : 11;
               node.layout = {
                 hLineWidth: function () { return 0.75; },
                 vLineWidth: function () { return 0.75; },
                 hLineColor: function () { return '#333333'; },
                 vLineColor: function () { return '#333333'; },
-                paddingLeft: function () { return 4; },
-                paddingRight: function () { return 4; },
+                paddingLeft: function () { return 2; },
+                paddingRight: function () { return 2; },
                 paddingTop: function () { return 2; },
                 paddingBottom: function () { return 2; },
               };
             } else {
-              node.fontSize = isContractDoc ? 8.5 : 10;
+              node.fontSize = isContractDoc ? 8.5 : 11;
               // Calculate max text length to determine layout for general tables
               const colTextLengths = Array(colCount).fill(0);
               let maxTotalLen = 0;
