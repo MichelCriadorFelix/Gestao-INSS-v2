@@ -1707,7 +1707,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                         (postData.caption?.length || 0) > 2200 
                           ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 font-bold animate-pulse'
-                          : (postData.caption?.length || 0) > 2000
+                          : (postData.caption?.length || 0) > 1900
                             ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                             : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                       }`}
@@ -1715,36 +1715,42 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                       {(postData.caption?.length || 0)} / 2.200 caracteres
                     </span>
                   </div>
-                  {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={handleCopyCaption}
-                      className="flex items-center gap-2 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg font-medium text-sm transition-all"
+                      onClick={() => generatePost('caption')}
+                      disabled={isGenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all disabled:opacity-50"
+                      title="Reescreve a legenda completa sem cortar informações, respeitando com folga o limite do Instagram"
                     >
-                      <DocumentDuplicateIcon className="w-4 h-4" />
-                      Copiar Legenda
+                      <ArrowPathIcon className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                      {isGenerating ? 'Regerando...' : 'Regerar Legenda'}
                     </button>
-                  ) : (
-                    <span className="text-xs text-slate-500">
-                      Aprovação necessária para copiar
-                    </span>
-                  )}
+                    {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
+                      <button
+                        onClick={handleCopyCaption}
+                        className="flex items-center gap-2 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg font-medium text-sm transition-all"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                        Copiar Legenda
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">
+                        Aprovação necessária para copiar
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {(postData.caption?.length || 0) > 2200 && (
                   <div className="mb-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
-                    <span>⚠️ A legenda excedeu o limite máximo do Instagram de 2.200 caracteres. Edite para encurtar.</span>
+                    <span>⚠️ A legenda excedeu o limite máximo do Instagram ({(postData.caption?.length || 0)} de 2.200 caracteres). Clique ao lado para a IA readequar o texto inteiro com concisão e sem perda de conteúdo.</span>
                     <button 
-                      onClick={() => {
-                        if (postData.caption) {
-                          const trimmed = postData.caption.slice(0, 2150);
-                          const lastDot = trimmed.lastIndexOf('.');
-                          const safeText = lastDot > 1000 ? trimmed.slice(0, lastDot + 1) : trimmed;
-                          handleTextChange('caption', safeText);
-                        }
-                      }}
-                      className="px-2 py-1 bg-rose-600 text-white rounded font-medium hover:bg-rose-700 text-xs ml-2 shrink-0"
+                      onClick={() => generatePost('caption')}
+                      disabled={isGenerating}
+                      className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-medium hover:bg-rose-700 text-xs ml-2 shrink-0 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
                     >
-                      Ajustar ao limite
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                      Readequar com IA
                     </button>
                   </div>
                 )}

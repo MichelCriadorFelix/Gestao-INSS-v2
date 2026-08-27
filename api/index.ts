@@ -4637,8 +4637,10 @@ app.post("/api/marketing/generate", async (req, res) => {
 
     const assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
     let prompt = "";
+    let maxOutputTokens = 2048;
 
     if (mode === 'strategies') {
+      maxOutputTokens = 1024;
       prompt = `Você é o principal estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
 Gere EXATAMENTE 4 a 5 opções distintas de estratégias e ângulos de abordagem para um post sobre o tema: "${topic}".
 Persona do Advogado: ${personaDesc}
@@ -4659,46 +4661,76 @@ Responda ESTRITAMENTE em formato JSON puro no esquema:
     { "title": "string", "description": "string" }
   ]
 }`;
+    } else if (mode === 'caption') {
+      maxOutputTokens = 1024;
+      const currentContext = currentData ? `
+DADOS DO POST ATUAL:
+- Tag/Público: ${currentData.audienceTag || 'Direito Previdenciário'}
+- Título da Arte: ${currentData.title || topic}
+- Alerta/Destaque: ${currentData.highlight || ''}
+- Tópicos Explicativos: ${(currentData.points || []).join(' | ')}
+` : '';
+
+      prompt = `Você é o principal redator e estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
+Gere uma Legenda de Instagram de ALTA AUTORIDADE, EDUCATIVA e CONCISA sobre o tema: "${topic}".
+Persona: ${personaDesc}
+${currentContext}
+
+REQUISITOS RIGOROSOS DE ESTRUTURA E TAMANHO:
+1. LIMITE RIGOROSO DO INSTAGRAM: A legenda inteira DEVE ter entre 1.300 e 1.700 caracteres no total (MÁXIMO ABSOLUTO 1.850 caracteres, contando espaços, emojis e hashtags).
+2. CONCISÃO E COMPLETUDE: Redija todo o conteúdo (do início ao fim) de forma enxuta, elegante e direta para caber integralmente no limite sem que falte nenhuma informação crucial.
+3. ESTRUTURA DA LEGENDA:
+   - Gancho inicial impactante com a dor real do segurado (1 parágrafo curto).
+   - Explicação clara da regra jurídica (ex: EC 103/2019, art. 195, § 14 da CF ou Lei 8.213/91).
+   - Principais riscos da falta de regularização (perda de carência, tempo de contribuição e indeferimento de benefício).
+   - As soluções práticas explicadas de forma didática e direta (Complementação, Agrupamento, Uso de Excedente).
+   - Chamada ética e institucional para ação (ex: salvar o post ou compartilhar com quem contribui para o INSS).
+   - 6 a 8 hashtags relevantes no final.
+4. FORMATAÇÃO: Parágrafos curtos, linhas em branco entre eles e emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 👉 📌).
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{ "caption": "string" }`;
+    } else if (mode === 'template') {
+      maxOutputTokens = 1024;
+      prompt = `Você é o principal designer e redator de marketing jurídico do escritório Felix & Castro Advocacia.
+Gere os textos completos e de alto impacto para a ARTE VISUAL de um post sobre: "${topic}".
+Persona: ${personaDesc}
+Estratégia: ${strategyDesc}
+${assetContext}
+
+DIRETRIZES PARA OS CAMPOS DA ARTE:
+1. "audienceTag": Nicho ou público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA").
+2. "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?").
+3. "highlight": Alerta de alto impacto em 5 a 12 palavras (Ex: "⚠️ Meses abaixo do piso NÃO contam para tempo de aposentadoria nem carência!").
+4. "points": 3 ou 4 itens com palavra-chave em caixa alta seguida de explicação prática (Ex: "1) COMPLEMENTAÇÃO: Pague a diferença via DARF para validar a competência.").
+5. "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e verifique seu extrato do CNIS!").
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
-      const isTemplateOnly = mode === 'template';
-      const taskDesc = isTemplateOnly
-        ? `Texto completo e de alto impacto para a arte do post sobre: "${topic}".`
-        : `Conteúdo completo e de alto valor para Instagram sobre: "${topic}".`;
-
-      const jsonFormat = isTemplateOnly
-        ? `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`
-        : `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
-
+      maxOutputTokens = 2048;
       const marketingInstructions = `
 DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
-1. CAMPO "audienceTag": Identifique de forma clara e profissional o público-alvo ou nicho do tema em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA", "DIREITO PREVIDENCIÁRIO | AUXÍLIO-DOENÇA", "BPC/LOAS | BENEFÍCIO ASSISTENCIAL", "TRABALHADOR RURAL | SEGURADO ESPECIAL").
-2. CAMPO "title": Título persuasivo, forte e direto (pergunta provocativa ou gancho de dor real), com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?", "Seu laudo médico foi ignorado pelo INSS?").
-3. CAMPO "highlight": Alerta de alto impacto ou benefício central em 5 a 12 palavras que chame a atenção do leitor imediatamente (Ex: "⚠️ Meses abaixo do piso NÃO contam para tempo de aposentadoria nem carência!").
-4. CAMPO "points": Deve conter 3 ou 4 itens altamente informativos, relevantes e substantivos. NUNCA faça tópicos vazios ou genéricos de poucas palavras. Cada ponto deve ter uma palavra-chave em caixa alta seguida de explicação jurídica clara e prática (Ex:
-   - "1) COMPLEMENTAÇÃO: Pague a diferença da contribuição via DARF/GPS para validar o mês."
-   - "2) AGRUPAMENTO: Una duas ou mais contribuições abaixo do mínimo do mesmo ano para atingir o piso."
-   - "3) USO DO EXCEDENTE: Transfira o valor que ultrapassou o teto de um mês para cobrir os menores."
-   - "4) ANÁLISE NO CNIS: Regularize pendências antes de dar entrada no pedido de benefício.").
-5. CAMPO "ctaCaption": Chamada para ação educativa e institucional (máximo 10 palavras), ex: "📌 Salve este post para consultar quando analisar o seu CNIS!", "💡 Compartilhe com quem também contribui para o INSS!". NUNCA use frases mercantilistas de captação de clientes (como "fale conosco", "agende consulta", "chame no WhatsApp") para cumprir o Código de Ética da OAB.
+1. CAMPO "audienceTag": Identifique o nicho/público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA").
+2. CAMPO "title": Título persuasivo e direto com 3 a 7 palavras.
+3. CAMPO "highlight": Alerta de alto impacto em 5 a 12 palavras.
+4. CAMPO "points": 3 ou 4 itens com palavra-chave em caixa alta + explicação jurídica prática.
+5. CAMPO "ctaCaption": Chamada institucional curta (sem frases de captação/WhatsApp).
 6. CAMPO "caption" (Legenda do Instagram):
-   - LIMITE RIGOROSO DO INSTAGRAM: A legenda completa (incluindo texto explicativo, quebras de linha, emojis e hashtags) DEVE ter entre 1.400 e 1.900 caracteres (NUNCA ultrapasse 2.000 caracteres, pois o limite absoluto do Instagram é 2.200 caracteres).
-   - Escreva uma legenda ALTAMENTE EDUCATIVA, fluida e envolvente.
-   - Explique o embasamento legal de forma simples e direta (ex: EC 103/2019, Lei 8.213/91, Art. 195 da CF).
-   - Divida em parágrafos curtos e arejados com linha em branco entre eles.
-   - Use emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 🤝 👉 📌) para guiar a leitura.
-   - Finalize SEMPRE com 6 a 10 hashtags relevantes.`;
+   - LIMITE RIGOROSO: Entre 1.300 e 1.700 caracteres no total (MÁXIMO 1.850 caracteres com hashtags).
+   - Redija um texto fluido, didático, parágrafos curtos, embasamento legal claro, soluções práticas e 6 a 8 hashtags.
+7. CAMPO "imagePrompt": Descrição em inglês para imagem profissional de suporte.`;
 
       prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
-    ${taskDesc}${assetContext}
-    Tema do Post: "${topic}"
+    Conteúdo completo e de alto valor para Instagram sobre: "${topic}".${assetContext}
     Estratégia Solicitada: ${strategyDesc}
     Persona do Advogado: ${personaDesc}
-    Público: Segurados do INSS, trabalhadores, aposentados e contribuintes. Linguagem acessível, clara, mas com extrema precisão técnica e relevância informativa.
+    Público: Segurados do INSS, trabalhadores e contribuintes. Linguagem acessível com alta precisão técnica.
     
     ${marketingInstructions}
     
     Responda ESTRITAMENTE em formato JSON puro no esquema:
-    ${jsonFormat}`;
+    { "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
 
     const response = await callGemini({
@@ -4707,32 +4739,12 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
       contents: prompt,
       config: { 
         responseMimeType: 'application/json',
-        maxOutputTokens: 8192,
+        maxOutputTokens,
         temperature: 0.25
       }
     });
 
     let cleanedText = response.text || "{}";
-    try {
-      const parsed = JSON.parse(cleanedText);
-      // Proteção rigorosa para o limite de 2.200 caracteres do Instagram
-      if (parsed && typeof parsed.caption === 'string' && parsed.caption.length > 2100) {
-        const hashtagsMatch = parsed.caption.match(/(?:#\w+\s*)+$/);
-        const hashtags = hashtagsMatch ? hashtagsMatch[0].trim() : '';
-        const bodyWithoutHashtags = hashtags ? parsed.caption.slice(0, -hashtags.length).trim() : parsed.caption;
-        
-        // Corta no último ponto final antes do limite seguro
-        const safeCutLimit = 2000 - hashtags.length - 10;
-        const lastPeriodIndex = bodyWithoutHashtags.lastIndexOf('.', safeCutLimit);
-        const cutIndex = lastPeriodIndex > 1200 ? lastPeriodIndex + 1 : safeCutLimit;
-        
-        parsed.caption = `${bodyWithoutHashtags.slice(0, cutIndex)}\n\n${hashtags}`.trim();
-        cleanedText = JSON.stringify(parsed);
-      }
-    } catch (e) {
-      // Mantém cleanedText se não for JSON válido para parsing manual
-    }
-
     res.json({ text: cleanedText });
   } catch (error: any) {
     console.error("Marketing error:", error);
