@@ -278,6 +278,17 @@ const diffMonths = (d1: Date, d2: Date) => {
   return months <= 0 ? 0 : months;
 };
 
+// Conta apenas anos integralmente decorridos entre d1 e d2 (sem arredondar fração de ano para cima).
+// Usada exclusivamente no cálculo do aviso prévio proporcional (Lei 12.506/2011).
+const fullYearsElapsed = (d1: Date, d2: Date) => {
+  let years = d2.getFullYear() - d1.getFullYear();
+  const monthDiff = d2.getMonth() - d1.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && d2.getDate() < d1.getDate())) {
+    years--;
+  }
+  return years < 0 ? 0 : years;
+};
+
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
 const getSalaryAtDate = (date: Date, history: LaborData['salaryHistory'], currentSalary: number): number => {
@@ -493,13 +504,15 @@ const calculateLaborResults = (calcData: LaborData) => {
     const shouldPayNotice = isIndemnified && calcData.terminationReason !== 'justa_causa' && calcData.terminationReason !== 'pedido_demissao';
 
     if (start && end && salary && shouldPayNotice) {
-        const years = Math.floor(diffMonths(start, end) / 12);
-        const extraDays = Math.min(years * 3, 60); // Lei 12.506
+        // Lei 12.506/2011, art. 1º e par. único (Súmula 441 TST): 30 dias até 1 ano completo;
+        // a partir do 2º ano completo, +3 dias por ano completo além do primeiro, até o teto de 90.
+        const years = fullYearsElapsed(start, end);
+        const extraDays = years >= 1 ? Math.min(3 * (years - 1), 60) : 0;
         noticeDays = 30 + extraDays;
         noticeValue = (salary / 30) * noticeDays;
-        results.push({ 
-            desc: `Aviso Prévio Indenizado (${noticeDays} dias)`, 
-            value: noticeValue, 
+        results.push({
+            desc: `Aviso Prévio Indenizado (${noticeDays} dias)`,
+            value: noticeValue,
             category: 'Rescisórias',
             details: `Salário Base: ${formatCurrency(salary)}\nDias de Aviso: ${noticeDays} (30 + ${noticeDays - 30} proporcionais)\nCálculo: (${formatCurrency(salary)} / 30) * ${noticeDays} = ${formatCurrency(noticeValue)}`
         });
