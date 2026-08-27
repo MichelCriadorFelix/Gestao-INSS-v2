@@ -754,10 +754,10 @@ Responda dúvidas técnicas com clareza, profundidade e precisão cirúrgica.
 
 REGRAS DESTE MODO:
 1. DIRETO AO PONTO: Vá direto à resposta. Sem introduções longas, sem repetir a pergunta.
-2. FUNDAMENTADO (REGRA DE OURO): Use EXCLUSIVAMENTE a Base de Conhecimento (RAG). Cite o dispositivo legal exato e/ou súmula que conste no contexto enviado. Se NÃO estiver na base, informe que a fonte não foi encontrada e não responda com base em conhecimento externo para evitar alucinações.
+2. FUNDAMENTADO (REGRA DE OURO): Sempre priorize a Base de Conhecimento (RAG) para fundamentar suas respostas com os dispositivos legais exatos do contexto. No entanto, se a pergunta for de caráter jurídico geral, teórica, explicativa sobre procedimentos comuns (ex: como funciona uma perícia, prazos gerais, etc.) ou se o usuário pedir para redigir uma mensagem para o cliente (ex: mensagem para o WhatsApp do Luciano avisando sobre a perícia e orientando como se portar), você DEVE utilizar seu conhecimento geral avançado para fornecer uma resposta rica, completa, didática, bem estruturada e extremamente útil, mantendo a precisão técnica e sem alucinar sobre os fatos específicos do caso do cliente.
 3. PRÁTICO: Termine sempre com a implicação prática para o caso concreto do advogado.
-4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
-5. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis ou súmulas. PROIBIDO responder sobre Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento.
+4. DETALHADO E COMPLETO (NÃO ECONOMIZE PALAVRAS): Suas respostas devem ser profundas, ricas, didáticas e bem explicadas. Se for uma mensagem para cliente, redija-a de forma completa, com todas as orientações necessárias (por exemplo, em caso de perícia, explique detalhadamente como o cliente deve se portar, quais documentos levar, a importância do laudo, etc.). O advogado ou a secretária devem poder copiar e colar a mensagem diretamente para o cliente, com total profissionalismo e profundidade.
+5. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis ou súmulas. PROIBIDO responder sobre Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento para justificar fatos específicos do processo, mas conceitos gerais doutrinários são permitidos se fundamentarem a explicação ao cliente.
 6. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as duas posições (majoritária e minoritária) e indique qual tende a prevalecer nos JEFs do RJ.
 
 ESTILO: Advogado sênior respondendo a colega de escritório. Tom técnico, direto, sem cerimônia desnecessária.`;
@@ -770,11 +770,11 @@ Responda dúvidas técnicas com clareza, profundidade e precisão cirúrgica.
 
 REGRAS DESTE MODO:
 1. DIRETO AO PONTO: Vá direto à resposta. Sem introduções longas, sem repetir a pergunta.
-2. FUNDAMENTADO (REGRA DE OURO): Use EXCLUSIVAMENTE a Base de Conhecimento (RAG). Cite o dispositivo legal exato da CLT, Súmulas TST ou CF/88 que conste no contexto enviado. Se NÃO estiver na base, informe que a fonte não foi encontrada e não responda com base em conhecimento externo para evitar alucinações.
+2. FUNDAMENTADO (REGRA DE OURO): Sempre priorize a Base de Conhecimento (RAG) para fundamentar suas respostas com os dispositivos legais exatos do contexto. No entanto, se a pergunta for de caráter jurídico geral, teórica, explicativa sobre procedimentos comuns ou se o usuário pedir para redigir uma mensagem para o cliente (ex: mensagem de agendamento de audiência, explicações trabalhistas), você DEVE utilizar seu conhecimento geral avançado para fornecer uma resposta rica, completa, didática, bem estruturada e extremamente útil, mantendo a precisão técnica e sem alucinar sobre os fatos específicos do caso do cliente.
 3. PRÁTICO: Termine sempre com a implicação prática (rito aplicável, prazo prescricional, risco de sucumbência).
-4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
+4. DETALHADO E COMPLETO (NÃO ECONOMIZE PALAVRAS): Suas respostas devem ser profundas, ricas, didáticas e bem explicadas. Se for uma mensagem para cliente, redija-a de forma completa, com todas as orientações necessárias (como documentos a separar, testemunhas, rito de audiência, etc.). O advogado ou a secretária devem poder copiar e colar a mensagem diretamente para o cliente, com total profissionalismo e profundidade.
 5. RITO PROCESSUAL: Sempre que relevante, informe o rito (Sumário / Sumaríssimo / Ordinário) e suas implicações práticas.
-6. PROIBIÇÕES: PROIBIDO usar juridiquês arcaico. PROIBIDO inventar artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel). É terminantemente proibido usar leis que não estejam na Base de Conhecimento.
+6. PROIBIÇÕES: PROIBIDO usar juridiquês arcaico. PROIBIDO inventar artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel). É terminantemente proibido usar leis que não estejam na Base de Conhecimento para justificar fatos específicos do processo, mas conceitos gerais doutrinários são permitidos.
 7. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as posições do TST e dos TRTs relevantes, indicando a tendência predominante.
 
 ESTILO: Advogada sênior respondendo a colega de escritório. Tom técnico, direto, sem cerimônia desnecessária.`;
@@ -791,11 +791,11 @@ Responda dúvidas técnicas de Direito do Consumidor, Direito Civil e Processo C
 
 REGRAS DESTE MODO:
 1. DIRETO AO PONTO: Vá direto à resposta. Sem introduções longas, sem repetir a pergunta.
-2. FUNDAMENTADO (REGRA DE OURO): Use EXCLUSIVAMENTE a Base de Conhecimento (RAG). Cite o dispositivo legal exato — CDC, Código Civil, CPC ou CF/88 que conste no contexto enviado. Se NÃO estiver na base, informe que a fonte não foi encontrada e não responda com base em conhecimento externo para evitar alucinações.
+2. FUNDAMENTADO (REGRA DE OURO): Sempre priorize a Base de Conhecimento (RAG) para fundamentar suas respostas com os dispositivos legais exatos do contexto. No entanto, se a pergunta for de caráter jurídico geral, teórica, explicativa sobre procedimentos comuns ou se o usuário pedir para redigir uma mensagem para o cliente, você DEVE utilizar seu conhecimento geral avançado para fornecer uma resposta rica, completa, didática, bem estruturada e extremamente útil, mantendo a precisão técnica e sem alucinar sobre os fatos específicos do caso do cliente.
 3. PRÁTICO: Termine sempre com a implicação prática para o caso concreto do advogado (competência, prazo, rito, risco).
-4. CONCISO MAS COMPLETO: Resposta ideal entre 150 e 400 palavras. Se a dúvida for complexa, pode ir além — mas sem enrolação.
+4. DETALHADO E COMPLETO (NÃO ECONOMIZE PALAVRAS): Suas respostas devem ser profundas, ricas, didáticas e bem explicadas. Se for uma mensagem para cliente, redija-a de forma completa, com todas as orientações necessárias. O advogado ou a secretária devem poder copiar e colar a mensagem diretamente para o cliente, com total profissionalismo e profundidade.
 5. COMPETÊNCIA E RITO: Sempre que relevante, informe se o caso cabe no JEC (até 40 salários mínimos) ou Vara Cível, e as implicações práticas (advogado obrigatório acima de 20 SM no JEC, recursos, etc.).
-6. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis, artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel) ou Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento.
+6. PROIBIÇÕES: PROIBIDO usar "data venia", "outrossim", juridiquês arcaico. PROIBIDO inventar leis, artigos ou súmulas. PROIBIDO responder sobre Direito Previdenciário (encaminhe para o Dr. Michel) ou Direito do Trabalho (encaminhe para a Dra. Luana). É terminantemente proibido usar leis que não estejam na Base de Conhecimento para justificar fatos específicos do processo, mas conceitos gerais doutrinários são permitidos.
 7. SE HOUVER DIVERGÊNCIA JURISPRUDENCIAL: Apresente as posições do STJ, TJRJ e Turmas Recursais relevantes, indicando a tendência predominante.
 
 ESTILO: Advogado sênior respondendo a colega de escritório. Tom técnico, direto, sem cerimônia desnecessária.`;
@@ -2666,36 +2666,42 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 }
 
 const MODEL_HIERARCHY = [
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-3.7-flash",
   "gemini-3-flash-preview"
 ];
 
 const MODEL_MAPPING: Record<string, string> = {
-  "gemini-2.0-flash-exp": "gemini-2.5-flash",
-  "gemini-1.5-flash-latest": "gemini-2.5-flash",
-  "gemini-1.5-flash": "gemini-2.5-flash",
-  "gemini-1.5-pro": "gemini-2.5-flash",
-  "gemini-2.5-flash": "gemini-2.5-flash",
-  "gemini-3.5-flash": "gemini-3.5-flash",
-  "gemini-3.6-flash": "gemini-3.6-flash",
+  "gemini-2.0-flash-exp": "gemini-3.7-flash",
+  "gemini-1.5-flash-latest": "gemini-3.7-flash",
+  "gemini-1.5-flash": "gemini-3.7-flash",
+  "gemini-1.5-pro": "gemini-3.7-flash",
+  "gemini-2.5-flash": "gemini-3.7-flash",
+  "gemini-3.5-flash": "gemini-3.7-flash",
+  "gemini-3.6-flash": "gemini-3.7-flash",
   "gemini-3.7-flash": "gemini-3.7-flash",
-  "gemini-3-flash-preview": "gemini-3-flash-preview",
-  "google/gemini-3.5-flash": "gemini-3.5-flash",
-  "google/gemini-3.6-flash": "gemini-3.6-flash",
-  "google/gemini-3-flash-preview": "gemini-3-flash-preview"
+  "gemini-3-flash-preview": "gemini-3.7-flash",
+  "google/gemini-3.5-flash": "gemini-3.7-flash",
+  "google/gemini-3.6-flash": "gemini-3.7-flash",
+  "google/gemini-3-flash-preview": "gemini-3.7-flash"
 };
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return MODEL_HIERARCHY[0];
+  
+  // Se houver prefixo "direct:", retorna o modelo solicitado diretamente (bypass para failover de quota)
+  if (modelName.startsWith("direct:")) {
+    return modelName.substring(7);
+  }
+
   const mapped = MODEL_MAPPING[modelName];
   if (mapped) return mapped;
   
   if (modelName.includes('3.7-flash')) return "gemini-3.7-flash";
-  if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
-  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
+  if (modelName.includes('3.6-flash')) return "gemini-3.7-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-3.7-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-3.7-flash";
   if (modelName.includes('deepseek')) return modelName;
   return modelName;
 }
@@ -2889,7 +2895,12 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   const ai = new GoogleGenAI({ apiKey });
   
   const requestedModel = params.model || MODEL_HIERARCHY[0];
-  const currentModel = getEffectiveModel(requestedModel);
+  let currentModel = getEffectiveModel(requestedModel);
+
+  // Se for uma requisição de geração de imagem, usa o modelo de imagem correto
+  if (params.config?.imageConfig) {
+    currentModel = "gemini-3.1-flash-lite-image";
+  }
 
   const finalParams = { ...params, model: currentModel };
   
@@ -2943,8 +2954,22 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
       console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`); 
 
+      let nextParams = { ...params };
+      if (isDailyQuota || is503Overloaded) {
+        const currentModel = params.model || "gemini-3.7-flash";
+        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+        let currentIndex = alternatives.indexOf(currentModel);
+        if (currentIndex === -1) {
+          currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
+        }
+        const nextIndex = (currentIndex + 1) % alternatives.length;
+        const nextModel = alternatives[nextIndex];
+        console.warn(`[FAILOVER QUOTA/503 NON-STREAM] Modelo '${currentModel}' esgotado ou indisponível. Alternando para o modelo reserva: '${nextModel}'`);
+        nextParams.model = "direct:" + nextModel;
+      }
+
       await new Promise(resolve => setTimeout(resolve, delay));
-      return callGemini(params, retries - 1, 0, nextFailures, undefined);
+      return callGemini(nextParams, retries - 1, 0, nextFailures, undefined);
     }
     
     if (retries === 0) {
@@ -3174,7 +3199,18 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       else if (isNotFound) errorReason = 'modelo não encontrado (404)';
 
       let nextParams = { ...params };
-      if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
+      if (isDailyQuota || is503Overloaded) {
+        const currentModel = params.model || "gemini-3.7-flash";
+        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+        let currentIndex = alternatives.indexOf(currentModel);
+        if (currentIndex === -1) {
+          currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
+        }
+        const nextIndex = (currentIndex + 1) % alternatives.length;
+        const nextModel = alternatives[nextIndex];
+        console.warn(`[FAILOVER QUOTA/503 STREAM] Modelo '${currentModel}' esgotado ou indisponível. Alternando para o modelo reserva: '${nextModel}'`);
+        nextParams.model = "direct:" + nextModel;
+      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
         console.warn(`[FAILOVER 503] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
         nextParams.model = 'gemini-3.5-flash';
       } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
@@ -4589,8 +4625,8 @@ app.post("/api/marketing/generate", async (req, res) => {
 
     const captionInstructions = mode === 'full' ? `
 REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
-- Escreva em parágrafos CURTOS (máximo 3 linhas cada)
-- Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto
+- Escreva uma legenda ALTAMENTE DETALHADA, informativa e profunda (mínimo de 350 a 600 palavras). O advogado quer conteúdo de altíssimo valor que realmente eduque o cliente, explique seus direitos e gere engajamento orgânico. Não economize palavras, explique as leis e jurisprudências de forma completa e didática!
+- Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto para torná-lo atraente
 - Separe cada parágrafo com linha em branco
 - Termine SEMPRE com 8 a 12 hashtags relevantes em linha separada
 - Exemplo de formato:
@@ -4609,9 +4645,13 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.7-flash',
       contents: prompt,
-      config: { responseMimeType: 'application/json' }
+      config: { 
+        responseMimeType: 'application/json',
+        maxOutputTokens: 16383,
+        temperature: 0.25
+      }
     });
     res.json({ text: response.text });
   } catch (error: any) {

@@ -90,8 +90,15 @@ export const calculateTimeForPeriod = (
         else if (b.activityType === 'special_20') factor = gender === 'M' ? 1.75 : 1.5;
         else if (b.activityType === 'special_15') factor = gender === 'M' ? 2.33 : 2.0;
 
-        return { startMs: start.getTime(), endMs: bondEnd.getTime(), factor, activityType: b.activityType };
-    }).filter(b => b !== null && !isNaN(b.startMs) && !isNaN(b.endMs) && b.startMs <= b.endMs) as { startMs: number, endMs: number, factor: number, activityType: string }[];
+        return { 
+            startMs: start.getTime(), 
+            endMs: bondEnd.getTime(), 
+            factor, 
+            activityType: b.activityType,
+            sc: b.sc || [],
+            type: b.type || ''
+        };
+    }).filter(b => b !== null && !isNaN(b.startMs) && !isNaN(b.endMs) && b.startMs <= b.endMs) as { startMs: number, endMs: number, factor: number, activityType: string, sc: any[], type: string }[];
 
     if (processedBonds.length === 0) return { years: 0, months: 0, days: 0, totalDays: 0 };
 
@@ -116,6 +123,44 @@ export const calculateTimeForPeriod = (
 
         for (const bond of processedBonds) {
             if (currentMs >= bond.startMs && currentMs <= bond.endMs) {
+                // Verificar se a contribuição do mês correspondente está abaixo do salário mínimo
+                const currentMonth = current.getMonth() + 1;
+                const currentYear = current.getFullYear();
+                const monthStr = `${String(currentMonth).padStart(2, '0')}/${currentYear}`;
+                
+                const scForMonth = bond.sc.find(s => s.month === monthStr);
+                
+                let isBelowMinimum = false;
+                
+                if (scForMonth) {
+                    const compDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+                    const minWage = getCurrentMinimumWage(compDateStr);
+                    
+                    const isIndividualOrFacultativo = bond.type && (
+                        bond.type.toLowerCase().includes('individual') || 
+                        bond.type.toLowerCase().includes('facultativo') || 
+                        bond.type.toLowerCase().includes('autônomo') || 
+                        bond.type.toLowerCase().includes('contribuinte')
+                    );
+                    
+                    if (scForMonth.value > 0 && scForMonth.value < minWage) {
+                        if (currentMs <= REFORM_DATE_MS) {
+                            if (isIndividualOrFacultativo) {
+                                isBelowMinimum = true;
+                            }
+                        } else {
+                            // Pós-Reforma: desconsidera para todos os tipos de segurados
+                            isBelowMinimum = true;
+                        }
+                    } else if (scForMonth.value === 0 && isIndividualOrFacultativo) {
+                        isBelowMinimum = true;
+                    }
+                }
+                
+                if (isBelowMinimum) {
+                    continue; // Ignora este vínculo para este dia
+                }
+                
                 isActive = true;
                 // Apply factor only if Pre-Reform (before 13/11/2019)
                 // AND only if the bond type is special
@@ -223,6 +268,39 @@ export const calculateRMI = (
             
             // Filter >= July 1994 AND <= DER AND <= salaryLimitDate
             if (date >= new Date(1994, 6, 1) && date <= derDate && date <= limitDate) {
+                // Verificar se a contribuição está abaixo do salário mínimo da época
+                const compDateStr = `${ano}-${String(mes).padStart(2, '0')}-01`;
+                const minWage = getCurrentMinimumWage(compDateStr);
+                
+                const isIndividualOrFacultativo = b.type && (
+                    b.type.toLowerCase().includes('individual') || 
+                    b.type.toLowerCase().includes('facultativo') || 
+                    b.type.toLowerCase().includes('autônomo') || 
+                    b.type.toLowerCase().includes('contribuinte')
+                );
+                
+                const dateMs = date.getTime();
+                const REFORM_DATE_MS = new Date('2019-11-13').setHours(12, 0, 0, 0);
+                
+                let isBelowMin = false;
+                if (s.value > 0 && s.value < minWage) {
+                    if (dateMs <= REFORM_DATE_MS) {
+                        if (isIndividualOrFacultativo) {
+                            isBelowMin = true;
+                        }
+                    } else {
+                        // Pós-reforma: descarta para qualquer segurado
+                        isBelowMin = true;
+                    }
+                } else if (s.value === 0 && isIndividualOrFacultativo) {
+                    isBelowMin = true;
+                }
+                
+                if (isBelowMin) {
+                    // Desconsidera este salário de contribuição no cálculo do PBC
+                    return;
+                }
+
                 let correctedValue = s.value;
                 let correctionFactor = 1.0;
 
@@ -292,7 +370,19 @@ export const calculateRMI = (
 
     const allSalaries = Array.from(groupedSalaries.values());
 
-    if (allSalaries.length === 0) return { rmi: 0, rmiDetails: undefined };
+    if (allSalaries.length === 0) {
+        const minWage = customMinWage || getCurrentMinimumWage(der);
+        return { 
+            rmi: minWage, 
+            rmiDetails: {
+                average: minWage,
+                appliedFactor: 1.0,
+                finalRMI: minWage,
+                calculationFormula: "Garantia Constitucional de 1 Salário Mínimo (Art. 201, § 2º da CF/88). Não foram encontrados salários de contribuição válidos no PBC pós-julho de 1994.",
+                salaries: []
+            } 
+        };
+    }
 
     // Sort by value descending for picking highest (80% rule)
     const sortedByValue = [...allSalaries].sort((a, b) => b.value - a.value);
@@ -305,7 +395,7 @@ export const calculateRMI = (
 
     if (ruleType.startsWith('Pre-Reform')) {
         // Average of 80% highest
-        const cutoff = Math.floor(sortedByValue.length * 0.8);
+        const cutoff = Math.max(1, Math.floor(sortedByValue.length * 0.8));
         const top80 = sortedByValue.slice(0, cutoff);
         salariesUsed = top80;
         
@@ -590,6 +680,9 @@ export const calculateCarencia = (bonds: CNISBond[], targetDate: string, allBond
     const carenciaMonths = new Set<string>();
     const target = parseDateLocal(targetDate);
     
+    // Reform date to millisecond representation
+    const REFORM_DATE_MS = new Date('2019-11-13').setHours(12, 0, 0, 0);
+    
     bonds.forEach(bond => {
         if (!bond.useInCalculation || !bond.startDate || !bond.endDate) return;
         
@@ -609,7 +702,44 @@ export const calculateCarencia = (bonds: CNISBond[], targetDate: string, allBond
         const last = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), 1);
         
         while (current <= last) {
-            carenciaMonths.add(`${current.getFullYear()}-${current.getMonth()}`);
+            const currentMonth = current.getMonth() + 1;
+            const currentYear = current.getFullYear();
+            const monthStr = `${String(currentMonth).padStart(2, '0')}/${currentYear}`;
+            
+            const scForMonth = bond.sc?.find(s => s.month === monthStr);
+            let isBelowMinimum = false;
+            
+            if (scForMonth) {
+                const compDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+                const minWage = getCurrentMinimumWage(compDateStr);
+                
+                const isIndividualOrFacultativo = bond.type && (
+                    bond.type.toLowerCase().includes('individual') || 
+                    bond.type.toLowerCase().includes('facultativo') || 
+                    bond.type.toLowerCase().includes('autônomo') || 
+                    bond.type.toLowerCase().includes('contribuinte')
+                );
+                
+                // Represent current month in MS (middle of month to safe check against reform)
+                const monthMidMs = new Date(currentYear, current.getMonth(), 15).getTime();
+                
+                if (scForMonth.value > 0 && scForMonth.value < minWage) {
+                    if (monthMidMs < REFORM_DATE_MS) {
+                        if (isIndividualOrFacultativo) {
+                            isBelowMinimum = true;
+                        }
+                    } else {
+                        isBelowMinimum = true;
+                    }
+                } else if (scForMonth.value === 0 && isIndividualOrFacultativo) {
+                    isBelowMinimum = true;
+                }
+            }
+            
+            if (!isBelowMinimum) {
+                carenciaMonths.add(`${current.getFullYear()}-${current.getMonth()}`);
+            }
+            
             current.setMonth(current.getMonth() + 1);
         }
     });
@@ -1417,6 +1547,41 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
                 : `Carência: ${totalCarencia}/24. Renda: ${rmiEst > lowIncomeLimit ? 'Acima do limite' : 'Ok'}.`
         });
     }
+
+    // Preencher a RMI projetada/estimada para todos os benefícios (inclusive os não elegíveis) para que o advogado sempre veja o cálculo
+    benefits.forEach(b => {
+        if (b.rmi === undefined) {
+            let activeRuleType = b.ruleType;
+            const validRules = ['Pre-Reform', 'Post-Reform', 'Transition_50', 'Transition_100', 'Disability', 'TemporaryDisability', 'Death', 'Pre-Reform-8696', 'Pre-Reform-Age', 'Pre-Reform-Special', 'Pre-Reform-Disability', 'Pre-Reform-Teacher', 'Pre-Reform-Death'];
+            if (!validRules.includes(activeRuleType)) {
+                activeRuleType = 'Post-Reform';
+            }
+            
+            const limitDateStr = b.ruleType.startsWith('Pre-Reform') ? '2019-11-13' : undefined;
+            const yearsToUse = b.ruleType.startsWith('Pre-Reform') ? timeAtReformTotal.years : timeTotal.years;
+            
+            try {
+                const rmiCalc = calculateRMI(
+                    data.bonds,
+                    activeRuleType as any,
+                    data.gender,
+                    yearsToUse,
+                    inpcIndices,
+                    der,
+                    fractionalAge,
+                    data.customMinWage,
+                    limitDateStr,
+                    data.isTeacher,
+                    ibgeTable
+                );
+                
+                b.rmi = rmiCalc.rmi;
+                b.rmiDetails = rmiCalc.rmiDetails;
+            } catch (err) {
+                console.error("Erro ao calcular RMI projetada para", b.benefitName, err);
+            }
+        }
+    });
 
     return {
         totalTime: timeTotal,

@@ -13,38 +13,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link id="manifest-placeholder" rel="manifest" href="">
+    <link id="manifest-placeholder" rel="manifest" href="/manifest.json">
     
-    <script>
-        // Dynamic Manifest Generation for PWA Installation
-        window.addEventListener('DOMContentLoaded', () => {
-            const manifest = {
-                "name": "Felix e Castro Advocacia Especializada",
-                "short_name": "Felix e Castro",
-                "start_url": window.location.origin + "/",
-                "display": "standalone",
-                "background_color": "#6B1A1F",
-                "theme_color": "#6B1A1F",
-                "icons": [
-                    {
-                        "src": window.location.origin + "/icon-192.png",
-                        "sizes": "192x192",
-                        "type": "image/png"
-                    },
-                    {
-                        "src": window.location.origin + "/icon-512.png",
-                        "sizes": "512x512",
-                        "type": "image/png"
-                    }
-                ]
-            };
-            const stringManifest = JSON.stringify(manifest);
-            const blob = new Blob([stringManifest], {type: 'application/json'});
-            const manifestURL = URL.createObjectURL(blob);
-            document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
-        });
-    </script>
-
     <style>
         body { font-family: 'Inter', sans-serif; }
         h1, h2, h3, .font-display, .font-serif {
