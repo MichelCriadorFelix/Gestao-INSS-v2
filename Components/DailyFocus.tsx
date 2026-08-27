@@ -364,208 +364,205 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
     );
   };
 
+  /**
+   * Identidade visual por TIPO de compromisso.
+   * Cada natureza (audiência, perícia, atendimento, prazo...) tem cor própria,
+   * para reconhecer o compromisso antes mesmo de ler. `accent` pinta a barra
+   * lateral e o rótulo; `chip` pinta o selo do tipo.
+   */
+  const getTaskVisual = (task: FocusTask) => {
+    const badge = (task.categoryBadge || '').toLowerCase();
+    const isAgenda = badge.includes('agenda');
+
+    const map: { match: boolean; label: string; bar: string; text: string; chip: string; Icon: any }[] = [
+      { match: task.type === 'contract',
+        label: 'Contrato', bar: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300',
+        chip: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-800/60', Icon: DocumentTextIcon },
+      { match: badge.includes('audi'),
+        label: isAgenda ? 'Audiência' : 'Audiência', bar: 'bg-rose-600', text: 'text-rose-700 dark:text-rose-300',
+        chip: 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-800/60', Icon: ExclamationCircleIcon },
+      { match: badge.includes('perícia médica') || badge.includes('pericia medica') || badge.includes('perícia') && badge.includes('méd'),
+        label: 'Perícia Médica', bar: 'bg-violet-600', text: 'text-violet-700 dark:text-violet-300',
+        chip: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:ring-violet-800/60', Icon: SparklesIcon },
+      { match: badge.includes('social'),
+        label: 'Perícia Social', bar: 'bg-indigo-600', text: 'text-indigo-700 dark:text-indigo-300',
+        chip: 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-800/60', Icon: SparklesIcon },
+      { match: badge.includes('perícia') || badge.includes('pericia'),
+        label: 'Perícia', bar: 'bg-violet-600', text: 'text-violet-700 dark:text-violet-300',
+        chip: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:ring-violet-800/60', Icon: SparklesIcon },
+      { match: badge.includes('atendimento'),
+        label: 'Atendimento', bar: 'bg-emerald-600', text: 'text-emerald-700 dark:text-emerald-300',
+        chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800/60', Icon: UserIcon },
+      { match: badge.includes('prorroga'),
+        label: 'Prorrogação', bar: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300',
+        chip: 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-800/60', Icon: ClockIcon },
+      { match: badge.includes('dcb') || badge.includes('cessa'),
+        label: 'DCB / Cessação', bar: 'bg-orange-600', text: 'text-orange-700 dark:text-orange-300',
+        chip: 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:ring-orange-800/60', Icon: ExclamationCircleIcon },
+      { match: badge.includes('90'),
+        label: 'Revisão 90 Dias', bar: 'bg-teal-600', text: 'text-teal-700 dark:text-teal-300',
+        chip: 'bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:ring-teal-800/60', Icon: ClockIcon },
+      { match: badge.includes('mandado'),
+        label: 'Mandado de Segurança', bar: 'bg-fuchsia-600', text: 'text-fuchsia-700 dark:text-fuchsia-300',
+        chip: 'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200 dark:bg-fuchsia-950/40 dark:text-fuchsia-300 dark:ring-fuchsia-800/60', Icon: DocumentTextIcon },
+      { match: badge.includes('reuni'),
+        label: 'Reunião', bar: 'bg-cyan-600', text: 'text-cyan-700 dark:text-cyan-300',
+        chip: 'bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:ring-cyan-800/60', Icon: UserIcon },
+    ];
+
+    const hit = map.find(m => m.match);
+    if (hit) return hit;
+
+    return isAgenda
+      ? { label: 'Compromisso', bar: 'bg-bordeaux-700', text: 'text-bordeaux-800 dark:text-gold-300',
+          chip: 'bg-bordeaux-50 text-bordeaux-800 ring-bordeaux-200 dark:bg-bordeaux-950/50 dark:text-gold-300 dark:ring-gold-500/25', Icon: CalendarIcon }
+      : { label: 'Prazo', bar: 'bg-gold-500', text: 'text-gold-700 dark:text-gold-300',
+          chip: 'bg-gold-50 text-gold-800 ring-gold-200 dark:bg-gold-950/40 dark:text-gold-300 dark:ring-gold-500/25', Icon: ExclamationCircleIcon };
+  };
+
   const renderTaskGroup = (title: string, icon: string, tasks: FocusTask[], emptyMessage: string) => {
     return (
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-            <span className="bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 p-1.5 rounded-lg">
-              {icon}
-            </span>
-            {title}
-          </h2>
-          <span className="text-xs font-medium px-2.5 py-1 bg-slate-200 dark:bg-bordeaux-900/40 text-slate-600 dark:text-slate-300 rounded-full">
-            {tasks.length} / 3 Tarefas
+      <div className="mb-10">
+        {/* Cabeçalho da seção */}
+        <div className="flex items-end justify-between mb-5 gap-4">
+          <div className="min-w-0">
+            <h2 className={`font-serif text-2xl font-bold tracking-tight leading-none ${darkMode ? 'text-cream-50' : 'text-bordeaux-900'}`}>
+              {title}
+            </h2>
+            <div className="mt-2 h-px w-16 bg-gradient-to-r from-gold-500 to-transparent" />
+          </div>
+          <span className={`shrink-0 text-[11px] font-semibold tracking-wide px-3 py-1 rounded-full ring-1 ${
+            darkMode ? 'bg-bordeaux-950/60 text-gold-300 ring-gold-500/25' : 'bg-cream-100 text-bordeaux-800 ring-bordeaux-200'
+          }`}>
+            {tasks.length} de 3
           </span>
         </div>
 
         {tasks.length === 0 ? (
           renderEmptyState(emptyMessage)
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {tasks.map((task) => (
-              <div 
-                key={task.id} 
-                className={`flex flex-col p-4 rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-                  darkMode 
-                    ? 'bg-slate-800/95 border-slate-700 hover:border-primary-500/50' 
-                    : 'bg-white border-slate-200 hover:border-primary-300'
-                } ${task.priority === 'high' ? 'ring-1 ring-red-500/50 dark:ring-red-500/40' : ''}`}
-              >
-                {/* Header: Icon + Category Badge + Priority */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${
-                      task.type === 'contract' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
-                      task.categoryBadge?.includes('Perícia') ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
-                      task.categoryBadge?.includes('Atendimento') ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                      task.categoryBadge?.includes('Audiência') ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                      'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-                    }`}>
-                      {task.type === 'contract' ? <DocumentTextIcon className="w-4 h-4" /> :
-                       task.categoryBadge?.includes('Perícia') ? <SparklesIcon className="w-4 h-4" /> :
-                       task.categoryBadge?.includes('Agenda') ? <CalendarIcon className="w-4 h-4" /> :
-                       <ExclamationCircleIcon className="w-4 h-4" />}
-                    </div>
-                    <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 truncate">
-                      {task.categoryBadge || (task.type === 'contract' ? 'Contrato' : 'Prazo')}
-                    </span>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {tasks.map((task) => {
+              const v = getTaskVisual(task);
+              const atrasado = task.elapsedOrRemainingText?.includes('Atrasado') || task.elapsedOrRemainingText?.includes('Vencido');
+              const hoje = task.elapsedOrRemainingText === 'Hoje' || task.elapsedOrRemainingText === 'Vence Hoje';
+              const Icon = v.Icon;
 
-                  {task.priority === 'high' && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0">
-                      Urgente
-                    </span>
-                  )}
-                </div>
-                
-                {/* Title */}
-                <h3 className={`font-bold text-sm mb-2.5 leading-snug line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {task.title}
-                </h3>
+              return (
+                <div
+                  key={task.id}
+                  className={`group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 ${
+                    darkMode
+                      ? 'bg-bordeaux-950/40 border-gold-500/15 hover:border-gold-500/35 shadow-lg shadow-black/20'
+                      : 'bg-white border-cream-200 hover:border-gold-300 shadow-sm hover:shadow-lg hover:shadow-bordeaux-900/5'
+                  }`}
+                >
+                  {/* Barra de cor: identifica o tipo num relance */}
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${v.bar}`} />
 
-                {/* Structured Metadata Box */}
-                <div className={`p-2.5 rounded-xl text-xs space-y-1.5 mb-3 flex-1 ${
-                  darkMode ? 'bg-slate-900/50 border border-slate-700/60' : 'bg-slate-50 border border-slate-100'
-                }`}>
-                  {/* Contrato Info */}
-                  {task.type === 'contract' ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <CalendarIcon className="w-3.5 h-3.5 opacity-70" /> Assinado em:
-                        </span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {task.eventDateFormatted || 'Data não informada'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <ClockIcon className="w-3.5 h-3.5 opacity-70" /> Tempo:
-                        </span>
-                        <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-[11px]">
-                          {task.elapsedOrRemainingText || 'Pendente'}
-                        </span>
-                      </div>
-
-                      {task.serviceType && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-[11px]">
-                          <span className="text-slate-500 dark:text-slate-400 truncate">Serviço:</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[140px] text-right">
-                            {task.serviceType}
-                          </span>
-                        </div>
-                      )}
-
-                      {task.lawyerName && (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 dark:text-slate-400">Responsável:</span>
-                          <span className="font-medium text-primary-600 dark:text-primary-400">
-                            {task.lawyerName}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    /* Prazos e Agenda Info */
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <CalendarIcon className="w-3.5 h-3.5 opacity-70" /> Data:
-                        </span>
-                        <span className="font-bold text-primary-700 dark:text-primary-300">
-                          {task.eventDateFormatted} {task.eventTime ? `às ${task.eventTime}` : ''}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <ClockIcon className="w-3.5 h-3.5 opacity-70" /> Situação:
-                        </span>
-                        <span className={`font-semibold px-1.5 py-0.5 rounded text-[11px] ${
-                          task.elapsedOrRemainingText?.includes('Atrasado') || task.elapsedOrRemainingText?.includes('Vencido')
-                            ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                            : task.elapsedOrRemainingText === 'Hoje' || task.elapsedOrRemainingText === 'Vence Hoje'
-                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-bold'
-                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                  <div className="pl-5 pr-4 pt-4 pb-3 flex-1 flex flex-col">
+                    {/* Tipo + urgência */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-1 rounded-md ring-1 ${v.chip}`}>
+                        <Icon className="w-3 h-3" />
+                        {v.label}
+                      </span>
+                      {(atrasado || hoje) && (
+                        <span className={`shrink-0 text-[9px] font-bold uppercase tracking-[0.1em] px-2 py-1 rounded-md ${
+                          atrasado
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gold-500 text-bordeaux-950'
                         }`}>
-                          {task.elapsedOrRemainingText || 'Pendente'}
+                          {atrasado ? 'Atrasado' : 'Hoje'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Nome do cliente — protagonista, SEM corte */}
+                    <h3 className={`font-serif text-lg font-bold leading-tight break-words mb-3 ${
+                      darkMode ? 'text-cream-50' : 'text-bordeaux-900'
+                    }`}>
+                      {task.clientName || task.title}
+                    </h3>
+
+                    {/* Dados essenciais */}
+                    <div className="space-y-1.5 text-[13px] mb-4">
+                      <div className={`flex items-baseline gap-2 ${darkMode ? 'text-cream-100/80' : 'text-slate-700'}`}>
+                        <CalendarIcon className="w-3.5 h-3.5 shrink-0 translate-y-0.5 opacity-50" />
+                        <span className="font-semibold tabular-nums">
+                          {task.eventDateFormatted}
+                          {task.eventTime && <span className="font-normal opacity-70"> · {task.eventTime}</span>}
                         </span>
                       </div>
 
-                      {task.clientName && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-[11px]">
-                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <UserIcon className="w-3 h-3 opacity-70" /> Cliente:
-                          </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
-                            {task.clientName}
-                          </span>
+                      {task.elapsedOrRemainingText && !atrasado && !hoje && (
+                        <div className={`flex items-baseline gap-2 ${darkMode ? 'text-cream-100/55' : 'text-slate-500'}`}>
+                          <ClockIcon className="w-3.5 h-3.5 shrink-0 translate-y-0.5 opacity-50" />
+                          <span>{task.elapsedOrRemainingText}</span>
                         </div>
                       )}
 
                       {task.location && (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <TagIcon className="w-3 h-3 opacity-70" /> Local:
-                          </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
-                            {task.location}
-                          </span>
+                        <div className={`flex items-baseline gap-2 ${darkMode ? 'text-cream-100/55' : 'text-slate-500'}`}>
+                          <MapPinIcon className="w-3.5 h-3.5 shrink-0 translate-y-0.5 opacity-50" />
+                          <span className="break-words">{task.location}</span>
                         </div>
                       )}
 
                       {task.serviceType && !task.location && (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 dark:text-slate-400">Assunto:</span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px] text-right">
-                            {task.serviceType}
-                          </span>
+                        <div className={`flex items-baseline gap-2 ${darkMode ? 'text-cream-100/55' : 'text-slate-500'}`}>
+                          <TagIcon className="w-3.5 h-3.5 shrink-0 translate-y-0.5 opacity-50" />
+                          <span className="break-words">{task.serviceType}</span>
                         </div>
                       )}
-                    </>
-                  )}
+
+                      {task.type === 'contract' && task.lawyerName && (
+                        <div className={`flex items-baseline gap-2 ${darkMode ? 'text-cream-100/55' : 'text-slate-500'}`}>
+                          <UserIcon className="w-3.5 h-3.5 shrink-0 translate-y-0.5 opacity-50" />
+                          <span>{task.lawyerName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ações */}
+                    <div className={`mt-auto flex items-center gap-1.5 pt-3 border-t ${
+                      darkMode ? 'border-gold-500/12' : 'border-cream-200'
+                    }`}>
+                      <button
+                        onClick={() => handleAction(task, 'completed')}
+                        title="Marcar como concluído"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition"
+                      >
+                        <CheckCircleIcon className="w-4 h-4" />
+                        Feito
+                      </button>
+                      <button
+                        onClick={() => handleAction(task, 'postponed')}
+                        title="Adiar"
+                        className={`inline-flex items-center justify-center p-2 rounded-lg transition active:scale-[0.98] ${
+                          darkMode
+                            ? 'text-gold-300 hover:bg-gold-500/12'
+                            : 'text-amber-600 hover:bg-amber-50'
+                        }`}
+                      >
+                        <ClockIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleAction(task, 'discarded')}
+                        title="Descartar — não é mais necessário"
+                        className={`inline-flex items-center justify-center p-2 rounded-lg transition active:scale-[0.98] ${
+                          darkMode
+                            ? 'text-cream-100/40 hover:bg-white/5 hover:text-cream-100/70'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                        }`}
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Action Buttons */}
-                <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-gold-500/15">
-                  <button 
-                    onClick={() => handleAction(task, 'completed')}
-                    title="Marcar como Concluído / Protocolado"
-                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition-colors"
-                  >
-                    <CheckCircleIcon className="w-5 h-5" />
-                    <span className="text-[9px] font-bold uppercase">Feito</span>
-                  </button>
-                  <button 
-                    onClick={() => handleAction(task, 'postponed')}
-                    title="Adiar para Amanhã"
-                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 transition-colors"
-                  >
-                    <ClockIcon className="w-5 h-5" />
-                    <span className="text-[9px] font-bold uppercase">Adiar</span>
-                  </button>
-                  <button 
-                    onClick={() => handleAction(task, 'discarded')}
-                    title="Não é mais necessário"
-                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-bordeaux-900/40 dark:text-slate-400 dark:hover:bg-bordeaux-900/60 transition-colors"
-                  >
-                    <XMarkIcon className="w-5 h-5" />
-                    <span className="text-[9px] font-bold uppercase">Descartar</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-            
-            {Array.from({ length: 3 - tasks.length }).map((_, i) => (
-              <div key={`empty-${i}`} className={`flex flex-col items-center justify-center p-4 rounded-2xl border border-dashed opacity-50 ${darkMode ? 'border-slate-600 bg-slate-800/30' : 'border-slate-300 bg-slate-50/50'}`}>
-                <SparklesIcon className={`w-6 h-6 mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                <p className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Espaço livre para novas tarefas.
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
