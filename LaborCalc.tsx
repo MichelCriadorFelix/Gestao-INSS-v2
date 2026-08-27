@@ -1532,6 +1532,7 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
   const [showSavedList, setShowSavedList] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
+  const [pendingPdfReview, setPendingPdfReview] = useState<{ alerts: string[]; calcDataInput?: LaborData } | null>(null);
 
   // --- Handlers ---
   const handleInputChange = (field: keyof LaborData, value: any) => {
@@ -1904,7 +1905,20 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
     setActiveTab(6); // Ir para resultados
   };
 
+  // Gate: roda a validação automática antes de gerar o PDF. Se houver algo para
+  // conferir, abre uma janela de confirmação em vez de gerar direto — o relatório
+  // final não menciona nada sobre a validação, esteja ela limpa ou não.
   const generatePDF = (calcDataInput?: LaborData) => {
+      const dataToValidate = calcDataInput || data;
+      const alerts = validateLaborCalculation(dataToValidate);
+      if (alerts.length > 0) {
+          setPendingPdfReview({ alerts, calcDataInput });
+          return;
+      }
+      buildAndSavePDF(calcDataInput);
+  };
+
+  const buildAndSavePDF = (calcDataInput?: LaborData) => {
       // @ts-ignore
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -2120,38 +2134,6 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
       
       const splitText = doc.splitTextToSize(text, pageWidth - (margin * 2));
       doc.text(splitText, margin, y, { align: "justify", maxWidth: pageWidth - (margin * 2) });
-      y += (splitText.length * 4) + 4;
-
-      // ⚠ Pontos para Conferência Manual (Validação Automática)
-      const validationAlerts = validateLaborCalculation(dataToUse);
-
-      if (y > pageHeight - 50) { doc.addPage(); y = 30; } else { y += 8; }
-
-      doc.setTextColor(0);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("⚠ PONTOS PARA CONFERÊNCIA MANUAL", margin, y);
-      doc.line(margin, y+2, pageWidth - margin, y+2);
-      y += 8;
-
-      doc.setFontSize(9);
-      if (validationAlerts.length === 0) {
-          doc.setFont("helvetica", "italic");
-          doc.setTextColor(80);
-          doc.text("Nenhuma inconsistência detectada nas validações automáticas.", margin, y);
-          y += 6;
-      } else {
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(180, 83, 9); // Âmbar/alerta
-          validationAlerts.forEach(alertMsg => {
-              const lines = doc.splitTextToSize(alertMsg, pageWidth - (margin * 2) - 4);
-              const neededHeight = (lines.length * 4) + 4;
-              if (y + neededHeight > pageHeight - 20) { doc.addPage(); y = 30; }
-              doc.text(lines, margin, y);
-              y += neededHeight;
-          });
-      }
-      doc.setTextColor(0);
 
       // Footer
       const pageCount = doc.getNumberOfPages();
@@ -3758,7 +3740,47 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
 
           </div>
       </div>
-      
+
+      {/* Janela de Conferência Manual — bloqueia a geração do PDF até o responsável decidir */}
+      {pendingPdfReview && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
+                  <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-start gap-3 bg-amber-50 dark:bg-amber-900/10 rounded-t-2xl">
+                      <ExclamationTriangleIcon className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                          <h3 className="font-bold text-slate-800 dark:text-white">Pontos para Conferência Manual</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">A validação automática encontrou {pendingPdfReview.alerts.length} ponto(s) antes de gerar o PDF. Confira antes de prosseguir.</p>
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-5 space-y-2">
+                      {pendingPdfReview.alerts.map((alertMsg, idx) => (
+                          <div key={idx} className="text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-lg p-3">
+                              {alertMsg}
+                          </div>
+                      ))}
+                  </div>
+                  <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-2 justify-end">
+                      <button
+                          onClick={() => setPendingPdfReview(null)}
+                          className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                      >
+                          Vou conferir
+                      </button>
+                      <button
+                          onClick={() => {
+                              const { calcDataInput } = pendingPdfReview;
+                              setPendingPdfReview(null);
+                              buildAndSavePDF(calcDataInput);
+                          }}
+                          className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg shadow-indigo-500/30 transition"
+                      >
+                          Já conferi, está correto — Gerar PDF
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 }
