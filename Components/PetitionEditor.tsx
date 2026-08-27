@@ -1011,28 +1011,39 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
               }
             });
 
-            // Explicitly detect 2-column signature / identification box tables
-            const is2ColSignatureTable = colCount === 2 && (
+            // Explicitly detect 2-column or 3-column signature / identification box tables
+            const is2ColSignatureTable = (colCount === 2 || colCount === 3) && (
               allTableText.includes('ASSINATURA') ||
               allTableText.includes('IDENTIFICAÇÃO') ||
+              allTableText.includes('IDENTIFICACAO') ||
               allTableText.includes('SIGNATÁRIO') ||
+              allTableText.includes('SIGNATARIO') ||
               allTableText.includes('CONTRATADO') ||
-              allTableText.includes('CONTRATANTE')
+              allTableText.includes('CONTRATANTE') ||
+              allTableText.includes('OAB') ||
+              allTableText.includes('MICHEL') ||
+              allTableText.includes('LUANA') ||
+              allTableText.includes('FELIX') ||
+              allTableText.includes('CASTRO') ||
+              allTableText.includes('ADVOGAD') ||
+              allTableText.includes('PROCURAD') ||
+              allTableText.includes('PATRONO') ||
+              allTableText.includes('PATRONA')
             );
 
             if (is2ColSignatureTable) {
               node._isSignatureTable = true;
-              node.table.widths = ['50%', '50%'];
+              node.table.widths = Array(colCount).fill(`${Math.floor(100 / colCount)}%`);
               node.alignment = 'center';
               node.layout = {
                 hLineWidth: function () { return 0.75; },
                 vLineWidth: function () { return 0.75; },
-                hLineColor: function () { return '#d1b3b3'; },
-                vLineColor: function () { return '#d1b3b3'; },
+                hLineColor: function () { return '#333333'; },
+                vLineColor: function () { return '#333333'; },
                 paddingLeft: function () { return 6; },
                 paddingRight: function () { return 6; },
-                paddingTop: function () { return 3; },
-                paddingBottom: function () { return 3; },
+                paddingTop: function () { return 4; },
+                paddingBottom: function () { return 4; },
               };
             } else {
               // Calculate max text length to determine layout for general tables
@@ -1071,15 +1082,23 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 }
               });
 
-              // Borderless signature lists or small tables
-              const isSmallTable = colCount <= 3 && maxTotalLen < 40;
+              const isSmallTable = colCount <= 3 && maxTotalLen < 60;
               node._isSignatureTable = isSmallTable;
 
               if (isSmallTable) {
-                // Signatures and small tables: stretch equally across margin to margin
+                // Signatures and small tables: stretch equally across margin to margin with crisp borders
                 node.table.widths = Array(colCount).fill('*');
                 node.alignment = 'center';
-                node.layout = 'noBorders';
+                node.layout = {
+                  hLineWidth: function () { return 0.75; },
+                  vLineWidth: function () { return 0.75; },
+                  hLineColor: function () { return '#333333'; },
+                  vLineColor: function () { return '#333333'; },
+                  paddingLeft: function () { return 6; },
+                  paddingRight: function () { return 6; },
+                  paddingTop: function () { return 4; },
+                  paddingBottom: function () { return 4; },
+                };
               } else {
                 // Larger tables or tables with long text: Dynamically allocate widths
                 const maxLenIdx = colTextLengths.indexOf(Math.max(...colTextLengths));
@@ -1098,8 +1117,8 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 node.layout = {
                   hLineWidth: function () { return 1; },
                   vLineWidth: function () { return 1; },
-                  hLineColor: function () { return '#d1b3b3'; }, // Light burgundy/brown
-                  vLineColor: function () { return '#d1b3b3'; },
+                  hLineColor: function () { return '#333333'; },
+                  vLineColor: function () { return '#333333'; },
                   paddingLeft: function () { return 4; },
                   paddingRight: function () { return 4; },
                   paddingTop: function () { return 4; },
