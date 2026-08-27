@@ -5323,9 +5323,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isExplicitSurgical = !!req.body.isArtifactCorrection || 
                                message.includes("[CORREÇÃO CIRÚRGICA") || 
                                message.includes("[CORRECAO CIRURGICA") || 
+                               message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                message.includes("[GERAÇÃO MODULAR") || 
-                               message.includes("[GERACAO MODULAR") ||
-                               message.includes("TRECHO SELECIONADO A MODIFICAR");
+                               message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgical && draftContent && revisionIntent !== 'FULL_REGENERATION') {
@@ -5496,7 +5496,11 @@ Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 
     }
 
     const mentionsDocsOrOcr = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
-    const shouldSkipDocumentContext = isExplicitSurgical && !mentionsDocsOrOcr;
+    const mentionsLawsOrRagMichel = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(message);
+    const shouldSkipDocumentContext = (isExplicitSurgical || isSurgicalMode) && !mentionsDocsOrOcr;
+    if ((isSurgicalMode || isExplicitSurgical) && !mentionsLawsOrRagMichel) {
+      ragContext = "";
+    }
 
     if (documentContext && !activeDocCache && !shouldSkipDocumentContext) {
       const originalDocSize = documentContext.length;
@@ -5740,7 +5744,10 @@ ${message}`;
     let thinkingConfig: any = undefined;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
-    if (isGenerationRequest) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Máximo raciocínio para petições
     } else if (isReportRequest) {
@@ -6079,9 +6086,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const isExplicitSurgicalLuana = !!req.body.isArtifactCorrection || 
                                     message.includes("[CORREÇÃO CIRÚRGICA") || 
                                     message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                     message.includes("[GERAÇÃO MODULAR") || 
-                                    message.includes("[GERACAO MODULAR") ||
-                                    message.includes("TRECHO SELECIONADO A MODIFICAR");
+                                    message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgicalLuana && draftContent) {
@@ -6302,7 +6309,11 @@ Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 
     }
 
     const mentionsDocsOrOcrLuana = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
-    const shouldSkipDocumentContextLuana = isExplicitSurgicalLuana && !mentionsDocsOrOcrLuana;
+    const mentionsLawsOrRagLuana = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(message);
+    const shouldSkipDocumentContextLuana = (isExplicitSurgicalLuana || isSurgicalMode) && !mentionsDocsOrOcrLuana;
+    if ((isSurgicalMode || isExplicitSurgicalLuana) && !mentionsLawsOrRagLuana) {
+      ragContext = "";
+    }
 
     if (documentContext && !activeDocCache && !shouldSkipDocumentContextLuana) {
       const originalDocSize = documentContext.length;
@@ -6566,10 +6577,10 @@ ${message}`;
     let maxOutputTokens = 8192;
     let thinkingConfig: any = undefined;
 
-    if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined;
-    } else if (isReportRequestLuana) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Optimization: fast execution
     } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
@@ -6929,6 +6940,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isExplicitSurgicalFelix = !!req.body.isArtifactCorrection || 
                                     message.includes("[CORREÇÃO CIRÚRGICA") || 
                                     message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                     message.includes("[GERAÇÃO MODULAR") || 
                                     message.includes("[GERACAO MODULAR");
 
@@ -7299,7 +7311,10 @@ ${message}`;
     let maxOutputTokens = 8192;
     let thinkingConfig: any = undefined;
 
-    if (isGenerationRequest) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined;
     } else if (isReportRequest) {

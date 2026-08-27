@@ -1307,7 +1307,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         messageText.includes('[CORRECAO CIRURGICA') || 
         messageText.includes('TRECHO SELECIONADO A MODIFICAR') ||
         messageText.includes('[CORREÇÃO NO ARTEFATO') ||
-        messageText.includes('[CORRECAO NO ARTEFATO');
+        messageText.includes('[CORRECAO NO ARTEFATO') ||
+        messageText.includes('[EDIÇÃO CIRÚRGICA') ||
+        messageText.includes('[EDICAO CIRURGICA') ||
+        messageText.includes('CORREÇÃO CIRÚRGICA NO ARTEFATO') ||
+        messageText.includes('CORRECAO CIRURGICA NO ARTEFATO');
 
       // Se for uma edição cirúrgica pontual de trecho selecionado, verificamos se o usuário pediu especificamente leis/RAG ou menção a documentos
       const mentionsLawsOrRag = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(messageText);

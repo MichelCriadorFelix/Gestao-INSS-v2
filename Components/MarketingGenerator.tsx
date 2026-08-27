@@ -139,9 +139,13 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
         });
 
         // Define IMEDIATAMENTE a imagem: 1. Imagem do tema na Biblioteca -> 2. Foto oficial do Dr. Michel ou Dra. Luana
-        const { url, asset } = resolvePostImage(targetTopic, targetPersona, libraryAssets, incomingPost.imagePrompt);
-        setUploadedImage(url);
-        setSelectedAsset(asset);
+        const bestAsset = findBestAssetForContext(targetTopic, libraryAssets, targetPersona, incomingPost.imagePrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+        } else {
+          setUploadedImage(getDefaultImage(targetTopic, targetPersona));
+        }
       }
 
       if (onClearInitialData) {
