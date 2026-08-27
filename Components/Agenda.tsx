@@ -46,6 +46,8 @@ interface AgendaProps {
   onUpdateContractStatus?: (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => void;
   dailyFocusState?: any;
   onUpdateDailyFocus?: (state: any) => void;
+  /** Repassado ao DailyFocus: propaga a conclusao para sininho/agenda/clientes. */
+  onTaskResolved?: (task: any) => void;
 }
 
 const EVENT_TYPES = {
@@ -62,7 +64,7 @@ const STATUS_LABELS = {
   'cancelled': { label: 'Cancelado', color: 'bg-slate-100 text-slate-800 dark:bg-bordeaux-900/40 dark:text-slate-300' }
 };
 
-const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }) => {
+const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkMode, eventToEdit, onClearEventToEdit, onSaveEvent, onDeleteEvent, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus, onTaskResolved }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -871,6 +873,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
               onUpdateContractStatus={onUpdateContractStatus}
               dailyFocusState={dailyFocusState}
               onUpdateDailyFocus={onUpdateDailyFocus}
+              onTaskResolved={onTaskResolved}
             />
           </div>
         </div>

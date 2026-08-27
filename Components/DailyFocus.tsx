@@ -25,6 +25,8 @@ interface DailyFocusProps {
   onUpdateContractStatus?: (contractId: string, newStatus: 'Pendente' | 'Em Andamento' | 'Concluído') => void;
   dailyFocusState?: any;
   onUpdateDailyFocus?: (state: any) => void;
+  /** Propaga a conclusão para o sininho, a agenda e a lista de clientes. */
+  onTaskResolved?: (task: FocusTask) => void;
 }
 
 // Helper to safely parse dates in various formats: ISO, YYYY-MM-DD, or DD/MM/YYYY
@@ -59,7 +61,7 @@ const parseAnyDate = (dateVal: string | undefined | null): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-export default function DailyFocus({ events, clients, contracts, user, darkMode, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus }: DailyFocusProps) {
+export default function DailyFocus({ events, clients, contracts, user, darkMode, onUpdateContractStatus, dailyFocusState, onUpdateDailyFocus, onTaskResolved }: DailyFocusProps) {
   const resolvedTasks = dailyFocusState?.resolvedTasks || [];
   const postponedTasks = dailyFocusState?.postponedTasks || [];
   const taskLog = dailyFocusState?.taskLog || [];
@@ -337,6 +339,12 @@ export default function DailyFocus({ events, clients, contracts, user, darkMode,
         postponedTasks: newPostponedTasks,
         taskLog: newTaskLog
       });
+    }
+
+    // Concluir aqui deve refletir no sininho, na agenda e na lista de clientes.
+    // 'postponed' (adiar) não resolve nada; 'discarded' também encerra a pendência.
+    if (action !== 'postponed' && onTaskResolved) {
+      onTaskResolved(task);
     }
   };
 

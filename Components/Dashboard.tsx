@@ -616,6 +616,14 @@ export default function Dashboard({
       const updated = [...resolvedAlerts, id];
       saveData('resolved_alerts', updated);
 
+      // Reflete na Manutenção Periódica: sem isto, resolver no sininho deixava
+      // a mesma pendência ainda listada lá, obrigando a resolver duas vezes.
+      const focusEntry = DEADLINE_KEYS.find(k => id.endsWith(k.alertSuffix));
+      if (focusEntry) {
+          const clientId = id.slice(0, -focusEntry.alertSuffix.length);
+          if (clientId) resolveFocusTask(`alert-${clientId}-${focusEntry.focusKey}`);
+      }
+
       if (skipAgendaUpdate) return;
 
       // Also mark the corresponding virtual event as resolved
@@ -1355,6 +1363,20 @@ export default function Dashboard({
       try {
           if (payload.action === 'resolve') {
               const eventId = payload.eventId;
+
+              // Propaga para a Manutenção Periódica e para o sininho, para que o
+              // mesmo compromisso não continue pendente nos outros painéis.
+              resolveFocusTask(`agenda-${eventId}`);
+              if (eventId.startsWith('v-')) {
+                  // Evento virtual de prazo: v-{clientId}-{campoDoPrazo}
+                  const semPrefixo = eventId.slice(2);
+                  const entry = DEADLINE_KEYS.find(k => semPrefixo.endsWith(`-${String(k.field)}`));
+                  if (entry) {
+                      const clientId = semPrefixo.slice(0, -(String(entry.field).length + 1));
+                      if (clientId) resolveDeadlineEverywhere(clientId, entry.focusKey);
+                  }
+              }
+
               setAgendaEvents(prevEvents => {
                   let updated: AgendaEvent[];
                   const existingEvent = prevEvents.find(e => e.id === eventId);
@@ -1758,6 +1780,85 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
     saveData('daily_focus', [newState]);
   };
 
+  /**
+   * FONTE ÚNICA DE VERDADE para "este prazo foi resolvido".
+   *
+   * O mesmo prazo era identificado de três formas diferentes, cada uma com seu
+   * próprio armazenamento, e nenhuma conversava com a outra:
+   *   Sininho (resolvedAlerts):        `{clientId}_med`
+   *   Manutenção Periódica (resolvedTasks): `alert-{clientId}-medExpertise`
+   *   Agenda (evento virtual):         `v-{clientId}-medExpertiseDate`
+   * Resultado: marcar como feito num lugar não refletia nos outros.
+   *
+   * Esta tabela liga as três identidades, e resolveDeadlineEverywhere marca
+   * todas de uma vez — em qualquer direção.
+   */
+  const DEADLINE_KEYS: { field: keyof ClientRecord; alertSuffix: string; focusKey: string }[] = [
+    { field: 'medExpertiseDate' as keyof ClientRecord,    alertSuffix: '_med',  focusKey: 'medExpertise' },
+    { field: 'socialExpertiseDate' as keyof ClientRecord, alertSuffix: '_soc',  focusKey: 'socialExpertise' },
+    { field: 'extensionDate' as keyof ClientRecord,       alertSuffix: '_ext',  focusKey: 'extension' },
+    { field: 'securityMandateDate' as keyof ClientRecord, alertSuffix: '_mand', focusKey: 'securityMandate' },
+    { field: 'dcbDate' as keyof ClientRecord,             alertSuffix: '_dcb',  focusKey: 'dcb' },
+    { field: 'ninetyDaysDate' as keyof ClientRecord,      alertSuffix: '_90d',  focusKey: 'ninetyDays' },
+  ];
+
+  /** Propaga a resolução de um prazo para os três lugares. */
+  const resolveDeadlineEverywhere = (clientId: string, focusKey: string) => {
+      const entry = DEADLINE_KEYS.find(k => k.focusKey === focusKey);
+      if (!entry || !clientId) return;
+
+      // 1) Sininho
+      const alertId = `${clientId}${entry.alertSuffix}`;
+      if (!resolvedAlerts.includes(alertId)) {
+          const updatedAlerts = [...resolvedAlerts, alertId];
+          setResolvedAlerts(updatedAlerts);
+          saveData('resolved_alerts', updatedAlerts);
+      }
+
+      // 2) Agenda (evento virtual do prazo)
+      const eventId = `v-${clientId}-${String(entry.field)}`;
+      const existing = mergedAgendaEvents.find(e => e.id === eventId);
+      if (existing && existing.status !== 'resolved') {
+          const jaSalvo = agendaEvents.find(e => e.id === eventId);
+          const updatedAgenda = jaSalvo
+              ? agendaEvents.map(e => e.id === eventId ? { ...e, status: 'resolved' as const } : e)
+              : [...agendaEvents, { ...existing, status: 'resolved' as const }];
+          setAgendaEvents(updatedAgenda);
+          saveData('agenda', updatedAgenda);
+      }
+  };
+
+  /** Marca uma tarefa como resolvida na Manutenção Periódica (foco diário). */
+  const resolveFocusTask = (taskId: string) => {
+      const current = dailyFocusState || { resolvedTasks: [], postponedTasks: [], taskLog: [] };
+      if ((current.resolvedTasks || []).includes(taskId)) return;
+      handleUpdateDailyFocus({
+          ...current,
+          resolvedTasks: [...(current.resolvedTasks || []), taskId],
+          postponedTasks: (current.postponedTasks || []).filter((t: any) => t.id !== taskId)
+      } as DailyFocusState);
+  };
+
+  /**
+   * Chamado pela Manutenção Periódica ao concluir/descartar uma tarefa.
+   * Propaga para o sininho, a agenda e a lista de clientes.
+   */
+  const handleFocusTaskResolved = (task: any) => {
+      if (!task?.id) return;
+
+      // Prazo de cliente: alert-{clientId}-{focusKey}
+      if (task.id.startsWith('alert-') && task.clientId && task.originalAlertKey) {
+          resolveDeadlineEverywhere(task.clientId, task.originalAlertKey);
+          return;
+      }
+
+      // Compromisso da agenda: agenda-{eventId}
+      if (task.id.startsWith('agenda-')) {
+          const eventId = task.id.slice('agenda-'.length);
+          handleAgendaAction({ action: 'resolve', eventId });
+      }
+  };
+
   const handleViewChange = (view: any) => {
     setCurrentView(view);
     setIsMobileMenuOpen(false);
@@ -2083,6 +2184,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     darkMode={darkMode}
                     dailyFocusState={dailyFocusState}
                     onUpdateDailyFocus={handleUpdateDailyFocus}
+                    onTaskResolved={handleFocusTaskResolved}
                     eventToEdit={eventToEdit}
                     onClearEventToEdit={() => setEventToEdit(null)}
                     onSaveEvent={handleSaveAgendaEvent}
