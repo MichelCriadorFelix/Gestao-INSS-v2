@@ -4568,24 +4568,51 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const response = await callGemini({
-      bypassOpenRouter: true,
-      model: 'gemini-3.5-flash',
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-    });
+    const keys = getApiKeys();
+    if (keys.length === 0) {
+      return res.status(400).json({ error: "Nenhuma chave de API configurada para geração de imagem." });
+    }
 
     let base64Image = "";
-    const candidate = response.candidates?.[0];
-    if (candidate?.content?.parts) {
-      for (const part of candidate.content.parts) {
-        if (part.inlineData?.data) {
-          base64Image = part.inlineData.data as string;
+    let lastError: any = null;
+
+    // Tenta gerar imagem usando Imagen 3
+    for (let i = 0; i < Math.min(keys.length, 2); i++) {
+      try {
+        const apiKey = keys[(currentKeyIndex + i) % keys.length];
+        const ai = new GoogleGenAI({ apiKey });
+        
+        const response = await ai.models.generateImages({
+          model: 'imagen-3.0-generate-002',
+          prompt: `${prompt}. High quality editorial photography, photorealistic, professional lighting, clean background, 8k resolution, no text, no watermarks.`,
+          config: {
+            numberOfImages: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/png'
+          }
+        });
+
+        const imgBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        if (imgBytes) {
+          base64Image = imgBytes;
           break;
         }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[MARKETING IMAGE] Falha na chave de imagem ${i}:`, err.message || err);
       }
     }
-    res.json({ image: `data:image/png;base64,${base64Image}` });
+
+    if (base64Image) {
+      return res.json({ image: `data:image/png;base64,${base64Image}` });
+    }
+
+    // Se Imagen não estiver disponível ou falhar, retorna resposta informativa para fallback limpo na biblioteca
+    return res.status(422).json({ 
+      error: "image_generation_unavailable", 
+      message: "Geração de imagem via IA indisponível. Selecionando melhor imagem da biblioteca de ativos.",
+      detail: lastError?.message
+    });
   } catch (error: any) {
     console.error("Erro na geração de imagem:", error);
     res.status(500).json({ error: error.message });

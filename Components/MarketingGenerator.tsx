@@ -225,6 +225,152 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     }
   };
 
+  // Função inteligente de correspondência semântica e contextual de fotos da biblioteca
+  const findBestAssetForContext = (
+    topicStr: string,
+    assets: LibraryAsset[],
+    currentPersona?: string,
+    imagePromptStr?: string
+  ): LibraryAsset | null => {
+    if (!assets || assets.length === 0) return null;
+
+    const normalize = (str: string) =>
+      str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ');
+
+    const topicNorm = normalize(topicStr);
+    const promptNorm = normalize(imagePromptStr || '');
+    const combinedQuery = `${topicNorm} ${promptNorm}`;
+
+    // Regras conceituais e sinônimos jurídicos previdenciários/trabalhistas
+    const conceptRules: {
+      triggers: string[];
+      assetKeywords: string[];
+      bonus: number;
+    }[] = [
+      {
+        // Contribuintes individuais, facultativos, carência, tempo, idade, CNIS, mínimo
+        triggers: [
+          'contribuinte', 'facultativo', 'individual', 'contribuicao', 'contribuicoes', 'minimo',
+          'abaixo do minimo', 'cnis', 'recolhimento', 'gps', 'carencia', 'tempo de contribuicao',
+          'aposentadoria por idade', 'aposentadoria', 'planejamento', 'revisao', 'segurado', 'riscos'
+        ],
+        assetKeywords: ['homem idoso', 'mulher idosa', 'casal', 'doutor michel felix', 'doutora luana castro', 'idoso', 'idosa'],
+        bonus: 50
+      },
+      {
+        // Laudo Médico / Doença / Perícia / Atestado / Incapacidade / Auxílio-doença
+        triggers: [
+          'laudo', 'medico', 'pericia', 'atestado', 'incapacidade', 'doenca', 'auxilio doenca',
+          'invalidez', 'acidente', 'hospital', 'cirurgia', 'tratamento', 'cid', 'exame', 'perito'
+        ],
+        assetKeywords: ['laudo medico', 'laudo', 'medico'],
+        bonus: 70
+      },
+      {
+        // BPC / LOAS / Deficiência / Autismo / Cegueira / Assistencial
+        triggers: [
+          'bpc', 'loas', 'deficiencia', 'deficiente', 'cegueira', 'cego', 'autismo', 'autista',
+          'pcd', 'assistencial', 'cadunico', 'miserabilidade', 'vulneravel'
+        ],
+        assetKeywords: ['beneficios assistenciais', 'deficiente cegueira', 'deficiente', 'assistenciais'],
+        bonus: 70
+      },
+      {
+        // Aposentadoria Especial / Insalubridade / Periculosidade / Enfermagem / Profissões
+        triggers: [
+          'especial', 'insalubre', 'insalubridade', 'periculosidade', 'enfermeiro', 'enfermeira',
+          'vigilante', 'frentista', 'mecanico', 'soldador', 'eletricista', 'ruido', 'quimico',
+          'ppp', 'ltcat', 'hospitalar'
+        ],
+        assetKeywords: ['aposentadorias especiais', 'especial', 'especiais', 'enfermeiros'],
+        bonus: 70
+      },
+      {
+        // Rural / Lavrador / Segurado Especial / Pescador / Agricultura
+        triggers: ['rural', 'lavrador', 'agricultor', 'pescador', 'campo', 'roca', 'sitio', 'trabalhador rural'],
+        assetKeywords: ['rural', 'agricultor', 'idosos', 'homem idoso', 'mulher idosa'],
+        bonus: 60
+      },
+      {
+        // Institucional / Equipe / Atendimento / Contato
+        triggers: ['escritorio', 'advogado', 'advogada', 'doutor', 'doutora', 'secretaria', 'atendimento', 'consulta', 'duvida', 'equipe'],
+        assetKeywords: ['doutor michel felix', 'doutora luana castro', 'secretaria fabricia felix'],
+        bonus: 45
+      }
+    ];
+
+    const stopwords = new Set([
+      'com', 'dos', 'das', 'para', 'pelo', 'pela', 'como', 'onde', 'qual', 'quais', 'esse',
+      'essa', 'este', 'esta', 'isso', 'riscos', 'sobre', 'mais', 'menos', 'entre', 'apos',
+      'uma', 'uns', 'umas', 'seu', 'sua', 'seus', 'suas', 'ter', 'fazer', 'gerar'
+    ]);
+
+    const queryWords = combinedQuery
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopwords.has(w));
+
+    let bestAsset: LibraryAsset | null = null;
+    let highestScore = -1;
+
+    for (const asset of assets) {
+      const assetTopicNorm = normalize(asset.topic || '');
+      const assetDescNorm = normalize(asset.description || '');
+      let score = 0;
+
+      // 1. Match de palavras diretas no tópico ou descrição
+      for (const word of queryWords) {
+        if (assetTopicNorm.includes(word)) score += 20;
+        if (assetDescNorm.includes(word)) score += 10;
+      }
+
+      // 2. Match de frase
+      if (topicNorm.includes(assetTopicNorm) || assetTopicNorm.includes(topicNorm)) {
+        score += 40;
+      }
+
+      // 3. Regras conceituais
+      for (const rule of conceptRules) {
+        const triggerHit = rule.triggers.some(t => topicNorm.includes(t) || promptNorm.includes(t));
+        if (triggerHit) {
+          const assetHit = rule.assetKeywords.some(
+            k => assetTopicNorm.includes(k) || assetDescNorm.includes(k)
+          );
+          if (assetHit) {
+            score += rule.bonus;
+          }
+        }
+      }
+
+      // 4. Bônus por persona
+      if (currentPersona === 'michel' && assetTopicNorm.includes('michel')) score += 15;
+      if (currentPersona === 'luana' && assetTopicNorm.includes('luana')) score += 15;
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestAsset = asset;
+      }
+    }
+
+    if (highestScore > 0 && bestAsset) {
+      return bestAsset;
+    }
+
+    // Fallback prioritário para a persona ou primeiro ativo
+    if (currentPersona === 'michel') {
+      const michelAsset = assets.find(a => normalize(a.topic).includes('michel'));
+      if (michelAsset) return michelAsset;
+    } else if (currentPersona === 'luana') {
+      const luanaAsset = assets.find(a => normalize(a.topic).includes('luana'));
+      if (luanaAsset) return luanaAsset;
+    }
+
+    return assets[0] || null;
+  };
+
   const generatePost = async (mode: 'full' | 'template' | 'caption' = 'full') => {
     if (!topic.trim()) {
       alert('Por favor, digite um tema para o post.');
@@ -278,46 +424,32 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           setImageOffsetX(0);
           setImageOffsetY(0);
           
-          // 1. If we have a manually selected asset, use it
+          // 1. Se houver ativo selecionado manualmente pelo usuário, usa diretamente
           if (selectedAsset) {
             setUploadedImage(selectedAsset.url);
           } 
-          // 2. Otherwise, check if we already have a theme image for this topic in the database (exact match)
+          // 2. Busca o ativo mais adequado na biblioteca pelo contexto
+          else if (libraryAssets.length > 0) {
+            const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, data.imagePrompt);
+            if (bestAsset) {
+              setUploadedImage(bestAsset.url);
+              setSelectedAsset(bestAsset);
+            } else {
+              const existingThemeImage = await supabaseService.getThemeImage(topic);
+              if (existingThemeImage) {
+                setUploadedImage(existingThemeImage.url);
+              } else {
+                setUploadedImage(getDefaultImage(topic));
+              }
+            }
+          } 
+          // 3. Fallback para tema salvo ou imagem padrão
           else {
             const existingThemeImage = await supabaseService.getThemeImage(topic);
             if (existingThemeImage) {
               setUploadedImage(existingThemeImage.url);
-            } 
-            // 3. Try keyword matching in the library assets
-            else {
-              const searchTopic = topic.toLowerCase();
-              const matchedAsset = libraryAssets.find(asset => {
-                const assetTopic = asset.topic.toLowerCase();
-                const assetDesc = (asset.description || '').toLowerCase();
-                
-                // Split search topic into keywords (removing common small words)
-                const keywords = searchTopic.split(/\s+/).filter(w => w.length > 2 && !['com', 'dos', 'das', 'para', 'pelo'].includes(w));
-                
-                // Check if any keyword matches asset topic or description
-                const hasKeywordMatch = keywords.some(word => 
-                  assetTopic.includes(word) || assetDesc.includes(word)
-                );
-
-                return searchTopic.includes(assetTopic) || 
-                       assetTopic.includes(searchTopic) ||
-                       hasKeywordMatch;
-              });
-              
-              if (matchedAsset) {
-                setUploadedImage(matchedAsset.url);
-                setSelectedAsset(matchedAsset);
-              }
-              // 4. Finally, generate a new one if nothing else is available
-              else if (data.imagePrompt) {
-                // Clear old image before generating new one to avoid showing stale content
-                setUploadedImage(null);
-                generateAIImage(data.imagePrompt);
-              }
+            } else {
+              setUploadedImage(getDefaultImage(topic));
             }
           }
         } else if (mode === 'template' && postData) {
@@ -360,29 +492,50 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         body: JSON.stringify({ prompt: finalPrompt }),
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar imagem');
-      
-      const result = await response.json();
-      if (result.image) {
-        // Upload to Storage to get a public URL and save as theme image
-        try {
-          const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
-          const publicUrl = await supabaseService.uploadFile('marketing', fileName, result.image);
-          if (publicUrl) {
-            setUploadedImage(publicUrl);
-            // Save as theme image for future use
-            await supabaseService.saveThemeImage(topic, publicUrl);
-          } else {
+      if (response.ok) {
+        const result = await response.json();
+        if (result.image) {
+          try {
+            const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+            const publicUrl = await supabaseService.uploadFile('marketing', fileName, result.image);
+            if (publicUrl) {
+              setUploadedImage(publicUrl);
+              await supabaseService.saveThemeImage(topic, publicUrl);
+            } else {
+              setUploadedImage(result.image);
+            }
+          } catch (e) {
+            console.error('Error uploading generated image:', e);
             setUploadedImage(result.image);
           }
-        } catch (e) {
-          console.error('Error uploading generated image:', e);
-          setUploadedImage(result.image);
+          return;
         }
       }
+      
+      // Fallback inteligente para a Biblioteca de Ativos caso a IA de imagem não esteja disponível
+      if (libraryAssets.length > 0) {
+        const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, finalPrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+          alert(`Geração via IA indisponível. Selecionamos a imagem ideal da sua Biblioteca de Ativos: "${bestAsset.topic}"!`);
+          return;
+        }
+      }
+      
+      setUploadedImage(getDefaultImage(topic));
     } catch (error) {
       console.error('Erro ao gerar imagem:', error);
-      alert('Erro ao gerar imagem com IA.');
+      if (libraryAssets.length > 0) {
+        const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, finalPrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+          alert(`Selecionamos a foto da biblioteca que melhor reflete o tema: "${bestAsset.topic}".`);
+          return;
+        }
+      }
+      setUploadedImage(getDefaultImage(topic));
     } finally {
       setIsGeneratingImage(false);
     }
@@ -441,26 +594,37 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     }
   };
 
-  const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
-    const words = text.split(' ');
-    let line = '';
-    let currentY = y;
+  // Divide texto em múltiplas linhas respeitando limite em pixels
+  const getWrappedLines = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+    if (!text) return [];
+    const words = text.trim().split(/\s+/);
+    const lines: string[] = [];
+    let currentLine = '';
 
     for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
+      const testLine = currentLine ? `${currentLine} ${words[n]}` : words[n];
       const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, currentY);
-        line = words[n] + ' ';
-        currentY += lineHeight;
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = words[n];
       } else {
-        line = testLine;
+        currentLine = testLine;
       }
     }
-    ctx.fillText(line, x, currentY);
-    return currentY + lineHeight; // Return the next Y position
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+    return lines;
+  };
+
+  const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+    const lines = getWrappedLines(ctx, text, maxWidth);
+    let currentY = y;
+    for (const line of lines) {
+      ctx.fillText(line, x, currentY);
+      currentY += lineHeight;
+    }
+    return currentY;
   };
 
   const getDefaultImage = (topicStr: string) => {
@@ -472,7 +636,6 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       return 'https://images.unsplash.com/photo-1447069387593-a5de0862481e?q=80&w=800&auto=format&fit=crop';
     }
     if (t.includes('bpc') || t.includes('loas') || t.includes('invalidez') || t.includes('doença') || t.includes('incapacidade') || t.includes('deficiência') || t.includes('auxílio-doença')) {
-      // More appropriate image for disability/health
       return 'https://images.unsplash.com/photo-1584515933487-779824d29309?q=80&w=800&auto=format&fit=crop';
     }
     if (t.includes('rural') || t.includes('lavrador') || t.includes('agricultor') || t.includes('pescador')) {
@@ -489,32 +652,31 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Canvas dimensions (Instagram Square)
+    // Canvas dimensions (Instagram Square 1080x1080)
     const width = 1080;
     const height = 1080;
     canvas.width = width;
     canvas.height = height;
 
-    // 1. Background
+    // 1. Background Bordô Oficial
     ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Decorative Elements (White/Gold lines)
-    ctx.strokeStyle = colors.white;
-    ctx.lineWidth = 4;
+    // 2. Elementos Decorativos Geométricos
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 3;
     
-    // Top right corner decoration
-    ctx.strokeRect(850, 50, 200, 200);
+    // Decoração Canto Superior Direito
+    ctx.strokeRect(840, 45, 195, 195);
     
-    // Bottom right corner decoration
-    ctx.strokeRect(500, 780, 250, 200);
+    // Decoração Fundo Inferior Direito
+    ctx.strokeRect(520, 760, 260, 220);
 
-    // 3. Logo Area (Top Left)
-    // Draw Premium Scale Icon
+    // 3. Área do Logotipo (Topo Esquerda)
     ctx.strokeStyle = colors.gold;
-    
-    // Base & Pillar
     ctx.lineWidth = 2.5;
+    
+    // Balança da Justiça
     ctx.beginPath();
     ctx.moveTo(85, 165);
     ctx.lineTo(115, 165);
@@ -524,34 +686,31 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.lineTo(100, 115);
     ctx.stroke();
 
-    // Top detail (Circle)
+    // Detalhe topo
     ctx.beginPath();
-    ctx.arc(100, 112, 3, 0, Math.PI * 2);
+    ctx.arc(100, 112, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = colors.gold;
     ctx.fill();
 
-    // Beam
+    // Haste principal
     ctx.beginPath();
     ctx.moveTo(65, 120);
     ctx.lineTo(135, 120);
     ctx.stroke();
 
-    // Chains and Plates
+    // Correntes e pratos
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    // Left Chains
     ctx.moveTo(70, 120);
     ctx.lineTo(60, 145);
     ctx.moveTo(70, 120);
     ctx.lineTo(80, 145);
-    // Right Chains
     ctx.moveTo(130, 120);
     ctx.lineTo(120, 145);
     ctx.moveTo(130, 120);
     ctx.lineTo(140, 145);
     ctx.stroke();
 
-    // Plates
     ctx.beginPath();
     ctx.moveTo(55, 145);
     ctx.quadraticCurveTo(70, 155, 85, 145);
@@ -559,35 +718,41 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.quadraticCurveTo(130, 155, 145, 145);
     ctx.stroke();
 
+    // Tipografia da Marca
     ctx.fillStyle = colors.white;
-    ctx.font = 'bold 45px "Times New Roman", serif';
+    ctx.font = 'bold 44px "Times New Roman", Georgia, serif';
     ctx.fillText('F&C', 150, 140);
-    ctx.font = '500 18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    
+    ctx.font = '600 17px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.letterSpacing = '2px';
-    ctx.fillText('ADVOCACIA PREVIDENCIÁRIA', 150, 165);
+    const subTitle = persona === 'michel' ? 'ADVOCACIA ESPECIALIZADA' : 'ADVOCACIA PREVIDENCIÁRIA';
+    ctx.fillText(subTitle, 150, 165);
     ctx.letterSpacing = '0px'; // reset
     
-    // Top line separator
+    // Linha divisória horizontal superior
     ctx.beginPath();
-    ctx.moveTo(80, 190);
-    ctx.lineTo(800, 190);
-    ctx.strokeStyle = colors.white;
+    ctx.moveTo(75, 190);
+    ctx.lineTo(530, 190);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 4. Image Area (Right Side)
-    // Fixed Frame (The white background)
-    const frameX = 580;
-    const frameY = 220;
-    const frameW = 420;
-    const frameH = 680;
+    // 4. Área da Imagem (Coluna Direita)
+    const frameX = 560;
+    const frameY = 210;
+    const frameW = 450;
+    const frameH = 720;
 
-    // White background (fixed as requested)
+    // Moldura de fundo branca elegante
     ctx.fillStyle = colors.white;
-    ctx.fillRect(frameX - 15, frameY - 15, frameW + 30, frameH + 30);
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(frameX - 12, frameY - 12, frameW + 24, frameH + 24, 16);
+      ctx.fill();
+    } else {
+      ctx.fillRect(frameX - 12, frameY - 12, frameW + 24, frameH + 24);
+    }
 
-    // Image area (adjustable margins inside the fixed white frame)
-    // imgFrameX = marginLeft, imgFrameY = marginTop, imgFrameW = marginRight, imgFrameH = marginBottom
     const imgX = frameX + imgFrameX;
     const imgY = frameY + imgFrameY;
     const imgW = Math.max(10, frameW - imgFrameX - imgFrameW);
@@ -596,10 +761,8 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     const imageUrl = uploadedImage || getDefaultImage(topic);
     
     const img = new Image();
-    img.crossOrigin = "anonymous"; // Important for external images
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      // Draw image with object-fit: cover logic
-      // We use a slightly smarter cover that centers the image
       const baseScale = Math.max(imgW / img.width, imgH / img.height);
       const scale = baseScale * imageZoom;
       const drawW = img.width * scale;
@@ -609,81 +772,188 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       
       ctx.save();
       ctx.beginPath();
-      // Rounded corners for the image
       if (ctx.roundRect) {
-        ctx.roundRect(imgX, imgY, imgW, imgH, 15);
+        ctx.roundRect(imgX, imgY, imgW, imgH, 12);
       } else {
         ctx.rect(imgX, imgY, imgW, imgH);
       }
       ctx.clip();
       
-      // Draw a subtle shadow/gradient behind the image if it has transparency
       ctx.fillStyle = '#f8f9fa';
       ctx.fillRect(imgX, imgY, imgW, imgH);
       
       ctx.drawImage(img, imgX + offsetX, imgY + offsetY, drawW, drawH);
-      
-      // Add a very subtle inner shadow to the image for depth
-      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(imgX, imgY, imgW, imgH);
-      
       ctx.restore();
       
-      // Draw text after image loads to ensure it's on top if they overlap
+      // Desenha o conteúdo de texto com auto-fit milimétrico
       drawTextContent(ctx, width, height);
     };
+
+    img.onerror = () => {
+      // Se a imagem falhar ao carregar, desenha um card com a cor de tema e o texto
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(imgX, imgY, imgW, imgH);
+      ctx.fillStyle = colors.gold;
+      ctx.font = 'bold 22px "Helvetica Neue", sans-serif';
+      ctx.fillText('Felix & Castro', imgX + 30, imgY + imgH / 2);
+      drawTextContent(ctx, width, height);
+    };
+
     img.src = imageUrl;
   };
 
   const drawTextContent = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     if (!postData) return;
 
-    // 5. Title — fonte 60px para caber melhor em 5 palavras
-    ctx.fillStyle = colors.gold;
-    ctx.font = 'italic bold 60px "Times New Roman", serif';
-    const titleMaxWidth = 480;
-    let nextY = wrapText(ctx, postData.title, 80, 280, titleMaxWidth, 72);
+    const leftX = 75;
+    const maxTextWidth = 450;
+    const availableHeight = 740; // Espaço útil entre y=225 e y=965
 
-    // 6. Highlight Box
-    const highlightY = nextY + 22;
-    ctx.font = 'bold 33px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    const highlightMetrics = ctx.measureText(postData.highlight);
-    const highlightWidth = Math.min(highlightMetrics.width + 40, 480);
+    // 1. Cálculo prévio das quebras de linha e tamanhos
+    let titleFontSize = 46;
+    if (postData.title.length > 55) titleFontSize = 40;
+    else if (postData.title.length > 40) titleFontSize = 43;
 
-    ctx.fillStyle = colors.yellowHighlight;
-    ctx.fillRect(80, highlightY - 38, highlightWidth, 58);
-    ctx.fillStyle = colors.blueText;
-    nextY = wrapText(ctx, postData.highlight, 100, highlightY, 440, 38);
+    ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
+    let titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
+    if (titleLines.length > 3 && titleFontSize > 38) {
+      titleFontSize = 38;
+      ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
+      titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
+    }
+    const titleLineHeight = Math.round(titleFontSize * 1.15);
 
-    // Highlight underline
-    ctx.fillStyle = colors.white;
-    ctx.fillRect(80, nextY + 12, 150, 5);
+    // 2. Destaque (Highlight Box)
+    let highlightFontSize = 24;
+    let highlightLineHeight = 32;
+    ctx.font = `bold ${highlightFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    let highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 40);
+    let highlightBoxHeight = highlightLines.length * highlightLineHeight + 20;
 
-    // 7. Points (List)
-    ctx.fillStyle = colors.white;
-    ctx.font = '29px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    let currentY = nextY + 68;
-
-    postData.points.forEach((point, index) => {
-      const text = `${index + 1}) ${point}`;
-      currentY = wrapText(ctx, text, 80, currentY, 460, 38);
-      currentY += 22;
+    // 3. Pontos (List)
+    let pointFontSize = 22;
+    let pointLineHeight = 29;
+    let pointGap = 14;
+    ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    
+    const formattedPointsLines: string[][] = postData.points.map((p, idx) => {
+      const fullText = `${idx + 1}) ${p}`;
+      return getWrappedLines(ctx, fullText, maxTextWidth);
     });
 
-    // 8. CTA — posicionado dinamicamente após os points
-    const ctaY = Math.min(currentY + 40, 920);
-    if (postData.ctaCaption) {
-      ctx.fillStyle = colors.yellowHighlight;
-      ctx.font = 'italic bold 30px "Helvetica Neue", Helvetica, Arial, sans-serif';
-      ctx.fillText(postData.ctaCaption, 80, ctaY);
+    const totalPointLinesCount = formattedPointsLines.reduce((acc, lines) => acc + lines.length, 0);
+
+    // 4. CTA
+    let ctaFontSize = 23;
+    let ctaLineHeight = 28;
+    ctx.font = `italic bold ${ctaFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    const ctaLines = postData.ctaCaption ? getWrappedLines(ctx, postData.ctaCaption, maxTextWidth) : [];
+
+    // 5. Verificação de Altura Total para Auto-Fit (Evitar qualquer sobreposição)
+    let estimatedTotalHeight = 
+      (titleLines.length * titleLineHeight) + 20 +
+      highlightBoxHeight + 30 +
+      (totalPointLinesCount * pointLineHeight) + (formattedPointsLines.length * pointGap) +
+      (ctaLines.length > 0 ? (ctaLines.length * ctaLineHeight + 24) : 0);
+
+    if (estimatedTotalHeight > availableHeight) {
+      // Redução proporcional inteligente para acomodar textos muito longos
+      pointFontSize = 19;
+      pointLineHeight = 25;
+      pointGap = 10;
+      highlightFontSize = 22;
+      highlightLineHeight = 28;
+      highlightBoxHeight = highlightLines.length * highlightLineHeight + 16;
+      ctaFontSize = 21;
+      ctaLineHeight = 26;
+      titleFontSize = Math.max(34, titleFontSize - 4);
     }
 
-    // 9. Footer — sempre 50px abaixo do CTA, nunca ultrapassa y=990
-    const footerY = Math.min(ctaY + 50, 990);
-    ctx.fillStyle = colors.white;
-    ctx.font = '500 24px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    ctx.fillText('@advprevfelixecastro', 80, footerY);
+    // --- RENDERIZAÇÃO REAL ---
+
+    // A. Desenho do Título
+    ctx.fillStyle = colors.gold;
+    ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
+    let currentY = 255;
+    for (const line of titleLines) {
+      ctx.fillText(line, leftX, currentY);
+      currentY += Math.round(titleFontSize * 1.15);
+    }
+
+    // B. Desenho da Caixa de Destaque Amarela
+    currentY += 16;
+    const highlightBoxY = currentY;
+    
+    ctx.font = `bold ${highlightFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 40);
+    
+    // Mede a largura máxima necessária para a caixa
+    let maxLineWidth = 0;
+    for (const l of highlightLines) {
+      const w = ctx.measureText(l).width;
+      if (w > maxLineWidth) maxLineWidth = w;
+    }
+    const highlightBoxWidth = Math.min(maxTextWidth, Math.max(maxLineWidth + 36, 260));
+    highlightBoxHeight = highlightLines.length * highlightLineHeight + 18;
+
+    // Fundo Amarelo Dourado da Caixa
+    ctx.fillStyle = colors.yellowHighlight;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(leftX, highlightBoxY, highlightBoxWidth, highlightBoxHeight, 8);
+      ctx.fill();
+    } else {
+      ctx.fillRect(leftX, highlightBoxY, highlightBoxWidth, highlightBoxHeight);
+    }
+
+    // Texto do Destaque em Azul Escuro Profundo (100% de contraste, dentro da caixa)
+    ctx.fillStyle = colors.blueText;
+    let highlightTextY = highlightBoxY + highlightLineHeight - 4;
+    for (const line of highlightLines) {
+      ctx.fillText(line, leftX + 18, highlightTextY);
+      highlightTextY += highlightLineHeight;
+    }
+
+    // Traço divisor sutil abaixo da caixa de destaque
+    currentY = highlightBoxY + highlightBoxHeight + 14;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(leftX, currentY, 120, 3.5);
+
+    // C. Desenho dos Pontos da Lista
+    currentY += 26;
+    ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    
+    postData.points.forEach((point, index) => {
+      const fullText = `${index + 1}) ${point}`;
+      const lines = getWrappedLines(ctx, fullText, maxTextWidth);
+      
+      lines.forEach((line, lineIdx) => {
+        // Primeiro segmento (número) em destaque ou branco puro
+        ctx.fillStyle = colors.white;
+        ctx.fillText(line, leftX, currentY);
+        currentY += pointLineHeight;
+      });
+      currentY += pointGap;
+    });
+
+    // D. Chamada para Ação (CTA) — Posicionada com segurança após os pontos
+    if (postData.ctaCaption && ctaLines.length > 0) {
+      currentY += 8;
+      ctx.fillStyle = colors.yellowHighlight;
+      ctx.font = `italic bold ${ctaFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      for (const line of ctaLines) {
+        if (currentY < 965) {
+          ctx.fillText(line, leftX, currentY);
+          currentY += ctaLineHeight;
+        }
+      }
+    }
+
+    // E. Rodapé Fixo (@advprevfelixecastro) — Travado na base com segurança
+    const footerY = 1005;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.font = '600 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.fillText('@advprevfelixecastro', leftX, footerY);
   };
 
   // Redraw canvas when data or image changes
