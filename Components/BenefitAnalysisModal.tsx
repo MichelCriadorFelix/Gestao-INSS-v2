@@ -53,20 +53,24 @@ const BenefitCard: React.FC<BenefitCardProps> = ({ benefit, onDetail }) => {
                 </div>
             )}
 
-            {benefit.isEligible && (
-                <div className="mt-3 pt-3 border-t border-emerald-100 dark:border-emerald-800/30 flex items-center justify-between">
+            {benefit.rmi !== undefined && (
+                <div className={`mt-3 pt-3 border-t ${benefit.isEligible ? 'border-emerald-100 dark:border-emerald-800/30' : 'border-slate-100 dark:border-slate-800/30'} flex items-center justify-between`}>
                     <div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase block">RMI Estimada (Base)</span>
-                        <span className="text-lg font-bold text-slate-800 dark:text-white">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                            {benefit.isEligible ? 'RMI Estimada (Base)' : 'RMI Projetada (Base)'}
+                        </span>
+                        <span className={`text-lg font-bold ${benefit.isEligible ? 'text-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
                             {benefit.rmi ? benefit.rmi.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00'}
                         </span>
                         <p className="text-[10px] text-slate-400 mt-0.5 max-w-xs leading-tight">
-                            *Valor estimado (média simples). Requer correção monetária oficial.
+                            {benefit.isEligible 
+                                ? '*Valor estimado (média simples). Requer correção monetária oficial.'
+                                : '*Projeção de RMI com base nas contribuições atuais se preenchidos os requisitos.'}
                         </p>
                     </div>
                     <button 
                         onClick={() => onDetail(benefit)}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-lg shadow-indigo-500/20 transition"
+                        className={`px-3 py-1.5 ${benefit.isEligible ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20' : 'bg-slate-600 hover:bg-slate-700 shadow-slate-500/20'} text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-lg transition`}
                     >
                         <CalculatorIcon className="h-3.5 w-3.5" />
                         Detalhar RMI

@@ -1548,6 +1548,41 @@ export const analyzeBenefits = (data: SocialSecurityData, inpcIndices?: Map<stri
         });
     }
 
+    // Preencher a RMI projetada/estimada para todos os benefícios (inclusive os não elegíveis) para que o advogado sempre veja o cálculo
+    benefits.forEach(b => {
+        if (b.rmi === undefined) {
+            let activeRuleType = b.ruleType;
+            const validRules = ['Pre-Reform', 'Post-Reform', 'Transition_50', 'Transition_100', 'Disability', 'TemporaryDisability', 'Death', 'Pre-Reform-8696', 'Pre-Reform-Age', 'Pre-Reform-Special', 'Pre-Reform-Disability', 'Pre-Reform-Teacher', 'Pre-Reform-Death'];
+            if (!validRules.includes(activeRuleType)) {
+                activeRuleType = 'Post-Reform';
+            }
+            
+            const limitDateStr = b.ruleType.startsWith('Pre-Reform') ? '2019-11-13' : undefined;
+            const yearsToUse = b.ruleType.startsWith('Pre-Reform') ? timeAtReformTotal.years : timeTotal.years;
+            
+            try {
+                const rmiCalc = calculateRMI(
+                    data.bonds,
+                    activeRuleType as any,
+                    data.gender,
+                    yearsToUse,
+                    inpcIndices,
+                    der,
+                    fractionalAge,
+                    data.customMinWage,
+                    limitDateStr,
+                    data.isTeacher,
+                    ibgeTable
+                );
+                
+                b.rmi = rmiCalc.rmi;
+                b.rmiDetails = rmiCalc.rmiDetails;
+            } catch (err) {
+                console.error("Erro ao calcular RMI projetada para", b.benefitName, err);
+            }
+        }
+    });
+
     return {
         totalTime: timeTotal,
         totalCarencia,
