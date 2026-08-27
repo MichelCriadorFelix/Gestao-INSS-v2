@@ -11,8 +11,8 @@ export const DB_CONFIG_KEY = 'inss_db_config';
 // ------------------------------------------------------------------
 // CONFIGURAÇÃO GLOBAL DO BANCO DE DADOS (AUTO-CONFIG)
 // ------------------------------------------------------------------
-const GLOBAL_SUPABASE_URL = "";
-const GLOBAL_SUPABASE_KEY = "";
+const GLOBAL_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
+const GLOBAL_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
 
 const getEnvVar = (key: string): string | undefined => {
     try {
@@ -28,7 +28,7 @@ const getEnvVar = (key: string): string | undefined => {
 };
 
 const isValidUrl = (url: string | undefined): boolean => {
-    if (!url || url === 'undefined' || url === 'null') return false;
+    if (!url || url === 'undefined' || url === 'null' || url.startsWith('NEXT_PUBLIC_')) return false;
     try {
         const parsed = new URL(url);
         return parsed.protocol === 'http:' || parsed.protocol === 'https:';
@@ -41,15 +41,22 @@ export const getDbConfig = () => {
     let stored = null;
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         try {
-            stored = localStorage.getItem(DB_CONFIG_KEY);
+            const raw = localStorage.getItem(DB_CONFIG_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && isValidUrl(parsed.url) && parsed.key) {
+                    return parsed;
+                } else {
+                    localStorage.removeItem(DB_CONFIG_KEY);
+                }
+            }
         } catch (e) {
             console.warn("Could not read from localStorage on getDbConfig:", e);
         }
     }
-    if (stored) return JSON.parse(stored);
 
-    const envUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE');
-    const envKey = getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('ANON_KEY_SUPABASE');
+    const envUrl = getEnvVar('SUPABASE_URL') || getEnvVar('VITE_SUPABASE_URL') || getEnvVar('URL_SUPABASE') || getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+    const envKey = getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('ANON_KEY_SUPABASE') || getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 
     if (isValidUrl(envUrl) && envKey) {
         return { url: envUrl as string, key: envKey, isEnv: true };
@@ -60,7 +67,7 @@ export const getDbConfig = () => {
     }
 
     return null;
-  };
+};
   
   export const supabase = (() => {
       try {

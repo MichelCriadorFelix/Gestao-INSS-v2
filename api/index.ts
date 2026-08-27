@@ -25,9 +25,12 @@ app.use((req, res, next) => {
 });
 
 // Supabase Admin Client for Auth Verification
+const DEFAULT_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
+const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
+
 const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE || DEFAULT_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY
 );
 
 // Authentication Middleware
@@ -7856,12 +7859,14 @@ app.get("/api/config", (req, res) => {
   const url = process.env.SUPABASE_URL || 
               process.env.VITE_SUPABASE_URL || 
               process.env.URL_SUPABASE ||
-              process.env.NEXT_PUBLIC_SUPABASE_URL;
+              (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith("http") ? process.env.NEXT_PUBLIC_SUPABASE_URL : "") ||
+              DEFAULT_SUPABASE_URL;
               
   const key = process.env.SUPABASE_ANON_KEY || 
               process.env.VITE_SUPABASE_ANON_KEY || 
               process.env.ANON_KEY_SUPABASE ||
-              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+              DEFAULT_SUPABASE_KEY;
   
   res.json({ url, key });
 });
