@@ -8474,7 +8474,8 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
   const send = (obj: object) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const { adminKey, batchOffset = 0 } = req.body || {};
+    const adminKey = req.body?.adminKey || req.body?.adminkey;
+    const batchOffset = req.body?.batchOffset || 0;
 
     const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
     if (adminKey !== expectedKey) {
@@ -8615,7 +8616,7 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
   };
 
   try {
-    const { adminKey } = req.body || {};
+    const adminKey = req.body?.adminKey || req.body?.adminkey;
     const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
     if (adminKey !== expectedKey) {
       send({ error: "Não autorizado" });
