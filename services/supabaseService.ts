@@ -104,6 +104,70 @@ export const supabaseService = {
     return data;
   },
 
+  /**
+   * PERF: lista de conversas SEM as mensagens.
+   * A coluna `messages` guarda a conversa inteira (media de 59 kB, ate 360 kB).
+   * Buscar 20 conversas completas so para desenhar a barra lateral de titulos
+   * trazia ~1,2 MB, dos quais o usuario le no maximo uma. Aqui trazemos so o
+   * cabecalho; as mensagens vem em getAIConversationMessages ao abrir a conversa.
+   */
+  async getAIConversationsList(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .select('id, lawyer_type, title, date, updated_at')
+      .eq('lawyer_type', aiName)
+      .order('updated_at', { ascending: false })
+      .limit(30);
+
+    if (error) {
+      console.warn('Erro ao listar conversas de IA:', error);
+      return [];
+    }
+
+    return (data || []).map((s: any) => ({
+      ...s,
+      messages: [],
+      documents: [],
+      // Marca que o conteudo ainda nao veio. O PersonaChat usa isto para
+      // (a) buscar sob demanda e (b) NUNCA salvar uma conversa nao carregada,
+      // o que sobrescreveria o historico com uma lista vazia.
+      messagesLoaded: false
+    }));
+  },
+
+  /** Carrega as mensagens de UMA conversa (sob demanda, ao abri-la). */
+  async getAIConversationMessages(id: string) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('ai_conversations')
+      .select('messages')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn('Erro ao carregar mensagens da conversa:', error);
+      return null;
+    }
+
+    let messages = data.messages || [];
+    let documents: any[] = [];
+    const docsIdx = messages.findIndex((m: any) => m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
+    if (docsIdx !== -1) {
+      try {
+        documents = JSON.parse(messages[docsIdx].content.replace('[SYSTEM_DOCUMENTS_METADATA]\n', ''));
+        messages = messages.filter((_: any, i: number) => i !== docsIdx);
+      } catch (e) {
+        console.error('Error parsing documents metadata', e);
+      }
+    }
+    return { messages, documents };
+  },
+
   async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
     const supabase = getSupabase();
     if (!supabase) return [];

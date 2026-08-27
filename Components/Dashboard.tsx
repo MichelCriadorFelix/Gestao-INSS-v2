@@ -371,13 +371,13 @@ export default function Dashboard({
           } else if (view === 'social_calc') {
               setSavedSocialCalculations(await supabaseService.getCalculations().catch(() => []));
           } else if (view === 'dr_michel') {
-              setDrMichelSessions(await supabaseService.getAIConversations('michel').catch(() => []));
+              setDrMichelSessions(await supabaseService.getAIConversationsList('michel').catch(() => []));
           } else if (view === 'dra_luana') {
-              setDraLuanaSessions(await supabaseService.getAIConversations('luana').catch(() => []));
+              setDraLuanaSessions(await supabaseService.getAIConversationsList('luana').catch(() => []));
           } else if (view === 'dr_felix_castro') {
-              setDrFelixCastroSessions(await supabaseService.getAIConversations('felix_castro').catch(() => []));
+              setDrFelixCastroSessions(await supabaseService.getAIConversationsList('felix_castro').catch(() => []));
           } else if (view === 'sec_fabricia') {
-              setSecFabriciaSessions(await supabaseService.getAIConversations('fabricia').catch(() => []));
+              setSecFabriciaSessions(await supabaseService.getAIConversationsList('fabricia').catch(() => []));
           }
       } catch (e) {
           // Libera para nova tentativa caso a carga sob demanda falhe
@@ -816,7 +816,7 @@ export default function Dashboard({
           } else if (type === 'sec_fabricia') {
               setSecFabriciaSessions(newData);
               if (supabase) {
-                  const error = await upsertWithRetry({ id: 18, data: newData }); // 18 or whichever next logic id, or we just rely on getAIConversations('fabricia') 
+                  const error = await upsertWithRetry({ id: 18, data: newData }); // 18 or whichever next logic id, or we just rely on getAIConversationsList('fabricia') 
                   // Oh wait, AI conversations in supabaseService uses getAIConversations, which uses ai_conversations table! 
                   // Where is upsertWithRetry({ id: 11, data: newData }) pointing to? It points to 'services' table which was a backup or the old local storage sync!
                   if (error) {

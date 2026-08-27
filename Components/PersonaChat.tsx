@@ -729,6 +729,44 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     }
   }, [currentSessionId]);
 
+  // PERF: busca as mensagens da conversa aberta sob demanda.
+  // A lista vem sem histórico (ver getAIConversationsList); só a conversa que
+  // você realmente abre carrega o conteúdo — e apenas uma vez.
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const sess = sessions.find(s => s.id === currentSessionId) as any;
+    if (!sess || sess.messagesLoaded !== false) return;
+
+    let cancelado = false;
+    (async () => {
+      const carregado = await supabaseService.getAIConversationMessages(currentSessionId);
+      if (cancelado || !carregado) return;
+
+      setSessions(prev => prev.map(s => s.id === currentSessionId
+        ? { ...s, messages: carregado.messages, documents: carregado.documents, messagesLoaded: true } as any
+        : s));
+
+      // Reabre o último artefato da conversa. Antes isso acontecia na carga
+      // inicial; agora só é possível aqui, quando as mensagens de fato chegam.
+      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+        const lastArtifact = [...(carregado.messages || [])].reverse()
+          .find((m: any) => m.role === 'assistant' && isArtifactContent(m.content));
+        if (lastArtifact) setActiveArtifactId(lastArtifact.id);
+      }
+
+      // Registra o estado recém-carregado como "já sincronizado", senão o
+      // efeito de auto-save o trataria como alteração e reenviaria ao banco.
+      lastSyncedSessionsRef.current[currentSessionId] = JSON.stringify({
+        ...sess,
+        messages: carregado.messages,
+        documents: carregado.documents,
+        messagesLoaded: true
+      });
+    })();
+
+    return () => { cancelado = true; };
+  }, [currentSessionId, sessions]);
+
   const handleSetArtifactType = (messageId: string, typeKey: ArtifactTypeKey) => {
     setCustomArtifactTypes(prev => {
       const updated = { ...prev, [messageId]: typeKey };
@@ -820,7 +858,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             setPendingAudit(saved);
           }
         }).catch(console.error);
-        const dbSessions = await supabaseService.getAIConversations(persona.aiName);
+        // PERF: lista SEM as mensagens (~1,2 MB antes, poucos KB agora).
+        // O histórico de cada conversa vem sob demanda ao abri-la.
+        const dbSessions = await supabaseService.getAIConversationsList(persona.aiName);
         const formattedSessions = dbSessions && dbSessions.length > 0 ? dbSessions.map(s => {
           // Filtrar mensagens de erro de cota ou limite temporário do sistema para limpar o histórico visual do usuário
           const cleanedMessages = (s.messages || []).filter((m: any) => {
@@ -854,7 +894,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
             title: s.title,
             date: s.date,
             messages: cleanedMessages,
-            documents: cleanedDocuments
+            documents: cleanedDocuments,
+            // PRESERVAR: é o que impede o auto-save de sobrescrever uma conversa
+            // cujo histórico ainda não foi carregado.
+            messagesLoaded: (s as any).messagesLoaded
           };
         }) : [];
 
@@ -947,6 +990,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     if (!isLoaded) return;
     let hasChanges = false;
     sanitizedSessions.forEach(session => {
+      // TRAVA DE SEGURANÇA: uma conversa cujo histórico ainda não foi buscado
+      // tem messages: []. Salvá-la sobrescreveria a conversa real no banco com
+      // uma lista vazia — perda de dados. Só sincroniza o que está carregado.
+      if ((session as any).messagesLoaded === false) return;
+
       const sessionStr = JSON.stringify(session);
       if (lastSyncedSessionsRef.current[session.id] !== sessionStr) {
         pendingSyncRef.current.add(session.id);
