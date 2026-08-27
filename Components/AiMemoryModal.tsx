@@ -137,6 +137,29 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
     }
   };
 
+  const resolveDuplicates = async (ruleIds: string[]) => {
+    if (ruleIds.length <= 1) return;
+    const toDelete = ruleIds.slice(1);
+    try {
+      setRules(prev => prev.filter(r => !toDelete.includes(r.id)));
+      await Promise.all(toDelete.map(id => apiFetch(`/api/ai-memory-rules/${id}`, { method: 'DELETE' })));
+      setAnalysis(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          duplicates: prev.duplicates.filter(d => d.ruleIds !== ruleIds),
+          contradictions: prev.contradictions.map(c => ({
+            ...c,
+            ruleIds: c.ruleIds.filter(id => !toDelete.includes(id))
+          })).filter(c => c.ruleIds.length > 1),
+          improvements: prev.improvements.filter(i => !toDelete.includes(i.ruleId))
+        };
+      });
+    } catch (err) {
+      console.error("Erro ao resolver duplicadas:", err);
+    }
+  };
+
   const applyImprovement = async (ruleId: string, suggestedText: string) => {
     try {
       // Find the rule to update
@@ -257,7 +280,19 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
                         <AlertTriangle size={16} /> Contradição Detectada
                       </h4>
                       <p className="text-sm text-red-800 mb-3">{item.description}</p>
-                      <div className="text-xs text-red-600 font-medium">IDs envolvidos: {item.ruleIds.map(id => id.slice(0, 8)).join(', ')} (Procure e apague/edite abaixo)</div>
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-red-200/60">
+                        <span className="text-xs text-red-700 font-medium">Ações rápidas:</span>
+                        {item.ruleIds.map((id, index) => (
+                          <button
+                            key={id}
+                            onClick={() => handleDelete(id)}
+                            className="bg-red-100 hover:bg-red-200 text-red-800 text-xs font-medium px-2.5 py-1 rounded flex items-center gap-1 transition-colors"
+                            title={`Excluir regra ID: ${id}`}
+                          >
+                            <Trash2 size={12} /> Excluir Opção {index + 1} ({id.slice(0, 6)}...)
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ))}
                   
@@ -267,7 +302,17 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
                         <AlertTriangle size={16} /> Regras Duplicadas
                       </h4>
                       <p className="text-sm text-amber-800 mb-3">{item.description}</p>
-                      <div className="text-xs text-amber-600 font-medium">IDs envolvidos: {item.ruleIds.map(id => id.slice(0, 8)).join(', ')} (Escolha uma para excluir)</div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-200/60">
+                        <span className="text-xs text-amber-700 font-medium">
+                          {item.ruleIds.length} cópias encontradas
+                        </span>
+                        <button
+                          onClick={() => resolveDuplicates(item.ruleIds)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
+                        >
+                          <Trash2 size={13} /> Manter 1ª e Excluir {item.ruleIds.length - 1} Repetida{item.ruleIds.length - 1 > 1 ? 's' : ''}
+                        </button>
+                      </div>
                     </div>
                   ))}
 
