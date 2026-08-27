@@ -19,6 +19,7 @@ import { fetchINPCData, processINPCIndices } from './services/bcbService';
 import { fetchIBGELifeExpectancy, IBGELifeExpectancy } from './src/services/ibgeService';
 import { analyzeBenefits } from './BenefitRules';
 import { extractTextFromPDF } from './src/utils/pdfParser';
+import { getCurrentMinimumWage } from './constants/MinimumWage';
 
 // --- Types ---
 
