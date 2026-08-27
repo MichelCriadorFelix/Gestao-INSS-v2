@@ -928,7 +928,7 @@ async function detectUserIntent(message: string): Promise<string> {
 
   try {
     const response = await callOpenRouter({
-      model: "deepseek/deepseek-v4-flash",
+      model: "deepseek/deepseek-chat",
       messages: [
         { role: "system", content: INTENT_DETECTOR_PROMPT },
         { role: "user", content: safeMessage }
@@ -2853,7 +2853,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
         orModel = "google/gemini-2.0-flash-001"; 
       }
     } else if (!orModel.includes("/")) {
-      orModel = "deepseek/deepseek-v4-flash";
+      orModel = "deepseek/deepseek-chat";
     }
     
     const orMessages: any[] = [];
@@ -3054,7 +3054,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
         orModel = "google/gemini-2.0-flash-001";
       }
     } else if (!orModel.includes("/")) {
-      orModel = "deepseek/deepseek-v4-flash";
+      orModel = "deepseek/deepseek-chat";
     }
     
     const orMessages: any[] = [];
@@ -3319,12 +3319,27 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 
   try {
     const response = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: { role: "user", parts: [{ text }] },
+      model: "gemini-embedding-001",
+      contents: text,
+      config: { outputDimensionality: 768 }
     });
     return response.embeddings?.[0]?.values || [];
   } catch (error: any) {
     const errorMessage = error.message || String(error);
+    
+    // Tentativa secundária com gemini-embedding-2 se a versão 001 falhar por alias
+    if (errorMessage.includes("NOT_FOUND") || errorMessage.includes("not found")) {
+      try {
+        const altResponse = await ai.models.embedContent({
+          model: "gemini-embedding-2",
+          contents: text,
+          config: { outputDimensionality: 768 }
+        });
+        return altResponse.embeddings?.[0]?.values || [];
+      } catch (e) {
+        // Ignora para seguir o fluxo padrão de retry
+      }
+    }
     
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
     const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
@@ -3361,7 +3376,7 @@ async function callOpenRouter(params: any): Promise<any> {
       "X-Title": "Felix & Castro Advocacia"
     },
     body: JSON.stringify({
-      model: params.model || "deepseek/deepseek-v4-flash",
+      model: params.model || "deepseek/deepseek-chat",
       messages: params.messages,
       temperature: params.temperature ?? 0.2,
       max_tokens: params.max_tokens || 4096,
@@ -3397,7 +3412,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
 
   try {
     // Para estabilidade absoluta solicitada pelo usuário, geramos tudo direto no backend (stream: false)
-    console.log(`[OpenRouter] Solicitando geração completa (stream: false) para o modelo: ${params.model || "deepseek/deepseek-v4-flash"}...`);
+    console.log(`[OpenRouter] Solicitando geração completa (stream: false) para o modelo: ${params.model || "deepseek/deepseek-chat"}...`);
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -3407,7 +3422,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         "X-Title": "Felix & Castro Advocacia"
       },
       body: JSON.stringify({
-        model: params.model || "deepseek/deepseek-v4-flash",
+        model: params.model || "deepseek/deepseek-chat",
         messages: params.messages,
         temperature: params.temperature ?? 0.2,
         max_tokens: params.max_tokens || 16383,
@@ -5824,7 +5839,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             }
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessages,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -6660,7 +6675,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessagesFinal,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -7401,7 +7416,7 @@ REGRAS ABSOLUTAS:
             }
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessages,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -8060,7 +8075,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 orMessages.push({ role: "user", content: finalMessage });
 await callOpenRouterStream({
-  model: model || "deepseek/deepseek-v4-flash",
+  model: model || "deepseek/deepseek-chat",
   messages: orMessages,
   temperature: finalTemperature,
   max_tokens: 2000,
