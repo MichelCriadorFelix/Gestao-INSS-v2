@@ -2734,19 +2734,30 @@ const MODEL_HIERARCHY = [
   "gemini-3-flash-preview"
 ];
 
+/**
+ * IMPORTANTE: este mapa NÃO deve colapsar os modelos atuais em um só.
+ * Ele fazia isso — todo modelo virava "gemini-3.7-flash" — o que tornava o
+ * seletor da interface puramente decorativo: o usuário escolhia 3.5 e o
+ * backend chamava 3.7. Agora só os nomes LEGADOS são redirecionados; os
+ * modelos atuais são respeitados como escolhidos.
+ * (O failover por cota/503 continua livre para trocar de modelo em runtime,
+ * via prefixo "direct:" — ver callGeminiStream.)
+ */
 const MODEL_MAPPING: Record<string, string> = {
+  // Legados / descontinuados -> modelo atual equivalente
   "gemini-2.0-flash-exp": "gemini-3.7-flash",
   "gemini-1.5-flash-latest": "gemini-3.7-flash",
   "gemini-1.5-flash": "gemini-3.7-flash",
   "gemini-1.5-pro": "gemini-3.7-flash",
   "gemini-2.5-flash": "gemini-3.7-flash",
-  "gemini-3.5-flash": "gemini-3.7-flash",
-  "gemini-3.6-flash": "gemini-3.7-flash",
+  // Modelos atuais -> respeitam a escolha do seletor
+  "gemini-3.5-flash": "gemini-3.5-flash",
+  "gemini-3.6-flash": "gemini-3.6-flash",
   "gemini-3.7-flash": "gemini-3.7-flash",
-  "gemini-3-flash-preview": "gemini-3.7-flash",
-  "google/gemini-3.5-flash": "gemini-3.7-flash",
-  "google/gemini-3.6-flash": "gemini-3.7-flash",
-  "google/gemini-3-flash-preview": "gemini-3.7-flash"
+  "gemini-3-flash-preview": "gemini-3-flash-preview",
+  "google/gemini-3.5-flash": "gemini-3.5-flash",
+  "google/gemini-3.6-flash": "gemini-3.6-flash",
+  "google/gemini-3-flash-preview": "gemini-3-flash-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
@@ -2760,10 +2771,12 @@ function getEffectiveModel(modelName?: string): string {
   const mapped = MODEL_MAPPING[modelName];
   if (mapped) return mapped;
   
+  // Fallback para variantes não mapeadas (ex.: "models/gemini-3.5-flash").
+  // Mesma regra: respeita o modelo pedido, não colapsa tudo em 3.7.
   if (modelName.includes('3.7-flash')) return "gemini-3.7-flash";
-  if (modelName.includes('3.6-flash')) return "gemini-3.7-flash";
-  if (modelName.includes('3.5-flash')) return "gemini-3.7-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-3.7-flash";
+  if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
+  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
   if (modelName.includes('deepseek')) return modelName;
   return modelName;
 }
