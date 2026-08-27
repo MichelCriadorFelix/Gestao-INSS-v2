@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
 import { 
   ScaleIcon, UserGroupIcon, BriefcaseIcon, CalculatorIcon, ArrowRightOnRectangleIcon, 
   ArrowPathRoundedSquareIcon, CloudIcon, BellIcon, Cog6ToothIcon, SunIcon, MoonIcon,
@@ -49,7 +49,32 @@ import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
 import { safeSetLocalStorage } from '../utils';
 
-export default function Dashboard({ 
+/**
+ * PERF: aplica um evento de Realtime a uma lista já carregada, sem ir ao banco.
+ * Substitui o padrão anterior de "recarregar tudo a cada mudança", que multiplicava
+ * a carga do Postgres pelo número de navegadores abertos.
+ */
+const applyRowDelta = <T extends { id: any }>(
+    list: T[],
+    payload: any,
+    mapRow: (row: any) => T
+): T[] => {
+    if (payload?.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (deletedId === undefined || deletedId === null) return list;
+        return list.filter(item => String(item.id) !== String(deletedId));
+    }
+
+    if (!payload?.new?.id) return list;
+    const mapped = mapRow(payload.new);
+    const idx = list.findIndex(item => String(item.id) === String(mapped.id));
+    if (idx === -1) return [mapped, ...list];
+    const next = [...list];
+    next[idx] = mapped;
+    return next;
+};
+
+export default function Dashboard({
   user, 
   onLogout, 
   darkMode, 
@@ -63,6 +88,8 @@ export default function Dashboard({
 }: DashboardProps) {
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'sec_fabricia' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
+  // PERF: trava contra cargas simultâneas (ver fetchData)
+  const isFetchingRef = useRef(false);
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
     setClientFilter(filter);
@@ -133,45 +160,38 @@ export default function Dashboard({
 
   // --- Realtime & Data Fetching Logic ---
     const fetchData = async () => {
+    // PERF: impede tempestade de cargas simultâneas. Sem isso, vários eventos de
+    // Realtime em sequência disparavam vários fetchData concorrentes, cada um
+    // abrindo suas conexões — foi o que esgotava o pool do Postgres.
+    if (isFetchingRef.current) {
+        console.log('[PERF] fetchData já em andamento — ignorando chamada duplicada.');
+        return;
+    }
+    isFetchingRef.current = true;
+
     setIsLoading(true);
     setDbError(null);
     const supabase = initSupabase();
 
     try {
-        // PERF: Executamos todas as chamadas remotas de forma 100% paralela para carregamento instantâneo (sub-segundo)!
+        // PERF: apenas o essencial para a primeira tela. Cálculos salvos e conversas
+        // das 4 personas são carregados sob demanda (ver loadViewData), pois só são
+        // usados dentro das respectivas telas e carregam blobs pesados.
         const [
             remoteClients,
             remoteContracts,
-            remoteLaborCalculations,
-            remoteSocial,
-            remoteMichel,
-            remoteLuana,
-            remoteFelixCastro,
-            remoteFabricia,
             globalDataResult
         ] = await Promise.all([
             supabaseService.getClients().catch(() => []),
             supabaseService.getContracts().catch(() => []),
-            supabaseService.getLaborCalculations().catch(() => []),
-            supabaseService.getCalculations().catch(() => []),
-            supabaseService.getAIConversations('michel').catch(() => []),
-            supabaseService.getAIConversations('luana').catch(() => []),
-            supabaseService.getAIConversations('felix_castro').catch(() => []),
-            supabaseService.getAIConversations('fabricia').catch(() => []),
-            supabase 
-                ? supabase.from('clients').select('id, data').in('id', [7, 8, 9, 10]) 
+            supabase
+                ? supabase.from('clients').select('id, data').in('id', [7, 8, 9, 10])
                 : Promise.resolve({ data: null, error: null })
         ]);
 
         setRecords(remoteClients || []);
         setContracts(remoteContracts || []);
-        setSavedCalculations(remoteLaborCalculations || []);
         setResolvedAlerts([]);
-        setSavedSocialCalculations(remoteSocial || []);
-        setDrMichelSessions(remoteMichel || []);
-        setDraLuanaSessions(remoteLuana || []);
-        setDrFelixCastroSessions(remoteFelixCastro || []);
-        setSecFabriciaSessions(remoteFabricia || []);
 
         const globalData = globalDataResult?.data;
         const globalError = globalDataResult?.error;
@@ -223,14 +243,45 @@ export default function Dashboard({
     } catch (err: any) {
         console.error("Exception in fetchData:", err);
         setIsLoading(false);
-        
+
         let errorMessage = "Erro de carregamento. Usando dados locais.";
         if (err.message?.includes('fetch') || err.message?.includes('Falha ao buscar')) {
             errorMessage = "⚠️ Erro de Conexão com a Nuvem. Verifique se o projeto Supabase está ativo ou se as chaves nas Configurações estão corretas.";
         }
-        
+
         setDbError(errorMessage);
+    } finally {
+        isFetchingRef.current = false;
     }
+  };
+
+  // PERF: carga sob demanda. Cada bloco pesado só vai ao banco na primeira vez
+  // que a tela correspondente é aberta, e nunca mais durante a sessão.
+  const loadedViewsRef = useRef<Set<string>>(new Set());
+
+  const loadViewData = async (view: string) => {
+      if (loadedViewsRef.current.has(view)) return;
+      loadedViewsRef.current.add(view);
+
+      try {
+          if (view === 'labor_calc') {
+              setSavedCalculations(await supabaseService.getLaborCalculations().catch(() => []));
+          } else if (view === 'social_calc') {
+              setSavedSocialCalculations(await supabaseService.getCalculations().catch(() => []));
+          } else if (view === 'dr_michel') {
+              setDrMichelSessions(await supabaseService.getAIConversations('michel').catch(() => []));
+          } else if (view === 'dra_luana') {
+              setDraLuanaSessions(await supabaseService.getAIConversations('luana').catch(() => []));
+          } else if (view === 'dr_felix_castro') {
+              setDrFelixCastroSessions(await supabaseService.getAIConversations('felix_castro').catch(() => []));
+          } else if (view === 'sec_fabricia') {
+              setSecFabriciaSessions(await supabaseService.getAIConversations('fabricia').catch(() => []));
+          }
+      } catch (e) {
+          // Libera para nova tentativa caso a carga sob demanda falhe
+          loadedViewsRef.current.delete(view);
+          console.error(`Erro ao carregar dados da tela ${view}:`, e);
+      }
   };
 
   // Setup Realtime Subscription
@@ -247,10 +298,34 @@ export default function Dashboard({
                     schema: 'public',
                     table: 'clients_v2'
                 },
-                async (_payload: any) => {
+                async (payload: any) => {
+                    // PERF: aplica APENAS a linha que mudou. Antes, qualquer alteração
+                    // em um cliente fazia todos os navegadores abertos rebaixarem os
+                    // 384 clientes inteiros — principal fonte de sobrecarga do banco.
                     try {
-                        const updated = await supabaseService.getClients();
-                        setRecords(updated);
+                        if (payload.eventType === 'DELETE') {
+                            const deletedId = String(payload.old?.id ?? '');
+                            if (deletedId) setRecords(prev => prev.filter(r => r.id !== deletedId));
+                            return;
+                        }
+
+                        const rowId = String(payload.new?.id ?? '');
+                        if (!rowId) return;
+
+                        // O payload do Realtime já traz a linha completa na maioria dos
+                        // casos; só vamos ao banco (1 linha) se ele vier truncado.
+                        const mapped = payload.new?.name !== undefined
+                            ? supabaseService.mapClientRow(payload.new)
+                            : await supabaseService.getClientSummaryById(rowId);
+                        if (!mapped) return;
+
+                        setRecords(prev => {
+                            const idx = prev.findIndex(r => r.id === mapped.id);
+                            if (idx === -1) return [mapped, ...prev];
+                            const next = [...prev];
+                            next[idx] = { ...next[idx], ...mapped };
+                            return next;
+                        });
                     } catch (e) {
                         console.error('Realtime clients_v2 error', e);
                     }
@@ -280,15 +355,35 @@ export default function Dashboard({
                 }
             )
             // Removed ai_conversations subscription to prevent read loops and high I/O
+            // PERF: antes estes dois disparavam fetchData() — ou seja, TODAS as consultas
+            // do app, em TODOS os navegadores abertos, a cada cálculo salvo. Agora
+            // aplicam só a linha alterada, e apenas se a tela já tiver sido carregada.
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'social_security_calculations' },
-                () => fetchData()
+                (payload: any) => {
+                    if (!loadedViewsRef.current.has('social_calc')) return;
+                    setSavedSocialCalculations(prev => applyRowDelta(prev, payload, (r: any) => ({
+                        id: r.id,
+                        clientName: r.client_name,
+                        date: r.date,
+                        data: r.data
+                    })));
+                }
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'labor_calculations' },
-                () => fetchData()
+                (payload: any) => {
+                    if (!loadedViewsRef.current.has('labor_calc')) return;
+                    setSavedCalculations(prev => applyRowDelta(prev, payload, (r: any) => ({
+                        id: r.id,
+                        employeeName: r.employee_name,
+                        date: r.date,
+                        totalValue: r.total_value,
+                        data: r.data
+                    })));
+                }
             )
             .subscribe();
 
@@ -301,6 +396,11 @@ export default function Dashboard({
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage, currentView, clientFilter]);
+
+  // PERF: dispara a carga pesada só quando a tela é realmente aberta.
+  useEffect(() => {
+    if (isCloudConfigured) loadViewData(currentView);
+  }, [currentView, isCloudConfigured]);
 
   const handleSaveCustomLaws = (newLaws: any[]) => {
     setCustomLaws(newLaws);
