@@ -50,6 +50,66 @@ import CopyButton from './CopyButton';
 import { safeSetLocalStorage } from '../utils';
 
 /**
+ * PERF: cache local para PRIMEIRA PINTURA INSTANTÂNEA.
+ * A tela abre imediatamente com o que já foi visto, e o fetch de rede + o Realtime
+ * reconciliam em segundo plano. Sem isso, o app fica em branco esperando a rede.
+ *
+ * Cuidado com cota: o localStorage tem ~5 MB. Por isso guardamos uma versão
+ * ENXUTA — sem o conteúdo dos certificados narrativos e sem os documentos, que
+ * são os campos grandes. As contagens são preservadas, que é o que a lista exibe.
+ * (Uma tentativa anterior de cachear os registros crus causava QuotaExceededError.)
+ */
+const CACHE_KEYS = {
+    records: 'inss_cache_records_v1',
+    contracts: 'inss_cache_contracts_v1'
+};
+
+const readCache = <T,>(key: string): T[] => {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+};
+
+const trimRecordForCache = (r: any) => {
+    const { narrativeCertificates, documents, ...rest } = r || {};
+    // Mantém apenas as contagens (já calculadas em mapClientRow); o conteúdo
+    // completo é recarregado sob demanda ao abrir o cliente (getClientDetails).
+    return rest;
+};
+
+// Restaura os arrays vazios ao ler o cache, para que os registros hidratados
+// tenham o mesmo formato dos que vêm da rede.
+const rehydrateRecord = (r: any) => ({
+    ...r,
+    documents: r?.documents || [],
+    narrativeCertificates: r?.narrativeCertificates || []
+});
+
+const writeCache = (key: string, list: any[]) => {
+    try {
+        const payload = key === CACHE_KEYS.records
+            ? (list || []).map(trimRecordForCache)
+            : (list || []);
+        safeSetLocalStorage(key, JSON.stringify(payload));
+    } catch (e) {
+        console.warn('Não foi possível gravar o cache local:', e);
+    }
+};
+
+// Grava o cache de forma agrupada: numa rajada de eventos do Realtime,
+// serializa uma vez só no fim, em vez de a cada evento (evita travar a UI).
+const cacheWriteTimers: Record<string, any> = {};
+const scheduleCacheWrite = (key: string, list: any[]) => {
+    clearTimeout(cacheWriteTimers[key]);
+    cacheWriteTimers[key] = setTimeout(() => writeCache(key, list), 1000);
+};
+
+/**
  * PERF: aplica um evento de Realtime a uma lista já carregada, sem ir ao banco.
  * Substitui o padrão anterior de "recarregar tudo a cada mudança", que multiplicava
  * a carga do Postgres pelo número de navegadores abertos.
@@ -97,8 +157,10 @@ export default function Dashboard({
   };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [records, setRecords] = useState<ClientRecord[]>([]);
-  const [contracts, setContracts] = useState<ContractRecord[]>([]);
+  // PERF: hidrata do cache local já na primeira renderização — a tela aparece
+  // instantaneamente e os dados de rede substituem estes logo em seguida.
+  const [records, setRecords] = useState<ClientRecord[]>(() => readCache<any>(CACHE_KEYS.records).map(rehydrateRecord));
+  const [contracts, setContracts] = useState<ContractRecord[]>(() => readCache<ContractRecord>(CACHE_KEYS.contracts));
   const [savedCalculations, setSavedCalculations] = useState<CalculationRecord[]>([]);
   const [savedSocialCalculations, setSavedSocialCalculations] = useState<SocialSecurityCalculationRecord[]>([]);
   const [drMichelSessions, setDrMichelSessions] = useState<any[]>([]);
@@ -189,13 +251,23 @@ export default function Dashboard({
             remoteContracts,
             globalData
         ] = await Promise.all([
-            supabaseService.getClients().catch((e) => { console.error('Erro ao buscar clientes:', e); return []; }),
-            supabaseService.getContracts().catch(() => []),
+            // null (e não []) sinaliza FALHA. Assim uma lista legitimamente vazia
+            // — o usuário apagou tudo — não é confundida com erro de rede.
+            supabaseService.getClients().catch((e) => { console.error('Erro ao buscar clientes:', e); return null; }),
+            supabaseService.getContracts().catch(() => null),
             supabaseService.getGlobalSystemData().catch(() => null)
         ]);
 
-        setRecords(remoteClients || []);
-        setContracts(remoteContracts || []);
+        // Só substitui o que veio do cache quando a rede respondeu de fato.
+        // Em caso de falha, mantém o cache na tela em vez de esvaziar.
+        if (remoteClients !== null) {
+            setRecords(remoteClients);
+            writeCache(CACHE_KEYS.records, remoteClients);
+        }
+        if (remoteContracts !== null) {
+            setContracts(remoteContracts);
+            writeCache(CACHE_KEYS.contracts, remoteContracts);
+        }
         setResolvedAlerts([]);
 
         if (globalData) {
@@ -312,7 +384,11 @@ export default function Dashboard({
                     try {
                         if (payload.eventType === 'DELETE') {
                             const deletedId = String(payload.old?.id ?? '');
-                            if (deletedId) setRecords(prev => prev.filter(r => r.id !== deletedId));
+                            if (deletedId) setRecords(prev => {
+                                const next = prev.filter(r => r.id !== deletedId);
+                                scheduleCacheWrite(CACHE_KEYS.records, next);
+                                return next;
+                            });
                             return;
                         }
 
@@ -328,9 +404,10 @@ export default function Dashboard({
 
                         setRecords(prev => {
                             const idx = prev.findIndex(r => r.id === mapped.id);
-                            if (idx === -1) return [mapped, ...prev];
-                            const next = [...prev];
-                            next[idx] = { ...next[idx], ...mapped };
+                            const next = idx === -1
+                                ? [mapped, ...prev]
+                                : prev.map((r, i) => i === idx ? { ...r, ...mapped } : r);
+                            scheduleCacheWrite(CACHE_KEYS.records, next);
                             return next;
                         });
                     } catch (e) {
