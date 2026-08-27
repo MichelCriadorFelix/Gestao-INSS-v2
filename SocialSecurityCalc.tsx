@@ -594,23 +594,88 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                 while (current <= end && safety < 1200) {
                     const m = String(current.getMonth() + 1).padStart(2, '0');
                     const y = current.getFullYear();
-                    bondMonths.add(`${m}/${y}`);
+                    const monthStr = `${m}/${y}`;
+                    
+                    // Verificar se a contribuição do mês está abaixo do salário mínimo
+                    const scForMonth = bond.sc?.find(s => s.month === monthStr);
+                    let isBelowMinimum = false;
+                    
+                    if (scForMonth) {
+                        const compDateStr = `${y}-${m}-01`;
+                        const minWage = getCurrentMinimumWage(compDateStr);
+                        
+                        const isIndividualOrFacultativo = bond.type && (
+                            bond.type.toLowerCase().includes('individual') || 
+                            bond.type.toLowerCase().includes('facultativo') || 
+                            bond.type.toLowerCase().includes('autônomo') || 
+                            bond.type.toLowerCase().includes('contribuinte')
+                        );
+                        
+                        const monthMidMs = new Date(y, current.getMonth(), 15).getTime();
+                        const REFORM_DATE_MS = new Date('2019-11-13').setHours(12, 0, 0, 0);
+                        
+                        if (scForMonth.value > 0 && scForMonth.value < minWage) {
+                            if (monthMidMs <= REFORM_DATE_MS) {
+                                if (isIndividualOrFacultativo) {
+                                    isBelowMinimum = true;
+                                }
+                            } else {
+                                isBelowMinimum = true;
+                            }
+                        } else if (scForMonth.value === 0 && isIndividualOrFacultativo) {
+                            isBelowMinimum = true;
+                        }
+                    }
+                    
+                    if (!isBelowMinimum) {
+                        bondMonths.add(monthStr);
+                    }
                     current.setMonth(current.getMonth() + 1);
                     safety++;
                 }
             } else if (bond.sc && bond.sc.length > 0) {
                 bond.sc.forEach(s => {
-                    if (data.der) {
-                        const [m, y] = s.month.split('/');
-                        const scDate = new Date(parseInt(y), parseInt(m) - 1, 1, 12, 0, 0, 0);
-                        const derDate = parseDateLocal(data.der);
-                        derDate.setDate(1);
-                        derDate.setHours(12, 0, 0, 0);
-                        if (scDate <= derDate) {
+                    const [m, y] = s.month.split('/');
+                    
+                    // Verificar se a contribuição do mês está abaixo do salário mínimo
+                    let isBelowMinimum = false;
+                    const compDateStr = `${y}-${m}-01`;
+                    const minWage = getCurrentMinimumWage(compDateStr);
+                    
+                    const isIndividualOrFacultativo = bond.type && (
+                        bond.type.toLowerCase().includes('individual') || 
+                        bond.type.toLowerCase().includes('facultativo') || 
+                        bond.type.toLowerCase().includes('autônomo') || 
+                        bond.type.toLowerCase().includes('contribuinte')
+                    );
+                    
+                    const monthMidMs = new Date(parseInt(y), parseInt(m) - 1, 15).getTime();
+                    const REFORM_DATE_MS = new Date('2019-11-13').setHours(12, 0, 0, 0);
+                    
+                    if (s.value > 0 && s.value < minWage) {
+                        if (monthMidMs <= REFORM_DATE_MS) {
+                            if (isIndividualOrFacultativo) {
+                                isBelowMinimum = true;
+                            }
+                        } else {
+                            isBelowMinimum = true;
+                        }
+                    } else if (s.value === 0 && isIndividualOrFacultativo) {
+                        isBelowMinimum = true;
+                    }
+                    
+                    if (!isBelowMinimum) {
+                        if (data.der) {
+                            const scDate = new Date(parseInt(y), parseInt(m) - 1, 1, 12, 0, 0, 0);
+                            const derDate = parseDateLocal(data.der);
+                            derDate.setDate(1);
+                            derDate.setHours(12, 0, 0, 0);
+                            if (scDate <= derDate) {
+                                bondMonths.add(s.month);
+                            }
+                        } else {
                             bondMonths.add(s.month);
                         }
-                    } else {
-                        bondMonths.add(s.month);
                     }
                 });
             }
@@ -630,11 +695,44 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
     // Helper to generate full monthly history including gaps
     const generateFullMonthlyHistory = (bond: CNISBond) => {
-        const history: { month: string, value: number | null, indicators: string[], isMissing: boolean }[] = [];
+        const history: { month: string, value: number | null, indicators: string[], isMissing: boolean, isBelowMin: boolean }[] = [];
         
+        const checkBelowMin = (monthStr: string, val: number | null) => {
+            const [m, y] = monthStr.split('/');
+            const compDateStr = `${y}-${m}-01`;
+            const minWage = getCurrentMinimumWage(compDateStr);
+            
+            const isIndividualOrFacultativo = bond.type && (
+                bond.type.toLowerCase().includes('individual') || 
+                bond.type.toLowerCase().includes('facultativo') || 
+                bond.type.toLowerCase().includes('autônomo') || 
+                bond.type.toLowerCase().includes('contribuinte')
+            );
+            
+            const monthMidMs = new Date(parseInt(y), parseInt(m) - 1, 15).getTime();
+            const REFORM_DATE_MS = new Date('2019-11-13').setHours(12, 0, 0, 0);
+            
+            if (val && val > 0 && val < minWage) {
+                if (monthMidMs <= REFORM_DATE_MS) {
+                    return !!isIndividualOrFacultativo;
+                }
+                return true;
+            } else if (val === 0 && isIndividualOrFacultativo) {
+                return true;
+            }
+            return false;
+        };
+
         // If no start date, we can only show what we have
         if (!bond.startDate) {
-            return bond.sc.map(s => ({ month: s.month, value: s.value, indicators: s.indicators || [], isMissing: false }));
+            return bond.sc.map(s => {
+                const isBelowMin = checkBelowMin(s.month, s.value);
+                const indicators = [...(s.indicators || [])];
+                if (isBelowMin && !indicators.includes('PSC-MENOR-MIN')) {
+                    indicators.push('PSC-MENOR-MIN');
+                }
+                return { month: s.month, value: s.value, indicators, isMissing: false, isBelowMin };
+            });
         }
 
         const current = parseDateLocal(bond.startDate);
@@ -647,7 +745,14 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
             end = parseDateLocal(bond.endDate);
         } else {
             // If no end date, we don't generate history (as requested by user)
-            return bond.sc.map(s => ({ month: s.month, value: s.value, indicators: s.indicators || [], isMissing: false }));
+            return bond.sc.map(s => {
+                const isBelowMin = checkBelowMin(s.month, s.value);
+                const indicators = [...(s.indicators || [])];
+                if (isBelowMin && !indicators.includes('PSC-MENOR-MIN')) {
+                    indicators.push('PSC-MENOR-MIN');
+                }
+                return { month: s.month, value: s.value, indicators, isMissing: false, isBelowMin };
+            });
         }
         if (data.der) {
             const derDate = parseDateLocal(data.der);
@@ -670,9 +775,14 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
 
             if (scMap.has(monthStr)) {
                 const s = scMap.get(monthStr);
-                history.push({ month: monthStr, value: s.value, indicators: s.indicators || [], isMissing: false });
+                const isBelowMin = checkBelowMin(monthStr, s.value);
+                const indicators = [...(s.indicators || [])];
+                if (isBelowMin && !indicators.includes('PSC-MENOR-MIN')) {
+                    indicators.push('PSC-MENOR-MIN');
+                }
+                history.push({ month: monthStr, value: s.value, indicators, isMissing: false, isBelowMin });
             } else {
-                history.push({ month: monthStr, value: null, indicators: [], isMissing: true });
+                history.push({ month: monthStr, value: null, indicators: [], isMissing: true, isBelowMin: false });
             }
             
             current.setMonth(current.getMonth() + 1);
@@ -2485,18 +2595,18 @@ const SocialSecurityCalc: React.FC<SocialSecurityCalcProps> = ({
                                                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                                                                 {generateFullMonthlyHistory(bond).length > 0 ? (
                                                                                     generateFullMonthlyHistory(bond).map((s, i) => (
-                                                                                        <tr key={s.month} className={s.isMissing ? "bg-amber-50 dark:bg-amber-900/10" : ""}>
+                                                                                        <tr key={s.month} className={s.isBelowMin ? "bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-mono" : s.isMissing ? "bg-amber-50 dark:bg-amber-900/10 font-mono" : "font-mono"}>
                                                                                             <td className="px-2 py-1 text-slate-700 dark:text-slate-300 font-mono">{s.month}</td>
-                                                                                            <td className={`px-2 py-1 text-right font-mono ${s.isMissing ? "text-amber-600 italic" : "text-slate-700 dark:text-slate-300"}`}>
+                                                                                            <td className={`px-2 py-1 text-right font-mono ${s.isBelowMin ? "text-red-600 dark:text-red-400 font-semibold" : s.isMissing ? "text-amber-600 italic" : "text-slate-700 dark:text-slate-300"}`}>
                                                                                                 <input 
                                                                                                     type="text" 
-                                                                                                    className={`w-full bg-transparent text-right border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 py-0.5 ${s.isMissing ? "placeholder-amber-400" : ""}`}
+                                                                                                    className={`w-full bg-transparent text-right border-none focus:ring-1 focus:ring-indigo-500 rounded px-1 py-0.5 ${s.isBelowMin ? "text-red-600 dark:text-red-400 font-semibold placeholder-red-400" : s.isMissing ? "placeholder-amber-400" : ""}`}
                                                                                                     placeholder="Sem registro"
                                                                                                     defaultValue={s.isMissing ? "" : formatCurrency(s.value!).replace('R$', '').trim()}
                                                                                                     onBlur={(e) => handleSalaryChange(bond.id, s.month, e.target.value)}
                                                                                                 />
                                                                                             </td>
-                                                                                            <td className="px-2 py-1 text-center text-slate-500 dark:text-slate-400 text-[10px]">
+                                                                                            <td className={`px-2 py-1 text-center text-[10px] ${s.isBelowMin ? "text-red-600 dark:text-red-400 font-bold" : "text-slate-500 dark:text-slate-400"}`}>
                                                                                                 {s.indicators?.join(', ')}
                                                                                             </td>
                                                                                         </tr>
