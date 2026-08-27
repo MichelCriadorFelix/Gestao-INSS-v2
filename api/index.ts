@@ -25,9 +25,12 @@ app.use((req, res, next) => {
 });
 
 // Supabase Admin Client for Auth Verification
+const DEFAULT_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
+const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
+
 const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE || DEFAULT_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY
 );
 
 // Authentication Middleware
@@ -55,11 +58,65 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
-// Helper para injetar a data atual nos prompts
+// Helper para injetar a data atual, contexto temporal e tabela histórica oficial do Banco Central (SGS 1619)
+export const OFFICIAL_MINIMUM_WAGE_TABLE = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TABELA HISTÓRICA OFICIAL DE SALÁRIO MÍNIMO (BACEN SGS 1619 / PLANO REAL ATÉ O PRESENTE):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 2026 (01/01/2026 até hoje): R$ 1.621,00  ← [SALÁRIO MÍNIMO VIGENTE ATUAL DO SISTEMA]
+• 2025 (01/01/2025 a 31/12/2025): R$ 1.518,00
+• 2024 (01/01/2024 a 31/12/2024): R$ 1.412,00 (Decreto nº 11.864/2023)
+• 2023 (01/05/2023 a 31/12/2023): R$ 1.320,00 (Lei nº 14.663/2023)
+• 2023 (01/01/2023 a 30/04/2023): R$ 1.302,00 (MP nº 1.143/2022)
+• 2022 (01/01/2022 a 31/12/2022): R$ 1.212,00 (Lei nº 14.358/2022)
+• 2021 (01/01/2021 a 31/12/2021): R$ 1.100,00 (Lei nº 14.158/2021)
+• 2020 (01/02/2020 a 31/12/2020): R$ 1.045,00 (Lei nº 14.013/2020)
+• 2020 (01/01/2020 a 31/01/2020): R$ 1.039,00 (MP nº 916/2019)
+• 2019 (01/01/2019 a 31/12/2019): R$ 998,00 (Decreto nº 9.661/2019)
+• 2018 (01/01/2018 a 31/12/2018): R$ 954,00 (Decreto nº 9.255/2017)
+• 2017 (01/01/2017 a 31/12/2017): R$ 937,00 (Decreto nº 8.948/2016)
+• 2016 (01/01/2016 a 31/12/2016): R$ 880,00 (Decreto nº 8.618/2015)
+• 2015 (01/01/2015 a 31/12/2015): R$ 788,00 (Decreto nº 8.381/2014)
+• 2014 (01/01/2014 a 31/12/2014): R$ 724,00 (Decreto nº 8.166/2013)
+• 2013 (01/01/2013 a 31/12/2013): R$ 678,00 (Decreto nº 7.872/2012)
+• 2012 (01/01/2012 a 31/12/2012): R$ 622,00 (Decreto nº 7.655/2011)
+• 2011 (01/03/2011 a 31/12/2011): R$ 545,00 (Lei nº 12.382/2011)
+• 2011 (01/01/2011 a 28/02/2011): R$ 540,00 (MP nº 516/2010)
+• 2010 (01/01/2010 a 31/12/2010): R$ 510,00 (Lei nº 12.255/2010)
+• 2009 (01/02/2009 a 31/12/2009): R$ 465,00 (Lei nº 11.944/2009)
+• 2008 (01/03/2008 a 31/01/2009): R$ 415,00 (Lei nº 11.709/2008)
+• 2007 (01/04/2007 a 29/02/2008): R$ 380,00 (Lei nº 11.498/2007)
+• 2006 (01/04/2006 a 31/03/2007): R$ 350,00 (Lei nº 11.321/2006)
+• 2005 (01/05/2005 a 31/03/2006): R$ 300,00 (Lei nº 11.164/2005)
+• 2004 (01/05/2004 a 30/04/2005): R$ 260,00 (Lei nº 10.888/2004)
+• 2003 (01/04/2003 a 30/04/2004): R$ 240,00 (Lei nº 10.699/2003)
+• 2002 (01/04/2002 a 31/03/2003): R$ 200,00 (Lei nº 10.525/2002)
+• 2001 (01/04/2001 a 31/03/2002): R$ 180,00 (Lei nº 10.208/2001)
+• 2000 (03/04/2000 a 31/03/2001): R$ 151,00 (Lei nº 9.971/2000)
+• 1999 (01/05/1999 a 02/04/2000): R$ 136,00 (Lei nº 9.971/2000)
+• 1998 (01/05/1998 a 30/04/1999): R$ 130,00 (Lei nº 9.971/2000)
+• 1997 (01/05/1997 a 30/04/1998): R$ 120,00 (MP nº 1.572/1997)
+• 1996 (01/05/1996 a 30/04/1997): R$ 112,00 (MP nº 1.414/1996)
+• 1995 (01/05/1995 a 30/04/1996): R$ 100,00 (Lei nº 9.032/1995)
+• 1994 (01/09/1994 a 30/04/1995): R$ 70,00 (Lei nº 9.063/1995)
+• 1994 (01/07/1994 a 31/08/1994 - Início Plano Real): R$ 64,79 (Lei nº 8.880/1994)
+`;
+
 const getCurrentDateContext = () => {
   const date = new Date();
   const formatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
-  return `\n\n[CONTEXTO TEMPORAL CRÍTICO]: Hoje é ${formatter.format(date)}. O ano atual é ${date.getFullYear()}. Você DEVE usar esta data como o "hoje" para todos os cálculos de idade, tempo de contribuição, prescrição, decadência e aplicação de leis no tempo (ex: regras de transição da EC 103/2019). Nunca assuma que estamos em 2023 ou 2024.`;
+  return `\n\n[CONTEXTO TEMPORAL E ECONÔMICO OFICIAL - REGRA ABSOLUTA DO SISTEMA]:
+- HOJE É: ${formatter.format(date)}. O ANO ATUAL É ${date.getFullYear()}.
+- SALÁRIO MÍNIMO VIGENTE ATUAL (${date.getFullYear()}): R$ 1.621,00.
+- TETO DO RGPS/INSS (${date.getFullYear()}): R$ 8.157,41.
+
+⚠️ DIRETRIZES DE RIGOR TEMPORAL E SALÁRIO MÍNIMO:
+1. SALÁRIO MÍNIMO ATUAL: Se qualquer pergunta ou cálculo se referir ao salário mínimo "atual", "hoje", "vigente", "deste ano" ou "em 2026", o valor é ESTRITAMENTE R$ 1.621,00.
+2. PROIBIÇÃO DE ERRO: É TERMINANTEMENTE PROIBIDO afirmar que o salário mínimo atual é R$ 1.412,00 (valor de 2024) ou R$ 1.518,00 (valor de 2025).
+3. CONSULTA HISTÓRICA: Se o usuário perguntar o valor de um ano anterior específico (ex: "qual era em 2024?", "quanto foi em 2021?", "qual o piso em 2018?"), consulte e responda com a precisão histórica da tabela abaixo (ex: 2024 era R$ 1.412,00; 2021 era R$ 1.100,00; 2018 era R$ 954,00).
+4. CNIS E ART. 195, § 14 DA CF: Ao auditar competências de recolhimentos previdenciários e verificar se estão abaixo do mínimo, compare cada mês com o salário mínimo VIGENTE NAQUELA COMPETÊNCIA ESPECÍFICA segundo a tabela histórica do Banco Central abaixo.
+
+${OFFICIAL_MINIMUM_WAGE_TABLE}`;
 };
 
 // Nova Feature: Memória Contínua Pessoal (Aprendizado da IA)
@@ -85,9 +142,14 @@ const injectAiMemoryRules = async (personaId: string, currentPrompt: string): Pr
   return currentPrompt;
 };
 
-// Apply authentication to all /api routes except health and config
+// Apply authentication to all /api routes except health, config and official public economic data (BCB/IBGE)
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
+  if (
+    req.path === "/health" || 
+    req.path === "/config" || 
+    req.path.startsWith("/bcdata") || 
+    req.originalUrl.includes("/bcdata")
+  ) return next();
   authenticate(req, res, next);
 });
 
@@ -869,7 +931,7 @@ async function detectUserIntent(message: string): Promise<string> {
 
   try {
     const response = await callOpenRouter({
-      model: "deepseek/deepseek-v4-flash",
+      model: "deepseek/deepseek-chat",
       messages: [
         { role: "system", content: INTENT_DETECTOR_PROMPT },
         { role: "user", content: safeMessage }
@@ -2794,7 +2856,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
         orModel = "google/gemini-2.0-flash-001"; 
       }
     } else if (!orModel.includes("/")) {
-      orModel = "deepseek/deepseek-v4-flash";
+      orModel = "deepseek/deepseek-chat";
     }
     
     const orMessages: any[] = [];
@@ -2995,7 +3057,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
         orModel = "google/gemini-2.0-flash-001";
       }
     } else if (!orModel.includes("/")) {
-      orModel = "deepseek/deepseek-v4-flash";
+      orModel = "deepseek/deepseek-chat";
     }
     
     const orMessages: any[] = [];
@@ -3260,12 +3322,27 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 
   try {
     const response = await ai.models.embedContent({
-      model: "text-embedding-004",
-      contents: { role: "user", parts: [{ text }] },
+      model: "gemini-embedding-001",
+      contents: text,
+      config: { outputDimensionality: 768 }
     });
     return response.embeddings?.[0]?.values || [];
   } catch (error: any) {
     const errorMessage = error.message || String(error);
+    
+    // Tentativa secundária com gemini-embedding-2 se a versão 001 falhar por alias
+    if (errorMessage.includes("NOT_FOUND") || errorMessage.includes("not found")) {
+      try {
+        const altResponse = await ai.models.embedContent({
+          model: "gemini-embedding-2",
+          contents: text,
+          config: { outputDimensionality: 768 }
+        });
+        return altResponse.embeddings?.[0]?.values || [];
+      } catch (e) {
+        // Ignora para seguir o fluxo padrão de retry
+      }
+    }
     
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
     const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
@@ -3302,7 +3379,7 @@ async function callOpenRouter(params: any): Promise<any> {
       "X-Title": "Felix & Castro Advocacia"
     },
     body: JSON.stringify({
-      model: params.model || "deepseek/deepseek-v4-flash",
+      model: params.model || "deepseek/deepseek-chat",
       messages: params.messages,
       temperature: params.temperature ?? 0.2,
       max_tokens: params.max_tokens || 4096,
@@ -3338,7 +3415,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
 
   try {
     // Para estabilidade absoluta solicitada pelo usuário, geramos tudo direto no backend (stream: false)
-    console.log(`[OpenRouter] Solicitando geração completa (stream: false) para o modelo: ${params.model || "deepseek/deepseek-v4-flash"}...`);
+    console.log(`[OpenRouter] Solicitando geração completa (stream: false) para o modelo: ${params.model || "deepseek/deepseek-chat"}...`);
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -3348,7 +3425,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
         "X-Title": "Felix & Castro Advocacia"
       },
       body: JSON.stringify({
-        model: params.model || "deepseek/deepseek-v4-flash",
+        model: params.model || "deepseek/deepseek-chat",
         messages: params.messages,
         temperature: params.temperature ?? 0.2,
         max_tokens: params.max_tokens || 16383,
@@ -4542,24 +4619,24 @@ app.post("/api/analyze-cnis", async (req, res) => {
 
 const ARCHIVIST_SYSTEM_PROMPT = `
 VOCÊ É UM AUDITOR JURÍDICO E ANALISTA VISUAL DE ALTA PRECISÃO (MODO ARQUIVISTA).
-SUA MISSÃO: Realizar a ciência integral de documentos, mapeando cada detalhe textual e VISUAL para uso posterior.
+SUA MISSÃO: Realizar a tomada de ciência integral de documentos e processos judiciais, absorvendo e indexando todos os dados textuais e visuais no contexto para uso posterior nas petições, relatórios e análises.
 
 DIRETRIZES OBRIGATÓRIAS:
-1. LEITURA NATIVA DA BASE (OCR/TEXTO): Você está recebendo o conteúdo lido diretamente localmente no banco de dados, oriundos do processo de extração de relatórios. Use o texto integral injetado no prompt para a análise.
-2. EXTRAÇÃO EXAUSTIVA: Extraia TODOS os dados: nomes, CPFs, datas de vínculos, CIDs, valores de benefícios e, principalmente, PROPOSTAS DE ACORDO e LAUDOS PERICIAIS.
-3. ANÁLISE VISUAL (CRÍTICO): Se houver imagens (fotos de pessoas, partes do corpo, exames escaneados, carimbos) dentro dos documentos, você DEVE descrevê-las detalhadamente.
-   - Ex: "Página 230: Foto colorida mostrando as mãos do autor com sinais de [descrever]."
-   - Ex: "Página 241: Imagem de Ultrassonografia do Abdome com conclusão de [descrever]."
-4. MAPEAMENTO POR PÁGINA: Cite sempre a página de cada achado.
-5. FIDELIDADE: Não resuma demais. Se houver um parágrafo decisivo sobre a incapacidade, extraia-o.
-6. FORMATO DE RESPOSTA:
-   "✅ Ciência tomada do documento [Nome] via Leitura Nativa e Extração de Banco de Dados.
-   **Mapeamento de Dados e Evidências Visuais:**
-   * [Página Z]: [Informação ou descrição da imagem]
-   * ...
-   Aguardando próximo comando."
+1. LEITURA E INDEXAÇÃO NATIVA (INTERNA): Leia, extraia e indexe internamente todos os dados do processo (nomes, CPFs, datas de vínculos, CIDs, laudos periciais, decisões, sentenças, valores de benefício, fotos/evidências) no contexto do caso.
+2. RESPOSTA OBJETIVA DE CONFIRMAÇÃO (NÃO LISTAR PÁGINA POR PÁGINA):
+   NÃO descreva nem liste o conteúdo lido página por página na resposta. NÃO faça mapeamento exaustivo por página no texto retornado ao usuário.
+   Sua resposta deve ser estritamente uma confirmação clara, direta e elegante de que tomou ciência completa dos autos e que está com o conteúdo integral acessível em memória, perguntando como o advogado deseja prosseguir.
 
-ATENÇÃO: Se você ignorar uma imagem ou responder apenas "Recebido", o sistema falhará. Você DEVE ser os olhos do advogado.
+3. FORMATO OBRIGATÓRIO DE RESPOSTA:
+"✅ **Tomada de ciência completa dos autos realizada com sucesso!**
+
+Já estou com acesso integral a todo o conteúdo, peças, documentos e evidências do processo indexados e prontos em memória.
+
+Como deseja prosseguir, Dr(a).? Você pode me orientar a:
+- 📊 **Elaborar Relatório / Análise do Caso**: Diagnóstico minucioso dos fatos, datas e teses.
+- 💡 **Contextualizar o Processo**: Resumo executivo da situação atual dos autos.
+- 📝 **Criar Peça Processual**: Redação de petição inicial, réplica, recurso, contestação ou manifestação intercorrente.
+- ❓ **Responder Dúvidas / Consultas**: Perguntas pontuais sobre dados, datas ou provas dos autos."
 `;
 
 // Marketing Endpoints
@@ -4568,29 +4645,78 @@ app.post("/api/marketing/generate-image", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const response = await callGemini({
-      bypassOpenRouter: true,
-      model: 'gemini-3.5-flash',
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-    });
+    const keys = getApiKeys();
+    if (keys.length === 0) {
+      return res.status(400).json({ error: "Nenhuma chave de API configurada para geração de imagem." });
+    }
 
     let base64Image = "";
-    const candidate = response.candidates?.[0];
-    if (candidate?.content?.parts) {
-      for (const part of candidate.content.parts) {
-        if (part.inlineData?.data) {
-          base64Image = part.inlineData.data as string;
+    let lastError: any = null;
+
+    // Tenta gerar imagem usando Imagen 3
+    for (let i = 0; i < Math.min(keys.length, 2); i++) {
+      try {
+        const apiKey = keys[(currentKeyIndex + i) % keys.length];
+        const ai = new GoogleGenAI({ apiKey });
+        
+        const response = await ai.models.generateImages({
+          model: 'imagen-3.0-generate-002',
+          prompt: `${prompt}. High quality editorial photography, photorealistic, professional lighting, clean background, 8k resolution, no text, no watermarks.`,
+          config: {
+            numberOfImages: 1,
+            aspectRatio: '1:1',
+            outputMimeType: 'image/png'
+          }
+        });
+
+        const imgBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        if (imgBytes) {
+          base64Image = imgBytes;
           break;
         }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[MARKETING IMAGE] Falha na chave de imagem ${i}:`, err.message || err);
       }
     }
-    res.json({ image: `data:image/png;base64,${base64Image}` });
+
+    if (base64Image) {
+      return res.json({ image: `data:image/png;base64,${base64Image}` });
+    }
+
+    // Se Imagen não estiver disponível ou falhar, retorna resposta informativa para fallback limpo na biblioteca
+    return res.status(422).json({ 
+      error: "image_generation_unavailable", 
+      message: "Geração de imagem via IA indisponível. Selecionando melhor imagem da biblioteca de ativos.",
+      detail: lastError?.message
+    });
   } catch (error: any) {
     console.error("Erro na geração de imagem:", error);
     res.status(500).json({ error: error.message });
   }
 });
+
+const CURRENT_SYSTEM_YEAR_KNOWLEDGE = `
+[BASE DE ATUALIZAÇÃO TEMPORAL E ECONÔMICA VIGENTE - OBRIGATÓRIA]
+- ANO ATUAL DO SISTEMA: 2026.
+- SALÁRIO MÍNIMO VIGENTE (2026): R$ 1.621,00.
+- HISTÓRICO DE SALÁRIOS MÍNIMOS:
+  * 2026: R$ 1.621,00 (Vigente atual)
+  * 2025: R$ 1.518,00
+  * 2024: R$ 1.412,00
+  * 2023: R$ 1.320,00 (a partir de maio) / R$ 1.302,00 (jan-abr)
+  * 2022: R$ 1.212,00
+  * 2021: R$ 1.100,00
+  * 2020: R$ 1.045,00
+- TETO PREVIDENCIÁRIO DO INSS (2026): R$ 8.157,41.
+- BPC/LOAS (2026): R$ 1.621,00 mensais (1 salário mínimo vigente). Limite de renda per capita de 1/4 do salário mínimo (R$ 405,25) relativizado pelo STF (Tema 669) para dedução de medicamentos, fraldas, tratamentos e despesas médicas essenciais.
+- REGRAS PREVIDENCIÁRIAS VIGENTES EM 2026:
+  * Idade Mínima Progressiva: Mulheres 59 anos e 6 meses (+ 30 anos de contribuição); Homens 64 anos e 6 meses (+ 35 anos de contribuição).
+  * Regra de Pontos: Mulheres 93 pontos; Homens 103 pontos.
+  * Aposentadoria por Idade Urbana: Mulher 62 anos; Homem 65 anos (15 anos de carência/contribuição).
+  * Contribuições abaixo do mínimo (art. 195, §14 da CF e Portaria MPS/MF): podem ser ajustadas via Complementação (DARF), Agrupamento ou Aproveitamento de Excedente no mesmo ano civil.
+- PROIBIÇÃO ABSOLUTA DE DADOS DESATUALIZADOS: NUNCA trate o salário mínimo de 2024 (R$ 1.412,00) ou 2025 (R$ 1.518,00) como o valor vigente atual. O valor vigente atual é R$ 1.621,00. Use linguagem familiar, acolhedora, humana e clara para o público que lê no Instagram.
+`;
 
 app.post("/api/marketing/generate", async (req, res) => {
   try {
@@ -4598,50 +4724,124 @@ app.post("/api/marketing/generate", async (req, res) => {
     if (!topic) return res.status(400).json({ error: "Topic is required" });
 
     const personaDesc = persona === 'michel' 
-      ? 'Dr. Michel Felix: Estilo direto, estratégico.'
-      : 'Dra. Luana Castro: Estilo acolhedor, empático.';
+      ? 'Dr. Michel Felix: Estilo direto, estratégico, empático e de alta autoridade.'
+      : 'Dra. Luana Castro: Estilo acolhedor, humanizado, empático e didático.';
 
     let strategyDesc = "";
     if (mode !== 'strategies') {
-      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional.";
-      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta.";
+      if (strategy === 'educacional') strategyDesc = "Abordagem Educacional e Didática.";
+      else if (strategy === 'alerta') strategyDesc = "Abordagem de Alerta de Direitos e Urgência.";
       else strategyDesc = strategy;
     }
 
     const assetContext = assetDescription ? `\n\nINSPIRAÇÃO VISUAL: ${assetDescription}.` : "";
-    let jsonFormat = "";
-    let taskDesc = "";
+    let prompt = "";
+    let maxOutputTokens = 8192;
 
     if (mode === 'strategies') {
-      taskDesc = `Ideias de abordagens para post sobre: "${topic}".`;
-      jsonFormat = `{ "strategies": [{ "title": "string", "description": "string" }] }`;
+      maxOutputTokens = 4096;
+      prompt = `Você é o principal estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+Gere EXATAMENTE 4 a 5 opções distintas de estratégias e ângulos de abordagem para um post sobre o tema: "${topic}".
+Persona do Advogado: ${personaDesc}
+
+Cada estratégia deve ter um foco diferente (ex: 1. Alerta de Risco/Urgência; 2. Passo a Passo Educativo de Solução; 3. Mito vs Verdade ou Alerta de CNIS; 4. Análise Prática de Caso / Consequência Financeira; 5. Guia Prático para o Segurado).
+
+IMPORTANTE: 
+- "title": Nome claro e atrativo da estratégia (Ex: "1. Alerta de Risco: Perda de Aposentadoria", "2. Passo a Passo: Como Regularizar no CNIS em 2026").
+- "description": Resumo conciso de 1 ou 2 frases explicando o gancho, a dor do cliente e como o post abordará o tema com dados atuais. NÃO coloque textos de petição ou legendas inteiras aqui.
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{
+  "strategies": [
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" },
+    { "title": "string", "description": "string" }
+  ]
+}`;
+    } else if (mode === 'caption') {
+      maxOutputTokens = 8192;
+      const currentContext = currentData ? `
+DADOS DO POST ATUAL:
+- Tag/Público: ${currentData.audienceTag || 'Direito Previdenciário'}
+- Título da Arte: ${currentData.title || topic}
+- Alerta/Destaque: ${currentData.highlight || ''}
+- Tópicos Explicativos: ${(currentData.points || []).join(' | ')}
+` : '';
+
+      prompt = `Você é o principal redator e estrategista de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+Gere uma Legenda de Instagram de ALTA AUTORIDADE, EDUCATIVA, FAMILIAR e CONCISA sobre o tema: "${topic}".
+Persona: ${personaDesc}
+${currentContext}
+
+REQUISITOS RIGOROSOS DE ESTRUTURA E TAMANHO:
+1. LIMITE RIGOROSO DO INSTAGRAM: A legenda inteira DEVE ter entre 1.200 e 1.600 caracteres no total (MÁXIMO ABSOLUTO 1.800 caracteres, contando espaços, emojis e hashtags).
+2. CONCISÃO E COMPLETUDE: Redija todo o conteúdo (do início ao fim) de forma enxuta, elegante e direta para caber integralmente no limite sem que falte nenhuma informação crucial.
+3. ATUALIDADE: Use SEMPRE os valores vigentes de 2026 (Salário mínimo de R$ 1.621,00). Nunca cite valores antigos (como R$ 1.412,00) como atuais.
+4. LINGUAGEM FAMILIAR E HUMANA: Fale com clareza, empatia e proximidade da pessoa comum/segurado, traduzindo regras jurídicas em soluções práticas.
+5. ESTRUTURA DA LEGENDA:
+   - Gancho inicial impactante com a dor real do segurado (1 parágrafo curto).
+   - Explicação clara da regra jurídica (ex: EC 103/2019, art. 195, § 14 da CF ou Lei 8.213/91).
+   - Principais riscos da falta de regularização (perda de carência, tempo de contribuição e indeferimento de benefício).
+   - As soluções práticas explicadas de forma didática e direta (Complementação, Agrupamento, Uso de Excedente).
+   - Chamada ética e institucional para ação (ex: salvar o post ou compartilhar com quem contribui para o INSS).
+   - 6 a 8 hashtags relevantes no final.
+6. FORMATAÇÃO: Parágrafos curtos, linhas em branco entre eles e emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 👉 📌).
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{ "caption": "string" }`;
     } else if (mode === 'template') {
-      taskDesc = `Texto para a arte do post sobre: "${topic}".`;
-      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
+      maxOutputTokens = 4096;
+      prompt = `Você é o principal designer e redator de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+Gere os textos completos e de alto impacto para a ARTE VISUAL de um post sobre: "${topic}".
+Persona: ${personaDesc}
+Estratégia: ${strategyDesc}
+${assetContext}
+
+DIRETRIZES PARA OS CAMPOS DA ARTE:
+1. "audienceTag": Nicho ou público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA 2026", "BPC/LOAS | SEQUELAS DE AVC").
+2. "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?", "Sequelas de AVC dão direito ao BPC?").
+3. "highlight": Alerta de alto impacto em 5 a 12 palavras (Ex: "⚠️ Meses abaixo do piso (R$ 1.621) NÃO contam para tempo nem carência!").
+4. "points": 3 ou 4 itens com palavra-chave em caixa alta seguida de explicação prática e familiar (Ex: "1) COMPLEMENTAÇÃO: Pague a diferença via DARF para validar a competência.").
+5. "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e confira seu extrato do CNIS!").
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
-      taskDesc = `Conteúdo completo para Instagram sobre: "${topic}".`;
-      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
+      maxOutputTokens = 8192;
+      const marketingInstructions = `
+DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
+1. CAMPO "audienceTag": Identifique o nicho/público em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA 2026", "BPC/LOAS | PESSOA COM DEFICIÊNCIA").
+2. CAMPO "title": Título persuasivo e direto com 3 a 7 palavras.
+3. CAMPO "highlight": Alerta de alto impacto em 5 a 12 palavras com dados atuais de 2026.
+4. CAMPO "points": 3 ou 4 itens com palavra-chave em caixa alta + explicação jurídica prática e familiar.
+5. CAMPO "ctaCaption": Chamada institucional curta (sem frases de captação/WhatsApp).
+6. CAMPO "caption" (Legenda do Instagram):
+   - LIMITE RIGOROSO: Entre 1.200 e 1.600 caracteres no total (MÁXIMO 1.800 caracteres com hashtags).
+   - ATUALIDADE 2026: Salário mínimo vigente de R$ 1.621,00, regras de 2026.
+   - Linguagem familiar, acessível, didática e de alta conexão com o leitor.
+   - Parágrafos curtos, embasamento legal claro, soluções práticas e 6 a 8 hashtags.
+7. CAMPO "imagePrompt": Descrição em inglês para imagem profissional de suporte.`;
+
+      prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
+    ${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+    Conteúdo completo e de alto valor para Instagram sobre: "${topic}".${assetContext}
+    Estratégia Solicitada: ${strategyDesc}
+    Persona do Advogado: ${personaDesc}
+    Público: Segurados do INSS, trabalhadores e contribuintes. Linguagem familiar, acessível com extrema precisão técnica.
+    
+    ${marketingInstructions}
+    
+    Responda ESTRITAMENTE em formato JSON puro no esquema:
+    { "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
-
-    const captionInstructions = mode === 'full' ? `
-REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
-- Escreva uma legenda ALTAMENTE DETALHADA, informativa e profunda (mínimo de 350 a 600 palavras). O advogado quer conteúdo de altíssimo valor que realmente eduque o cliente, explique seus direitos e gere engajamento orgânico. Não economize palavras, explique as leis e jurisprudências de forma completa e didática!
-- Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto para torná-lo atraente
-- Separe cada parágrafo com linha em branco
-- Termine SEMPRE com 8 a 12 hashtags relevantes em linha separada
-- Exemplo de formato:
-  "Você sabia que o INSS não pode ignorar o laudo do seu médico particular? ⚖️\n\nIsso é um direito seu garantido por lei. Se seu benefício foi negado por esse motivo, você tem como reverter na Justiça. ✅\n\nNão aceite um não sem questionar. 👉\n\n#advocaciaprevidenciaria #inss #direitoprevidenciario"
-- O campo "title" deve ter NO MÁXIMO 5 palavras para caber no template
-- O campo "highlight" deve ter NO MÁXIMO 6 palavras
-- O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras
-- O campo "ctaCaption" deve ser uma frase imperativa corta (máximo 6 palavras) com caráter EDUCATIVO e INSTITUCIONAL. Exemplos: "Salve esse post!", "Comente sua dúvida!", "Compartilhe com quem precisa!", "Siga para mais conteúdo!". NUNCA use frases que incentivem contato direto ou captação de clientes como "Me chame no WhatsApp", "Entre em contato", "Agende sua consulta" — isso viola o Código de Ética da OAB.
-- PRECISÃO JURÍDICA: nunca simplifique a ponto de distorcer o direito. Se afirmar que algo é garantido por lei, isso deve ser juridicamente correto` : '';
-
-    const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
-    Público: Pessoas simples. Linguagem CLARA.
-    Estratégia: ${strategyDesc}. Tom: ${personaDesc}.
-    ${captionInstructions}
-    Responda em JSON puro: ${jsonFormat}`;
 
     const response = await callGemini({
       bypassOpenRouter: true,
@@ -4649,16 +4849,109 @@ REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
       contents: prompt,
       config: { 
         responseMimeType: 'application/json',
-        maxOutputTokens: 16383,
-        temperature: 0.25
+        maxOutputTokens,
+        temperature: 0.2
       }
     });
-    res.json({ text: response.text });
+
+    let cleanedText = response.text || "{}";
+    res.json({ text: cleanedText });
   } catch (error: any) {
     console.error("Marketing error:", error);
     res.status(500).json({ error: error.message });
   }
 });
+
+// Endpoint para sintetizar conversa do chat e criar post de Marketing instantaneamente
+app.post("/api/marketing/from-chat", async (req, res) => {
+  try {
+    const { messages = [], persona = 'michel', specificContent = '', topicHint = '' } = req.body;
+    
+    // Extrai o contexto relevante das mensagens da conversa
+    const recentMessages = Array.isArray(messages) ? messages.slice(-12) : [];
+    const chatSnippet = recentMessages.map((m: any) => `${m.role === 'user' ? 'Advogado/Usuário' : 'Especialista IA'}: ${m.content}`).join("\n\n");
+    const fullSourceText = specificContent ? `TRECHO ESPECÍFICO SELECIONADO:\n${specificContent}\n\nCONTEXTO GERAL DA CONVERSA:\n${chatSnippet}` : chatSnippet;
+
+    const personaDesc = persona === 'michel' 
+      ? 'Dr. Michel Felix: Direto, estratégico, de alta autoridade e conexão com os segurados.'
+      : 'Dra. Luana Castro: Acolhedora, empática, didática e de fácil entendimento.';
+
+    const prompt = `Você é o estrategista chefe de marketing jurídico do escritório Felix & Castro Advocacia.
+${CURRENT_SYSTEM_YEAR_KNOWLEDGE}
+
+O advogado estava analisando um caso prático / tirando dúvidas no chat do escritório e solicitou transformar este caso real em um post de alto impacto e autoridade para o Instagram.
+
+Persona do Advogado: ${personaDesc}
+${topicHint ? `DICA/SUGESTÃO DE TEMA: ${topicHint}` : ''}
+
+CONVERSA E FATOS DO CASO ANALISADO:
+${fullSourceText || 'Dúvidas gerais de Direito Previdenciário e Trabalhista.'}
+
+SUA MISSÃO:
+1. Identifique o cerne do caso (ex: BPC/LOAS para quem teve AVC e ficou com sequelas, Contribuições abaixo do salário mínimo no CNIS, Aposentadoria por Idade Mínima Progressiva, etc.).
+2. Crie uma postagem COMPLETA e FAMILIAR que fale diretamente à dor do segurado/trabalhador comum que passa por essa mesma situação.
+3. Use SEMPRE os dados econômicos e normativos vigentes de 2026 (Salário mínimo de R$ 1.621,00). Nunca cite valores de 2024 como se fossem de hoje.
+4. Redija textos didáticos, humanos e fáceis de entender para o público leigo, mas com rigor técnico impecável.
+
+ESTRUTURA OBRIGATÓRIA (JSON PURO):
+- "topic": Tema central do post sintetizado (ex: "BPC/LOAS para Sequelas de AVC").
+- "strategy": "educacional" ou "alerta".
+- "audienceTag": Nicho/público em CAIXA ALTA (Ex: "BPC/LOAS | SEQUELAS DE AVC & SAÚDE", "ALERTA CNIS 2026 | APOSENTADORIA").
+- "title": Título provocativo e forte com 3 a 7 palavras (Ex: "Teve AVC e ficou com sequelas?", "Contribuiu abaixo do piso em 2026?").
+- "highlight": Alerta de alto impacto em 5 a 12 palavras que sintetiza o direito (Ex: "⚠️ Sequelas incapacitantes dão direito ao BPC de R$ 1.621 mesmo sem nunca ter pago o INSS!").
+- "points": 3 a 4 itens com palavra-chave em caixa alta e explicação prática e familiar (Ex:
+  "1) NÃO EXIGE CONTRIBUIÇÃO: O BPC/LOAS é um benefício assistencial para baixa renda.",
+  "2) AVALIAÇÃO DA INCAPACIDADE: Laudos e relatórios médicos comprovam o impedimento de longo prazo.",
+  "3) RENDA FAMILIAR: Gastos com medicamentos e terapias podem ser abatidos da conta.",
+  "4) BENEFÍCIO VIGENTE: Valor mensal de 1 salário mínimo (R$ 1.621,00 em 2026).").
+- "ctaCaption": Chamada institucional curta (Ex: "📌 Salve este post e compartilhe com quem precisa desse apoio!").
+- "caption": Legenda de Instagram de ALTA AUTORIDADE e FAMILIARIDADE.
+  * LIMITE RIGOROSO: Entre 1.300 e 1.700 caracteres (MÁXIMO ABSOLUTO 1.850 caracteres com hashtags).
+  * Gancho empático com a dor real da família/segurado.
+  * Explicação clara e humana dos requisitos legais.
+  * Passo a passo das soluções práticas.
+  * Chamada ética e 6 a 8 hashtags estratégicas no final.
+- "imagePrompt": Prompt em inglês para imagem conceitual de suporte.
+
+Responda ESTRITAMENTE em formato JSON puro no esquema:
+{
+  "topic": "string",
+  "strategy": "string",
+  "audienceTag": "string",
+  "title": "string",
+  "highlight": "string",
+  "points": ["string"],
+  "ctaCaption": "string",
+  "caption": "string",
+  "imagePrompt": "string"
+}`;
+
+    const response = await callGemini({
+      bypassOpenRouter: true,
+      model: 'gemini-3.7-flash',
+      contents: prompt,
+      config: { 
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+        temperature: 0.2
+      }
+    });
+
+    const cleanedText = response.text || "{}";
+    res.json({ text: cleanedText });
+  } catch (error: any) {
+    console.error("Marketing from-chat error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ====================================================================
+// BANCO CENTRAL DO BRASIL (BCB / SGS) - DADOS ECONÔMICOS OFICIAIS
+// ====================================================================
+
+// Cache em memória de dados do Banco Central (evita sobrecarga e garante alta disponibilidade)
+let bcbWageCache: { data: any[]; lastFetch: number } | null = null;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
 
 app.get("/api/bcdata/inpc", async (req, res) => {
   try {
@@ -4669,9 +4962,65 @@ app.get("/api/bcdata/inpc", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
-    console.error("BCB Proxy Error:", error);
+    console.error("BCB Proxy Error (INPC):", error);
     res.status(500).json({ error: error.message || "Failed to fetch BCB data" });
   }
+});
+
+// Endpoint oficial de Salário Mínimo do Banco Central do Brasil (Série 1619)
+app.get("/api/bcdata/minimum-wage", async (req, res) => {
+  try {
+    const now = Date.now();
+    if (bcbWageCache && (now - bcbWageCache.lastFetch) < CACHE_TTL_MS) {
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: true,
+        data: bcbWageCache.data
+      });
+    }
+
+    const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1619/dados?formato=json');
+    if (response.ok) {
+      const data = await response.json();
+      bcbWageCache = { data, lastFetch: now };
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: false,
+        data
+      });
+    }
+
+    // Se a API do BCB falhar temporariamente, retorna dados estruturados de contingência
+    if (bcbWageCache) {
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619 (Stale Cache)",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: true,
+        data: bcbWageCache.data
+      });
+    }
+
+    res.status(500).json({ error: "Falha ao consultar API do Banco Central" });
+  } catch (error: any) {
+    console.error("BCB Proxy Error (Salário Mínimo):", error);
+    res.status(500).json({ error: error.message || "Erro ao consultar Banco Central" });
+  }
+});
+
+// Endpoint com resumo rápido do Salário Mínimo Atual
+app.get("/api/bcdata/minimum-wage/current", async (req, res) => {
+  res.json({
+    currentYear: 2026,
+    value: 1621.00,
+    formatted: "R$ 1.621,00",
+    source: "Banco Central do Brasil - SGS Série 1619 / Lei Orçamentária",
+    lastAdjustmentDate: "2026-01-01"
+  });
 });
 
 // ====================================================================
@@ -4741,6 +5090,118 @@ app.post("/api/ai-memory-rules", async (req, res) => {
   }
 });
 
+app.post("/api/ai-memory-rules/analyze", async (req, res) => {
+  try {
+    const { rules } = req.body;
+    if (!rules || !Array.isArray(rules)) {
+      return res.status(400).json({ error: "Lista de regras inválida." });
+    }
+
+    // 1. Detecção programática INFALÍVEL e INSTANTÂNEA de duplicadas por texto
+    const programmaticDuplicates: Array<{ ruleIds: string[]; description: string }> = [];
+    const textGroupMap = new Map<string, string[]>();
+
+    for (const r of rules) {
+      if (!r || !r.id || !r.rule_text) continue;
+      // Normalização do texto (remove acentos, pontuação e espaços extras)
+      const norm = r.rule_text
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
+      if (!norm) continue;
+
+      if (!textGroupMap.has(norm)) {
+        textGroupMap.set(norm, [r.id]);
+      } else {
+        textGroupMap.get(norm)!.push(r.id);
+      }
+    }
+
+    for (const [key, ids] of textGroupMap.entries()) {
+      if (ids.length > 1) {
+        programmaticDuplicates.push({
+          ruleIds: ids,
+          description: `Existem ${ids.length} registros com o texto idêntico registrados. Mantenha a primeira ocorrência (${ids[0].slice(0, 8)}) e remova as demais.`
+        });
+      }
+    }
+
+    // 2. Análise Semântica via IA (Contradições, Duplicações Semânticas e Melhorias)
+    let llmResult: { contradictions: any[]; duplicates: any[]; improvements: any[] } = {
+      contradictions: [],
+      duplicates: [],
+      improvements: []
+    };
+
+    try {
+      const prompt = `Você é um especialista em lógica e estruturação de prompts de IA jurídica.
+Abaixo está uma lista de regras de memória de uma IA.
+Seu objetivo é analisar e encontrar:
+1. Contradições: Regras que dizem o oposto ou entram em conflito direto.
+2. Duplicações Semânticas: Regras que dizem a mesma coisa com palavras totalmente diferentes.
+3. Melhorias: No máximo 3 regras que estejam confusas, redundantes ou mal estruturadas.
+
+Lista de regras (ID | Persona | Texto):
+${rules.map((r: any) => `${r.id} | ${r.persona} | ${(r.rule_text || '').substring(0, 350)}`).join('\n')}
+
+Seja extremamente conciso e direto. Retorne estritamente um JSON válido no seguinte formato:
+{
+  "contradictions": [
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta do conflito" }
+  ],
+  "duplicates": [
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta do motivo de duplicidade semântica" }
+  ],
+  "improvements": [
+    { "ruleId": "id", "originalText": "texto original", "suggestedText": "texto sugerido mais claro", "reason": "motivo em 1 frase" }
+  ]
+}`;
+
+      const response = await callGemini({
+        bypassOpenRouter: true,
+        model: "gemini-3.7-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 1500,
+          temperature: 0.1
+        }
+      });
+
+      let text = response.text || "{}";
+      text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      llmResult = JSON.parse(text);
+    } catch (llmErr) {
+      console.warn("[Análise de Regras] LLM falhou ou demorou, mantendo análise programática:", llmErr);
+    }
+
+    // Unifica duplicadas programáticas + duplicadas da IA (sem repetir IDs)
+    const combinedDuplicates = [...programmaticDuplicates];
+    if (llmResult.duplicates && Array.isArray(llmResult.duplicates)) {
+      for (const dup of llmResult.duplicates) {
+        if (!dup.ruleIds || !Array.isArray(dup.ruleIds)) continue;
+        const alreadyInProgrammatic = combinedDuplicates.some(pd => 
+          dup.ruleIds.some((id: string) => pd.ruleIds.includes(id))
+        );
+        if (!alreadyInProgrammatic) {
+          combinedDuplicates.push(dup);
+        }
+      }
+    }
+
+    res.json({
+      contradictions: Array.isArray(llmResult.contradictions) ? llmResult.contradictions : [],
+      duplicates: combinedDuplicates,
+      improvements: Array.isArray(llmResult.improvements) ? llmResult.improvements : []
+    });
+  } catch (error: any) {
+    console.error("Erro na análise de regras:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put("/api/ai-memory-rules/:id/toggle", async (req, res) => {
   try {
     const { id } = req.params;
@@ -4761,6 +5222,26 @@ app.put("/api/ai-memory-rules/:id/toggle", async (req, res) => {
   }
 });
 
+app.put("/api/ai-memory-rules/:id/text", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rule_text } = req.body;
+    
+    const { data, error } = await supabaseAdmin
+      .from('ai_memory_rules')
+      .update({ rule_text })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    console.error("Erro ao atualizar texto da regra:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete("/api/ai-memory-rules/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -4777,8 +5258,8 @@ app.delete("/api/ai-memory-rules/:id", async (req, res) => {
   }
 });
 
-// ====================================================================
-// AUTOMATED BACKEND-MANAGED CONTEXT CACHING
+// Auto-seeding removido para permitir que o usuário gerencie e exclua regras livremente sem recriação automática pelo servidor.
+
 // Evita reenviar documentos gigantes em todas as mensagens do chat.
 // Vincula o cache de contexto ao modelo selecionado e rotaciona chaves.
 // ====================================================================
@@ -4971,9 +5452,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isExplicitSurgical = !!req.body.isArtifactCorrection || 
                                message.includes("[CORREÇÃO CIRÚRGICA") || 
                                message.includes("[CORRECAO CIRURGICA") || 
+                               message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                message.includes("[GERAÇÃO MODULAR") || 
-                               message.includes("[GERACAO MODULAR") ||
-                               message.includes("TRECHO SELECIONADO A MODIFICAR");
+                               message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgical && draftContent && revisionIntent !== 'FULL_REGENERATION') {
@@ -5087,7 +5568,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma clara e familiar, destacando o público-alvo e a estratégia.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dr. Michel + Globais)
     const memoryRulesMichel = await getActiveMemoryRulesPrompt('michel');
@@ -5137,7 +5625,11 @@ Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar u
     }
 
     const mentionsDocsOrOcr = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
-    const shouldSkipDocumentContext = isExplicitSurgical && !mentionsDocsOrOcr;
+    const mentionsLawsOrRagMichel = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(message);
+    const shouldSkipDocumentContext = (isExplicitSurgical || isSurgicalMode) && !mentionsDocsOrOcr;
+    if ((isSurgicalMode || isExplicitSurgical) && !mentionsLawsOrRagMichel) {
+      ragContext = "";
+    }
 
     if (documentContext && !activeDocCache && !shouldSkipDocumentContext) {
       const originalDocSize = documentContext.length;
@@ -5381,7 +5873,10 @@ ${message}`;
     let thinkingConfig: any = undefined;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
-    if (isGenerationRequest) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Máximo raciocínio para petições
     } else if (isReportRequest) {
@@ -5458,7 +5953,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             }
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessages,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -5720,9 +6215,9 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const isExplicitSurgicalLuana = !!req.body.isArtifactCorrection || 
                                     message.includes("[CORREÇÃO CIRÚRGICA") || 
                                     message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                     message.includes("[GERAÇÃO MODULAR") || 
-                                    message.includes("[GERACAO MODULAR") ||
-                                    message.includes("TRECHO SELECIONADO A MODIFICAR");
+                                    message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
     if (isExplicitSurgicalLuana && draftContent) {
@@ -5839,13 +6334,12 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
 
     const PHASED_SCIENCE_PROMPT = `
     [MODO DE TOMADA DE CIÊNCIA PARCELADA]
-    Você está recebendo uma PARTE de um documento longo para AUDITORIA DETALHADA.
+    Você está recebendo uma PARTE de um documento longo para AUDITORIA E INDEXAÇÃO.
     SUA TAREFA:
-    1. Analise o texto e as imagens fornecidas nesta fase com foco total em detalhes.
-    2. Extraia TODOS os dados cruciais (Datas, Nomes, CIDs, Valores, OABs).
-    3. Se houver divergência entre o texto e a imagem, a IMAGEM prevalece.
-    4. Responda seguindo o protocolo: "✅ Ciência tomada da Parte X do documento [Nome]. Dados extraídos: [Lista detalhada]. Aguardando próxima parte."
-    5. NÃO gere relatórios completos ainda. Apenas acumule o conhecimento para a fase final.
+    1. Analise e absorva o texto e as imagens fornecidas nesta fase no contexto.
+    2. Extraia e indexe internamente todos os dados cruciais (Datas, Nomes, CIDs, Valores, OABs).
+    3. Responda apenas: "✅ Ciência tomada da Parte X do documento [Nome]. Conteúdo indexado com sucesso. Aguardando próxima parte."
+    4. NÃO liste os dados nem detalhe páginas na resposta. Apenas confirme a indexação com sucesso.
     `;
 
     let temperature = 0.2;
@@ -5887,7 +6381,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma acolhedora, humana e familiar, destacando o público-alvo e a solução jurídica.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dra. Luana + Globais)
     const memoryRulesLuana = await getActiveMemoryRulesPrompt('luana');
@@ -5937,7 +6438,11 @@ Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar u
     }
 
     const mentionsDocsOrOcrLuana = /\b(documento|documentos|anexo|anexos|laudo|laudos|cnis|ctps|decisão|decisao|indeferimento|ocr|extrato|comprovante|perícia|pericia)\b/i.test(message);
-    const shouldSkipDocumentContextLuana = isExplicitSurgicalLuana && !mentionsDocsOrOcrLuana;
+    const mentionsLawsOrRagLuana = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(message);
+    const shouldSkipDocumentContextLuana = (isExplicitSurgicalLuana || isSurgicalMode) && !mentionsDocsOrOcrLuana;
+    if ((isSurgicalMode || isExplicitSurgicalLuana) && !mentionsLawsOrRagLuana) {
+      ragContext = "";
+    }
 
     if (documentContext && !activeDocCache && !shouldSkipDocumentContextLuana) {
       const originalDocSize = documentContext.length;
@@ -6201,10 +6706,10 @@ ${message}`;
     let maxOutputTokens = 8192;
     let thinkingConfig: any = undefined;
 
-    if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined;
-    } else if (isReportRequestLuana) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined; // Optimization: fast execution
     } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
@@ -6284,7 +6789,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             const orMessagesFinal = orMessages.map((m: any) => m.role === 'system' ? { ...m, content: orSystemPromptLuana } : m);
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessagesFinal,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -6564,6 +7069,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isExplicitSurgicalFelix = !!req.body.isArtifactCorrection || 
                                     message.includes("[CORREÇÃO CIRÚRGICA") || 
                                     message.includes("[CORRECAO CIRURGICA") || 
+                                    message.includes("TRECHO SELECIONADO A MODIFICAR") ||
                                     message.includes("[GERAÇÃO MODULAR") || 
                                     message.includes("[GERACAO MODULAR");
 
@@ -6679,7 +7185,14 @@ Se o usuário der uma ordem EXPLÍCITA para você MEMORIZAR, APRENDER ou SALVAR 
 [COMANDO_SALVAR_MEMORIA: "Escreva a regra de forma imperativa e universal aqui"]
 
 Se o usuário NÃO pediu para salvar, mas você notou que acabou de padronizar uma tese valiosa, corrigiu um erro recorrente, ou estabeleceu uma preferência do escritório que seria útil aplicar sempre, sugira PROATIVAMENTE que ele salve isso na memória, incluindo a tag exata:
-[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]`;
+[SUGESTAO_MEMORIA: "Escreva a regra sugerida aqui"]
+
+[TRANSFORMAÇÃO DE CASOS EM POSTS DE MARKETING JURÍDICO / INSTAGRAM]
+Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marketing, ou transformar a conversa/caso em post (ex: "faça um post de instagram sobre isso", "crie um post de marketing", "transforme esse caso em postagem"):
+1. Apresente o rascunho de forma clara, empática e familiar, destacando o público-alvo e a orientação jurídica.
+2. Inclua OBRIGATORIAMENTE no final da resposta a tag com o JSON completo do post:
+[GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
+Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
     // Injeção de Regras da Memória Contínua (Dr. Felix & Castro + Globais)
     const memoryRulesFelix = await getActiveMemoryRulesPrompt('felix');
@@ -6927,7 +7440,10 @@ ${message}`;
     let maxOutputTokens = 8192;
     let thinkingConfig: any = undefined;
 
-    if (isGenerationRequest) {
+    if (isSurgicalMode) {
+      maxOutputTokens = 4096;
+      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
+    } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
       thinkingConfig = undefined;
     } else if (isReportRequest) {
@@ -7014,7 +7530,7 @@ REGRAS ABSOLUTAS:
             }
 
             const orResult = await callOpenRouterStream({
-              model: model || "deepseek/deepseek-v4-flash",
+              model: model || "deepseek/deepseek-chat",
               messages: orMessages,
               temperature: finalTemperature,
               max_tokens: maxOutputTokens || 18000,
@@ -7343,12 +7859,14 @@ app.get("/api/config", (req, res) => {
   const url = process.env.SUPABASE_URL || 
               process.env.VITE_SUPABASE_URL || 
               process.env.URL_SUPABASE ||
-              process.env.NEXT_PUBLIC_SUPABASE_URL;
+              (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith("http") ? process.env.NEXT_PUBLIC_SUPABASE_URL : "") ||
+              DEFAULT_SUPABASE_URL;
               
   const key = process.env.SUPABASE_ANON_KEY || 
               process.env.VITE_SUPABASE_ANON_KEY || 
               process.env.ANON_KEY_SUPABASE ||
-              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+              DEFAULT_SUPABASE_KEY;
   
   res.json({ url, key });
 });
@@ -7673,7 +8191,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
 orMessages.push({ role: "user", content: finalMessage });
 await callOpenRouterStream({
-  model: model || "deepseek/deepseek-v4-flash",
+  model: model || "deepseek/deepseek-chat",
   messages: orMessages,
   temperature: finalTemperature,
   max_tokens: 2000,
@@ -8004,7 +8522,8 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
   const send = (obj: object) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
   try {
-    const { adminKey, batchOffset = 0 } = req.body || {};
+    const adminKey = req.body?.adminKey || req.body?.adminkey;
+    const batchOffset = req.body?.batchOffset || 0;
 
     const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
     if (adminKey !== expectedKey) {
@@ -8145,7 +8664,7 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
   };
 
   try {
-    const { adminKey } = req.body || {};
+    const adminKey = req.body?.adminKey || req.body?.adminkey;
     const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
     if (adminKey !== expectedKey) {
       send({ error: "Não autorizado" });

@@ -26,9 +26,12 @@ import { User, UserRole } from '../types';
 interface MarketingGeneratorProps {
   darkMode: boolean;
   user: User;
+  initialData?: any;
+  onClearInitialData?: () => void;
 }
 
 interface PostData {
+  audienceTag?: string;
   title: string;
   highlight: string;
   points: string[];
@@ -69,7 +72,13 @@ interface SavedPost {
   strategy?: string;
 }
 
-export default function MarketingGenerator({ darkMode, user }: MarketingGeneratorProps) {
+// Imagens de Autoridade dos Advogados Titulares (Felix & Castro Advocacia)
+export const OFFICIAL_LAWYER_PHOTOS = {
+  michel: 'https://images.unsplash.com/photo-1556157382-97eda2d62296?q=80&w=800&auto=format&fit=crop', // Dr. Michel Felix
+  luana: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop'   // Dra. Luana Castro
+};
+
+export default function MarketingGenerator({ darkMode, user, initialData, onClearInitialData }: MarketingGeneratorProps) {
   const [topic, setTopic] = useState('');
   const [strategy, setStrategy] = useState('educacional');
   const [suggestedStrategies, setSuggestedStrategies] = useState<StrategySuggestion[] | null>(null);
@@ -105,6 +114,45 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const libraryFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      const targetPersona = (initialData.persona === 'luana' || initialData.persona === 'michel') ? initialData.persona : persona;
+      const targetTopic = initialData.topic || initialData.title || topic;
+
+      if (initialData.topic) setTopic(initialData.topic);
+      if (initialData.persona && (initialData.persona === 'michel' || initialData.persona === 'luana')) {
+        setPersona(initialData.persona);
+      }
+      if (initialData.strategy) setStrategy(initialData.strategy);
+
+      const incomingPost = initialData.postData || (initialData.title ? initialData : null);
+      if (incomingPost) {
+        setPostData({
+          audienceTag: incomingPost.audienceTag || 'DIREITO PREVIDENCIÁRIO',
+          title: incomingPost.title || '',
+          highlight: incomingPost.highlight || '',
+          points: Array.isArray(incomingPost.points) ? incomingPost.points : [],
+          caption: incomingPost.caption || '',
+          ctaCaption: incomingPost.ctaCaption || '📌 Salve e compartilhe com quem precisa!',
+          imagePrompt: incomingPost.imagePrompt || ''
+        });
+
+        // Define IMEDIATAMENTE a imagem: 1. Imagem do tema na Biblioteca -> 2. Foto oficial do Dr. Michel ou Dra. Luana
+        const bestAsset = findBestAssetForContext(targetTopic, libraryAssets, targetPersona, incomingPost.imagePrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+        } else {
+          setUploadedImage(getDefaultImage(targetTopic, targetPersona));
+        }
+      }
+
+      if (onClearInitialData) {
+        onClearInitialData();
+      }
+    }
+  }, [initialData, libraryAssets]);
 
   useEffect(() => {
     loadSavedPosts();
@@ -170,6 +218,68 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     blueText: '#003366',
   };
 
+  const safeParseMarketingJson = (rawText: string, expectedMode: string = 'full'): any => {
+    let clean = (rawText || '').trim();
+    if (clean.startsWith('```json')) {
+      clean = clean.replace(/^```json/, '').replace(/```$/, '').trim();
+    } else if (clean.startsWith('```')) {
+      clean = clean.replace(/^```/, '').replace(/```$/, '').trim();
+    }
+
+    // 1. Tenta parse padrão direto
+    try {
+      return JSON.parse(clean);
+    } catch (err1) {
+      console.warn("Standard JSON parse failed, attempting repairs...", err1);
+    }
+
+    // 2. Extração específica para caption se for mode === 'caption'
+    if (expectedMode === 'caption') {
+      const captionMatch = clean.match(/"caption"\s*:\s*"([\s\S]*?)"\s*}/) || 
+                           clean.match(/"caption"\s*:\s*"([\s\S]*)/) ||
+                           clean.match(/"caption"\s*:\s*`([\s\S]*?)`/);
+      if (captionMatch && captionMatch[1]) {
+        let cap = captionMatch[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/"\s*$/, '')
+          .trim();
+        return { caption: cap };
+      }
+    }
+
+    // 3. Tenta localizar o primeiro '{' e último '}'
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        const slice = clean.slice(firstBrace, lastBrace + 1);
+        return JSON.parse(slice);
+      } catch (err2) {
+        // continua
+      }
+    }
+
+    // 4. Reparo para strings truncadas ou aspas não fechadas
+    try {
+      let repaired = clean;
+      if (firstBrace !== -1 && !repaired.startsWith('{')) {
+        repaired = repaired.slice(firstBrace);
+      }
+      const quotes = (repaired.match(/"/g) || []).length;
+      if (quotes % 2 !== 0) {
+        repaired += '"';
+      }
+      if (!repaired.endsWith('}')) {
+        repaired += '}';
+      }
+      return JSON.parse(repaired);
+    } catch (err3) {
+      console.error("All JSON repair attempts failed:", err3, "Raw string was:", rawText);
+      throw new Error("A IA retornou um formato inválido. Tente novamente.");
+    }
+  };
+
   const generateStrategies = async () => {
     if (!topic.trim()) {
       alert('Por favor, digite um tema para o post.');
@@ -197,20 +307,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        let jsonStr = result.text.trim();
-        if (jsonStr.startsWith('```json')) {
-          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
-        }
-        
-        let data;
-        try {
-          data = JSON.parse(jsonStr);
-        } catch (parseError) {
-          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
-          throw new Error("A IA retornou um formato inválido. Tente novamente.");
-        }
+        const data = safeParseMarketingJson(result.text, 'strategies');
         
         if (data.strategies && Array.isArray(data.strategies)) {
           setSuggestedStrategies(data.strategies);
@@ -223,6 +320,152 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     } finally {
       setIsGeneratingStrategies(false);
     }
+  };
+
+  // Função inteligente de correspondência semântica e contextual de fotos da biblioteca
+  const findBestAssetForContext = (
+    topicStr: string,
+    assets: LibraryAsset[],
+    currentPersona?: string,
+    imagePromptStr?: string
+  ): LibraryAsset | null => {
+    if (!assets || assets.length === 0) return null;
+
+    const normalize = (str: string) =>
+      str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ');
+
+    const topicNorm = normalize(topicStr);
+    const promptNorm = normalize(imagePromptStr || '');
+    const combinedQuery = `${topicNorm} ${promptNorm}`;
+
+    // Regras conceituais e sinônimos jurídicos previdenciários/trabalhistas
+    const conceptRules: {
+      triggers: string[];
+      assetKeywords: string[];
+      bonus: number;
+    }[] = [
+      {
+        // Contribuintes individuais, facultativos, carência, tempo, idade, CNIS, mínimo
+        triggers: [
+          'contribuinte', 'facultativo', 'individual', 'contribuicao', 'contribuicoes', 'minimo',
+          'abaixo do minimo', 'cnis', 'recolhimento', 'gps', 'carencia', 'tempo de contribuicao',
+          'aposentadoria por idade', 'aposentadoria', 'planejamento', 'revisao', 'segurado', 'riscos'
+        ],
+        assetKeywords: ['homem idoso', 'mulher idosa', 'casal', 'doutor michel felix', 'doutora luana castro', 'idoso', 'idosa'],
+        bonus: 50
+      },
+      {
+        // Laudo Médico / Doença / Perícia / Atestado / Incapacidade / Auxílio-doença
+        triggers: [
+          'laudo', 'medico', 'pericia', 'atestado', 'incapacidade', 'doenca', 'auxilio doenca',
+          'invalidez', 'acidente', 'hospital', 'cirurgia', 'tratamento', 'cid', 'exame', 'perito'
+        ],
+        assetKeywords: ['laudo medico', 'laudo', 'medico'],
+        bonus: 70
+      },
+      {
+        // BPC / LOAS / Deficiência / Autismo / Cegueira / Assistencial
+        triggers: [
+          'bpc', 'loas', 'deficiencia', 'deficiente', 'cegueira', 'cego', 'autismo', 'autista',
+          'pcd', 'assistencial', 'cadunico', 'miserabilidade', 'vulneravel'
+        ],
+        assetKeywords: ['beneficios assistenciais', 'deficiente cegueira', 'deficiente', 'assistenciais'],
+        bonus: 70
+      },
+      {
+        // Aposentadoria Especial / Insalubridade / Periculosidade / Enfermagem / Profissões
+        triggers: [
+          'especial', 'insalubre', 'insalubridade', 'periculosidade', 'enfermeiro', 'enfermeira',
+          'vigilante', 'frentista', 'mecanico', 'soldador', 'eletricista', 'ruido', 'quimico',
+          'ppp', 'ltcat', 'hospitalar'
+        ],
+        assetKeywords: ['aposentadorias especiais', 'especial', 'especiais', 'enfermeiros'],
+        bonus: 70
+      },
+      {
+        // Rural / Lavrador / Segurado Especial / Pescador / Agricultura
+        triggers: ['rural', 'lavrador', 'agricultor', 'pescador', 'campo', 'roca', 'sitio', 'trabalhador rural'],
+        assetKeywords: ['rural', 'agricultor', 'idosos', 'homem idoso', 'mulher idosa'],
+        bonus: 60
+      },
+      {
+        // Institucional / Equipe / Atendimento / Contato
+        triggers: ['escritorio', 'advogado', 'advogada', 'doutor', 'doutora', 'secretaria', 'atendimento', 'consulta', 'duvida', 'equipe'],
+        assetKeywords: ['doutor michel felix', 'doutora luana castro', 'secretaria fabricia felix'],
+        bonus: 45
+      }
+    ];
+
+    const stopwords = new Set([
+      'com', 'dos', 'das', 'para', 'pelo', 'pela', 'como', 'onde', 'qual', 'quais', 'esse',
+      'essa', 'este', 'esta', 'isso', 'riscos', 'sobre', 'mais', 'menos', 'entre', 'apos',
+      'uma', 'uns', 'umas', 'seu', 'sua', 'seus', 'suas', 'ter', 'fazer', 'gerar'
+    ]);
+
+    const queryWords = combinedQuery
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopwords.has(w));
+
+    let bestAsset: LibraryAsset | null = null;
+    let highestScore = -1;
+
+    for (const asset of assets) {
+      const assetTopicNorm = normalize(asset.topic || '');
+      const assetDescNorm = normalize(asset.description || '');
+      let score = 0;
+
+      // 1. Match de palavras diretas no tópico ou descrição
+      for (const word of queryWords) {
+        if (assetTopicNorm.includes(word)) score += 20;
+        if (assetDescNorm.includes(word)) score += 10;
+      }
+
+      // 2. Match de frase
+      if (topicNorm.includes(assetTopicNorm) || assetTopicNorm.includes(topicNorm)) {
+        score += 40;
+      }
+
+      // 3. Regras conceituais
+      for (const rule of conceptRules) {
+        const triggerHit = rule.triggers.some(t => topicNorm.includes(t) || promptNorm.includes(t));
+        if (triggerHit) {
+          const assetHit = rule.assetKeywords.some(
+            k => assetTopicNorm.includes(k) || assetDescNorm.includes(k)
+          );
+          if (assetHit) {
+            score += rule.bonus;
+          }
+        }
+      }
+
+      // 4. Bônus por persona
+      if (currentPersona === 'michel' && assetTopicNorm.includes('michel')) score += 15;
+      if (currentPersona === 'luana' && assetTopicNorm.includes('luana')) score += 15;
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestAsset = asset;
+      }
+    }
+
+    if (highestScore > 0 && bestAsset) {
+      return bestAsset;
+    }
+
+    // Fallback prioritário para a persona ou primeiro ativo
+    if (currentPersona === 'michel') {
+      const michelAsset = assets.find(a => normalize(a.topic).includes('michel'));
+      if (michelAsset) return michelAsset;
+    } else if (currentPersona === 'luana') {
+      const luanaAsset = assets.find(a => normalize(a.topic).includes('luana'));
+      if (luanaAsset) return luanaAsset;
+    }
+
+    return assets[0] || null;
   };
 
   const generatePost = async (mode: 'full' | 'template' | 'caption' = 'full') => {
@@ -255,20 +498,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        let jsonStr = result.text.trim();
-        if (jsonStr.startsWith('```json')) {
-          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
-        } else if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
-        }
-        
-        let data;
-        try {
-          data = JSON.parse(jsonStr);
-        } catch (parseError) {
-          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
-          throw new Error("A IA retornou um formato inválido. Tente novamente.");
-        }
+        const data = safeParseMarketingJson(result.text, mode);
         
         if (mode === 'full') {
           setPostData(data as PostData);
@@ -278,46 +508,32 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
           setImageOffsetX(0);
           setImageOffsetY(0);
           
-          // 1. If we have a manually selected asset, use it
+          // 1. Se houver ativo selecionado manualmente pelo usuário, usa diretamente
           if (selectedAsset) {
             setUploadedImage(selectedAsset.url);
           } 
-          // 2. Otherwise, check if we already have a theme image for this topic in the database (exact match)
+          // 2. Busca o ativo mais adequado na biblioteca pelo contexto
+          else if (libraryAssets.length > 0) {
+            const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, data.imagePrompt);
+            if (bestAsset) {
+              setUploadedImage(bestAsset.url);
+              setSelectedAsset(bestAsset);
+            } else {
+              const existingThemeImage = await supabaseService.getThemeImage(topic);
+              if (existingThemeImage) {
+                setUploadedImage(existingThemeImage.url);
+              } else {
+                setUploadedImage(getDefaultImage(topic, persona));
+              }
+            }
+          } 
+          // 3. Fallback para tema salvo ou foto oficial do advogado (Dr. Michel / Dra. Luana)
           else {
             const existingThemeImage = await supabaseService.getThemeImage(topic);
             if (existingThemeImage) {
               setUploadedImage(existingThemeImage.url);
-            } 
-            // 3. Try keyword matching in the library assets
-            else {
-              const searchTopic = topic.toLowerCase();
-              const matchedAsset = libraryAssets.find(asset => {
-                const assetTopic = asset.topic.toLowerCase();
-                const assetDesc = (asset.description || '').toLowerCase();
-                
-                // Split search topic into keywords (removing common small words)
-                const keywords = searchTopic.split(/\s+/).filter(w => w.length > 2 && !['com', 'dos', 'das', 'para', 'pelo'].includes(w));
-                
-                // Check if any keyword matches asset topic or description
-                const hasKeywordMatch = keywords.some(word => 
-                  assetTopic.includes(word) || assetDesc.includes(word)
-                );
-
-                return searchTopic.includes(assetTopic) || 
-                       assetTopic.includes(searchTopic) ||
-                       hasKeywordMatch;
-              });
-              
-              if (matchedAsset) {
-                setUploadedImage(matchedAsset.url);
-                setSelectedAsset(matchedAsset);
-              }
-              // 4. Finally, generate a new one if nothing else is available
-              else if (data.imagePrompt) {
-                // Clear old image before generating new one to avoid showing stale content
-                setUploadedImage(null);
-                generateAIImage(data.imagePrompt);
-              }
+            } else {
+              setUploadedImage(getDefaultImage(topic, persona));
             }
           }
         } else if (mode === 'template' && postData) {
@@ -360,29 +576,50 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
         body: JSON.stringify({ prompt: finalPrompt }),
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar imagem');
-      
-      const result = await response.json();
-      if (result.image) {
-        // Upload to Storage to get a public URL and save as theme image
-        try {
-          const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
-          const publicUrl = await supabaseService.uploadFile('marketing', fileName, result.image);
-          if (publicUrl) {
-            setUploadedImage(publicUrl);
-            // Save as theme image for future use
-            await supabaseService.saveThemeImage(topic, publicUrl);
-          } else {
+      if (response.ok) {
+        const result = await response.json();
+        if (result.image) {
+          try {
+            const fileName = `marketing/${topic.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.png`;
+            const publicUrl = await supabaseService.uploadFile('marketing', fileName, result.image);
+            if (publicUrl) {
+              setUploadedImage(publicUrl);
+              await supabaseService.saveThemeImage(topic, publicUrl);
+            } else {
+              setUploadedImage(result.image);
+            }
+          } catch (e) {
+            console.error('Error uploading generated image:', e);
             setUploadedImage(result.image);
           }
-        } catch (e) {
-          console.error('Error uploading generated image:', e);
-          setUploadedImage(result.image);
+          return;
         }
       }
+      
+      // Fallback inteligente para a Biblioteca de Ativos caso a IA de imagem não esteja disponível
+      if (libraryAssets.length > 0) {
+        const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, finalPrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+          alert(`Geração via IA indisponível. Selecionamos a imagem ideal da sua Biblioteca de Ativos: "${bestAsset.topic}"!`);
+          return;
+        }
+      }
+      
+      setUploadedImage(getDefaultImage(topic));
     } catch (error) {
       console.error('Erro ao gerar imagem:', error);
-      alert('Erro ao gerar imagem com IA.');
+      if (libraryAssets.length > 0) {
+        const bestAsset = findBestAssetForContext(topic, libraryAssets, persona, finalPrompt);
+        if (bestAsset) {
+          setUploadedImage(bestAsset.url);
+          setSelectedAsset(bestAsset);
+          alert(`Selecionamos a foto da biblioteca que melhor reflete o tema: "${bestAsset.topic}".`);
+          return;
+        }
+      }
+      setUploadedImage(getDefaultImage(topic));
     } finally {
       setIsGeneratingImage(false);
     }
@@ -441,30 +678,41 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     }
   };
 
-  const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
-    const words = text.split(' ');
-    let line = '';
-    let currentY = y;
+  // Divide texto em múltiplas linhas respeitando limite em pixels
+  const getWrappedLines = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+    if (!text) return [];
+    const words = text.trim().split(/\s+/);
+    const lines: string[] = [];
+    let currentLine = '';
 
     for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
+      const testLine = currentLine ? `${currentLine} ${words[n]}` : words[n];
       const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, currentY);
-        line = words[n] + ' ';
-        currentY += lineHeight;
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = words[n];
       } else {
-        line = testLine;
+        currentLine = testLine;
       }
     }
-    ctx.fillText(line, x, currentY);
-    return currentY + lineHeight; // Return the next Y position
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+    return lines;
   };
 
-  const getDefaultImage = (topicStr: string) => {
-    const t = topicStr.toLowerCase();
+  const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+    const lines = getWrappedLines(ctx, text, maxWidth);
+    let currentY = y;
+    for (const line of lines) {
+      ctx.fillText(line, x, currentY);
+      currentY += lineHeight;
+    }
+    return currentY;
+  };
+
+  const getDefaultImage = (topicStr: string, currentPersona: 'michel' | 'luana' = persona) => {
+    const t = (topicStr || '').toLowerCase();
     if (t.includes('maternidade') || t.includes('gestante') || t.includes('mãe')) {
       return 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=800&auto=format&fit=crop';
     }
@@ -472,14 +720,13 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       return 'https://images.unsplash.com/photo-1447069387593-a5de0862481e?q=80&w=800&auto=format&fit=crop';
     }
     if (t.includes('bpc') || t.includes('loas') || t.includes('invalidez') || t.includes('doença') || t.includes('incapacidade') || t.includes('deficiência') || t.includes('auxílio-doença')) {
-      // More appropriate image for disability/health
       return 'https://images.unsplash.com/photo-1584515933487-779824d29309?q=80&w=800&auto=format&fit=crop';
     }
     if (t.includes('rural') || t.includes('lavrador') || t.includes('agricultor') || t.includes('pescador')) {
       return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=800&auto=format&fit=crop';
     }
-    // Default: Professional/Justice
-    return 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=800&auto=format&fit=crop'; 
+    // Default: Foto de Autoridade da Persona Titular (Dr. Michel Felix ou Dra. Luana Castro)
+    return currentPersona === 'luana' ? OFFICIAL_LAWYER_PHOTOS.luana : OFFICIAL_LAWYER_PHOTOS.michel;
   };
 
   const drawCanvas = () => {
@@ -489,32 +736,31 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Canvas dimensions (Instagram Square)
+    // Canvas dimensions (Instagram Square 1080x1080)
     const width = 1080;
     const height = 1080;
     canvas.width = width;
     canvas.height = height;
 
-    // 1. Background
+    // 1. Background Bordô Oficial
     ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Decorative Elements (White/Gold lines)
-    ctx.strokeStyle = colors.white;
-    ctx.lineWidth = 4;
+    // 2. Elementos Decorativos Geométricos
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 3;
     
-    // Top right corner decoration
-    ctx.strokeRect(850, 50, 200, 200);
+    // Decoração Canto Superior Direito
+    ctx.strokeRect(840, 45, 195, 195);
     
-    // Bottom right corner decoration
-    ctx.strokeRect(500, 780, 250, 200);
+    // Decoração Fundo Inferior Direito
+    ctx.strokeRect(520, 760, 260, 220);
 
-    // 3. Logo Area (Top Left)
-    // Draw Premium Scale Icon
+    // 3. Área do Logotipo (Topo Esquerda)
     ctx.strokeStyle = colors.gold;
-    
-    // Base & Pillar
     ctx.lineWidth = 2.5;
+    
+    // Balança da Justiça
     ctx.beginPath();
     ctx.moveTo(85, 165);
     ctx.lineTo(115, 165);
@@ -524,34 +770,31 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.lineTo(100, 115);
     ctx.stroke();
 
-    // Top detail (Circle)
+    // Detalhe topo
     ctx.beginPath();
-    ctx.arc(100, 112, 3, 0, Math.PI * 2);
+    ctx.arc(100, 112, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = colors.gold;
     ctx.fill();
 
-    // Beam
+    // Haste principal
     ctx.beginPath();
     ctx.moveTo(65, 120);
     ctx.lineTo(135, 120);
     ctx.stroke();
 
-    // Chains and Plates
+    // Correntes e pratos
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    // Left Chains
     ctx.moveTo(70, 120);
     ctx.lineTo(60, 145);
     ctx.moveTo(70, 120);
     ctx.lineTo(80, 145);
-    // Right Chains
     ctx.moveTo(130, 120);
     ctx.lineTo(120, 145);
     ctx.moveTo(130, 120);
     ctx.lineTo(140, 145);
     ctx.stroke();
 
-    // Plates
     ctx.beginPath();
     ctx.moveTo(55, 145);
     ctx.quadraticCurveTo(70, 155, 85, 145);
@@ -559,47 +802,51 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     ctx.quadraticCurveTo(130, 155, 145, 145);
     ctx.stroke();
 
+    // Tipografia da Marca
     ctx.fillStyle = colors.white;
-    ctx.font = 'bold 45px "Times New Roman", serif';
+    ctx.font = 'bold 44px "Times New Roman", Georgia, serif';
     ctx.fillText('F&C', 150, 140);
-    ctx.font = '500 18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    
+    ctx.font = '600 17px "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.letterSpacing = '2px';
-    ctx.fillText('ADVOCACIA PREVIDENCIÁRIA', 150, 165);
+    const subTitle = persona === 'michel' ? 'ADVOCACIA ESPECIALIZADA' : 'ADVOCACIA PREVIDENCIÁRIA';
+    ctx.fillText(subTitle, 150, 165);
     ctx.letterSpacing = '0px'; // reset
     
-    // Top line separator
+    // Linha divisória horizontal superior
     ctx.beginPath();
-    ctx.moveTo(80, 190);
-    ctx.lineTo(800, 190);
-    ctx.strokeStyle = colors.white;
+    ctx.moveTo(75, 190);
+    ctx.lineTo(530, 190);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // 4. Image Area (Right Side)
-    // Fixed Frame (The white background)
-    const frameX = 580;
-    const frameY = 220;
-    const frameW = 420;
-    const frameH = 680;
+    // 4. Área da Imagem (Coluna Direita)
+    const frameX = 560;
+    const frameY = 210;
+    const frameW = 450;
+    const frameH = 720;
 
-    // White background (fixed as requested)
+    // Moldura de fundo branca elegante
     ctx.fillStyle = colors.white;
-    ctx.fillRect(frameX - 15, frameY - 15, frameW + 30, frameH + 30);
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(frameX - 12, frameY - 12, frameW + 24, frameH + 24, 16);
+      ctx.fill();
+    } else {
+      ctx.fillRect(frameX - 12, frameY - 12, frameW + 24, frameH + 24);
+    }
 
-    // Image area (adjustable margins inside the fixed white frame)
-    // imgFrameX = marginLeft, imgFrameY = marginTop, imgFrameW = marginRight, imgFrameH = marginBottom
     const imgX = frameX + imgFrameX;
     const imgY = frameY + imgFrameY;
     const imgW = Math.max(10, frameW - imgFrameX - imgFrameW);
     const imgH = Math.max(10, frameH - imgFrameY - imgFrameH);
 
-    const imageUrl = uploadedImage || getDefaultImage(topic);
+    const imageUrl = uploadedImage || getDefaultImage(topic, persona);
     
     const img = new Image();
-    img.crossOrigin = "anonymous"; // Important for external images
+    img.crossOrigin = "anonymous";
     img.onload = () => {
-      // Draw image with object-fit: cover logic
-      // We use a slightly smarter cover that centers the image
       const baseScale = Math.max(imgW / img.width, imgH / img.height);
       const scale = baseScale * imageZoom;
       const drawW = img.width * scale;
@@ -609,81 +856,207 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       
       ctx.save();
       ctx.beginPath();
-      // Rounded corners for the image
       if (ctx.roundRect) {
-        ctx.roundRect(imgX, imgY, imgW, imgH, 15);
+        ctx.roundRect(imgX, imgY, imgW, imgH, 12);
       } else {
         ctx.rect(imgX, imgY, imgW, imgH);
       }
       ctx.clip();
       
-      // Draw a subtle shadow/gradient behind the image if it has transparency
       ctx.fillStyle = '#f8f9fa';
       ctx.fillRect(imgX, imgY, imgW, imgH);
       
       ctx.drawImage(img, imgX + offsetX, imgY + offsetY, drawW, drawH);
-      
-      // Add a very subtle inner shadow to the image for depth
-      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(imgX, imgY, imgW, imgH);
-      
       ctx.restore();
       
-      // Draw text after image loads to ensure it's on top if they overlap
+      // Desenha o conteúdo de texto com auto-fit milimétrico
       drawTextContent(ctx, width, height);
     };
+
+    img.onerror = () => {
+      // Se a imagem falhar ao carregar, desenha um card com a cor de tema e o texto
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(imgX, imgY, imgW, imgH);
+      ctx.fillStyle = colors.gold;
+      ctx.font = 'bold 22px "Helvetica Neue", sans-serif';
+      ctx.fillText('Felix & Castro', imgX + 30, imgY + imgH / 2);
+      drawTextContent(ctx, width, height);
+    };
+
     img.src = imageUrl;
   };
 
   const drawTextContent = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     if (!postData) return;
 
-    // 5. Title — fonte 60px para caber melhor em 5 palavras
-    ctx.fillStyle = colors.gold;
-    ctx.font = 'italic bold 60px "Times New Roman", serif';
-    const titleMaxWidth = 480;
-    let nextY = wrapText(ctx, postData.title, 80, 280, titleMaxWidth, 72);
+    const leftX = 75;
+    const maxTextWidth = 455;
 
-    // 6. Highlight Box
-    const highlightY = nextY + 22;
-    ctx.font = 'bold 33px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    const highlightMetrics = ctx.measureText(postData.highlight);
-    const highlightWidth = Math.min(highlightMetrics.width + 40, 480);
+    // 1. Tag de Público-Alvo / Categoria (Eyebrow Pill)
+    let currentY = 222;
+    const tagText = (postData.audienceTag || '').trim() || (topic.length > 0 && topic.length < 35 ? topic.toUpperCase() : 'DIREITO PREVIDENCIÁRIO | INSS');
+    
+    if (tagText) {
+      ctx.font = 'bold 12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      const tagMetrics = ctx.measureText(tagText);
+      const tagPillWidth = Math.min(maxTextWidth, tagMetrics.width + 24);
+      const tagPillHeight = 24;
 
-    ctx.fillStyle = colors.yellowHighlight;
-    ctx.fillRect(80, highlightY - 38, highlightWidth, 58);
-    ctx.fillStyle = colors.blueText;
-    nextY = wrapText(ctx, postData.highlight, 100, highlightY, 440, 38);
+      // Fundo Translúcido com Contorno Dourado Elegante
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.18)';
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.75)';
+      ctx.lineWidth = 1.2;
+      
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(leftX, currentY - 16, tagPillWidth, tagPillHeight, 6);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(leftX, currentY - 16, tagPillWidth, tagPillHeight);
+        ctx.strokeRect(leftX, currentY - 16, tagPillWidth, tagPillHeight);
+      }
 
-    // Highlight underline
-    ctx.fillStyle = colors.white;
-    ctx.fillRect(80, nextY + 12, 150, 5);
-
-    // 7. Points (List)
-    ctx.fillStyle = colors.white;
-    ctx.font = '29px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    let currentY = nextY + 68;
-
-    postData.points.forEach((point, index) => {
-      const text = `${index + 1}) ${point}`;
-      currentY = wrapText(ctx, text, 80, currentY, 460, 38);
-      currentY += 22;
-    });
-
-    // 8. CTA — posicionado dinamicamente após os points
-    const ctaY = Math.min(currentY + 40, 920);
-    if (postData.ctaCaption) {
       ctx.fillStyle = colors.yellowHighlight;
-      ctx.font = 'italic bold 30px "Helvetica Neue", Helvetica, Arial, sans-serif';
-      ctx.fillText(postData.ctaCaption, 80, ctaY);
+      ctx.letterSpacing = '1px';
+      ctx.fillText(tagText, leftX + 12, currentY);
+      ctx.letterSpacing = '0px';
+      currentY += 28;
+    } else {
+      currentY = 235;
     }
 
-    // 9. Footer — sempre 50px abaixo do CTA, nunca ultrapassa y=990
-    const footerY = Math.min(ctaY + 50, 990);
-    ctx.fillStyle = colors.white;
-    ctx.font = '500 24px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    ctx.fillText('@advprevfelixecastro', 80, footerY);
+    // 2. Título Principal em Dourado
+    let titleFontSize = 42;
+    if (postData.title.length > 55) titleFontSize = 36;
+    else if (postData.title.length > 40) titleFontSize = 39;
+
+    ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
+    let titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
+    if (titleLines.length > 3 && titleFontSize > 34) {
+      titleFontSize = 34;
+      ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
+      titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
+    }
+    const titleLineHeight = Math.round(titleFontSize * 1.15);
+
+    ctx.fillStyle = colors.gold;
+    currentY += 10;
+    for (const line of titleLines) {
+      ctx.fillText(line, leftX, currentY);
+      currentY += titleLineHeight;
+    }
+
+    // 3. Caixa de Destaque / Alerta Amarela
+    currentY += 14;
+    const highlightFontSize = 21;
+    const highlightLineHeight = 28;
+    ctx.font = `bold ${highlightFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    const highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 36);
+
+    let maxLineWidth = 0;
+    for (const l of highlightLines) {
+      const w = ctx.measureText(l).width;
+      if (w > maxLineWidth) maxLineWidth = w;
+    }
+    const highlightBoxWidth = Math.min(maxTextWidth, Math.max(maxLineWidth + 32, 280));
+    const highlightBoxHeight = highlightLines.length * highlightLineHeight + 16;
+    const highlightBoxY = currentY;
+
+    // Fundo Amarelo Dourado
+    ctx.fillStyle = colors.yellowHighlight;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(leftX, highlightBoxY, highlightBoxWidth, highlightBoxHeight, 8);
+      ctx.fill();
+    } else {
+      ctx.fillRect(leftX, highlightBoxY, highlightBoxWidth, highlightBoxHeight);
+    }
+
+    // Texto do Destaque em Azul Escuro Profundo (Contraste 100% nítido)
+    ctx.fillStyle = colors.blueText;
+    let highlightTextY = highlightBoxY + highlightLineHeight - 5;
+    for (const line of highlightLines) {
+      ctx.fillText(line, leftX + 16, highlightTextY);
+      highlightTextY += highlightLineHeight;
+    }
+
+    // Traço divisor sutil abaixo da caixa de destaque
+    currentY = highlightBoxY + highlightBoxHeight + 14;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(leftX, currentY, 140, 3);
+
+    // 4. Desenho dos Pontos Informativos
+    currentY += 24;
+    const pointCount = postData.points.length;
+    // Ajusta o tamanho da fonte dos pontos com base na quantidade para preenchimento ideal
+    const pointFontSize = pointCount >= 4 ? 18 : 20;
+    const pointLineHeight = pointCount >= 4 ? 25 : 27;
+    const pointGap = pointCount >= 4 ? 12 : 16;
+
+    postData.points.forEach((point, index) => {
+      // Formata se não tiver número no início
+      let fullText = point.trim();
+      if (!/^\d+[\)\.\-]/.test(fullText)) {
+        fullText = `${index + 1}) ${fullText}`;
+      }
+
+      ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      const lines = getWrappedLines(ctx, fullText, maxTextWidth);
+
+      lines.forEach((line, lineIdx) => {
+        // Se contiver ":", desenha o prefixo em negrito e o restante em branco suave
+        if (lineIdx === 0 && line.includes(':')) {
+          const parts = line.split(':');
+          const prefix = parts[0] + ':';
+          const suffix = parts.slice(1).join(':');
+
+          ctx.font = `bold ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = colors.white;
+          ctx.fillText(prefix, leftX, currentY);
+
+          const prefixWidth = ctx.measureText(prefix).width;
+          ctx.font = `400 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fillText(suffix, leftX + prefixWidth + 4, currentY);
+        } else {
+          ctx.font = `400 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fillText(line, leftX, currentY);
+        }
+        currentY += pointLineHeight;
+      });
+      currentY += pointGap;
+    });
+
+    // 5. Chamada para Ação (CTA)
+    if (postData.ctaCaption) {
+      currentY += 6;
+      ctx.fillStyle = colors.yellowHighlight;
+      ctx.font = 'italic bold 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      const ctaLines = getWrappedLines(ctx, postData.ctaCaption, maxTextWidth);
+      for (const line of ctaLines) {
+        if (currentY < 975) {
+          ctx.fillText(line, leftX, currentY);
+          currentY += 26;
+        }
+      }
+    }
+
+    // 6. Rodapé Fixo Institucional (@advprevfelixecastro)
+    const footerY = 1010;
+    
+    // Linha divisória sutil acima do rodapé
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(leftX, footerY - 22);
+    ctx.lineTo(leftX + maxTextWidth, footerY - 22);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.font = '600 18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.fillText('@advprevfelixecastro  •  Felix & Castro Advocacia', leftX, footerY);
   };
 
   // Redraw canvas when data or image changes
@@ -1309,6 +1682,16 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                 {isEditingText && (
                   <div className={`w-full mb-6 p-4 rounded-xl border grid grid-cols-1 gap-4 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                     <div>
+                      <label className="block text-xs font-medium mb-1 opacity-70">Tag de Público-Alvo / Categoria (Topo)</label>
+                      <input 
+                        type="text" 
+                        value={postData.audienceTag || ''} 
+                        placeholder="Ex: CONTRIBUINTE INDIVIDUAL & FACULTATIVO"
+                        onChange={(e) => handleTextChange('audienceTag', e.target.value)}
+                        className={`w-full p-2 rounded border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium mb-1 opacity-70">Título</label>
                       <input 
                         type="text" 
@@ -1398,24 +1781,63 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
               {/* Caption Preview */}
               <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Legenda para o Instagram
-                  </h3>
-                  {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
-                    <button
-                      onClick={handleCopyCaption}
-                      className="flex items-center gap-2 text-primary-500 hover:text-primary-600 font-medium text-sm"
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Legenda para o Instagram
+                    </h3>
+                    <span 
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        (postData.caption?.length || 0) > 2200 
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 font-bold animate-pulse'
+                          : (postData.caption?.length || 0) > 1900
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
                     >
-                      <DocumentDuplicateIcon className="w-4 h-4" />
-                      Copiar Legenda
-                    </button>
-                  ) : (
-                    <span className="text-xs text-slate-500">
-                      Aprovação necessária para copiar
+                      {(postData.caption?.length || 0)} / 2.200 caracteres
                     </span>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => generatePost('caption')}
+                      disabled={isGenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all disabled:opacity-50"
+                      title="Reescreve a legenda completa sem cortar informações, respeitando com folga o limite do Instagram"
+                    >
+                      <ArrowPathIcon className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                      {isGenerating ? 'Regerando...' : 'Regerar Legenda'}
+                    </button>
+                    {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
+                      <button
+                        onClick={handleCopyCaption}
+                        className="flex items-center gap-2 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg font-medium text-sm transition-all"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                        Copiar Legenda
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">
+                        Aprovação necessária para copiar
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {(postData.caption?.length || 0) > 2200 && (
+                  <div className="mb-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                    <span>⚠️ A legenda excedeu o limite máximo do Instagram ({(postData.caption?.length || 0)} de 2.200 caracteres). Clique ao lado para a IA readequar o texto inteiro com concisão e sem perda de conteúdo.</span>
+                    <button 
+                      onClick={() => generatePost('caption')}
+                      disabled={isGenerating}
+                      className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-medium hover:bg-rose-700 text-xs ml-2 shrink-0 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                      Readequar com IA
+                    </button>
+                  </div>
+                )}
+
                 {isEditingText ? (
                   <textarea 
                     value={postData.caption} 
@@ -1423,7 +1845,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                     className={`w-full p-4 rounded-xl border text-sm h-48 resize-none ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-700'}`}
                   />
                 ) : (
-                  <div className={`p-4 rounded-xl whitespace-pre-wrap ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
+                  <div className={`p-4 rounded-xl whitespace-pre-wrap text-sm leading-relaxed ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
                     {postData.caption}
                   </div>
                 )}

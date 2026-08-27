@@ -131,10 +131,16 @@ export default function Dashboard({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activePetition, setActivePetition] = useState<any>(null);
   const [activePetitionClientId, setActivePetitionClientId] = useState<string | null>(null);
+  const [marketingInitialData, setMarketingInitialData] = useState<any>(null);
   const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const handleOpenMarketing = (marketingData: any) => {
+    setMarketingInitialData(marketingData);
+    setCurrentView('marketing');
+  };
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const handleEditClient = async (record: ClientRecord) => {
@@ -174,29 +180,25 @@ export default function Dashboard({
     const supabase = initSupabase();
 
     try {
-        // PERF: apenas o essencial para a primeira tela. Cálculos salvos e conversas
-        // das 4 personas são carregados sob demanda (ver loadViewData), pois só são
-        // usados dentro das respectivas telas e carregam blobs pesados.
+        // PERF: apenas o essencial para a primeira tela. Cálculos salvos (blob
+        // completo do CNIS por linha) e conversas das 4 personas saem daqui —
+        // são carregados sob demanda em loadViewData, pois só existem dentro
+        // das telas correspondentes.
         const [
             remoteClients,
             remoteContracts,
-            globalDataResult
+            globalData
         ] = await Promise.all([
-            supabaseService.getClients().catch(() => []),
+            supabaseService.getClients().catch((e) => { console.error('Erro ao buscar clientes:', e); return []; }),
             supabaseService.getContracts().catch(() => []),
-            supabase
-                ? supabase.from('clients').select('id, data').in('id', [7, 8, 9, 10])
-                : Promise.resolve({ data: null, error: null })
+            supabaseService.getGlobalSystemData().catch(() => null)
         ]);
 
         setRecords(remoteClients || []);
         setContracts(remoteContracts || []);
         setResolvedAlerts([]);
 
-        const globalData = globalDataResult?.data;
-        const globalError = globalDataResult?.error;
-
-        if (!globalError && globalData) {
+        if (globalData) {
             const agenda = globalData.find(d => d.id === 7)?.data;
             if (agenda) setAgendaEvents(agenda);
             else {
@@ -225,7 +227,7 @@ export default function Dashboard({
                 if (localFocus) setDailyFocusState(JSON.parse(localFocus));
             }
         } else {
-            // Fallback to local storage if global fetch fails or no data in cloud
+            // Fallback para localStorage
             const localAgenda = localStorage.getItem('agenda_events');
             if (localAgenda) setAgendaEvents(JSON.parse(localAgenda));
             
@@ -240,6 +242,11 @@ export default function Dashboard({
         }
 
         setIsLoading(false);
+
+        // NOTA: o carregamento em segundo plano das 4 personas foi removido daqui.
+        // Ele adiava as consultas, mas ainda disparava as 4 em TODO carregamento.
+        // Agora cada persona é buscada uma única vez, quando a tela dela é aberta
+        // (ver loadViewData) — quem nunca abre um chat não paga por ele.
     } catch (err: any) {
         console.error("Exception in fetchData:", err);
         setIsLoading(false);
@@ -1889,6 +1896,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={drMichelSessions} 
                     onSaveSessions={handleSaveDrMichelSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1902,6 +1910,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={draLuanaSessions} 
                     onSaveSessions={handleSaveDraLuanaSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1915,6 +1924,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={drFelixCastroSessions} 
                     onSaveSessions={handleSaveDrFelixCastroSessions} 
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -1928,6 +1938,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                     initialSessions={secFabriciaSessions} 
                     onSaveSessions={handleSaveSecFabriciaSessions}
                     onOpenPetition={handleOpenPetition}
+                    onOpenMarketing={handleOpenMarketing}
                     customLaws={customLaws}
                     agendaEvents={mergedAgendaEvents}
                     onAgendaAction={handleAgendaAction}
@@ -2294,7 +2305,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
              ) : currentView === 'knowledge_base' ? (
                  <KnowledgeBase />
              ) : currentView === 'marketing' ? (
-                 <MarketingGenerator darkMode={darkMode} user={user} />
+                 <MarketingGenerator darkMode={darkMode} user={user} initialData={marketingInitialData} onClearInitialData={() => setMarketingInitialData(null)} />
              ) : (
                  <>
                     <FinancialStats contracts={contracts} />

@@ -572,11 +572,29 @@ export const supabaseService = {
     return data;
   },
 
-  // Colunas da LISTA de clientes. Mantido como constante para que a busca da lista
-  // e a atualização pontual via Realtime usem exatamente o mesmo shape.
+  // Colunas da LISTA de clientes. Constante para que a busca da lista e a
+  // atualização pontual via Realtime usem exatamente o mesmo shape.
   _clientListColumns: 'id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions',
 
+  // Modo leve: só campos escalares. Usado quando a consulta completa falha
+  // (banco sob pressão) — perde as contagens de anexos, mas a lista abre.
+  _clientLightColumns: 'id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality',
+
   mapClientRow(c: any) {
+    const docs = Array.isArray(c.documents) ? c.documents : [];
+    const peps = Array.isArray(c.petitions) ? c.petitions : [];
+    const ncs = Array.isArray(c.narrative_certificates) ? c.narrative_certificates : [];
+
+    // Remove possíveis strings base64 pesadas dos documentos no carregamento da
+    // lista — mantém só o metadado necessário para exibir e abrir depois.
+    const lightDocs = docs.map((d: any) => ({
+      id: d?.id,
+      name: d?.name || d?.title,
+      type: d?.type,
+      date: d?.date,
+      url: d?.url
+    }));
+
     return {
       id: String(c.id),
       name: c.name,
@@ -610,35 +628,52 @@ export const supabaseService = {
       referrerName: c.referrer_name,
       referrerPercentage: c.referrer_percentage,
       totalFee: c.total_fee,
-      documents: c.documents || [],
-      documentCount: (c.documents || []).length,
-      petitionCount: (c.petitions || []).length,
-      narrativeCertificates: c.narrative_certificates || [],
-      narrativeCertificateCount: (c.narrative_certificates || []).length
+      documents: lightDocs,
+      documentCount: docs.length,
+      petitionCount: peps.length,
+      narrativeCertificates: ncs,
+      narrativeCertificateCount: ncs.length
     };
   },
 
   // PERF: sem laço de retentativa. Retentar consulta pesada durante sobrecarga
   // multiplica a carga exatamente quando o banco precisa respirar (era a causa
   // do ciclo timeout -> retry -> mais timeout -> pool esgotado).
+  // Em caso de falha, degrada UMA vez para o modo leve em vez de insistir.
   async getClients() {
     const supabase = getSupabase();
     if (!supabase) return [];
 
-    const { data, error } = await supabase
-      .from('clients_v2')
-      .select(this._clientListColumns);
+    try {
+      const { data, error } = await supabase
+        .from('clients_v2')
+        .select(this._clientListColumns);
 
-    if (error) {
-      console.error('Error fetching clients from Supabase:', error);
-      throw error;
+      if (!error && data) {
+        return data.map((c: any) => this.mapClientRow(c));
+      }
+
+      console.warn('[Supabase] Consulta completa de clientes falhou. Tentando modo leve:', error);
+
+      const { data: lightData, error: lightError } = await supabase
+        .from('clients_v2')
+        .select(this._clientLightColumns);
+
+      if (!lightError && lightData) {
+        console.log(`[Supabase] ${lightData.length} clientes recuperados em modo leve (sem contagem de anexos).`);
+        return lightData.map((c: any) => this.mapClientRow(c));
+      }
+
+      console.error('Error fetching clients from Supabase:', lightError || error);
+      throw (lightError || error);
+    } catch (err) {
+      console.error('Exceção ao buscar clientes:', err);
+      throw err;
     }
-
-    return (data || []).map((c: any) => this.mapClientRow(c));
   },
 
   // Busca UM cliente no mesmo formato da lista — usado pelo Realtime para
-  // atualizar só a linha que mudou, em vez de recarregar os 384 clientes.
+  // atualizar só a linha que mudou, em vez de recarregar todos os clientes.
   async getClientSummaryById(id: string) {
     const supabase = getSupabase();
     if (!supabase) return null;
@@ -651,6 +686,33 @@ export const supabaseService = {
 
     if (error || !data) return null;
     return this.mapClientRow(data);
+  },
+
+  async getGlobalSystemData(retries = 2) {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    let attempt = 0;
+    while (attempt <= retries) {
+      attempt++;
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, data')
+          .in('id', [7, 8, 9, 10]);
+
+        if (!error && data) {
+          return data;
+        }
+        console.warn(`[Supabase] Erro ao buscar dados globais (tentativa ${attempt}/${retries + 1}):`, error);
+      } catch (e) {
+        console.warn(`[Supabase] Exceção ao buscar dados globais (tentativa ${attempt}/${retries + 1}):`, e);
+      }
+      if (attempt <= retries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    return null;
   },
 
   async getClientDetails(id: string) {
