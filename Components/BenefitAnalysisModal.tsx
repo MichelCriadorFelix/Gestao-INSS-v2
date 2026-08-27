@@ -1,9 +1,69 @@
 import React, { useState, useMemo } from 'react';
-import { SocialSecurityData } from '../SocialSecurityCalc';
+import { SocialSecurityData, CNISBond } from '../SocialSecurityCalc';
 import { analyzeBenefits, BenefitResult } from '../BenefitRules';
-import { CheckCircleIcon, XCircleIcon, CalculatorIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, XCircleIcon, CalculatorIcon, DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 import { IBGELifeExpectancy } from '../src/services/ibgeService';
+
+// --- Validação de Cobertura de Salários de Contribuição (CNIS) ---
+// Não recalcula nada — apenas confere, a partir dos dados brutos importados,
+// se há competências sem salário de contribuição carregado. Sem esse dado:
+// (a) a RMI não pode usar o valor real da competência, e
+// (b) para Contribuinte Individual/Facultativo/Autônomo, o motor de tempo de
+//     contribuição não consegue verificar se a contribuição foi abaixo do
+//     salário mínimo (o que a excluiria da contagem) — logo tempo e carência
+//     podem estar SUPERESTIMADOS silenciosamente.
+interface CoverageGap {
+    bondLabel: string;
+    missingMonths: number;
+    totalMonths: number;
+    risksTempoCarencia: boolean;
+}
+
+const parseDateLocalForCoverage = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    return new Date(dateStr + 'T12:00:00');
+};
+
+const checkSalaryCoverage = (bonds: CNISBond[]): CoverageGap[] => {
+    const gaps: CoverageGap[] = [];
+    (bonds || []).forEach(bond => {
+        if (!bond.useInCalculation || bond.isBenefit) return;
+        const start = parseDateLocalForCoverage(bond.startDate);
+        const end = parseDateLocalForCoverage(bond.endDate);
+        if (!start || !end || end < start) return;
+
+        const scMonths = new Set((bond.sc || []).map(s => s.month));
+        let totalMonths = 0;
+        let missingMonths = 0;
+        const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+        const endCursor = new Date(end.getFullYear(), end.getMonth(), 1);
+        let safety = 0;
+        while (cursor <= endCursor && safety < 1200) {
+            totalMonths++;
+            const monthStr = `${String(cursor.getMonth() + 1).padStart(2, '0')}/${cursor.getFullYear()}`;
+            if (!scMonths.has(monthStr)) missingMonths++;
+            cursor.setMonth(cursor.getMonth() + 1);
+            safety++;
+        }
+
+        if (missingMonths > 0) {
+            const isCI = !!bond.type && (
+                bond.type.toLowerCase().includes('individual') ||
+                bond.type.toLowerCase().includes('facultativo') ||
+                bond.type.toLowerCase().includes('autônomo') ||
+                bond.type.toLowerCase().includes('contribuinte')
+            );
+            gaps.push({
+                bondLabel: `${bond.type || 'Vínculo'} (${bond.startDate} a ${bond.endDate})`,
+                missingMonths,
+                totalMonths,
+                risksTempoCarencia: isCI
+            });
+        }
+    });
+    return gaps;
+};
 
 interface BenefitAnalysisModalProps {
     isOpen: boolean;
@@ -166,6 +226,12 @@ const BenefitAnalysisModal: React.FC<BenefitAnalysisModalProps> = ({ isOpen, onC
     // Run analysis
     const result = useMemo(() => analyzeBenefits(data, inpcIndices, ibgeTable), [data, inpcIndices, ibgeTable]);
 
+    // Validação de cobertura de salários de contribuição (não altera o cálculo, só audita os dados de entrada)
+    const coverageGaps = useMemo(() => checkSalaryCoverage(data.bonds), [data.bonds]);
+    const tempoCarenciaGaps = coverageGaps.filter(g => g.risksTempoCarencia);
+    const rmiOnlyGaps = coverageGaps.filter(g => !g.risksTempoCarencia);
+    const totalMissingMonths = coverageGaps.reduce((sum, g) => sum + g.missingMonths, 0);
+
     // Filter benefits by category
     const filteredBenefits = useMemo(() => {
         return result.benefits.filter(b => b.category === selectedCategory);
@@ -221,6 +287,39 @@ const BenefitAnalysisModal: React.FC<BenefitAnalysisModalProps> = ({ isOpen, onC
                             </div>
                         </div>
                     </div>
+
+                    {/* Alerta de Cobertura de Salários de Contribuição */}
+                    {coverageGaps.length > 0 && (
+                        <div className="mb-6 p-4 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/10">
+                            <div className="flex items-start gap-2">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                        {totalMissingMonths} competência(s) sem salário de contribuição carregado do CNIS
+                                    </p>
+                                    {tempoCarenciaGaps.length > 0 && (
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                            ⚠ {tempoCarenciaGaps.length} vínculo(s) de Contribuinte Individual/Facultativo/Autônomo com competências sem valor — não é possível verificar se essas contribuições foram abaixo do salário mínimo, o que <strong>pode superestimar o tempo de contribuição e a carência</strong> exibidos acima. Confirme manualmente antes de peticionar.
+                                        </p>
+                                    )}
+                                    {rmiOnlyGaps.length > 0 && (
+                                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                            ⚠ {rmiOnlyGaps.length} vínculo(s) adicionais com competências sem valor — a RMI projetada pode estar usando o piso constitucional (1 salário mínimo) em vez do salário real da competência.
+                                        </p>
+                                    )}
+                                    <ul className="mt-2 space-y-0.5 text-[11px] text-amber-700 dark:text-amber-400/80 max-h-24 overflow-y-auto">
+                                        {coverageGaps.slice(0, 8).map((g, idx) => (
+                                            <li key={idx}>• {g.bondLabel}: {g.missingMonths}/{g.totalMonths} competências sem valor{g.risksTempoCarencia ? ' (afeta tempo/carência)' : ''}</li>
+                                        ))}
+                                        {coverageGaps.length > 8 && <li>• +{coverageGaps.length - 8} outro(s) vínculo(s)</li>}
+                                    </ul>
+                                    <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-2 italic">
+                                        Reimporte um CNIS com detalhamento de remunerações ou complete os valores manualmente na tabela de cada vínculo.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Tabs */}
                     <div className="flex gap-1 mb-4 border-b border-slate-200 dark:border-gold-500/15 overflow-x-auto">
