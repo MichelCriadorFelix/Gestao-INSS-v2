@@ -379,7 +379,8 @@ export const calculateRMI = (
                 appliedFactor: 1.0,
                 finalRMI: minWage,
                 calculationFormula: "Garantia Constitucional de 1 Salário Mínimo (Art. 201, § 2º da CF/88). Não foram encontrados salários de contribuição válidos no PBC pós-julho de 1994.",
-                salaries: []
+                salaries: [],
+                isFloorApplied: true
             } 
         };
     }

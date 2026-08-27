@@ -572,21 +572,29 @@ export const supabaseService = {
     return data;
   },
 
-  async getClients() {
+  async getClients(retries = 3) {
     const supabase = getSupabase();
     if (!supabase) return [];
     
-    // Fetch summary including documents (now lightweight with URLs) to show counts
-    const { data, error } = await supabase
-      .from('clients_v2')
-      .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions');
+    let attempt = 0;
+    while (attempt < retries) {
+      attempt++;
+      // Fetch summary including documents (now lightweight with URLs) to show counts
+      const { data, error } = await supabase
+        .from('clients_v2')
+        .select('id, name, cpf, password, nationality, marital_status, profession, type, der, med_expertise_date, social_expertise_date, extension_date, dcb_date, ninety_days_date, security_mandate_date, address, gender, legal_representative, legal_representative_gender, legal_representative_cpf, legal_representative_marital_status, legal_representative_profession, legal_representative_address, is_daily_attention, is_urgent_attention, is_archived, is_referral, referrer_name, referrer_percentage, total_fee, whatsapp, legal_representative_nationality, narrative_certificates, documents, petitions');
+        
+      if (error) {
+        if (attempt >= retries) {
+          console.error('Error fetching clients from Supabase after retries:', error);
+          throw error;
+        }
+        console.warn(`[Supabase] Erro ao buscar clientes (tentativa ${attempt}/${retries}). Tentando novamente em 1s...`, error);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue; // Retry
+      }
       
-    if (error) {
-      console.error('Error fetching clients from Supabase:', error);
-      throw error;
-    }
-    
-    return (data || []).map(c => ({
+      return (data || []).map(c => ({
       id: String(c.id),
       name: c.name,
       cpf: c.cpf,
@@ -625,6 +633,8 @@ export const supabaseService = {
       narrativeCertificates: c.narrative_certificates || [],
       narrativeCertificateCount: (c.narrative_certificates || []).length
     }));
+    } // End of while loop
+    return []; // Return empty if all retries fail
   },
 
   async getClientDetails(id: string) {

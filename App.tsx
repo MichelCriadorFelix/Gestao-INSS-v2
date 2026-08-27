@@ -24,107 +24,93 @@ export default function App() {
     setDarkMode(isDark);
     if (isDark) { document.documentElement.classList.add('dark'); }
     
-    // Auto-configuração da nuvem para novos dispositivos
-    const autoConfigCloud = async () => {
+    const initApp = async () => {
+      // 1. Auto-configuração da nuvem para novos dispositivos
       const config = getDbConfig();
+      let hasValidConfig = !!(config && config.url && config.key && config.url.includes('supabase.co'));
       
-      // Se já estiver configurado e for uma configuração válida, não faz nada
-      if (config && config.url && config.key && config.url.includes('supabase.co')) {
-        setLoading(false);
-        return;
-      }
-
-      // Verifica se já tentamos configurar nesta sessão para evitar loop infinito
-      const hasAttempted = sessionStorage.getItem('inss_config_attempted');
-      if (hasAttempted) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const configToken = (import.meta as any).env?.VITE_CONFIG_TOKEN || '';
-        const response = await fetch('/api/config', {
-          headers: configToken ? { 'X-Config-Token': configToken } : {}
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        
-        if (data.url && data.key) {
-          console.log("Configuração da nuvem recebida com sucesso.");
-          safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
-            url: data.url,
-            key: data.key,
-            isEnv: true
-          }));
-          sessionStorage.setItem('inss_config_attempted', 'true');
-          // Pequeno delay antes de recarregar para garantir o salvamento
-          setTimeout(() => window.location.reload(), 300);
-        } else {
-          console.warn("Configuração da nuvem retornou dados vazios do servidor.");
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Falha na auto-configuração da nuvem:", error);
-        setLoading(false);
-      }
-    };
-    autoConfigCloud();
-    
-    // Inicializar sessão do Supabase
-    const initAuth = async () => {
-      const supabaseInstance = supabase;
-      if (supabaseInstance) {
-        const { data: { session } } = await supabaseInstance.auth.getSession();
-        if (session?.user) {
-          const email = session.user.email?.toLowerCase();
-          const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
-
-          if (authorizedUser) {
-            const userData: User = {
-              firstName: authorizedUser.firstName,
-              lastName: authorizedUser.lastName,
-              role: authorizedUser.role,
-              email: session.user.email
-            };
-            setUser(userData);
-          } else {
-            // Se não estiver na lista, desloga
-            await supabaseInstance.auth.signOut();
-            setUser(null);
-            alert("Acesso não autorizado para este e-mail.");
+      if (!hasValidConfig) {
+        const hasAttempted = sessionStorage.getItem('inss_config_attempted');
+        if (!hasAttempted) {
+          try {
+            const configToken = (import.meta as any).env?.VITE_CONFIG_TOKEN || '';
+            const response = await fetch('/api/config', {
+              headers: configToken ? { 'X-Config-Token': configToken } : {}
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (data.url && data.key) {
+                console.log("Configuração da nuvem recebida com sucesso.");
+                safeSetLocalStorage(DB_CONFIG_KEY, JSON.stringify({
+                  url: data.url,
+                  key: data.key,
+                  isEnv: true
+                }));
+                sessionStorage.setItem('inss_config_attempted', 'true');
+                setTimeout(() => window.location.reload(), 300);
+                return; // Aguarda reload
+              } else {
+                console.warn("Configuração da nuvem retornou dados vazios do servidor.");
+              }
+            }
+          } catch (error) {
+            console.error("Falha na auto-configuração da nuvem:", error);
           }
         }
+      }
 
-        // Ouvir mudanças na autenticação
-        const { data: { subscription } } = supabaseInstance.auth.onAuthStateChange(async (_event, session) => {
+      // 2. Inicializar sessão do Supabase
+      const supabaseInstance = supabase;
+      if (supabaseInstance) {
+        try {
+          const { data: { session } } = await supabaseInstance.auth.getSession();
           if (session?.user) {
             const email = session.user.email?.toLowerCase();
             const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
 
             if (authorizedUser) {
-              const userData: User = {
+              setUser({
                 firstName: authorizedUser.firstName,
                 lastName: authorizedUser.lastName,
                 role: authorizedUser.role,
                 email: session.user.email
-              };
-              setUser(userData);
+              });
             } else {
               await supabaseInstance.auth.signOut();
               setUser(null);
-              alert("Acesso não autorizado para este e-mail.");
             }
-          } else {
-            setUser(null);
           }
-        });
+          
+          supabaseInstance.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+              const email = session.user.email?.toLowerCase();
+              const authorizedUser = AUTHORIZED_USERS.find(u => u.email.toLowerCase() === email);
 
-        return () => subscription.unsubscribe();
+              if (authorizedUser) {
+                setUser({
+                  firstName: authorizedUser.firstName,
+                  lastName: authorizedUser.lastName,
+                  role: authorizedUser.role,
+                  email: session.user.email
+                });
+              } else {
+                await supabaseInstance.auth.signOut();
+                setUser(null);
+                alert("Acesso não autorizado para este e-mail.");
+              }
+            } else {
+              setUser(null);
+            }
+          });
+        } catch (e) {
+            console.error("Erro ao carregar sessão do Supabase", e);
+        }
       }
+      
       setLoading(false);
     };
 
-    initAuth();
+    initApp();
   }, []);
   
   const checkCloudStatus = () => {

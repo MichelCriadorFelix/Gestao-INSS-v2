@@ -197,7 +197,21 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        const data = JSON.parse(result.text);
+        let jsonStr = result.text.trim();
+        if (jsonStr.startsWith('```json')) {
+          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+        
+        let data;
+        try {
+          data = JSON.parse(jsonStr);
+        } catch (parseError) {
+          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
+          throw new Error("A IA retornou um formato inválido. Tente novamente.");
+        }
+        
         if (data.strategies && Array.isArray(data.strategies)) {
           setSuggestedStrategies(data.strategies);
           setSelectedStrategy(null);
@@ -241,7 +255,21 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       const result = await response.json();
       
       if (result.text) {
-        const data = JSON.parse(result.text);
+        let jsonStr = result.text.trim();
+        if (jsonStr.startsWith('```json')) {
+          jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+        
+        let data;
+        try {
+          data = JSON.parse(jsonStr);
+        } catch (parseError) {
+          console.error("Falha ao parsear JSON:", parseError, "String recebida:", jsonStr);
+          throw new Error("A IA retornou um formato inválido. Tente novamente.");
+        }
+        
         if (mode === 'full') {
           setPostData(data as PostData);
           
@@ -966,7 +994,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
               {isGenerating ? (
                 <>
                   <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                  Gerando...
+                  Gerando (pode levar 1 minuto)...
                 </>
               ) : (
                 <>
@@ -1403,9 +1431,21 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
             </>
           ) : (
             <div className={`h-full min-h-[400px] flex flex-col items-center justify-center rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
-              <SparklesIcon className="w-16 h-16 mb-4 opacity-50" />
-              <p className="text-lg font-medium">Sua arte aparecerá aqui</p>
-              <p className="text-sm mt-2">Preencha o tema e clique em Gerar Post</p>
+              {isGenerating ? (
+                <>
+                  <div className="w-12 h-12 border-4 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+                  <p className="text-lg font-medium text-slate-600 dark:text-slate-400">Criando post de altíssimo valor...</p>
+                  <p className="text-xs mt-2 max-w-xs text-center text-slate-500">
+                    A IA está escrevendo uma legenda detalhada, didática e estruturando o design. Isso pode demorar cerca de 1 minuto para não economizar na qualidade. Aguarde.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <SparklesIcon className="w-16 h-16 mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Sua arte aparecerá aqui</p>
+                  <p className="text-sm mt-2">Preencha o tema e clique em Gerar Post</p>
+                </>
+              )}
             </div>
           )}
         </div>
