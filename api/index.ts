@@ -4681,11 +4681,12 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
    - "4) ANÁLISE NO CNIS: Regularize pendências antes de dar entrada no pedido de benefício.").
 5. CAMPO "ctaCaption": Chamada para ação educativa e institucional (máximo 10 palavras), ex: "📌 Salve este post para consultar quando analisar o seu CNIS!", "💡 Compartilhe com quem também contribui para o INSS!". NUNCA use frases mercantilistas de captação de clientes (como "fale conosco", "agende consulta", "chame no WhatsApp") para cumprir o Código de Ética da OAB.
 6. CAMPO "caption" (Legenda do Instagram):
-   - Escreva uma legenda ALTAMENTE DETALHADA, informativa e profunda (de 400 a 650 palavras).
-   - Explique o embasamento legal de forma simples (ex: EC 103/2019, Lei 8.213/91, Art. 195 da CF, Decretos e Jurisprudências).
+   - LIMITE RIGOROSO DO INSTAGRAM: A legenda completa (incluindo texto explicativo, quebras de linha, emojis e hashtags) DEVE ter entre 1.400 e 1.900 caracteres (NUNCA ultrapasse 2.000 caracteres, pois o limite absoluto do Instagram é 2.200 caracteres).
+   - Escreva uma legenda ALTAMENTE EDUCATIVA, fluida e envolvente.
+   - Explique o embasamento legal de forma simples e direta (ex: EC 103/2019, Lei 8.213/91, Art. 195 da CF).
    - Divida em parágrafos curtos e arejados com linha em branco entre eles.
    - Use emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 🤝 👉 📌) para guiar a leitura.
-   - Finalize SEMPRE com 8 a 12 hashtags relevantes.`;
+   - Finalize SEMPRE com 6 a 10 hashtags relevantes.`;
 
       prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
     ${taskDesc}${assetContext}
@@ -4706,11 +4707,33 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
       contents: prompt,
       config: { 
         responseMimeType: 'application/json',
-        maxOutputTokens: 16383,
+        maxOutputTokens: 8192,
         temperature: 0.25
       }
     });
-    res.json({ text: response.text });
+
+    let cleanedText = response.text || "{}";
+    try {
+      const parsed = JSON.parse(cleanedText);
+      // Proteção rigorosa para o limite de 2.200 caracteres do Instagram
+      if (parsed && typeof parsed.caption === 'string' && parsed.caption.length > 2100) {
+        const hashtagsMatch = parsed.caption.match(/(?:#\w+\s*)+$/);
+        const hashtags = hashtagsMatch ? hashtagsMatch[0].trim() : '';
+        const bodyWithoutHashtags = hashtags ? parsed.caption.slice(0, -hashtags.length).trim() : parsed.caption;
+        
+        // Corta no último ponto final antes do limite seguro
+        const safeCutLimit = 2000 - hashtags.length - 10;
+        const lastPeriodIndex = bodyWithoutHashtags.lastIndexOf('.', safeCutLimit);
+        const cutIndex = lastPeriodIndex > 1200 ? lastPeriodIndex + 1 : safeCutLimit;
+        
+        parsed.caption = `${bodyWithoutHashtags.slice(0, cutIndex)}\n\n${hashtags}`.trim();
+        cleanedText = JSON.stringify(parsed);
+      }
+    } catch (e) {
+      // Mantém cleanedText se não for JSON válido para parsing manual
+    }
+
+    res.json({ text: cleanedText });
   } catch (error: any) {
     console.error("Marketing error:", error);
     res.status(500).json({ error: error.message });

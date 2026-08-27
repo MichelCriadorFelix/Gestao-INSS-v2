@@ -1698,14 +1698,27 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
               {/* Caption Preview */}
               <div className={`p-6 rounded-2xl shadow-sm border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Legenda para o Instagram
-                  </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Legenda para o Instagram
+                    </h3>
+                    <span 
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        (postData.caption?.length || 0) > 2200 
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 font-bold animate-pulse'
+                          : (postData.caption?.length || 0) > 2000
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {(postData.caption?.length || 0)} / 2.200 caracteres
+                    </span>
+                  </div>
                   {user.role === UserRole.ADVOGADO || currentPostStatus === 'approved' ? (
                     <button
                       onClick={handleCopyCaption}
-                      className="flex items-center gap-2 text-primary-500 hover:text-primary-600 font-medium text-sm"
+                      className="flex items-center gap-2 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg font-medium text-sm transition-all"
                     >
                       <DocumentDuplicateIcon className="w-4 h-4" />
                       Copiar Legenda
@@ -1716,6 +1729,26 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                     </span>
                   )}
                 </div>
+
+                {(postData.caption?.length || 0) > 2200 && (
+                  <div className="mb-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+                    <span>⚠️ A legenda excedeu o limite máximo do Instagram de 2.200 caracteres. Edite para encurtar.</span>
+                    <button 
+                      onClick={() => {
+                        if (postData.caption) {
+                          const trimmed = postData.caption.slice(0, 2150);
+                          const lastDot = trimmed.lastIndexOf('.');
+                          const safeText = lastDot > 1000 ? trimmed.slice(0, lastDot + 1) : trimmed;
+                          handleTextChange('caption', safeText);
+                        }
+                      }}
+                      className="px-2 py-1 bg-rose-600 text-white rounded font-medium hover:bg-rose-700 text-xs ml-2 shrink-0"
+                    >
+                      Ajustar ao limite
+                    </button>
+                  </div>
+                )}
+
                 {isEditingText ? (
                   <textarea 
                     value={postData.caption} 
@@ -1723,7 +1756,7 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
                     className={`w-full p-4 rounded-xl border text-sm h-48 resize-none ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-700'}`}
                   />
                 ) : (
-                  <div className={`p-4 rounded-xl whitespace-pre-wrap ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
+                  <div className={`p-4 rounded-xl whitespace-pre-wrap text-sm leading-relaxed ${darkMode ? 'bg-slate-900 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
                     {postData.caption}
                   </div>
                 )}
