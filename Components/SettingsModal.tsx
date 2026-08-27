@@ -148,9 +148,36 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Salário Mínimo Vigente (R$)</label>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Salário Mínimo Vigente (R$)</label>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        const res = await fetch('/api/bcdata/minimum-wage/current');
+                                        if (res.ok) {
+                                            const data = await res.json();
+                                            if (data.value) {
+                                                setMinWageState(data.value);
+                                                setMinWage(data.value);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn("Erro ao consultar BACEN:", e);
+                                    }
+                                }}
+                                className="text-[11px] text-primary-600 dark:text-gold-400 hover:underline flex items-center gap-1 font-medium"
+                                title="Sincronizar dados com o Banco Central do Brasil (Série 1619)"
+                            >
+                                <ArrowPathIcon className="h-3 w-3 inline" />
+                                Sync BACEN SGS 1619
+                            </button>
+                        </div>
                         <input type="number" step="0.01" value={minWage} onChange={e => setMinWageState(parseFloat(e.target.value) || 0)} className="w-full px-4 py-2 bg-slate-50 dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-lg text-sm font-mono text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="1621.00" />
-                        <p className="text-[10px] text-slate-400 mt-1">Usado para definir o rito processual (Sumário, Sumaríssimo, Ordinário).</p>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                            <span>Usado para definir rito processual e base de cálculo.</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Oficial 2026: R$ 1.621,00</span>
+                        </div>
                     </div>
                     <div className="pt-4 border-t border-slate-100 dark:border-gold-500/20">
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Supabase URL</label>

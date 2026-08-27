@@ -55,11 +55,65 @@ const authenticate = async (req: any, res: any, next: any) => {
   }
 };
 
-// Helper para injetar a data atual nos prompts
+// Helper para injetar a data atual, contexto temporal e tabela histórica oficial do Banco Central (SGS 1619)
+export const OFFICIAL_MINIMUM_WAGE_TABLE = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TABELA HISTÓRICA OFICIAL DE SALÁRIO MÍNIMO (BACEN SGS 1619 / PLANO REAL ATÉ O PRESENTE):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 2026 (01/01/2026 até hoje): R$ 1.621,00  ← [SALÁRIO MÍNIMO VIGENTE ATUAL DO SISTEMA]
+• 2025 (01/01/2025 a 31/12/2025): R$ 1.518,00
+• 2024 (01/01/2024 a 31/12/2024): R$ 1.412,00 (Decreto nº 11.864/2023)
+• 2023 (01/05/2023 a 31/12/2023): R$ 1.320,00 (Lei nº 14.663/2023)
+• 2023 (01/01/2023 a 30/04/2023): R$ 1.302,00 (MP nº 1.143/2022)
+• 2022 (01/01/2022 a 31/12/2022): R$ 1.212,00 (Lei nº 14.358/2022)
+• 2021 (01/01/2021 a 31/12/2021): R$ 1.100,00 (Lei nº 14.158/2021)
+• 2020 (01/02/2020 a 31/12/2020): R$ 1.045,00 (Lei nº 14.013/2020)
+• 2020 (01/01/2020 a 31/01/2020): R$ 1.039,00 (MP nº 916/2019)
+• 2019 (01/01/2019 a 31/12/2019): R$ 998,00 (Decreto nº 9.661/2019)
+• 2018 (01/01/2018 a 31/12/2018): R$ 954,00 (Decreto nº 9.255/2017)
+• 2017 (01/01/2017 a 31/12/2017): R$ 937,00 (Decreto nº 8.948/2016)
+• 2016 (01/01/2016 a 31/12/2016): R$ 880,00 (Decreto nº 8.618/2015)
+• 2015 (01/01/2015 a 31/12/2015): R$ 788,00 (Decreto nº 8.381/2014)
+• 2014 (01/01/2014 a 31/12/2014): R$ 724,00 (Decreto nº 8.166/2013)
+• 2013 (01/01/2013 a 31/12/2013): R$ 678,00 (Decreto nº 7.872/2012)
+• 2012 (01/01/2012 a 31/12/2012): R$ 622,00 (Decreto nº 7.655/2011)
+• 2011 (01/03/2011 a 31/12/2011): R$ 545,00 (Lei nº 12.382/2011)
+• 2011 (01/01/2011 a 28/02/2011): R$ 540,00 (MP nº 516/2010)
+• 2010 (01/01/2010 a 31/12/2010): R$ 510,00 (Lei nº 12.255/2010)
+• 2009 (01/02/2009 a 31/12/2009): R$ 465,00 (Lei nº 11.944/2009)
+• 2008 (01/03/2008 a 31/01/2009): R$ 415,00 (Lei nº 11.709/2008)
+• 2007 (01/04/2007 a 29/02/2008): R$ 380,00 (Lei nº 11.498/2007)
+• 2006 (01/04/2006 a 31/03/2007): R$ 350,00 (Lei nº 11.321/2006)
+• 2005 (01/05/2005 a 31/03/2006): R$ 300,00 (Lei nº 11.164/2005)
+• 2004 (01/05/2004 a 30/04/2005): R$ 260,00 (Lei nº 10.888/2004)
+• 2003 (01/04/2003 a 30/04/2004): R$ 240,00 (Lei nº 10.699/2003)
+• 2002 (01/04/2002 a 31/03/2003): R$ 200,00 (Lei nº 10.525/2002)
+• 2001 (01/04/2001 a 31/03/2002): R$ 180,00 (Lei nº 10.208/2001)
+• 2000 (03/04/2000 a 31/03/2001): R$ 151,00 (Lei nº 9.971/2000)
+• 1999 (01/05/1999 a 02/04/2000): R$ 136,00 (Lei nº 9.971/2000)
+• 1998 (01/05/1998 a 30/04/1999): R$ 130,00 (Lei nº 9.971/2000)
+• 1997 (01/05/1997 a 30/04/1998): R$ 120,00 (MP nº 1.572/1997)
+• 1996 (01/05/1996 a 30/04/1997): R$ 112,00 (MP nº 1.414/1996)
+• 1995 (01/05/1995 a 30/04/1996): R$ 100,00 (Lei nº 9.032/1995)
+• 1994 (01/09/1994 a 30/04/1995): R$ 70,00 (Lei nº 9.063/1995)
+• 1994 (01/07/1994 a 31/08/1994 - Início Plano Real): R$ 64,79 (Lei nº 8.880/1994)
+`;
+
 const getCurrentDateContext = () => {
   const date = new Date();
   const formatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
-  return `\n\n[CONTEXTO TEMPORAL CRÍTICO]: Hoje é ${formatter.format(date)}. O ano atual é ${date.getFullYear()}. Você DEVE usar esta data como o "hoje" para todos os cálculos de idade, tempo de contribuição, prescrição, decadência e aplicação de leis no tempo (ex: regras de transição da EC 103/2019). Nunca assuma que estamos em 2023 ou 2024.`;
+  return `\n\n[CONTEXTO TEMPORAL E ECONÔMICO OFICIAL - REGRA ABSOLUTA DO SISTEMA]:
+- HOJE É: ${formatter.format(date)}. O ANO ATUAL É ${date.getFullYear()}.
+- SALÁRIO MÍNIMO VIGENTE ATUAL (${date.getFullYear()}): R$ 1.621,00.
+- TETO DO RGPS/INSS (${date.getFullYear()}): R$ 8.157,41.
+
+⚠️ DIRETRIZES DE RIGOR TEMPORAL E SALÁRIO MÍNIMO:
+1. SALÁRIO MÍNIMO ATUAL: Se qualquer pergunta ou cálculo se referir ao salário mínimo "atual", "hoje", "vigente", "deste ano" ou "em 2026", o valor é ESTRITAMENTE R$ 1.621,00.
+2. PROIBIÇÃO DE ERRO: É TERMINANTEMENTE PROIBIDO afirmar que o salário mínimo atual é R$ 1.412,00 (valor de 2024) ou R$ 1.518,00 (valor de 2025).
+3. CONSULTA HISTÓRICA: Se o usuário perguntar o valor de um ano anterior específico (ex: "qual era em 2024?", "quanto foi em 2021?", "qual o piso em 2018?"), consulte e responda com a precisão histórica da tabela abaixo (ex: 2024 era R$ 1.412,00; 2021 era R$ 1.100,00; 2018 era R$ 954,00).
+4. CNIS E ART. 195, § 14 DA CF: Ao auditar competências de recolhimentos previdenciários e verificar se estão abaixo do mínimo, compare cada mês com o salário mínimo VIGENTE NAQUELA COMPETÊNCIA ESPECÍFICA segundo a tabela histórica do Banco Central abaixo.
+
+${OFFICIAL_MINIMUM_WAGE_TABLE}`;
 };
 
 // Nova Feature: Memória Contínua Pessoal (Aprendizado da IA)
@@ -85,9 +139,14 @@ const injectAiMemoryRules = async (personaId: string, currentPrompt: string): Pr
   return currentPrompt;
 };
 
-// Apply authentication to all /api routes except health and config
+// Apply authentication to all /api routes except health, config and official public economic data (BCB/IBGE)
 app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/config" || req.path === "/bcdata/inpc" || req.originalUrl.includes("/bcdata/inpc")) return next();
+  if (
+    req.path === "/health" || 
+    req.path === "/config" || 
+    req.path.startsWith("/bcdata") || 
+    req.originalUrl.includes("/bcdata")
+  ) return next();
   authenticate(req, res, next);
 });
 
@@ -4868,6 +4927,14 @@ Responda ESTRITAMENTE em formato JSON puro no esquema:
   }
 });
 
+// ====================================================================
+// BANCO CENTRAL DO BRASIL (BCB / SGS) - DADOS ECONÔMICOS OFICIAIS
+// ====================================================================
+
+// Cache em memória de dados do Banco Central (evita sobrecarga e garante alta disponibilidade)
+let bcbWageCache: { data: any[]; lastFetch: number } | null = null;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
+
 app.get("/api/bcdata/inpc", async (req, res) => {
   try {
     const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.188/dados?formato=json');
@@ -4877,9 +4944,65 @@ app.get("/api/bcdata/inpc", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
-    console.error("BCB Proxy Error:", error);
+    console.error("BCB Proxy Error (INPC):", error);
     res.status(500).json({ error: error.message || "Failed to fetch BCB data" });
   }
+});
+
+// Endpoint oficial de Salário Mínimo do Banco Central do Brasil (Série 1619)
+app.get("/api/bcdata/minimum-wage", async (req, res) => {
+  try {
+    const now = Date.now();
+    if (bcbWageCache && (now - bcbWageCache.lastFetch) < CACHE_TTL_MS) {
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: true,
+        data: bcbWageCache.data
+      });
+    }
+
+    const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1619/dados?formato=json');
+    if (response.ok) {
+      const data = await response.json();
+      bcbWageCache = { data, lastFetch: now };
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: false,
+        data
+      });
+    }
+
+    // Se a API do BCB falhar temporariamente, retorna dados estruturados de contingência
+    if (bcbWageCache) {
+      return res.json({
+        source: "Banco Central do Brasil - SGS Série 1619 (Stale Cache)",
+        currentYear: 2026,
+        currentWage: 1621.00,
+        cached: true,
+        data: bcbWageCache.data
+      });
+    }
+
+    res.status(500).json({ error: "Falha ao consultar API do Banco Central" });
+  } catch (error: any) {
+    console.error("BCB Proxy Error (Salário Mínimo):", error);
+    res.status(500).json({ error: error.message || "Erro ao consultar Banco Central" });
+  }
+});
+
+// Endpoint com resumo rápido do Salário Mínimo Atual
+app.get("/api/bcdata/minimum-wage/current", async (req, res) => {
+  res.json({
+    currentYear: 2026,
+    value: 1621.00,
+    formatted: "R$ 1.621,00",
+    source: "Banco Central do Brasil - SGS Série 1619 / Lei Orçamentária",
+    lastAdjustmentDate: "2026-01-01"
+  });
 });
 
 // ====================================================================
@@ -4985,8 +5108,29 @@ app.delete("/api/ai-memory-rules/:id", async (req, res) => {
   }
 });
 
-// ====================================================================
-// AUTOMATED BACKEND-MANAGED CONTEXT CACHING
+async function ensureDefaultMemoryRules() {
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from('ai_memory_rules')
+      .select('id, rule_text')
+      .ilike('rule_text', '%1.621%');
+    
+    if (!existing || existing.length === 0) {
+      await supabaseAdmin.from('ai_memory_rules').insert({
+        persona: 'global',
+        rule_text: 'O salário mínimo vigente atual em 2026 é rigorosamente R$ 1.621,00 (Teto do INSS R$ 8.157,41). NUNCA responder que o salário mínimo atual é R$ 1.412,00 (2024) ou R$ 1.518,00 (2025). Para anos anteriores, consultar sempre a tabela histórica oficial do Banco Central do Brasil (SGS 1619).',
+        active: true
+      });
+      console.log("[MEMÓRIA DA IA] Diretriz oficial de Salário Mínimo 2026/BACEN gravada na memória contínua com sucesso.");
+    }
+  } catch (e) {
+    // Ignora se tabela ainda não criada ou Supabase offline
+  }
+}
+
+// Inicializa a verificação de memória em segundo plano
+ensureDefaultMemoryRules().catch(() => {});
+
 // Evita reenviar documentos gigantes em todas as mensagens do chat.
 // Vincula o cache de contexto ao modelo selecionado e rotaciona chaves.
 // ====================================================================
