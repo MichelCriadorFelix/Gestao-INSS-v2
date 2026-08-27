@@ -5255,33 +5255,7 @@ app.delete("/api/ai-memory-rules/:id", async (req, res) => {
   }
 });
 
-async function ensureDefaultMemoryRules() {
-  try {
-    const { data: existing } = await supabaseAdmin
-      .from('ai_memory_rules')
-      .select('id, rule_text')
-      .ilike('rule_text', '%1.621%');
-    
-    if (!existing || existing.length === 0) {
-      await supabaseAdmin.from('ai_memory_rules').insert({
-        persona: 'global',
-        rule_text: 'O salário mínimo vigente atual em 2026 é rigorosamente R$ 1.621,00 (Teto do INSS R$ 8.157,41). NUNCA responder que o salário mínimo atual é R$ 1.412,00 (2024) ou R$ 1.518,00 (2025). Para anos anteriores, consultar sempre a tabela histórica oficial do Banco Central do Brasil (SGS 1619).',
-        active: true
-      });
-      console.log("[MEMÓRIA DA IA] Diretriz oficial de Salário Mínimo 2026/BACEN gravada na memória contínua com sucesso.");
-    } else if (existing.length > 1) {
-      // Limpa duplicadas automáticas mantendo apenas a primeira
-      const toDelete = existing.slice(1).map(r => r.id);
-      await supabaseAdmin.from('ai_memory_rules').delete().in('id', toDelete);
-      console.log(`[MEMÓRIA DA IA] ${toDelete.length} duplicatas do salário mínimo limpas do banco.`);
-    }
-  } catch (e) {
-    // Ignora se tabela ainda não criada ou Supabase offline
-  }
-}
-
-// Inicializa a verificação de memória em segundo plano
-ensureDefaultMemoryRules().catch(() => {});
+// Auto-seeding removido para permitir que o usuário gerencie e exclua regras livremente sem recriação automática pelo servidor.
 
 // Evita reenviar documentos gigantes em todas as mensagens do chat.
 // Vincula o cache de contexto ao modelo selecionado e rotaciona chaves.
