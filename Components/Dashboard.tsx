@@ -48,37 +48,32 @@ import SettingsModal from './SettingsModal';
 import NotificationsModal from './NotificationsModal';
 import CopyButton from './CopyButton';
 import { safeSetLocalStorage } from '../utils';
+import { cacheGet, cacheSet, clearLegacyLocalStorageCache } from '../services/localCache';
 
 /**
- * PERF: cache local para PRIMEIRA PINTURA INSTANTÂNEA.
- * A tela abre imediatamente com o que já foi visto, e o fetch de rede + o Realtime
- * reconciliam em segundo plano. Sem isso, o app fica em branco esperando a rede.
+ * PERF: cache local para PRIMEIRA PINTURA quase instantânea.
+ * A tela abre com o que já foi visto, e o fetch de rede + o Realtime reconciliam
+ * em segundo plano. Sem isso, o app fica em branco esperando a rede.
  *
- * Cuidado com cota: o localStorage tem ~5 MB. Por isso guardamos uma versão
- * ENXUTA — sem o conteúdo dos certificados narrativos e sem os documentos, que
- * são os campos grandes. As contagens são preservadas, que é o que a lista exibe.
- * (Uma tentativa anterior de cachear os registros crus causava QuotaExceededError.)
+ * Fica em IndexedDB, NÃO em localStorage: o app já ocupa quase toda a cota de
+ * ~5 MB do localStorage com outras listas (social_security_calculations guarda o
+ * CNIS completo de cada cálculo, inss_calculations, marketing_saved_posts...),
+ * e gravar o cache lá estourava a cota (QuotaExceededError observado em produção).
+ *
+ * Ainda assim guardamos uma versão ENXUTA — sem documentos nem certificados
+ * narrativos, que são os campos grandes. As contagens, que é o que a lista
+ * exibe, são preservadas; o conteúdo completo vem de getClientDetails ao abrir.
  */
 const CACHE_KEYS = {
-    records: 'inss_cache_records_v1',
-    contracts: 'inss_cache_contracts_v1'
+    records: 'records_v2',
+    contracts: 'contracts_v2'
 };
 
-const readCache = <T,>(key: string): T[] => {
-    try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-};
+// Chaves da tentativa anterior em localStorage — removidas para liberar cota.
+const LEGACY_CACHE_KEYS = ['inss_cache_records_v1', 'inss_cache_contracts_v1'];
 
 const trimRecordForCache = (r: any) => {
     const { narrativeCertificates, documents, ...rest } = r || {};
-    // Mantém apenas as contagens (já calculadas em mapClientRow); o conteúdo
-    // completo é recarregado sob demanda ao abrir o cliente (getClientDetails).
     return rest;
 };
 
@@ -91,14 +86,11 @@ const rehydrateRecord = (r: any) => ({
 });
 
 const writeCache = (key: string, list: any[]) => {
-    try {
-        const payload = key === CACHE_KEYS.records
-            ? (list || []).map(trimRecordForCache)
-            : (list || []);
-        safeSetLocalStorage(key, JSON.stringify(payload));
-    } catch (e) {
-        console.warn('Não foi possível gravar o cache local:', e);
-    }
+    const payload = key === CACHE_KEYS.records
+        ? (list || []).map(trimRecordForCache)
+        : (list || []);
+    // cacheSet nunca lança — falha em silêncio se o IndexedDB não estiver disponível
+    void cacheSet(key, payload);
 };
 
 // Grava o cache de forma agrupada: numa rajada de eventos do Realtime,
@@ -152,6 +144,35 @@ export default function Dashboard({
   const isFetchingRef = useRef(false);
   // Distingue a 1ª conexão do Realtime de uma RE-conexão (ver .subscribe abaixo)
   const hasConnectedRef = useRef(false);
+  // Marca que a rede já respondeu — impede que o cache (assíncrono) sobrescreva
+  // dados frescos caso a rede chegue primeiro.
+  const networkArrivedRef = useRef(false);
+
+  // PERF: hidratação do cache. Roda uma vez, em paralelo com o fetch de rede.
+  // O IndexedDB responde em poucos ms, então a tela sai do branco quase de imediato.
+  useEffect(() => {
+    let cancelado = false;
+
+    (async () => {
+      clearLegacyLocalStorageCache(LEGACY_CACHE_KEYS);
+
+      const [cachedRecords, cachedContracts] = await Promise.all([
+        cacheGet<any[]>(CACHE_KEYS.records),
+        cacheGet<any[]>(CACHE_KEYS.contracts)
+      ]);
+
+      if (cancelado || networkArrivedRef.current) return; // rede venceu: não regride
+
+      if (Array.isArray(cachedRecords) && cachedRecords.length > 0) {
+        setRecords(cachedRecords.map(rehydrateRecord));
+      }
+      if (Array.isArray(cachedContracts) && cachedContracts.length > 0) {
+        setContracts(cachedContracts);
+      }
+    })();
+
+    return () => { cancelado = true; };
+  }, []);
 
   const handleClientFilterChange = (filter: 'active' | 'archived' | 'referral') => {
     setClientFilter(filter);
@@ -159,10 +180,8 @@ export default function Dashboard({
   };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // PERF: hidrata do cache local já na primeira renderização — a tela aparece
-  // instantaneamente e os dados de rede substituem estes logo em seguida.
-  const [records, setRecords] = useState<ClientRecord[]>(() => readCache<any>(CACHE_KEYS.records).map(rehydrateRecord));
-  const [contracts, setContracts] = useState<ContractRecord[]>(() => readCache<ContractRecord>(CACHE_KEYS.contracts));
+  const [records, setRecords] = useState<ClientRecord[]>([]);
+  const [contracts, setContracts] = useState<ContractRecord[]>([]);
   const [savedCalculations, setSavedCalculations] = useState<CalculationRecord[]>([]);
   const [savedSocialCalculations, setSavedSocialCalculations] = useState<SocialSecurityCalculationRecord[]>([]);
   const [drMichelSessions, setDrMichelSessions] = useState<any[]>([]);
@@ -263,10 +282,12 @@ export default function Dashboard({
         // Só substitui o que veio do cache quando a rede respondeu de fato.
         // Em caso de falha, mantém o cache na tela em vez de esvaziar.
         if (remoteClients !== null) {
+            networkArrivedRef.current = true;
             setRecords(remoteClients);
             writeCache(CACHE_KEYS.records, remoteClients);
         }
         if (remoteContracts !== null) {
+            networkArrivedRef.current = true;
             setContracts(remoteContracts);
             writeCache(CACHE_KEYS.contracts, remoteContracts);
         }
