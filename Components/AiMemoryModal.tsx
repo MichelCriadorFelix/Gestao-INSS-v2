@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Save, Trash2, Check, BookOpen, User, Globe } from "lucide-react";
+import { X, Save, Trash2, Check, BookOpen, User, Globe, Sparkles, AlertTriangle, Info, RefreshCw } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { apiFetch } from "../services/apiService";
 
@@ -9,6 +9,12 @@ interface AiMemoryRule {
   rule_text: string;
   active: boolean;
   created_at: string;
+}
+
+interface AnalysisResult {
+  contradictions: Array<{ ruleIds: string[]; description: string }>;
+  duplicates: Array<{ ruleIds: string[]; description: string }>;
+  improvements: Array<{ ruleId: string; originalText: string; suggestedText: string; reason: string }>;
 }
 
 interface AiMemoryModalProps {
@@ -23,6 +29,8 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
   const [newRule, setNewRule] = useState(initialRule);
   const [targetPersona, setTargetPersona] = useState<string>(personaId || "global");
   const [submitting, setSubmitting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 
   useEffect(() => {
     if (initialRule) {
@@ -92,8 +100,72 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
     try {
       setRules(rules.filter(r => r.id !== id));
       await apiFetch(`/api/ai-memory-rules/${id}`, { method: 'DELETE' });
+      
+      // Update analysis state if exists
+      if (analysis) {
+        setAnalysis(prev => {
+          if (!prev) return prev;
+          return {
+            contradictions: prev.contradictions.filter(c => !c.ruleIds.includes(id)),
+            duplicates: prev.duplicates.filter(d => !d.ruleIds.includes(id)),
+            improvements: prev.improvements.filter(i => i.ruleId !== id)
+          };
+        });
+      }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleAnalyzeRules = async () => {
+    if (rules.length === 0) return;
+    try {
+      setAnalyzing(true);
+      const res = await apiFetch('/api/ai-memory-rules/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rules })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysis(data);
+      }
+    } catch (err) {
+      console.error("Erro na análise", err);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const applyImprovement = async (ruleId: string, suggestedText: string) => {
+    try {
+      // Find the rule to update
+      const ruleToUpdate = rules.find(r => r.id === ruleId);
+      if (!ruleToUpdate) return;
+      
+      // Set optimistic state
+      setRules(rules.map(r => r.id === ruleId ? { ...r, rule_text: suggestedText } : r));
+      
+      // Ideally, there should be an endpoint for PUT /api/ai-memory-rules/:id to update text
+      // Let's implement it in api/index.ts in the next step, for now just call it
+      await apiFetch(`/api/ai-memory-rules/${ruleId}/text`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule_text: suggestedText })
+      });
+      
+      // Remove from analysis
+      setAnalysis(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          improvements: prev.improvements.filter(i => i.ruleId !== ruleId)
+        };
+      });
+    } catch(e) {
+      console.error(e);
+      // Revert optimistic state on error (simple reload)
+      fetchRules();
     }
   };
 
@@ -161,6 +233,79 @@ export function AiMemoryModal({ onClose, personaId, initialRule = "" }: AiMemory
             </div>
           </div>
 
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <BookOpen size={16} className="text-gray-500" /> Banco de Memória ({rules.length})
+            </h3>
+            <button 
+              onClick={handleAnalyzeRules}
+              disabled={analyzing || rules.length === 0}
+              className="bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-700 hover:to-indigo-700 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-70"
+            >
+              {analyzing ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {analyzing ? 'Analisando...' : 'Análise Inteligente de Regras'}
+            </button>
+          </div>
+
+          {analysis && (
+            <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-top-2">
+              {(analysis.contradictions.length > 0 || analysis.duplicates.length > 0 || analysis.improvements.length > 0) ? (
+                <>
+                  {analysis.contradictions.map((item, idx) => (
+                    <div key={`c-${idx}`} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-red-700 flex items-center gap-2 mb-2">
+                        <AlertTriangle size={16} /> Contradição Detectada
+                      </h4>
+                      <p className="text-sm text-red-800 mb-3">{item.description}</p>
+                      <div className="text-xs text-red-600 font-medium">IDs envolvidos: {item.ruleIds.map(id => id.slice(0, 8)).join(', ')} (Procure e apague/edite abaixo)</div>
+                    </div>
+                  ))}
+                  
+                  {analysis.duplicates.map((item, idx) => (
+                    <div key={`d-${idx}`} className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-amber-700 flex items-center gap-2 mb-2">
+                        <AlertTriangle size={16} /> Regras Duplicadas
+                      </h4>
+                      <p className="text-sm text-amber-800 mb-3">{item.description}</p>
+                      <div className="text-xs text-amber-600 font-medium">IDs envolvidos: {item.ruleIds.map(id => id.slice(0, 8)).join(', ')} (Escolha uma para excluir)</div>
+                    </div>
+                  ))}
+
+                  {analysis.improvements.map((item, idx) => (
+                    <div key={`i-${idx}`} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-blue-700 flex items-center gap-2 mb-2">
+                        <Info size={16} /> Sugestão de Melhoria (ID: {item.ruleId.slice(0, 8)}...)
+                      </h4>
+                      <p className="text-sm text-blue-800 mb-2">{item.reason}</p>
+                      <div className="bg-white/60 p-2 rounded text-xs text-gray-500 mb-2 line-through">
+                        Original: {item.originalText}
+                      </div>
+                      <div className="bg-white p-2 rounded border border-blue-100 text-sm font-medium text-gray-800 mb-3">
+                        {item.suggestedText}
+                      </div>
+                      <button 
+                        onClick={() => applyImprovement(item.ruleId, item.suggestedText)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors"
+                      >
+                        <Check size={14} /> Aplicar Sugestão
+                      </button>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 rounded-full">
+                    <Check size={18} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-emerald-800">Tudo Perfeito!</h4>
+                    <p className="text-sm text-emerald-600">Não encontramos contradições, duplicações ou necessidade de melhorias nas suas regras.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
           ) : (
@@ -222,7 +367,10 @@ function RuleItem({ rule, onToggle, onDelete }: { rule: AiMemoryRule, onToggle: 
         </button>
         <div>
           <p className={`text-sm ${rule.active ? 'text-gray-800' : 'text-gray-500 line-through'}`}>{rule.rule_text}</p>
-          <div className="flex gap-2 mt-1.5">
+          <div className="flex gap-2 mt-1.5 flex-wrap">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">
+              <span className="opacity-50">ID:</span> {rule.id.slice(0, 8)}
+            </span>
             <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
               {new Date(rule.created_at).toLocaleDateString()}
             </span>

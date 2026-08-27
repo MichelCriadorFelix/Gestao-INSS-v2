@@ -5087,6 +5087,54 @@ app.post("/api/ai-memory-rules", async (req, res) => {
   }
 });
 
+app.post("/api/ai-memory-rules/analyze", async (req, res) => {
+  try {
+    const { rules } = req.body;
+    if (!rules || !Array.isArray(rules)) {
+      return res.status(400).json({ error: "Lista de regras inválida." });
+    }
+
+    const prompt = `Você é um especialista em lógica e estruturação de prompts de IA jurídica.
+Abaixo está uma lista de regras de memória de uma IA.
+Seu objetivo é encontrar:
+1. Contradições: Regras que dizem o oposto ou entram em conflito.
+2. Duplicações: Regras que dizem a mesma coisa com palavras diferentes.
+3. Melhorias: Regras que estão mal escritas, confusas, ou que poderiam ser mais claras e diretas para a IA entender.
+
+Lista de regras (ID | Persona | Texto):
+${rules.map((r: any) => `${r.id} | ${r.persona} | ${r.rule_text}`).join('\n')}
+
+Retorne estritamente um JSON no seguinte formato (sem formatação markdown extra, apenas o objeto JSON válido):
+{
+  "contradictions": [
+    { "ruleIds": ["id1", "id2"], "description": "Por que se contradizem e qual a sugestão de resolução" }
+  ],
+  "duplicates": [
+    { "ruleIds": ["id1", "id2"], "description": "Por que são duplicadas e qual manter" }
+  ],
+  "improvements": [
+    { "ruleId": "id", "originalText": "texto original", "suggestedText": "texto melhorado", "reason": "motivo da melhoria" }
+  ]
+}`;
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = response.text || "{}";
+    const result = JSON.parse(text);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Erro na análise de regras:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put("/api/ai-memory-rules/:id/toggle", async (req, res) => {
   try {
     const { id } = req.params;
@@ -5103,6 +5151,26 @@ app.put("/api/ai-memory-rules/:id/toggle", async (req, res) => {
     res.json(data);
   } catch (error: any) {
     console.error("Erro ao atualizar regra:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/ai-memory-rules/:id/text", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rule_text } = req.body;
+    
+    const { data, error } = await supabaseAdmin
+      .from('ai_memory_rules')
+      .update({ rule_text })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error: any) {
+    console.error("Erro ao atualizar texto da regra:", error);
     res.status(500).json({ error: error.message });
   }
 });
