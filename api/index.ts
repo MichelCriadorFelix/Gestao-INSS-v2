@@ -4643,32 +4643,42 @@ app.post("/api/marketing/generate", async (req, res) => {
       taskDesc = `Ideias de abordagens para post sobre: "${topic}".`;
       jsonFormat = `{ "strategies": [{ "title": "string", "description": "string" }] }`;
     } else if (mode === 'template') {
-      taskDesc = `Texto para a arte do post sobre: "${topic}".`;
-      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
+      taskDesc = `Texto completo e de alto impacto para a arte do post sobre: "${topic}".`;
+      jsonFormat = `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string" }`;
     } else {
-      taskDesc = `Conteúdo completo para Instagram sobre: "${topic}".`;
-      jsonFormat = `{ "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
+      taskDesc = `Conteúdo completo e de alto valor para Instagram sobre: "${topic}".`;
+      jsonFormat = `{ "audienceTag": "string", "title": "string", "highlight": "string", "points": ["string"], "ctaCaption": "string", "caption": "string", "imagePrompt": "string" }`;
     }
 
-    const captionInstructions = mode === 'full' ? `
-REGRAS OBRIGATÓRIAS PARA O CAMPO "caption":
-- Escreva uma legenda ALTAMENTE DETALHADA, informativa e profunda (mínimo de 350 a 600 palavras). O advogado quer conteúdo de altíssimo valor que realmente eduque o cliente, explique seus direitos e gere engajamento orgânico. Não economize palavras, explique as leis e jurisprudências de forma completa e didática!
-- Use emojis relevantes (🏛️⚖️💡✅❌🤝👉) ao longo do texto para torná-lo atraente
-- Separe cada parágrafo com linha em branco
-- Termine SEMPRE com 8 a 12 hashtags relevantes em linha separada
-- Exemplo de formato:
-  "Você sabia que o INSS não pode ignorar o laudo do seu médico particular? ⚖️\n\nIsso é um direito seu garantido por lei. Se seu benefício foi negado por esse motivo, você tem como reverter na Justiça. ✅\n\nNão aceite um não sem questionar. 👉\n\n#advocaciaprevidenciaria #inss #direitoprevidenciario"
-- O campo "title" deve ter NO MÁXIMO 5 palavras para caber no template
-- O campo "highlight" deve ter NO MÁXIMO 6 palavras
-- O campo "points" deve ter NO MÁXIMO 3 itens, cada um com NO MÁXIMO 8 palavras
-- O campo "ctaCaption" deve ser uma frase imperativa corta (máximo 6 palavras) com caráter EDUCATIVO e INSTITUCIONAL. Exemplos: "Salve esse post!", "Comente sua dúvida!", "Compartilhe com quem precisa!", "Siga para mais conteúdo!". NUNCA use frases que incentivem contato direto ou captação de clientes como "Me chame no WhatsApp", "Entre em contato", "Agende sua consulta" — isso viola o Código de Ética da OAB.
-- PRECISÃO JURÍDICA: nunca simplifique a ponto de distorcer o direito. Se afirmar que algo é garantido por lei, isso deve ser juridicamente correto` : '';
+    const marketingInstructions = `
+DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
+1. CAMPO "audienceTag": Identifique de forma clara e profissional o público-alvo ou nicho do tema em CAIXA ALTA (Ex: "CONTRIBUINTE INDIVIDUAL & FACULTATIVO", "ALERTA CNIS | APOSENTADORIA", "DIREITO PREVIDENCIÁRIO | AUXÍLIO-DOENÇA", "BPC/LOAS | BENEFÍCIO ASSISTENCIAL", "TRABALHADOR RURAL | SEGURADO ESPECIAL").
+2. CAMPO "title": Título persuasivo, forte e direto (pergunta provocativa ou gancho de dor real), com 3 a 7 palavras (Ex: "Contribuiu abaixo do salário mínimo?", "Seu laudo médico foi ignorado pelo INSS?").
+3. CAMPO "highlight": Alerta de alto impacto ou benefício central em 5 a 12 palavras que chame a atenção do leitor imediatamente (Ex: "⚠️ Meses abaixo do piso NÃO contam para tempo de aposentadoria nem carência!").
+4. CAMPO "points": Deve conter 3 ou 4 itens altamente informativos, relevantes e substantivos. NUNCA faça tópicos vazios ou genéricos de poucas palavras. Cada ponto deve ter uma palavra-chave em caixa alta seguida de explicação jurídica clara e prática (Ex:
+   - "1) COMPLEMENTAÇÃO: Pague a diferença da contribuição via DARF/GPS para validar o mês."
+   - "2) AGRUPAMENTO: Una duas ou mais contribuições abaixo do mínimo do mesmo ano para atingir o piso."
+   - "3) USO DO EXCEDENTE: Transfira o valor que ultrapassou o teto de um mês para cobrir os menores."
+   - "4) ANÁLISE NO CNIS: Regularize pendências antes de dar entrada no pedido de benefício.").
+5. CAMPO "ctaCaption": Chamada para ação educativa e institucional (máximo 10 palavras), ex: "📌 Salve este post para consultar quando analisar o seu CNIS!", "💡 Compartilhe com quem também contribui para o INSS!". NUNCA use frases mercantilistas de captação de clientes (como "fale conosco", "agende consulta", "chame no WhatsApp") para cumprir o Código de Ética da OAB.
+6. CAMPO "caption" (Legenda do Instagram):
+   - Escreva uma legenda ALTAMENTE DETALHADA, informativa e profunda (de 400 a 650 palavras).
+   - Explique o embasamento legal de forma simples (ex: EC 103/2019, Lei 8.213/91, Art. 195 da CF, Decretos e Jurisprudências).
+   - Divida em parágrafos curtos e arejados com linha em branco entre eles.
+   - Use emojis estratégicos (🏛️ ⚖️ 💡 ✅ ❌ 🤝 👉 📌) para guiar a leitura.
+   - Finalize SEMPRE com 8 a 12 hashtags relevantes.`;
 
-    const prompt = `Especialista em marketing jurídico. ${taskDesc}${assetContext}
-    Público: Pessoas simples. Linguagem CLARA.
-    Estratégia: ${strategyDesc}. Tom: ${personaDesc}.
-    ${captionInstructions}
-    Responda em JSON puro: ${jsonFormat}`;
+    const prompt = `Você é o principal estrategista de marketing jurídico e especialista em Direito Previdenciário/Trabalhista do escritório Felix & Castro Advocacia.
+    ${taskDesc}${assetContext}
+    Tema do Post: "${topic}"
+    Estratégia Solicitada: ${strategyDesc}
+    Persona do Advogado: ${personaDesc}
+    Público: Segurados do INSS, trabalhadores, aposentados e contribuintes. Linguagem acessível, clara, mas com extrema precisão técnica e relevância informativa.
+    
+    ${marketingInstructions}
+    
+    Responda ESTRITAMENTE em formato JSON puro no esquema:
+    ${jsonFormat}`;
 
     const response = await callGemini({
       bypassOpenRouter: true,

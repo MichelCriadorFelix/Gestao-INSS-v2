@@ -29,6 +29,7 @@ interface MarketingGeneratorProps {
 }
 
 interface PostData {
+  audienceTag?: string;
   title: string;
   highlight: string;
   points: string[];
@@ -806,97 +807,80 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
     if (!postData) return;
 
     const leftX = 75;
-    const maxTextWidth = 450;
-    const availableHeight = 740; // Espaço útil entre y=225 e y=965
+    const maxTextWidth = 455;
 
-    // 1. Cálculo prévio das quebras de linha e tamanhos
-    let titleFontSize = 46;
-    if (postData.title.length > 55) titleFontSize = 40;
-    else if (postData.title.length > 40) titleFontSize = 43;
+    // 1. Tag de Público-Alvo / Categoria (Eyebrow Pill)
+    let currentY = 222;
+    const tagText = (postData.audienceTag || '').trim() || (topic.length > 0 && topic.length < 35 ? topic.toUpperCase() : 'DIREITO PREVIDENCIÁRIO | INSS');
+    
+    if (tagText) {
+      ctx.font = 'bold 12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      const tagMetrics = ctx.measureText(tagText);
+      const tagPillWidth = Math.min(maxTextWidth, tagMetrics.width + 24);
+      const tagPillHeight = 24;
+
+      // Fundo Translúcido com Contorno Dourado Elegante
+      ctx.fillStyle = 'rgba(212, 175, 55, 0.18)';
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.75)';
+      ctx.lineWidth = 1.2;
+      
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(leftX, currentY - 16, tagPillWidth, tagPillHeight, 6);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(leftX, currentY - 16, tagPillWidth, tagPillHeight);
+        ctx.strokeRect(leftX, currentY - 16, tagPillWidth, tagPillHeight);
+      }
+
+      ctx.fillStyle = colors.yellowHighlight;
+      ctx.letterSpacing = '1px';
+      ctx.fillText(tagText, leftX + 12, currentY);
+      ctx.letterSpacing = '0px';
+      currentY += 28;
+    } else {
+      currentY = 235;
+    }
+
+    // 2. Título Principal em Dourado
+    let titleFontSize = 42;
+    if (postData.title.length > 55) titleFontSize = 36;
+    else if (postData.title.length > 40) titleFontSize = 39;
 
     ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
     let titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
-    if (titleLines.length > 3 && titleFontSize > 38) {
-      titleFontSize = 38;
+    if (titleLines.length > 3 && titleFontSize > 34) {
+      titleFontSize = 34;
       ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
       titleLines = getWrappedLines(ctx, postData.title, maxTextWidth);
     }
     const titleLineHeight = Math.round(titleFontSize * 1.15);
 
-    // 2. Destaque (Highlight Box)
-    let highlightFontSize = 24;
-    let highlightLineHeight = 32;
-    ctx.font = `bold ${highlightFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    let highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 40);
-    let highlightBoxHeight = highlightLines.length * highlightLineHeight + 20;
-
-    // 3. Pontos (List)
-    let pointFontSize = 22;
-    let pointLineHeight = 29;
-    let pointGap = 14;
-    ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    
-    const formattedPointsLines: string[][] = postData.points.map((p, idx) => {
-      const fullText = `${idx + 1}) ${p}`;
-      return getWrappedLines(ctx, fullText, maxTextWidth);
-    });
-
-    const totalPointLinesCount = formattedPointsLines.reduce((acc, lines) => acc + lines.length, 0);
-
-    // 4. CTA
-    let ctaFontSize = 23;
-    let ctaLineHeight = 28;
-    ctx.font = `italic bold ${ctaFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    const ctaLines = postData.ctaCaption ? getWrappedLines(ctx, postData.ctaCaption, maxTextWidth) : [];
-
-    // 5. Verificação de Altura Total para Auto-Fit (Evitar qualquer sobreposição)
-    let estimatedTotalHeight = 
-      (titleLines.length * titleLineHeight) + 20 +
-      highlightBoxHeight + 30 +
-      (totalPointLinesCount * pointLineHeight) + (formattedPointsLines.length * pointGap) +
-      (ctaLines.length > 0 ? (ctaLines.length * ctaLineHeight + 24) : 0);
-
-    if (estimatedTotalHeight > availableHeight) {
-      // Redução proporcional inteligente para acomodar textos muito longos
-      pointFontSize = 19;
-      pointLineHeight = 25;
-      pointGap = 10;
-      highlightFontSize = 22;
-      highlightLineHeight = 28;
-      highlightBoxHeight = highlightLines.length * highlightLineHeight + 16;
-      ctaFontSize = 21;
-      ctaLineHeight = 26;
-      titleFontSize = Math.max(34, titleFontSize - 4);
-    }
-
-    // --- RENDERIZAÇÃO REAL ---
-
-    // A. Desenho do Título
     ctx.fillStyle = colors.gold;
-    ctx.font = `italic bold ${titleFontSize}px "Times New Roman", Georgia, serif`;
-    let currentY = 255;
+    currentY += 10;
     for (const line of titleLines) {
       ctx.fillText(line, leftX, currentY);
-      currentY += Math.round(titleFontSize * 1.15);
+      currentY += titleLineHeight;
     }
 
-    // B. Desenho da Caixa de Destaque Amarela
-    currentY += 16;
-    const highlightBoxY = currentY;
-    
+    // 3. Caixa de Destaque / Alerta Amarela
+    currentY += 14;
+    const highlightFontSize = 21;
+    const highlightLineHeight = 28;
     ctx.font = `bold ${highlightFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 40);
-    
-    // Mede a largura máxima necessária para a caixa
+    const highlightLines = getWrappedLines(ctx, postData.highlight, maxTextWidth - 36);
+
     let maxLineWidth = 0;
     for (const l of highlightLines) {
       const w = ctx.measureText(l).width;
       if (w > maxLineWidth) maxLineWidth = w;
     }
-    const highlightBoxWidth = Math.min(maxTextWidth, Math.max(maxLineWidth + 36, 260));
-    highlightBoxHeight = highlightLines.length * highlightLineHeight + 18;
+    const highlightBoxWidth = Math.min(maxTextWidth, Math.max(maxLineWidth + 32, 280));
+    const highlightBoxHeight = highlightLines.length * highlightLineHeight + 16;
+    const highlightBoxY = currentY;
 
-    // Fundo Amarelo Dourado da Caixa
+    // Fundo Amarelo Dourado
     ctx.fillStyle = colors.yellowHighlight;
     if (ctx.roundRect) {
       ctx.beginPath();
@@ -906,54 +890,90 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
       ctx.fillRect(leftX, highlightBoxY, highlightBoxWidth, highlightBoxHeight);
     }
 
-    // Texto do Destaque em Azul Escuro Profundo (100% de contraste, dentro da caixa)
+    // Texto do Destaque em Azul Escuro Profundo (Contraste 100% nítido)
     ctx.fillStyle = colors.blueText;
-    let highlightTextY = highlightBoxY + highlightLineHeight - 4;
+    let highlightTextY = highlightBoxY + highlightLineHeight - 5;
     for (const line of highlightLines) {
-      ctx.fillText(line, leftX + 18, highlightTextY);
+      ctx.fillText(line, leftX + 16, highlightTextY);
       highlightTextY += highlightLineHeight;
     }
 
     // Traço divisor sutil abaixo da caixa de destaque
     currentY = highlightBoxY + highlightBoxHeight + 14;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.fillRect(leftX, currentY, 120, 3.5);
+    ctx.fillRect(leftX, currentY, 140, 3);
 
-    // C. Desenho dos Pontos da Lista
-    currentY += 26;
-    ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-    
+    // 4. Desenho dos Pontos Informativos
+    currentY += 24;
+    const pointCount = postData.points.length;
+    // Ajusta o tamanho da fonte dos pontos com base na quantidade para preenchimento ideal
+    const pointFontSize = pointCount >= 4 ? 18 : 20;
+    const pointLineHeight = pointCount >= 4 ? 25 : 27;
+    const pointGap = pointCount >= 4 ? 12 : 16;
+
     postData.points.forEach((point, index) => {
-      const fullText = `${index + 1}) ${point}`;
+      // Formata se não tiver número no início
+      let fullText = point.trim();
+      if (!/^\d+[\)\.\-]/.test(fullText)) {
+        fullText = `${index + 1}) ${fullText}`;
+      }
+
+      ctx.font = `500 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
       const lines = getWrappedLines(ctx, fullText, maxTextWidth);
-      
+
       lines.forEach((line, lineIdx) => {
-        // Primeiro segmento (número) em destaque ou branco puro
-        ctx.fillStyle = colors.white;
-        ctx.fillText(line, leftX, currentY);
+        // Se contiver ":", desenha o prefixo em negrito e o restante em branco suave
+        if (lineIdx === 0 && line.includes(':')) {
+          const parts = line.split(':');
+          const prefix = parts[0] + ':';
+          const suffix = parts.slice(1).join(':');
+
+          ctx.font = `bold ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = colors.white;
+          ctx.fillText(prefix, leftX, currentY);
+
+          const prefixWidth = ctx.measureText(prefix).width;
+          ctx.font = `400 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fillText(suffix, leftX + prefixWidth + 4, currentY);
+        } else {
+          ctx.font = `400 ${pointFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fillText(line, leftX, currentY);
+        }
         currentY += pointLineHeight;
       });
       currentY += pointGap;
     });
 
-    // D. Chamada para Ação (CTA) — Posicionada com segurança após os pontos
-    if (postData.ctaCaption && ctaLines.length > 0) {
-      currentY += 8;
+    // 5. Chamada para Ação (CTA)
+    if (postData.ctaCaption) {
+      currentY += 6;
       ctx.fillStyle = colors.yellowHighlight;
-      ctx.font = `italic bold ${ctaFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      ctx.font = 'italic bold 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
+      const ctaLines = getWrappedLines(ctx, postData.ctaCaption, maxTextWidth);
       for (const line of ctaLines) {
-        if (currentY < 965) {
+        if (currentY < 975) {
           ctx.fillText(line, leftX, currentY);
-          currentY += ctaLineHeight;
+          currentY += 26;
         }
       }
     }
 
-    // E. Rodapé Fixo (@advprevfelixecastro) — Travado na base com segurança
-    const footerY = 1005;
+    // 6. Rodapé Fixo Institucional (@advprevfelixecastro)
+    const footerY = 1010;
+    
+    // Linha divisória sutil acima do rodapé
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(leftX, footerY - 22);
+    ctx.lineTo(leftX + maxTextWidth, footerY - 22);
+    ctx.stroke();
+
     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.font = '600 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    ctx.fillText('@advprevfelixecastro', leftX, footerY);
+    ctx.font = '600 18px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.fillText('@advprevfelixecastro  •  Felix & Castro Advocacia', leftX, footerY);
   };
 
   // Redraw canvas when data or image changes
@@ -1578,6 +1598,16 @@ export default function MarketingGenerator({ darkMode, user }: MarketingGenerato
 
                 {isEditingText && (
                   <div className={`w-full mb-6 p-4 rounded-xl border grid grid-cols-1 gap-4 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                    <div>
+                      <label className="block text-xs font-medium mb-1 opacity-70">Tag de Público-Alvo / Categoria (Topo)</label>
+                      <input 
+                        type="text" 
+                        value={postData.audienceTag || ''} 
+                        placeholder="Ex: CONTRIBUINTE INDIVIDUAL & FACULTATIVO"
+                        onChange={(e) => handleTextChange('audienceTag', e.target.value)}
+                        className={`w-full p-2 rounded border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300'}`}
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-medium mb-1 opacity-70">Título</label>
                       <input 
