@@ -1415,6 +1415,107 @@ const calculateLaborResults = (calcData: LaborData) => {
     return results;
 };
 
+// --- Camada de Validação Automática (roda antes da geração do PDF) ---
+// Não recalcula verbas — apenas confere consistência do que já foi lançado
+// e sinaliza pontos que dependem de conferência manual de quem monta a petição.
+const validateLaborCalculation = (calcData: LaborData): string[] => {
+    const alerts: string[] = [];
+    const start = parseDate(calcData.startDate);
+    const end = parseDate(calcData.endDate);
+    const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR');
+
+    // 1. Períodos aquisitivos de férias
+    if (start && end && end > start) {
+        // Todos os ciclos de 12 meses INTEGRALMENTE decorridos entre admissão e rescisão/corte.
+        // O período aquisitivo em curso (fração do ano corrente) fica de fora de propósito —
+        // esse é tratado à parte como "Férias Proporcionais".
+        const acquisitivePeriods: { start: Date; end: Date }[] = [];
+        let cycleStart = new Date(start);
+        while (true) {
+            const cycleEnd = new Date(cycleStart);
+            cycleEnd.setFullYear(cycleEnd.getFullYear() + 1);
+            cycleEnd.setDate(cycleEnd.getDate() - 1);
+            if (cycleEnd > end) break;
+            acquisitivePeriods.push({ start: new Date(cycleStart), end: cycleEnd });
+            cycleStart = new Date(cycleStart);
+            cycleStart.setFullYear(cycleStart.getFullYear() + 1);
+        }
+
+        const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) => aStart <= bEnd && aEnd >= bStart;
+
+        // 1a. Período aquisitivo completo sem nenhuma linha correspondente lançada
+        acquisitivePeriods.forEach(period => {
+            const hasEntry = calcData.vacationPeriods.some(vac => {
+                const vacStart = parseDate(vac.startDate);
+                const vacEnd = parseDate(vac.endDate);
+                return !!vacStart && !!vacEnd && overlaps(vacStart, vacEnd, period.start, period.end);
+            });
+            if (!hasEntry) {
+                alerts.push(`⚠ Período aquisitivo ${fmtDate(period.start)} a ${fmtDate(period.end)} sem férias lançadas — verificar se foi gozado ou se está vencido.`);
+            }
+        });
+
+        // 1b. Férias lançadas cujas datas não correspondem a nenhum período aquisitivo calculado
+        calcData.vacationPeriods.forEach(vac => {
+            const vacStart = parseDate(vac.startDate);
+            const vacEnd = parseDate(vac.endDate);
+            if (!vacStart || !vacEnd) return;
+            const matchesCycle = acquisitivePeriods.some(period => overlaps(vacStart, vacEnd, period.start, period.end));
+            if (!matchesCycle) {
+                alerts.push(`⚠ Divergência entre data de gozo e período aquisitivo indicado — conferir mapeamento (lançamento: ${fmtDate(vacStart)} a ${fmtDate(vacEnd)}).`);
+            }
+        });
+    }
+
+    // 2. FGTS não depositado com salário histórico incompleto
+    if (start && end && end > start) {
+        // Verifica se calcData.salaryHistory cobre integralmente o período informado,
+        // sem lacunas (mesma lógica de busca usada por getSalaryAtDate/calculateFgtsExact).
+        const hasFullHistoryCoverage = (periodStart: Date, periodEnd: Date): boolean => {
+            const history = (calcData.salaryHistory || [])
+                .map(h => ({ start: parseDate(h.startDate), end: h.endDate ? parseDate(h.endDate) : periodEnd }))
+                .filter(iv => !!iv.start && !!iv.end) as { start: Date; end: Date }[];
+            if (history.length === 0) return false;
+            history.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+            let cursor = new Date(periodStart);
+            for (const iv of history) {
+                const oneDayMs = 24 * 60 * 60 * 1000;
+                if (iv.start.getTime() - cursor.getTime() > oneDayMs) return false; // lacuna encontrada
+                const next = new Date(iv.end.getTime() + oneDayMs);
+                if (next > cursor) cursor = next;
+            }
+            return cursor.getTime() > periodEnd.getTime();
+        };
+
+        const missingPeriods: { start: Date; end: Date }[] = [];
+        let usesFixedSalaryEstimate = false;
+
+        if (calcData.fgtsNoDeposits) {
+            missingPeriods.push({ start, end });
+        } else if (calcData.fgtsSpecificMissingPeriods.length > 0) {
+            calcData.fgtsSpecificMissingPeriods.forEach(p => {
+                const pStart = parseDate(p.startDate);
+                const pEnd = parseDate(p.endDate);
+                if (pStart && pEnd && pEnd > pStart) missingPeriods.push({ start: pStart, end: pEnd });
+            });
+        } else if (calcData.unpaidFgtsMonths > 0) {
+            // Este modo (legado/manual) sempre aplica meses * salário atual, sem histórico — flag obrigatório.
+            usesFixedSalaryEstimate = true;
+        }
+
+        if (!usesFixedSalaryEstimate && missingPeriods.length > 0) {
+            usesFixedSalaryEstimate = missingPeriods.some(p => !hasFullHistoryCoverage(p.start, p.end));
+        }
+
+        if (usesFixedSalaryEstimate) {
+            alerts.push(`⚠ FGTS calculado com salário único (${formatCurrency(calcData.baseSalary)}) para todo o período — confirmar se houve reajustes salariais no vínculo antes de considerar valor final.`);
+        }
+    }
+
+    return alerts;
+};
+
 interface LaborCalcProps {
     clients?: ClientRecord[];
     contracts?: ContractRecord[];
@@ -2019,6 +2120,38 @@ export default function LaborCalc({ clients = [], contracts = [], savedCalculati
       
       const splitText = doc.splitTextToSize(text, pageWidth - (margin * 2));
       doc.text(splitText, margin, y, { align: "justify", maxWidth: pageWidth - (margin * 2) });
+      y += (splitText.length * 4) + 4;
+
+      // ⚠ Pontos para Conferência Manual (Validação Automática)
+      const validationAlerts = validateLaborCalculation(dataToUse);
+
+      if (y > pageHeight - 50) { doc.addPage(); y = 30; } else { y += 8; }
+
+      doc.setTextColor(0);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("⚠ PONTOS PARA CONFERÊNCIA MANUAL", margin, y);
+      doc.line(margin, y+2, pageWidth - margin, y+2);
+      y += 8;
+
+      doc.setFontSize(9);
+      if (validationAlerts.length === 0) {
+          doc.setFont("helvetica", "italic");
+          doc.setTextColor(80);
+          doc.text("Nenhuma inconsistência detectada nas validações automáticas.", margin, y);
+          y += 6;
+      } else {
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(180, 83, 9); // Âmbar/alerta
+          validationAlerts.forEach(alertMsg => {
+              const lines = doc.splitTextToSize(alertMsg, pageWidth - (margin * 2) - 4);
+              const neededHeight = (lines.length * 4) + 4;
+              if (y + neededHeight > pageHeight - 20) { doc.addPage(); y = 30; }
+              doc.text(lines, margin, y);
+              y += neededHeight;
+          });
+      }
+      doc.setTextColor(0);
 
       // Footer
       const pageCount = doc.getNumberOfPages();
