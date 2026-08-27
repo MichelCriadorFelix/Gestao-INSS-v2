@@ -5094,11 +5094,50 @@ app.post("/api/ai-memory-rules/analyze", async (req, res) => {
       return res.status(400).json({ error: "Lista de regras inválida." });
     }
 
-    const prompt = `Você é um especialista em lógica e estruturação de prompts de IA jurídica.
+    // 1. Detecção programática INFALÍVEL e INSTANTÂNEA de duplicadas por texto
+    const programmaticDuplicates: Array<{ ruleIds: string[]; description: string }> = [];
+    const textGroupMap = new Map<string, string[]>();
+
+    for (const r of rules) {
+      if (!r || !r.id || !r.rule_text) continue;
+      // Normalização do texto (remove acentos, pontuação e espaços extras)
+      const norm = r.rule_text
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+
+      if (!norm) continue;
+
+      if (!textGroupMap.has(norm)) {
+        textGroupMap.set(norm, [r.id]);
+      } else {
+        textGroupMap.get(norm)!.push(r.id);
+      }
+    }
+
+    for (const [key, ids] of textGroupMap.entries()) {
+      if (ids.length > 1) {
+        programmaticDuplicates.push({
+          ruleIds: ids,
+          description: `Existem ${ids.length} registros com o texto idêntico registrados. Mantenha a primeira ocorrência (${ids[0].slice(0, 8)}) e remova as demais.`
+        });
+      }
+    }
+
+    // 2. Análise Semântica via IA (Contradições, Duplicações Semânticas e Melhorias)
+    let llmResult: { contradictions: any[]; duplicates: any[]; improvements: any[] } = {
+      contradictions: [],
+      duplicates: [],
+      improvements: []
+    };
+
+    try {
+      const prompt = `Você é um especialista em lógica e estruturação de prompts de IA jurídica.
 Abaixo está uma lista de regras de memória de uma IA.
-Seu objetivo é analisar rapidamente e encontrar:
-1. Contradições: Regras que dizem o oposto ou entram em conflito.
-2. Duplicações: Regras que dizem a mesma coisa ou tratam do mesmo assunto repetidamente.
+Seu objetivo é analisar e encontrar:
+1. Contradições: Regras que dizem o oposto ou entram em conflito direto.
+2. Duplicações Semânticas: Regras que dizem a mesma coisa com palavras totalmente diferentes.
 3. Melhorias: No máximo 3 regras que estejam confusas, redundantes ou mal estruturadas.
 
 Lista de regras (ID | Persona | Texto):
@@ -5107,38 +5146,53 @@ ${rules.map((r: any) => `${r.id} | ${r.persona} | ${(r.rule_text || '').substrin
 Seja extremamente conciso e direto. Retorne estritamente um JSON válido no seguinte formato:
 {
   "contradictions": [
-    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta em 1 frase do conflito" }
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta do conflito" }
   ],
   "duplicates": [
-    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta em 1 frase indicando qual manter" }
+    { "ruleIds": ["id1", "id2"], "description": "Descrição sucinta do motivo de duplicidade semântica" }
   ],
   "improvements": [
     { "ruleId": "id", "originalText": "texto original", "suggestedText": "texto sugerido mais claro", "reason": "motivo em 1 frase" }
   ]
 }`;
 
-    const response = await callGemini({
-      bypassOpenRouter: true,
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        maxOutputTokens: 1500,
-        temperature: 0.1
-      }
-    });
+      const response = await callGemini({
+        bypassOpenRouter: true,
+        model: "gemini-3.7-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 1500,
+          temperature: 0.1
+        }
+      });
 
-    let text = response.text || "{}";
-    
-    text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch (parseErr) {
-      console.error("Erro no parse do JSON da análise:", parseErr, text);
-      result = { contradictions: [], duplicates: [], improvements: [] };
+      let text = response.text || "{}";
+      text = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      llmResult = JSON.parse(text);
+    } catch (llmErr) {
+      console.warn("[Análise de Regras] LLM falhou ou demorou, mantendo análise programática:", llmErr);
     }
-    res.json(result);
+
+    // Unifica duplicadas programáticas + duplicadas da IA (sem repetir IDs)
+    const combinedDuplicates = [...programmaticDuplicates];
+    if (llmResult.duplicates && Array.isArray(llmResult.duplicates)) {
+      for (const dup of llmResult.duplicates) {
+        if (!dup.ruleIds || !Array.isArray(dup.ruleIds)) continue;
+        const alreadyInProgrammatic = combinedDuplicates.some(pd => 
+          dup.ruleIds.some((id: string) => pd.ruleIds.includes(id))
+        );
+        if (!alreadyInProgrammatic) {
+          combinedDuplicates.push(dup);
+        }
+      }
+    }
+
+    res.json({
+      contradictions: Array.isArray(llmResult.contradictions) ? llmResult.contradictions : [],
+      duplicates: combinedDuplicates,
+      improvements: Array.isArray(llmResult.improvements) ? llmResult.improvements : []
+    });
   } catch (error: any) {
     console.error("Erro na análise de regras:", error);
     res.status(500).json({ error: error.message });
@@ -5215,6 +5269,11 @@ async function ensureDefaultMemoryRules() {
         active: true
       });
       console.log("[MEMÓRIA DA IA] Diretriz oficial de Salário Mínimo 2026/BACEN gravada na memória contínua com sucesso.");
+    } else if (existing.length > 1) {
+      // Limpa duplicadas automáticas mantendo apenas a primeira
+      const toDelete = existing.slice(1).map(r => r.id);
+      await supabaseAdmin.from('ai_memory_rules').delete().in('id', toDelete);
+      console.log(`[MEMÓRIA DA IA] ${toDelete.length} duplicatas do salário mínimo limpas do banco.`);
     }
   } catch (e) {
     // Ignora se tabela ainda não criada ou Supabase offline
