@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -2681,49 +2682,182 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 
 `;
 
-// Logic for API Key Rotation (Round-Robin)
+// ============================================================
+// ROTAÇÃO DE CHAVES GEMINI — ESTADO COMPARTILHADO (SUPABASE)
+// ============================================================
+// api/index.ts roda como função serverless na Vercel. Sob uso concorrente
+// (vários advogados, várias abas, streams reabrindo conexão), a Vercel sobe
+// VÁRIAS instâncias separadas — cada uma com sua própria memória de módulo.
+// Antes disto, keyStatusRegistry era só uma variável local: cada instância
+// nova começava com o registro vazio, achava todas as 19 chaves livres, e
+// batia nelas às cegas ao mesmo tempo que outras instâncias faziam o mesmo —
+// o agregado descoordenado estourava o limite por minuto de cada chave quase
+// instantaneamente ("todas excedidas em menos de 1 segundo").
+//
+// keyStatusRegistry continua existindo como CACHE LOCAL rápido dentro do loop
+// de retentativas de uma mesma requisição (evita 1 round-trip ao banco por
+// tentativa). Mas agora é sincronizado com uma tabela no Supabase no início
+// de cada requisição nova, e toda escrita (chave esgotada, uso registrado)
+// é replicada para lá — para que a PRÓXIMA instância, seja ela qual for,
+// veja o estado atualizado.
 const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender a conexão por minutos desnecessários
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
+// Limite proativo de chamadas por chave por minuto. Evita ATÉ CHEGAR no 429,
+// em vez de só reagir depois. Ajustável via env sem precisar de deploy de código
+// (o limite real do tier gratuito pode variar por modelo/conta).
+const PROACTIVE_RPM_PER_KEY = Number(process.env.GEMINI_RPM_PER_KEY) || 8;
+const KEY_STATE_TABLE = 'gemini_key_state';
+
 interface KeyStatus {
   exhaustedUntil: number; // Para Rate Limits (por minuto)
   dailyExhausted: boolean; // Para Cota Diária (ex: 25M tokens)
+  windowStart: number; // Início da janela de contagem proativa (~60s)
+  windowCount: number; // Chamadas já feitas nesta janela
 }
 const keyStatusRegistry: Record<string, KeyStatus> = {};
+
+const keyHash = (apiKey: string): string => crypto.createHash('sha256').update(apiKey).digest('hex');
+
+// Evita sincronizar com o banco a cada tentativa dentro do mesmo loop de retry
+// (isso já é coberto pelo cache local); só refresca se fizer tempo.
+let lastKeyStateSync = 0;
+const KEY_STATE_SYNC_INTERVAL_MS = 3000;
+
+/** Puxa o estado mais recente das chaves do Supabase para o cache local. Best-effort: se falhar, segue com o que já tinha localmente. */
+async function syncKeyStateFromShared(keys: string[]): Promise<void> {
+  const now = Date.now();
+  if (now - lastKeyStateSync < KEY_STATE_SYNC_INTERVAL_MS) return;
+  lastKeyStateSync = now;
+
+  try {
+    const hashes = keys.map(keyHash);
+    const { data, error } = await supabaseAdmin
+      .from(KEY_STATE_TABLE)
+      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count')
+      .in('key_hash', hashes);
+
+    if (error || !data) return;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const hashToKey = new Map(keys.map(k => [keyHash(k), k]));
+
+    for (const row of data) {
+      const key = hashToKey.get(row.key_hash);
+      if (!key) continue;
+
+      const remoteExhaustedUntil = row.exhausted_until ? new Date(row.exhausted_until).getTime() : 0;
+      const remoteDaily = row.daily_exhausted_date === todayStr;
+      const remoteWindowStart = row.window_start ? new Date(row.window_start).getTime() : now;
+
+      const local = keyStatusRegistry[key];
+      keyStatusRegistry[key] = {
+        // Sempre confia no maior valor conhecido (local ou remoto) — nunca
+        // "esquece" uma exaustão que outra instância descobriu.
+        exhaustedUntil: Math.max(local?.exhaustedUntil || 0, remoteExhaustedUntil),
+        dailyExhausted: (local?.dailyExhausted || false) || remoteDaily,
+        windowStart: remoteWindowStart,
+        windowCount: row.window_count || 0
+      };
+    }
+  } catch (e) {
+    console.warn('[KEY STATE] Falha ao sincronizar estado compartilhado (seguindo com cache local):', e);
+  }
+}
+
+/** Marca uma chave como esgotada (por minuto ou diariamente) local + remotamente. Best-effort, não bloqueia o fluxo principal. */
+function markKeyExhaustedShared(apiKey: string, opts: { exhaustedUntil?: number; daily?: boolean }): void {
+  const hash = keyHash(apiKey);
+  const payload: any = { key_hash: hash, updated_at: new Date().toISOString() };
+  if (opts.exhaustedUntil) payload.exhausted_until = new Date(opts.exhaustedUntil).toISOString();
+  if (opts.daily) payload.daily_exhausted_date = new Date().toISOString().slice(0, 10);
+
+  supabaseAdmin
+    .from(KEY_STATE_TABLE)
+    .upsert(payload, { onConflict: 'key_hash' })
+    .then(({ error }: any) => {
+      if (error) console.warn('[KEY STATE] Falha ao gravar exaustão compartilhada:', error.message);
+    });
+}
+
+/** Registra uso da chave para o limitador proativo de janela deslizante. Best-effort. */
+function recordKeyUsageShared(apiKey: string): void {
+  const key = apiKey;
+  const status = keyStatusRegistry[key];
+  const now = Date.now();
+  const windowExpired = !status || (now - status.windowStart) >= 60000;
+
+  keyStatusRegistry[key] = {
+    exhaustedUntil: status?.exhaustedUntil || 0,
+    dailyExhausted: status?.dailyExhausted || false,
+    windowStart: windowExpired ? now : status.windowStart,
+    windowCount: windowExpired ? 1 : (status.windowCount + 1)
+  };
+
+  const hash = keyHash(key);
+  const updated = keyStatusRegistry[key];
+  supabaseAdmin
+    .from(KEY_STATE_TABLE)
+    .upsert({
+      key_hash: hash,
+      window_start: new Date(updated.windowStart).toISOString(),
+      window_count: updated.windowCount,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'key_hash' })
+    .then(({ error }: any) => {
+      if (error) console.warn('[KEY STATE] Falha ao registrar uso compartilhado:', error.message);
+    });
+}
 
 function getAvailableKey(keys: string[], startIndex: number): { key: string, index: number, waitMs: number } {
   let minWait = Infinity;
   let minWaitIdx = -1;
   let minWaitKey = '';
   const now = Date.now();
-  
+
   for (let i = 0; i < keys.length; i++) {
     const idx = (startIndex + i) % keys.length;
     const key = keys[idx];
-    
+
     // Ignora chaves permanentemente inválidas
     if (invalidKeys.has(key)) continue;
 
     const status = keyStatusRegistry[key];
     if (!status) return { key, index: idx, waitMs: 0 };
     if (status.dailyExhausted) continue; // Pula chaves esgotadas para o dia todo
-    if (status.exhaustedUntil <= now) return { key, index: idx, waitMs: 0 }; // Já liberou do limite por minuto
-    
-    const waitTime = status.exhaustedUntil - now;
+
+    // Limite proativo por minuto: mesmo sem 429 ainda, evita bater numa chave
+    // que já fez muitas chamadas nesta janela — espalha a carga de propósito.
+    const windowActive = (now - status.windowStart) < 60000;
+    const proactivelyBusy = windowActive && status.windowCount >= PROACTIVE_RPM_PER_KEY;
+    const rateLimited = status.exhaustedUntil > now;
+
+    if (!proactivelyBusy && !rateLimited) {
+      return { key, index: idx, waitMs: 0 }; // Livre de verdade
+    }
+
+    // Usa o MAIOR dos dois prazos: se a chave estiver proativamente ocupada
+    // E com um 429 real cujo cooldown passa do reset da janela, o cooldown
+    // real prevalece — senão a chave seria liberada cedo demais e levaria
+    // outro 429 na cara.
+    const proactiveWait = proactivelyBusy ? Math.max(0, 60000 - (now - status.windowStart)) : 0;
+    const rateLimitWait = rateLimited ? (status.exhaustedUntil - now) : 0;
+    const waitTime = Math.max(proactiveWait, rateLimitWait);
+
     if (waitTime < minWait) {
       minWait = waitTime;
       minWaitIdx = idx;
       minWaitKey = key;
     }
   }
-  
+
   if (minWait === Infinity || minWaitIdx === -1) {
     // Todas as chaves ativas estão esgotadas DIARIAMENTE
     return { key: '', index: -1, waitMs: -1 };
   }
-  
-  // Estão todas no limite por minuto. Retorna a chave com o menor tempo de espera necessário.
+
+  // Estão todas ocupadas (limite por minuto ou proativo). Retorna a de menor espera.
   return { key: minWaitKey, index: minWaitIdx, waitMs: minWait };
 }
 
@@ -2946,6 +3080,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
+  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+
   let activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
   let apiKey = keys[activeKeyIndex % keys.length];
 
@@ -2959,10 +3095,11 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
     return callGemini(params, retries, 0, 0, forcedKeyIndex);
   }
-  
+
   activeKeyIndex = available.index;
   apiKey = available.key;
-  
+  recordKeyUsageShared(apiKey);
+
   if (retries === MAX_RETRIES) {
     currentKeyIndex = (activeKeyIndex + 1) % keys.length;
   }
@@ -3004,8 +3141,15 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
     if (isInvalidKey) invalidKeys.add(apiKey);
-    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isDailyQuota) {
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { daily: true });
+    }
+    if (isRateLimit) {
+      const until = Date.now() + 61000;
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: until } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { exhaustedUntil: until });
+    }
 
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
@@ -3177,6 +3321,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
+  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+
   // CACHE: requisições com cachedContent ficam FIXAS na chave que criou o cache
   const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
 
@@ -3197,10 +3343,11 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
       return callGeminiStream(params, retries, 0, 0, forcedKeyIndex, onStatus);
     }
-    
+
     activeKeyIndex = available.index;
     apiKey = available.key;
-    
+    recordKeyUsageShared(apiKey);
+
     // Rotaciona round-robin para a próxima requisição inicial
     if (retries === MAX_RETRIES) {
       currentKeyIndex = (activeKeyIndex + 1) % keys.length;
@@ -3249,8 +3396,15 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
     
     if (isInvalidKey) invalidKeys.add(apiKey);
-    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isDailyQuota) {
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { daily: true });
+    }
+    if (isRateLimit) {
+      const until = Date.now() + 61000;
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: until } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { exhaustedUntil: until });
+    }
 
     if (isExpiredFile) {
       const paramsWithoutFiles = stripExpiredFileData(params);
@@ -3314,6 +3468,8 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
+  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+
   const available = getAvailableKey(keys, currentKeyIndex);
   if (available.waitMs === -1) {
     throw new Error("ALL_KEYS_EXHAUSTED: Todas as chaves esgotaram a cota diária do projeto Google Cloud (25.000.000 tokens).");
@@ -3323,10 +3479,11 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
     await new Promise(r => setTimeout(r, Math.min(available.waitMs, 10000)));
     return callGeminiEmbed(text, retries);
   }
-  
+
   const activeKeyIndex = available.index;
   const apiKey = available.key;
-  
+  recordKeyUsageShared(apiKey);
+
   if (retries === MAX_RETRIES) {
     currentKeyIndex = (activeKeyIndex + 1) % keys.length;
   }
@@ -3364,8 +3521,15 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
     const isInvalidKey = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found') || errorMessage.includes('unauthorized');
     
     if (isInvalidKey) invalidKeys.add(apiKey);
-    if (isDailyQuota) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true };
-    if (isRateLimit) keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: Date.now() + 61000 };
+    if (isDailyQuota) {
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { daily: true });
+    }
+    if (isRateLimit) {
+      const until = Date.now() + 61000;
+      keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], exhaustedUntil: until } as KeyStatus;
+      markKeyExhaustedShared(apiKey, { exhaustedUntil: until });
+    }
 
     console.error(`Erro ao gerar embedding com a chave ${activeKeyIndex}: ${errorMessage.substring(0, 90)}`);
     
