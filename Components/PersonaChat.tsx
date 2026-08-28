@@ -905,7 +905,22 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [showAiMemoryModal, setShowAiMemoryModal] = useState(false);
   const [initialMemoryRule, setInitialMemoryRule] = useState("");
   const [memoryModalPersona, setMemoryModalPersona] = useState("");
-  const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(new Set());
+  const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(() => {
+    try {
+      const local = localStorage.getItem("fc_saved_memory_suggestion_ids");
+      return local ? new Set(JSON.parse(local)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [savedRuleTexts, setSavedRuleTexts] = useState<Set<string>>(() => {
+    try {
+      const local = localStorage.getItem("fc_saved_memory_rules_texts");
+      return local ? new Set(JSON.parse(local)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [savingSuggestionId, setSavingSuggestionId] = useState<string | null>(null);
 
   // Base Legal (Artefato de RAG) Modal State
@@ -1070,6 +1085,35 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       }
     }
   }, [currentSessionId]);
+
+  // Carrega regras de memória ativas para que regras já salvas fiquem permanentemente verdes
+  useEffect(() => {
+    let cancel = false;
+    const loadMemoryRules = async () => {
+      try {
+        const res = await apiFetch("/api/ai-memory-rules");
+        if (res.ok && !cancel) {
+          const rules = await res.json();
+          if (Array.isArray(rules)) {
+            setSavedRuleTexts(prev => {
+              const next = new Set(prev);
+              rules.forEach((r: any) => {
+                if (r.rule_text) next.add(r.rule_text.trim().toLowerCase());
+              });
+              try {
+                localStorage.setItem("fc_saved_memory_rules_texts", JSON.stringify(Array.from(next)));
+              } catch {}
+              return next;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Could not preload memory rules:", e);
+      }
+    };
+    loadMemoryRules();
+    return () => { cancel = true; };
+  }, [persona.aiName]);
 
   // PERF: busca as mensagens da conversa aberta sob demanda.
   // A lista vem sem histórico (ver getAIConversationsList); só a conversa que
@@ -1568,6 +1612,8 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         throw new Error("Não foi possível sintetizar a conversa.");
       }
 
+      const allArtifactMessages = session.messages.filter(m => m.role === 'assistant' && isArtifactContent(m.content));
+
       const newMessages: Message[] = [];
       newMessages.push({
         id: generateId(),
@@ -1576,14 +1622,20 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         timestamp: new Date().toISOString()
       });
 
-      if (activeArtifactMsg) {
-        newMessages.push(activeArtifactMsg);
-        setActiveArtifactId(activeArtifactMsg.id);
+      // Preservar TODOS os artefatos existentes na conversa para continuar trabalhando neles
+      if (allArtifactMessages.length > 0) {
+        newMessages.push(...allArtifactMessages);
       }
 
       setSessions(prev => prev.map(s => 
         s.id === currentSessionId ? { ...s, messages: newMessages } : s
       ));
+
+      if (activeArtifactMsg) {
+        setActiveArtifactId(activeArtifactMsg.id);
+      } else if (allArtifactMessages.length > 0) {
+        setActiveArtifactId(allArtifactMessages[allArtifactMessages.length - 1].id);
+      }
 
       setArtifactUpdatePulse(true);
       setTimeout(() => setArtifactUpdatePulse(false), 2000);
@@ -3093,17 +3145,28 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     if (!ruleText.trim() || savingSuggestionId) return;
     setSavingSuggestionId(msgId);
     try {
+      const cleanRule = ruleText.trim();
       const res = await apiFetch('/api/ai-memory-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           persona: persona.aiName,
-          rule_text: ruleText.trim(),
+          rule_text: cleanRule,
           active: true
         })
       });
       if (res.ok) {
-        setSavedSuggestionIds(prev => new Set(prev).add(msgId));
+        const lowerText = cleanRule.toLowerCase();
+        setSavedSuggestionIds(prev => {
+          const next = new Set(prev).add(msgId);
+          try { localStorage.setItem("fc_saved_memory_suggestion_ids", JSON.stringify(Array.from(next))); } catch {}
+          return next;
+        });
+        setSavedRuleTexts(prev => {
+          const next = new Set(prev).add(lowerText);
+          try { localStorage.setItem("fc_saved_memory_rules_texts", JSON.stringify(Array.from(next))); } catch {}
+          return next;
+        });
       } else {
         console.error('Falha ao salvar regra de memória sugerida');
       }
@@ -3928,34 +3991,40 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                           )}
 
                           {/* UI SUGERIR MEMÓRIA */}
-                          {memorySuggestionText && !savedSuggestionIds.has(msg.id) && (
-                            <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
-                              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
-                                <Lightbulb className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">💡 Sugestão de Aprendizado</p>
-                                <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{memorySuggestionText}</p>
-                              </div>
-                              <button
-                                onClick={() => handleSaveSuggestedMemoryRule(msg.id, memorySuggestionText)}
-                                disabled={savingSuggestionId === msg.id}
-                                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                              >
-                                {savingSuggestionId === msg.id ? 'Salvando...' : '✨ Salvar Regra'}
-                              </button>
-                            </div>
-                          )}
-
-                          {/* UI SUGESTÃO SALVA COM SUCESSO */}
-                          {memorySuggestionText && savedSuggestionIds.has(msg.id) && (
-                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
-                               <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                               <div className="text-sm text-emerald-800 dark:text-emerald-200">
-                                 <span className="font-bold">Diretriz gravada com sucesso:</span> {memorySuggestionText}
-                               </div>
-                            </div>
-                          )}
+                          {(() => {
+                            const isSuggestionSaved = savedSuggestionIds.has(msg.id) || (memorySuggestionText ? savedRuleTexts.has(memorySuggestionText.trim().toLowerCase()) : false);
+                            if (memorySuggestionText && !isSuggestionSaved) {
+                              return (
+                                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
+                                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
+                                    <Lightbulb className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">💡 Sugestão de Aprendizado</p>
+                                    <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{memorySuggestionText}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleSaveSuggestedMemoryRule(msg.id, memorySuggestionText)}
+                                    disabled={savingSuggestionId === msg.id}
+                                    className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                                  >
+                                    {savingSuggestionId === msg.id ? 'Salvando...' : '✨ Salvar Regra'}
+                                  </button>
+                                </div>
+                              );
+                            }
+                            if (memorySuggestionText && isSuggestionSaved) {
+                              return (
+                                <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
+                                   <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                                   <div className="text-sm text-emerald-800 dark:text-emerald-200">
+                                     <span className="font-bold">Diretriz gravada com sucesso:</span> {memorySuggestionText}
+                                   </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           {/* UI COMANDO MEMÓRIA SUCESSO */}
                           {memoryCommandText && (
