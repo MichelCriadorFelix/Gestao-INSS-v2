@@ -1685,25 +1685,38 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           ? ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0)
           : [];
 
-        const freshEntries: Array<{ sig: string; title: string; content: string }> = freshPieces.map(piece => {
-          const headerMatch = piece.match(/^FONTE:\s*(.+?)(?:\s*\[[^\]]*\])?\n([\s\S]*)$/);
-          const title = headerMatch ? headerMatch[1].trim() : '';
-          const content = headerMatch ? headerMatch[2] : piece;
-          return { sig: chunkSignature(title, content), title, content };
+        // O ragContext deste turno mistura duas fontes bem diferentes:
+        // (a) o plano CURADO do planner/safety-net (/api/rag/plan), marcado
+        //     "[Recuperação Exata]" — dispositivos que o próprio raciocínio
+        //     jurídico do caso escolheu como necessários; e
+        // (b) a busca semântica/palavra-chave/título bruta (até ~60
+        //     candidatos por turno, marcados "[Score: N%]"/"[Keyword
+        //     Match]") — recall amplo, SEM curadoria, só pra reforçar a
+        //     resposta deste turno.
+        // O artefato "Base Legal" só deve reter (a): salvar tudo de (b)
+        // inflava o artefato para centenas de itens irrelevantes ao caso.
+        const freshEntries: Array<{ sig: string; title: string; content: string; curated: boolean }> = freshPieces.map(piece => {
+          const headerMatch = piece.match(/^FONTE:\s*(.+?)\s*\[([^\]]*)\]\n([\s\S]*)$/);
+          const title = headerMatch ? headerMatch[1].trim() : (piece.match(/^FONTE:\s*(.+)$/m)?.[1]?.trim() || '');
+          const tag = headerMatch ? headerMatch[2].trim() : '';
+          const content = headerMatch ? headerMatch[3] : piece.replace(/^FONTE:.*\n/, '');
+          const curated = tag === 'Recuperação Exata';
+          return { sig: chunkSignature(title, content), title, content, curated };
         });
 
         let addedNew = 0;
-        freshEntries.forEach(({ sig, title, content }) => {
-          if (!artifact.has(sig)) {
+        freshEntries.forEach(({ sig, title, content, curated }) => {
+          if (curated && !artifact.has(sig)) {
             artifact.set(sig, { title, content, addedAt: nowIso });
             addedNew++;
           }
         });
 
         // Reconstrói o ragContext final: achados deste turno primeiro
-        // (prioridade máxima, ordem preservada), seguidos pelos
-        // dispositivos já conhecidos da conversa que não voltaram agora
-        // (mais recentes primeiro), respeitando um teto de caracteres
+        // (prioridade máxima, ordem preservada, curados e brutos — a
+        // resposta deste turno continua usando os dois), seguidos pelos
+        // dispositivos CURADOS já conhecidos da conversa que não voltaram
+        // agora (mais recentes primeiro), respeitando um teto de caracteres
         // para não inflar o payload indefinidamente numa sessão longa.
         const RAG_ARTIFACT_CHAR_LIMIT = 300000;
         const freshSignatures = new Set(freshEntries.map(e => e.sig));
@@ -2988,6 +3001,14 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         <LegalBaseArtifactModal
           onClose={() => setShowLegalBaseModal(false)}
           artifact={currentSession?.legalBaseArtifact}
+          onClear={() => {
+            if (currentSessionId) {
+              ragArtifactRef.current.delete(currentSessionId);
+              setSessions(prev => prev.map(s => s.id === currentSessionId
+                ? { ...s, legalBaseArtifact: { items: [], updatedAt: new Date().toISOString() } }
+                : s));
+            }
+          }}
         />
       )}
 

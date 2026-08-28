@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { X, BookOpen, Copy, Check, Scale } from "lucide-react";
+import { X, BookOpen, Copy, Check, Scale, Trash2 } from "lucide-react";
 import type { LegalBaseArtifact } from "./PersonaChat";
 
 interface LegalBaseArtifactModalProps {
   onClose: () => void;
   artifact?: LegalBaseArtifact;
+  onClear?: () => void;
 }
 
-export function LegalBaseArtifactModal({ onClose, artifact }: LegalBaseArtifactModalProps) {
+export function LegalBaseArtifactModal({ onClose, artifact, onClear }: LegalBaseArtifactModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const items = artifact?.items || [];
 
@@ -41,9 +42,20 @@ export function LegalBaseArtifactModal({ onClose, artifact }: LegalBaseArtifactM
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            {items.length > 0 && onClear && (
+              <button
+                onClick={() => { if (window.confirm("Limpar a Base Legal desta conversa? Os dispositivos já encontrados serão removidos; novas buscas voltam a preenchê-la.")) onClear(); }}
+                className="p-2 hover:bg-red-50 rounded-full text-gray-400 hover:text-red-500 transition-colors"
+                title="Limpar artefato"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
