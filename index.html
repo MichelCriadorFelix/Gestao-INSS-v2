@@ -8,9 +8,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-    <link rel="apple-touch-icon" href="/icon-192.png">
+    <!-- Navegadores fazem cache de favicon de forma muito agressiva e não
+         respeitam o cache-busting normal do build. Se trocar o arquivo do
+         ícone de novo, incremente o "?v=" abaixo, senão o navegador continua
+         mostrando a versão antiga indefinidamente. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=2">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+    <link rel="apple-touch-icon" href="/icon-192.png?v=2">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
