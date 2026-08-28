@@ -873,9 +873,9 @@ async function detectUserIntent(message: string): Promise<string> {
     return "[ARQUIVO]";
   }
 
-  // PRIORIDADE MÁXIMA: comando explícito de geração de peça (botão ou texto)
-  if (/(?:^|\b)(?:gerar\s+pe[çc]a|gerar\s+peti[çc][ãa]o|gerar\s+inicial|gerar\s+recurso|fazer\s+a\s+pe[çc]a|redigir\s+pe[çc]a|elaborar\s+pe[çc]a)(?:\b|$)/i.test(safeMessage.trim())) {
-    console.log("[Detector] Comando explícito GERAR PEÇA -> [GERAÇÃO]");
+  // PRIORIDADE MÁXIMA: comando explícito de geração de peça ou quesitos (botão ou texto)
+  if (/(?:^|\b)(?:gerar\s+pe[çc]a|gerar\s+peti[çc][ãa]o|gerar\s+inicial|gerar\s+recurso|fazer\s+a\s+pe[çc]a|redigir\s+pe[çc]a|elaborar\s+pe[çc]a|gerar\s+quesitos|fazer\s+quesitos|elaborar\s+quesitos|formular\s+quesitos|redigir\s+quesitos|quesitos\s+periciais|quesitos\s+da\s+parte\s+autora|rol\s+de\s+quesitos|quesita[çc][ãa]o)(?:\b|$)/i.test(safeMessage.trim())) {
+    console.log("[Detector] Comando explícito GERAR PEÇA / QUESITOS -> [GERAÇÃO]");
     return "[GERAÇÃO]";
   }
 
@@ -5681,7 +5681,8 @@ app.post("/api/dr-michel/chat", async (req, res) => {
     const isGenerationRequest = !isReportRequest && (
       isGenerationIntent ||
       isRevisionRequested ||
-      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+      /\b(GERAR|FAZER|ELABORAR|REDIGIR|FORMULAR)\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL|QUESITOS)\b/i.test(message) ||
+      /\b(QUESITOS\s+(DA\s+PARTE\s+AUTORA|PERICIAIS|DO\s+AUTOR|DA\s+AUTORA|M[ÉE]DICOS|T[ÉE]CNICOS|JUDICIAIS)|ROL\s+DE\s+QUESITOS|QUESITA[ÇC][ÃA]O)\b/i.test(message)
     );
 
     // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
@@ -6447,7 +6448,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     const isGenerationRequest = !isReportRequestLuana && (
       isGenerationIntent ||
       isRevisionRequested ||
-      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+      /\b(GERAR|FAZER|ELABORAR|REDIGIR|FORMULAR)\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL|QUESITOS)\b/i.test(message) ||
+      /\b(QUESITOS\s+(DA\s+PARTE\s+AUTORA|PERICIAIS|DO\s+AUTOR|DA\s+AUTORA|M[ÉE]DICOS|T[ÉE]CNICOS|JUDICIAIS)|ROL\s+DE\s+QUESITOS|QUESITA[ÇC][ÃA]O)\b/i.test(message)
     );
 
     // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash
@@ -7298,7 +7300,8 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
     const isGenerationRequest = !isReportRequest && (
       isGenerationIntent ||
       isRevisionRequested ||
-      /\bGERAR\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL)\b/i.test(message)
+      /\b(GERAR|FAZER|ELABORAR|REDIGIR|FORMULAR)\s+(PE[ÇC]A|RECURSO|PETI[ÇC][ÃA]O|PETICAO|INICIAL|QUESITOS)\b/i.test(message) ||
+      /\b(QUESITOS\s+(DA\s+PARTE\s+AUTORA|PERICIAIS|DO\s+AUTOR|DA\s+AUTORA|M[ÉE]DICOS|T[ÉE]CNICOS|JUDICIAIS)|ROL\s+DE\s+QUESITOS|QUESITA[ÇC][ÃA]O)\b/i.test(message)
     );
 
     // Rotear modelo conforme escolha do usuário ou padrão Gemini 3.6 Flash

@@ -247,6 +247,46 @@ const isReportContent = (content: string = ''): boolean => {
   return hasReportHeader || hasReportSections;
 };
 
+const isQuesitosContent = (content: string = ''): boolean => {
+  if (!content || content.trim().length < 250) return false;
+  if (isReportContent(content)) return false;
+
+  const trimmed = content.trim();
+
+  // Cabeçalho explícito de quesitos
+  const hasQuesitosHeader = /(?:^|\n)(?:#+\s*)?(?:QUESITOS|ROL\s+DE\s+QUESITOS|QUESITAÇÃO|QUESITOS\s+(?:DA\s+PARTE\s+AUTORA|DO\s+AUTOR|DA\s+AUTORA|PERICIAIS|MÉDICOS|TÉCNICOS|JUDICIAIS)|FORMULAÇÃO\s+DE\s+QUESITOS|DOS\s+QUESITOS|QUESITOS\s+PARA\s+PERÍCIA)/i.test(trimmed);
+
+  // Termos periciais e médicos
+  const hasPericiaKeywords = /(?:quesito|quesitação|perícia\s+médica|perícia\s+judicial|laudo\s+pericial|perito\s+judicial|perita\s+judicial|sr\.?\s*perito|sra\.?\s*perita|assistente\s+técnico|incapacidade\s+laborativa|nexo\s+causal|exame\s+clínico|aptidão\s+laboral)/i.test(trimmed);
+
+  // Verificação de perguntas numeradas (Quesito 1, 1., 1 -, 1), etc.)
+  const hasNumberedQuestions = /(?:^|\n)\s*(?:quesito\s*0?1|1[\.\)\-º°]|quesito\s*primeiro|primeiro\s*quesito)\b/i.test(trimmed) &&
+    /(?:^|\n)\s*(?:quesito\s*0?2|2[\.\)\-º°]|quesito\s*segundo|segundo\s*quesito)\b/i.test(trimmed);
+
+  // Expressões típicas dirigidas ao perito ("Queira o Sr. Perito...", "O examinando...", "Informe o perito...")
+  const hasPeritoPhrasing = /(?:queira\s+o\s+(?:sr\.?\s*)?perit[oa]|informe\s+o\s+(?:sr\.?\s*)?perit[oa]|diga\s+o\s+(?:sr\.?\s*)?perit[oa]|esclare[çc]a\s+o\s+(?:sr\.?\s*)?perit[oa]|responda\s+o\s+(?:sr\.?\s*)?perit[oa]|o\s+examinad[oa]|o\s+periciand[oa]|o\s+autor\s+apresenta|a\s+autora\s+apresenta|h[aá]\s+incapacidade|qual\s+o\s+diagn[óo]stico|existe\s+nexo)/i.test(trimmed);
+
+  // Fecho forense
+  const hasPetitionClosing = /(?:Nestes\s+termos|Pede\s+deferimento|Termos\s+em\s+que\s+pede|Espera\s+deferimento|OAB\/(?:[A-Z]{2})?\s*\d+|MICHEL\s+SANTOS\s+FELIX|LUANA\s+(?:DE\s+OLIVEIRA\s+)?CASTRO)/i.test(trimmed);
+
+  // 1. Se tiver cabeçalho de quesitos E perguntas numeradas ou termos periciais
+  if (hasQuesitosHeader && (hasNumberedQuestions || hasPeritoPhrasing || hasPericiaKeywords || hasPetitionClosing || trimmed.length > 350)) {
+    return true;
+  }
+
+  // 2. Se tiver termos periciais E perguntas numeradas (1. e 2.)
+  if (hasPericiaKeywords && hasNumberedQuestions && (hasPeritoPhrasing || hasPetitionClosing || trimmed.length > 350)) {
+    return true;
+  }
+
+  // 3. Se tiver perguntas numeradas com frases explícitas de quesitação ("Queira o perito...")
+  if (hasNumberedQuestions && hasPeritoPhrasing && trimmed.length > 300) {
+    return true;
+  }
+
+  return false;
+};
+
 const isPetitionContent = (content: string = ''): boolean => {
   if (!content || content.trim().length < 450) return false;
 
@@ -405,8 +445,10 @@ export const detectArtifactType = (content: string = '', userPrompt: string = ''
 
   // 1. Quesitos Periciais
   if (
-    /quesito|quesitos periciais|quesitação|perícia médica|laudo pericial|perita judicial|perito judicial/i.test(clean) &&
-    (/1\.\s*(?:o\s*perito|a\s*autora|o\s*autor|a\s*segurada|queira|informe)|quesitos da parte|reiteração dos quesitos/i.test(clean) || /quesito/i.test(promptLower))
+    isQuesitosContent(content) ||
+    /quesito|quesitos periciais|quesitação|rol de quesitos|quesitos da parte/i.test(promptLower) ||
+    (/quesito|quesitos periciais|quesitação|perícia médica|laudo pericial|perita judicial|perito judicial/i.test(clean) &&
+      (/(?:^|\n)\s*(?:quesito\s*\d+|\d+[\.\)\-º°])\s*[:\-\s]*(?:o\s*perito|a\s*perita|o\s*sr|a\s*sra|o\s*autor|a\s*autora|o\s*examinado|o\s*periciando|a\s*segurada|queira|informe|diga|esclareça|responda|qual|há|existe)/i.test(clean) || /quesitos da parte|rol de quesitos|reiteração dos quesitos/i.test(clean)))
   ) {
     return 'quesitos';
   }
@@ -465,7 +507,7 @@ export const detectArtifactType = (content: string = '', userPrompt: string = ''
 };
 
 const isArtifactContent = (content: string = ''): boolean => {
-  return isPetitionContent(content) || isReportContent(content);
+  return isPetitionContent(content) || isReportContent(content) || isQuesitosContent(content);
 };
 
 export const getArtifactMeta = (
@@ -475,7 +517,8 @@ export const getArtifactMeta = (
   customTypeOverride?: ArtifactTypeKey
 ) => {
   const isReport = isReportContent(content);
-  const typeKey: ArtifactTypeKey = customTypeOverride || (isReport ? 'parecer' : detectArtifactType(content));
+  const isQuesitos = isQuesitosContent(content);
+  const typeKey: ArtifactTypeKey = customTypeOverride || (isReport ? 'parecer' : (isQuesitos ? 'quesitos' : detectArtifactType(content)));
   const config = ARTIFACT_TYPE_CONFIGS[typeKey] || ARTIFACT_TYPE_CONFIGS.geral;
 
   const artifactMessages = messages.filter(m => m.role === 'assistant' && isArtifactContent(m.content));
@@ -502,7 +545,7 @@ export const getArtifactMeta = (
 };
 
 export const getArtifactTypeInfo = (content: string = '', customType?: ArtifactTypeKey) => {
-  const typeKey = customType || (isReportContent(content) ? 'parecer' : detectArtifactType(content));
+  const typeKey = customType || (isReportContent(content) ? 'parecer' : (isQuesitosContent(content) ? 'quesitos' : detectArtifactType(content)));
   const config = ARTIFACT_TYPE_CONFIGS[typeKey] || ARTIFACT_TYPE_CONFIGS.geral;
   return {
     type: typeKey,
@@ -517,6 +560,14 @@ const getArtifactTitle = (content: string = '') => {
   if (!content) return "Documento Jurídico";
   const typeInfo = getArtifactTypeInfo(content);
 
+  if (typeInfo.type === 'quesitos') {
+    const quesitosMatch = content.match(/(?:(?:#+\s*)?(?:ROL\s+DE\s+QUESITOS|QUESITOS\s+(?:DA\s+PARTE\s+AUTORA|PERICIAIS|MÉDICOS|TÉCNICOS|JUDICIAIS|DO\s+AUTOR|DA\s+AUTORA)|QUESITOS|QUESITAÇÃO))[^\n]*/i);
+    if (quesitosMatch) {
+      const clean = quesitosMatch[0].replace(/[*#_]/g, '').trim();
+      if (clean.length > 5 && clean.length < 80) return clean;
+    }
+  }
+
   if (typeInfo.type === 'parecer' || typeInfo.type === 'geral') {
     const reportMatch = content.match(/(?:RELATÓRIO|AUDITORIA|ANÁLISE|PARECER)[^\n]*/i);
     if (reportMatch) {
@@ -524,7 +575,7 @@ const getArtifactTitle = (content: string = '') => {
       if (clean.length > 5 && clean.length < 80) return clean;
     }
   } else {
-    const match = content.match(/(?:AO JUÍZO|EXCELENTÍSSIMO|REQUERIMENTO|PETIÇÃO|CONTESTAÇÃO|PARECER|RECURSO|MANDADO|AGRAVO|EMBARGOS)[^\n]*/i);
+    const match = content.match(/(?:AO JUÍZO|EXCELENTÍSSIMO|REQUERIMENTO|PETIÇÃO|CONTESTAÇÃO|PARECER|RECURSO|MANDADO|AGRAVO|EMBARGOS|ROL\s+DE\s+QUESITOS|QUESITOS)[^\n]*/i);
     if (match) {
       const clean = match[0].replace(/[*#_]/g, '').trim();
       if (clean.length > 5 && clean.length < 80) return clean;
@@ -555,7 +606,7 @@ export const cleanPetitionDocument = (rawContent: string = ''): string => {
     return cleanedReport.trim();
   }
 
-  const startRegex = /(?:AO\s+JUÍZO|EXCELENTÍSSIMO|PROCESSO\s+Nº|REQUERIMENTO|CONTESTAÇÃO|PARECER\s+JURÍDICO|NOTIFICAÇÃO\s+EXTRAJUDICIAL|ILUSTRÍSSIMO|MEMORIAIS|AGRAVO|MANDADO\s+DE\s+SEGURANÇA|PETIÇÃO\s+INICIAL|RECURSO)/i;
+  const startRegex = /(?:AO\s+JUÍZO|EXCELENTÍSSIMO|PROCESSO\s+Nº|REQUERIMENTO|CONTESTAÇÃO|PARECER\s+JURÍDICO|NOTIFICAÇÃO\s+EXTRAJUDICIAL|ILUSTRÍSSIMO|MEMORIAIS|AGRAVO|MANDADO\s+DE\s+SEGURANÇA|PETIÇÃO\s+INICIAL|RECURSO|ROL\s+DE\s+QUESITOS|QUESITOS\s+DA\s+PARTE|QUESITOS\s+PERICIAIS|QUESITOS|QUESITAÇÃO)/i;
   const match = rawContent.match(startRegex);
 
   let cleaned = rawContent;
