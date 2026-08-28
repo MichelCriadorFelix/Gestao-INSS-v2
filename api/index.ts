@@ -1043,16 +1043,27 @@ function smartTruncate(text: string, maxChars: number): string {
 }
 
 function normalizeForMatching(str: string): string {
-  return (str || '')
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n+/g, '\n')
+  return (str || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function stripMarkdownForPatch(str: string): string {
+  return (str || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/^[#\s*_-]+/gm, "")
+    .replace(/[*_`~>]/g, "")
+    .replace(/[â€œâ€"Â«Â»]/g, '"')
+    .replace(/[â€˜â€™]/g, "'")
+    .replace(/[ \t]+/g, " ")
     .trim();
 }
 
 function flexibleReplace(source: string, search: string, replacement: string): string {
   if (!source || !search) return source;
-  
+
   // 1. Match exato direto
   if (source.includes(search)) {
     return source.replace(search, replacement);
@@ -1064,30 +1075,59 @@ function flexibleReplace(source: string, search: string, replacement: string): s
     return source.replace(cleanSearch, replacement);
   }
 
-  // 3. Match flexÃ­vel por palavras-chave de inÃ­cio e fim
-  const normSearch = normalizeForMatching(search);
-  const searchWords = normSearch.split(/\s+/).filter(w => w.length > 2);
-  if (searchWords.length >= 2) {
-    const firstWord = searchWords[0];
-    const lastWord = searchWords[searchWords.length - 1];
-
-    let firstPos = source.indexOf(firstWord);
-    let lastPos = source.indexOf(lastWord, firstPos > -1 ? firstPos : 0);
-
-    if (firstPos !== -1 && lastPos !== -1 && lastPos > firstPos && (lastPos - firstPos) < search.length * 2.5) {
-      const endPos = lastPos + lastWord.length;
-      return source.substring(0, firstPos) + replacement + source.substring(endPos);
-    }
-  }
-
-  // 4. Regex flexÃ­vel para espaÃ§os
+  // 3. Regex flexÃ­vel para espaÃ§amento e quebras de linha
   try {
-    const escaped = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-    const regex = new RegExp(escaped, 'i');
+    const escaped = cleanSearch
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "[\\s\\r\\n\\t]+");
+    const regex = new RegExp(escaped, "i");
     if (regex.test(source)) {
       return source.replace(regex, replacement);
     }
   } catch {}
+
+  // 4. Match tolerante a Markdown (strip #, *, _, >)
+  try {
+    const strippedSearch = stripMarkdownForPatch(cleanSearch);
+    if (strippedSearch.length > 20) {
+      const words = strippedSearch.split(/\s+/).filter(w => w.length > 1);
+      if (words.length >= 3) {
+        const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\r\\n\\t#*_\`~>-]+");
+        const regex = new RegExp(pattern, "i");
+        if (regex.test(source)) {
+          return source.replace(regex, replacement);
+        }
+      }
+    }
+  } catch {}
+
+  // 5. Sliding Window / Token Anchors (Multi-word anchor search)
+  const normSearch = normalizeForMatching(cleanSearch);
+  const normWords = normSearch.split(/\s+/).filter(w => w.length >= 3);
+  if (normWords.length >= 4) {
+    const headWords = normWords.slice(0, 3).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\S]{1,25}?");
+    const tailWords = normWords.slice(-3).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\S]{1,25}?");
+    try {
+      const anchorRegex = new RegExp("(" + headWords + "[\\s\\S]*?" + tailWords + ")", "i");
+      const match = anchorRegex.exec(source);
+      if (match && match[0] && Math.abs(match[0].length - search.length) < search.length * 0.5) {
+        return source.substring(0, match.index) + replacement + source.substring(match.index + match[0].length);
+      }
+    } catch {}
+  }
+
+  // 6. Match por TÃ­tulo de SeÃ§Ã£o (ex: "VIII. DO ROL DE DOCUMENTOS" ou "DOS FATOS")
+  const sectionTitleMatch = cleanSearch.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÃ-Ãš\s]+|DA\s+[A-ZÃ-Ãš\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|ROL\s+DE\s+DOCUMENTOS)\*{0,2}[:.]?/im);
+  if (sectionTitleMatch) {
+    const sectionName = sectionTitleMatch[1].trim();
+    try {
+      const secPattern = "(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}" + sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+") + "\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos|Belford\\s+Roxo|Rio\\s+de\\s+Janeiro|MICHEL\\s+SANTOS|LUANA\\s+DE\\s+OLIVEIRA))|$)";
+      const secRegex = new RegExp(secPattern, "i");
+      if (secRegex.test(source)) {
+        return source.replace(secRegex, replacement);
+      }
+    } catch {}
+  }
 
   return source;
 }
@@ -1098,17 +1138,32 @@ function flexibleInsertAfter(source: string, target: string, insertion: string):
   const idx = source.indexOf(target);
   if (idx !== -1) {
     const insertPos = idx + target.length;
-    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+    return source.substring(0, insertPos) + "\n\n" + insertion + source.substring(insertPos);
   }
 
   const cleanTarget = target.trim();
   const cleanIdx = source.indexOf(cleanTarget);
   if (cleanIdx !== -1) {
     const insertPos = cleanIdx + cleanTarget.length;
-    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+    return source.substring(0, insertPos) + "\n\n" + insertion + source.substring(insertPos);
   }
 
-  return source + '\n\n' + insertion;
+  try {
+    const escaped = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "[\\s\\r\\n\\t]+");
+    const regex = new RegExp(escaped, "i");
+    const match = regex.exec(source);
+    if (match && match.index !== undefined) {
+      const insertPos = match.index + match[0].length;
+      return source.substring(0, insertPos) + "\n\n" + insertion + source.substring(insertPos);
+    }
+  } catch {}
+
+  // Se o target for o fecho/assinaturas
+  if (/assinatura|advogad|nestes termos|pede deferimento|oab/i.test(target)) {
+    return source + "\n\n" + insertion;
+  }
+
+  return source + "\n\n" + insertion;
 }
 
 export function applyArtifactPatches(originalDoc: string, aiResponseText: string): { updatedText: string; appliedCount: number; cleanResponse: string } {
@@ -1132,8 +1187,8 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
   }
 
   for (const block of blocksToProcess) {
-    // PadrÃ£o 1: <<<SEARCH ... === ... >>>
-    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>/g;
+    // PadrÃ£o 1: <<<SEARCH ... === ... (>>> ou fim do bloco)
+    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi;
     let srMatch;
     while ((srMatch = searchReplaceRegex.exec(block)) !== null) {
       const search = srMatch[1].trim();
@@ -1148,7 +1203,7 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
     }
 
     // PadrÃ£o 2: SEARCH: ... REPLACE: ...
-    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$))/gi;
+    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi;
     let lsrMatch;
     while ((lsrMatch = labeledSRRegex.exec(block)) !== null) {
       const search = lsrMatch[1].trim();
@@ -1162,12 +1217,12 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
       }
     }
 
-    // PadrÃ£o 3: <<<AFTER ... === ... >>> ou AFTER: ... INSERT: ...
-    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    // PadrÃ£o 3: <<<AFTER ... === ... (>>> ou fim do bloco) ou AFTER: ... INSERT: ...
+    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$)))/gi;
     let aiMatch;
     while ((aiMatch = afterInsertRegex.exec(block)) !== null) {
-      const target = (aiMatch[1] || aiMatch[3] || '').trim();
-      const insert = (aiMatch[2] || aiMatch[4] || '').trim();
+      const target = (aiMatch[1] || aiMatch[3] || "").trim();
+      const insert = (aiMatch[2] || aiMatch[4] || "").trim();
       if (target && insert) {
         const newDoc = flexibleInsertAfter(doc, target, insert);
         if (newDoc !== doc) {
@@ -1177,13 +1232,13 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
       }
     }
 
-    // PadrÃ£o 4: <<<REMOVE ... >>> ou REMOVE: ...
-    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)\s*>>>|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    // PadrÃ£o 4: <<<REMOVE ... (>>> ou fim do bloco) ou REMOVE: ...
+    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$)))/gi;
     let rMatch;
     while ((rMatch = removeRegex.exec(block)) !== null) {
-      const target = (rMatch[1] || rMatch[2] || '').trim();
+      const target = (rMatch[1] || rMatch[2] || "").trim();
       if (target) {
-        const newDoc = flexibleReplace(doc, target, '');
+        const newDoc = flexibleReplace(doc, target, "");
         if (newDoc !== doc) {
           doc = newDoc;
           appliedCount++;
@@ -1192,12 +1247,35 @@ export function applyArtifactPatches(originalDoc: string, aiResponseText: string
     }
   }
 
+  // 5. Fallback estrutural: se nenhum patch formal casou, mas o texto contÃ©m uma seÃ§Ã£o formal da petiÃ§Ã£o
+  if (appliedCount === 0 && originalDoc && aiResponseText.length > 80) {
+    const cleanedAi = aiResponseText.replace(/```[\s\S]*?```/g, "").trim();
+    const sectionMatch = cleanedAi.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÃ-Ãš\s]+|DA\s+[A-ZÃ-Ãš\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|ROL\s+DE\s+DOCUMENTOS)\*{0,2}[:.]?/im);
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1].trim();
+      try {
+        const secPattern = "(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}" + sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+") + "\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos))|$)";
+        const secRegex = new RegExp(secPattern, "i");
+        if (secRegex.test(doc)) {
+          doc = doc.replace(secRegex, cleanedAi);
+          appliedCount++;
+        }
+      } catch {}
+    }
+  }
+
   // Remove os blocos de cÃ³digo de patch da resposta amigÃ¡vel para o chat
   let cleanResponse = aiResponseText
-    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?\s*[\s\S]*?```/g, '')
-    .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?>>>/g, '')
-    .replace(/<<<AFTER[\s\S]*?===[\s\S]*?>>>/g, '')
-    .replace(/<<<REMOVE[\s\S]*?>>>/g, '')
+    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?[\s\S]*?```/gi, "")
+    .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, "")
+    .replace(/<<<AFTER[\s\S]*?===[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, "")
+    .replace(/<<<REMOVE[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, "")
+    .replace(/SEARCH:[\s\S]*?REPLACE:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, "")
+    .replace(/AFTER:[\s\S]*?INSERT:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, "")
+    .replace(/REMOVE:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, "")
+    .replace(/<<<(?:SEARCH|AFTER|REMOVE|END)[^>]*>>>?/gi, "")
+    .replace(/===[^>\n]*>>>?/gi, "")
+    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?/gi, "")
     .trim();
 
   if (!cleanResponse) {
@@ -8842,330 +8920,26 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
         inserted.push({
           content: subChunks[i],
           metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
-            chunk_index: i, total_chunks: subChunks.length },
-          embedding
-        });
-      } catch (embErr: any) {
-        send({ log: `  âš ï¸  Erro embedding ${i + 1}: ${String(embErr.message)}` });
-        errors++;
-      }
-    }
-
-    send({ log: `ğŸ’¾ Salvando ${inserted.length} trechos no banco...` });
-
-    if (inserted.length > 0) {
-      // Inserir novos
-      const { error: insertErr } = await supabaseAdmin.from('legal_documents').insert(inserted);
-      if (insertErr) throw new Error('Insert: ' + insertErr.message);
-      // Deletar original
-      const { error: deleteErr } = await supabaseAdmin.from('legal_documents').delete().eq('id', doc.id);
-      if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
-    }
-
-    // Contar quantos restam
-    const { data: remainingData } = await supabaseAdmin
-      .rpc('count_large_legal_documents', { min_chars: 8000 });
-    const remaining = Number(remainingData) || 0;
-
-    send({
-      log: `âœ… "${titulo}" â†’ ${inserted.length} trechos salvos${errors > 0 ? ` (${errors} erros)` : ''}`,
-      done: remaining === 0,
-      remaining,
-      total_grandes: totalGrandes,
-      new_chunks: inserted.length,
-      errors
-    });
-
-    if (remaining === 0) {
-      send({ log: 'ğŸ‰ Base totalmente otimizada! Todos os documentos foram rechunked.' });
-    } else {
-      send({ log: `â© Restam ${remaining} documentos grandes. Clique em "Continuar" para processar o prÃ³ximo.` });
-    }
-
-  } catch (err: any) {
-    send({ error: String(err?.message || 'Erro interno desconhecido') });
-  }
-
-  res.end();
-});
-
-
-
-
-// ============================================================
-// ENDPOINT: GERAR EMBEDDINGS PARA CHUNKS PENDENTES
-// Processa chunks com embedding IS NULL em lotes de 15
-// Usa callGeminiEmbed + supabaseAdmin â€” 100% server-side
-// ============================================================
-app.post("/api/admin/fix-embeddings", async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-
-  const send = (obj: object) => {
-    try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {}
-  };
-
-  try {
-    const adminKey = req.body?.adminKey || req.body?.adminkey;
-    const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
-    if (adminKey !== expectedKey) {
-      send({ error: "NÃ£o autorizado" });
-      return res.end();
-    }
-
-    const BATCH = 15;
-
-    // Contar pendentes
-    const { count: totalPendentes } = await supabaseAdmin
-      .from('legal_documents')
-      .select('id', { count: 'exact', head: true })
-      .is('embedding', null);
-
-    send({ log: `ğŸ“‹ ${totalPendentes || 0} chunks sem embedding encontrados` });
-
-    if (!totalPendentes || totalPendentes === 0) {
-      send({ log: 'âœ… Nenhum chunk pendente â€” base jÃ¡ estÃ¡ completa!', done: true });
-      return res.end();
-    }
-
-    // Buscar em lotes de 15
-    let processed = 0;
-    let errors = 0;
-    let offset = 0;
-
-    while (true) {
-      const { data: chunks, error: fetchErr } = await supabaseAdmin
-        .from('legal_documents')
-        .select('id, content, metadata')
-        .is('embedding', null)
-        .order('id', { ascending: true })
-        .range(offset, offset + BATCH - 1);
-
-      if (fetchErr) { send({ log: `âŒ Erro ao buscar: ${fetchErr.message}` }); break; }
-      if (!chunks || chunks.length === 0) break;
-
-      send({ log: `âš™ï¸  Lote: ${chunks.length} chunks a processar (Progresso: ${processed}/${totalPendentes} feitos, offset: ${offset})` });
-
-      let batchSuccessCount = 0;
-
-      for (const chunk of chunks) {
-        let success = false;
-        try {
-          const embedding = await callGeminiEmbed(chunk.content);
-          if (embedding && embedding.length > 0) {
-            const { error: updateErr } = await supabaseAdmin
-              .from('legal_documents')
-              .update({ embedding })
-              .eq('id', chunk.id);
-
-            if (!updateErr) {
-              processed++;
-              batchSuccessCount++;
-              success = true;
-
-              // Atualizar progresso a cada 5 ou no final do lote
-              if (processed % 5 === 0) {
-                send({ progress: processed, total: totalPendentes, log: `  âœ“ ${processed}/${totalPendentes} embeddings gerados...` });
-              }
-            } else {
-              errors++;
-              send({ log: `  âš ï¸  Erro DB para chunk ${chunk.id}: ${updateErr.message}` });
-            }
-          } else {
-            errors++;
-            send({ log: `  âš ï¸  Embedding retornado estÃ¡ vazio para o chunk ${chunk.id}` });
-          }
-        } catch (e: any) {
-          errors++;
-          send({ log: `  âš ï¸  Chunk ${chunk.id} falhou: ${String(e.message).substring(0, 60)}` });
-        }
-        // Pausa de 300ms entre embeddings para nÃ£o sobrecarregar
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      // Se atualizamos com sucesso N chunks, eles foram removidos do conjunto "embedding IS NULL".
-      // Para o prÃ³ximo lote, apenas precisamos pular aqueles que falharam e continuam com embedding IS NULL.
-      offset += (chunks.length - batchSuccessCount);
-
-      if (chunks.length < BATCH) break; // Ãºltimo lote
-    }
-
-    // Contar restantes reais
-    const { count: restantes } = await supabaseAdmin
-      .from('legal_documents')
-      .select('id', { count: 'exact', head: true })
-      .is('embedding', null);
-
-    send({
-      done: true,
-      processed,
-      errors,
-      remaining: restantes || 0,
-      log: `ğŸ‰ ConcluÃ­do! ${processed} embeddings gerados. ${errors} erros. ${restantes || 0} pendentes.`
-    });
-
-  } catch (err: any) {
-    send({ error: String(err?.message || 'Erro interno') });
-  }
-  res.end();
-});
-
-// ====================================================================
-// DIAGNÃ“STICO DE CHAVES GEMINI (usado pelo botÃ£o "Testar Chaves de API"
-// nas ConfiguraÃ§Ãµes). Faz UMA chamada mÃ­nima real por chave para
-// classificar o status atual (saudÃ¡vel, esgotada, invÃ¡lida, bloqueada,
-// nÃ£o encontrada) e cruza com o estado compartilhado (gemini_key_state)
-// para estimar o uso na janela proativa de 60s. Protegido pelo mesmo
-// middleware de autenticaÃ§Ã£o de sessÃ£o que cobre todo /api/*.
-app.post("/api/admin/test-gemini-keys", async (req, res) => {
-  try {
-    const keys = getApiKeys();
-    if (keys.length === 0) {
-      return res.json({ testedAt: new Date().toISOString(), totalKeys: 0, results: [], summary: {} });
-    }
-
-    const hashes = keys.map(keyHash);
-    const { data: stateRows } = await supabaseAdmin
-      .from(KEY_STATE_TABLE)
-      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count, window_tokens')
-      .in('key_hash', hashes);
-    const stateByHash = new Map((stateRows || []).map((r: any) => [r.key_hash, r]));
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    // Testa em pequenos lotes com pausa entre eles â€” 21 chamadas simultÃ¢neas
-    // criariam a mesma rajada artificial que este diagnÃ³stico existe pra
-    // detectar.
-    const TEST_BATCH_SIZE = 4;
-    const TEST_MODEL = 'gemini-3.5-flash';
-    const results: any[] = [];
-
-    for (let i = 0; i < keys.length; i += TEST_BATCH_SIZE) {
-      const batch = keys.slice(i, i + TEST_BATCH_SIZE);
-      const batchResults = await Promise.all(batch.map(async (apiKey, bi) => {
-        const idx = i + bi;
-        const keyMask = `..${apiKey.slice(-6)}`;
-        const hash = keyHash(apiKey);
-        const state = stateByHash.get(hash);
-        const windowActive = state?.window_start ? (Date.now() - new Date(state.window_start).getTime()) < 60000 : false;
-        const windowCount = windowActive ? (state?.window_count || 0) : 0;
-        const windowTokens = windowActive ? (state?.window_tokens || 0) : 0;
-        const dailyExhausted = state?.daily_exhausted_date === todayStr;
-        const start = Date.now();
-
-        const base = {
-          index: idx + 1,
-          keyMask,
-          windowCount,
-          windowLimit: PROACTIVE_RPM_PER_KEY,
-          windowTokens,
-          tokenLimit: PROACTIVE_TPM_PER_KEY,
-          percentFreeWindow: Math.max(0, Math.round((1 - Math.max(windowCount / PROACTIVE_RPM_PER_KEY, windowTokens / PROACTIVE_TPM_PER_KEY)) * 100)),
-          dailyExhausted
-        };
-
-        try {
-          const ai = new GoogleGenAI({ apiKey });
-          await ai.models.generateContent({
-            model: TEST_MODEL,
-            contents: 'oi',
-            config: { maxOutputTokens: 1 }
-          });
-          recordKeyUsageShared(apiKey);
-          return { ...base, status: 'saudavel', statusLabel: 'âœ… SaudÃ¡vel', responseTimeMs: Date.now() - start };
-        } catch (error: any) {
-          const errorMessage = error?.message || String(error);
-          const is503 = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE');
-          const isRateLimit = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
-          const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
-          const isInvalid = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
-          const isPermission = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
-          const isNotFound = errorMessage.includes('404') || errorMessage.includes('NOT_FOUND');
-
-          let status = 'erro';
-          let statusLabel = 'âš ï¸ Erro desconhecido';
-          if (isInvalid) { status = 'invalida'; statusLabel = 'âŒ InvÃ¡lida'; invalidKeys.add(apiKey); }
-          else if (isPermission) { status = 'bloqueada'; statusLabel = 'ğŸš« Bloqueada / sem permissÃ£o'; }
-          else if (isNotFound) { status = 'nao_encontrada'; statusLabel = 'â“ Modelo/recurso nÃ£o encontrado'; }
-          else if (isDailyQuota) {
-            status = 'esgotada_diaria'; statusLabel = 'ğŸ“… Esgotada (cota diÃ¡ria)';
-            markKeyExhaustedShared(apiKey, { daily: true });
-          } else if (isRateLimit) {
-            status = 'esgotada'; statusLabel = 'â³ Esgotada (limite por minuto)';
-            markKeyExhaustedShared(apiKey, { exhaustedUntil: Date.now() + 61000 });
-          } else if (is503) { status = 'sobrecarregada'; statusLabel = 'ğŸ”¥ Servidor Google sobrecarregado agora'; }
-
-          return {
-            ...base,
-            status,
-            statusLabel,
-            responseTimeMs: Date.now() - start,
-            errorDetail: errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 150)
-          };
-        }
-      }));
-      results.push(...batchResults);
-      if (i + TEST_BATCH_SIZE < keys.length) await new Promise(r => setTimeout(r, 400));
-    }
-
-    const summary: Record<string, number> = {};
-    for (const r of results) summary[r.status] = (summary[r.status] || 0) + 1;
-
-    res.json({ testedAt: new Date().toISOString(), totalKeys: keys.length, model: TEST_MODEL, results, summary });
-  } catch (error: any) {
-    console.error('Erro ao testar chaves Gemini:', error);
-    res.status(500).json({ error: error.message || 'Erro interno' });
-  }
-});
-
-// Manipulador 404 para rotas /api que nÃ£o foram encontradas (deve ficar apÃ³s todas as rotas de API legÃ­timas)
-app.all("/api/*", (req, res) => {
-  res.status(404).json({ error: `Rota API nÃ£o encontrada: ${req.method} ${req.originalUrl}` });
-});
-
-
-// Development server setup
-const PORT = 3000;
-
-if (process.env.NODE_ENV !== "production") {
-  // Use dynamic import to avoid loading Vite in production/Vercel
-  import("vite").then(({ createServer: createViteServer }) => {
-    createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    }).then((vite) => {
-      app.use(vite.middlewares);
-
-app.listen(PORT, "0.0.0.0", () => {
-        console.log(`Development server running on http://localhost:${PORT}`);
-      });
-    });
-  }).catch(err => {
-    console.error("Failed to start development server:", err);
-  });
-} else {
-  // Production setup
-  const path = await import("path");
-  const url = await import("url");
-  const __filename = url.fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  
-  const root = path.join(__dirname, "..");
-  const distPath = path.join(root, 'dist');
-  
-  // Serve static files from the React app
-  app.use(express.static(distPath));
-  
-  // The "catchall" handler: for any request that doesn't
-  // match one above, send back React's index.html file.
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Production server running on port ${PORT}`);
-  });
-}
-
-export default app;
+            cxœÌZİnIv¾×S”	ï²9¦Z”gl$Ôx´DÛŒ-J)g7¶A•ºKdÛÍ.ºdÉZ¹Ù ‹,v€õŞd°‹ÉdA0Wƒ A.r£7ñd!ß©ªşeKöîä"´a“ÕU§Î9uÎw~ªgIğjâ®8ë2¯ÍbsâÌ0uY”o«¯¶/‚i<cËöË>b~,\×¦ÙØ²µe¾/™ÃcgÆ,Lê‡a—ñà¼Å.²™‘\ë‚ùrÚeGŒ½ÿúŸşç?¿bSeN—İ¼ğØ-¶¹ìâÛ(1dèÙsE|*ZË£Â¦`	ëÃèÖ­Œ5ıïÚÊ?|óÛÿf#îŸòÀ•´Q‰0®‘tÉâP83±@²c8Ò¶m½—¢å0«²„}Á:¹ˆl@Ï½Ned†D1»ĞŒBãŠ‚Âî1ş†{1”¾àÇ<=wîöI(çVÓS‹+d.‚8j¶l½2ã!ÓAÎ¨¶X<åˆ7Jµ¡ÕTLÅ]Ö„b³y™:·rîw„/b2zS/à~½ .Í z¥Õ²Åk«é¹Í6ÃSÛ+K’‘¯‘D1(´$Ù¼Š$æä!Î¶Hš×	bœj(¢˜Ï×Š¹<æ]<˜s/€¥íàçUBípáXMG&A<ñy8“ª˜mĞÅ|8áOÑét2{Õûfûa§aË­-ö‹_°ÎVÑ‚ÍîÚßÿş—¬qó"öâÄ—Ë{ÿ÷¿½Îš#X¼Œn^hG!“e_Â­td©6j1(¶¹<Jıİ•è™½wuÒ‡Ùp: QdÂ·ÄV?ê_éd3nÓ)š£µX2¿«p‘û\ÑÁ›?|ó›_±û81½=‡`2öæŞ[îòl,]èÓÓÂ×ò9#U1ğÓÌzñAªn§£÷_ı;PöÍgÌ-‹„*l¶í{¯ˆc²H/HxØ`r¶¥CÆ—Ã÷ËïÏ¼¹´sxS¦œÃjSCÆ+S¬Ã/S‡ 3j*xõ ˆ¨~`‚3áx®l¶Ì>j8‡Mô0¢<èŞøĞúşpgo0wÙÃşAï€õwï÷wvÃ‡#¶ß;è±íG‡ÃÇøyıá¸?¢5ûF'L›
+|f^ƒ>yBÚôe,p”‚mŞ¡u‡´„ûşCïóú´(Qòaöşï~Ç6;Ÿ@wá©×#Ï?ZN¾XØÅVcƒ/¼N;mœxgë×Q£Íxt8dÈ¯Û¤ì»÷…:GR|$âG‚»À&Yìg}|¾€’f,ÎâqJCšÏ›êÌª«¸3ë´6”>-äºCcõ³e'öd@S_	±Xç¾wZ?ùgë=ÇşúıääD‰iòMíĞÈe–<~ÙeøÄ3ù€á9 ‘È¾	=Àÿ‘Fİ›5ÚÚ‘²[ïäœV·–ÏƒçÁQk+³ú
+çKµ—¢S€Q¥èÇâ;C«ö±tÏ¿´³AØ~eô•8/¢°8[€Oáj
+Æá§vogw0œ<îÿ\9Ğ‰ğq–£rİàÄúíÎí»Í­²]o 
+„WpÊ8kcxùGÉx#Òšd£Ñ„"NÂ è…¨¦Y¿ßo?Ó›w¶ªÁn5{Q)Î©xe@y?ñ¡HwEOGˆ¿Nlâx¶ESœq'ÆÈöƒC ß2[ãEV3ó
+L
+ßomÕ¦jïşRa˜Ââ2Å…HqA ]ƒõC—Q%e»±J¤2r]H¡X;Á,™ë}3+,!±——ß2„ü¨ZPuCe6=üu¶8ÄûIäà+à¦"¿ˆSäk­lØÄõÒ˜<9ë15øfæù‚YÄO.i9Òzm§6z"à×dyYşC)™J›ö$€k³9E'ÖÚGşX†
+’ŒÅñÈ1±jf”¥ñ`*,­…vª[ÆqÖÙfj ÚDRQ¡™J˜ÿÃ¯u}ÂQ¨³!ÜJ§§qV$ìğüjËÔÆöŒ­ÂæœRQeLN/Y«1¼£÷_ÿ£*HJxo^”ÖgNPL!,DÎ)L+’4?3–åFÕ–8[)Jªš®¿-[çÑ–tL0<J"¶M>^0*FÙ³´i÷'†µbåGt"M«O8Òª¼~Ëa½h”¹g§ÆW‰í–ÚÆ6æT¨µæóõ?ıiN¬¶l+û‚±şdÛ¼®È)-ş'0Ó4]ŠƒË•IYy¤eTRi²­ŒÅª(,GŠ¼,N?+ç¹:%?*ò«ÊÖ
+§zq‚Œá-Å›Ôæe_.gw˜L¨€>¡(¨¬BØÏÁì'XSà/Ú'Òmº¹h¦qQjí¼Áğûwòƒ<CcS¡‚GVò—ÙX–~W*ƒôSíDTd¨m|ìÜ×•€öãæ8qÕÿÈN¸Œ4e^
+¿jùªçê*2«D¨’a •˜ØvÊßzRó*W¹­ò•s•—/+¡zŞ®àl»º%áÈL&Å>QÖ	°£äX'–V§Íîvª=£œ=*8x‚Ò¡öÓNg!“@]´%s@	[$Ø!¼<ÌHhp . xîEÂ
+)ùœ½¹Il…m¢İÊ;e©Ka÷‘`ÜxÓ\êjş§<j˜‡d_ä•ê\z®*b	´^Â…%k¬TH{­ ¡:µ´ÂT.‰Š©‡xÉ‹Ôæ‹Ä‡KsT«´­¤cNÛ
+¸©v×Wdévi¬E9Pyë«ĞSÂåéŸë`ÆHãò¿ü8e¿¾Õ£Z<*§Ã"¯6Î§üLK­Z6FrØ+uJVÚ1E)]N'¤iõo~Eºrüäò;WŞ(ác²J“ÈVíâË¼ä°Š›ÿÃ¾E¡U±Ú©ø‘å{±]±3è=^¾Û{l§Ï¶õöGìaõà€Y€	øÜBøHeL€Ğ“.B€?ÕézoĞ RäYPô‰7MB~ù¯—ÿ’ßfø[v¸Ûƒ_ó9Ëùåw7çd­>[ —rˆB"âø<Š¼ÏQ"ì'‘FfE<q/¿=>Ğ!šJÊ¥ÛĞ×éå·¾G_}	¦QÅq›ÕH¼Eş&o¹òeñ\ÁÉ[Ç|¿¬©Ê¶&¨›'´·h%…†˜¶‰©8pö’ÂWÉ(½S…¦w;° b,¦^ª6ğ\•¹çº¾xÃ´˜ŠB1¡¨?R—
+6Eô•0È!ÔE”Õ`ùÄ®o¹ÀãuÍó:x¾®éRm%Ğt ÁTÄ½…‡º=JK3Â%zXÉÛ/2·Ëê¹—‘`ÕÄ„p{€
+;\µ»c9íCo™¼…véÂ?iqâÇøşìEH4‡^Ï»ìbYî¦œÎx4£’U±lÏù‚Ø{„ÁR‡9-éÔ±È7vû?ŸŒÆ½q2îİÒ_:2Úw6CĞ„  t¹çŸOòaÊ[Úì¸òOg¿Rf¿bùJXõ‚|‚Q%nI6%Ó}%3d"-ïBV.*ĞãÙ‹–Ò•"ÎıYhç„/Z%¢°.~2ëÎÍ|Ï”OlvZyßE! UìcEuéNµP™…I((¤RÏàöfêş‹¼9ÎşòŸÁ£” zçH¨É] ü%a9& Àƒó«v2ôÌ\OƒËïáœøÌ£±°ÃrEŒƒã¡]tÜ'*´NFƒ¿íCàÏ¶ªw÷vúOğ¤i¼éSûÎú‰O'R¾Æ0†?{éÏ^µ¨ªŠ>O‹øïsVğ"@~Pá¤Ú–PÙBjèZ÷^›V®,ÜZ]w yËŒŞdf6jHKMPæaà+Ÿdz…®eNĞsÏ@‡6>ö¶*ÏÀÜ.^áù‘mß¼Ğ”·ëw‘vVÌ´Ù§5[·ª³”1cZÁÖm€“5Ë=Ÿ¬=©ç x³5_ÚEßc_2‹LÚä«…L,³q5¹4·EQâjµZ8¶»º¿êV‹öâÎiW Äv,3¢Ü^e-ëÔ“+4ø -WShÔOÁ(×IJ)HOİ¿æB-W^¡NÍ-"­«šôjvs‹m¯Ï¹‡
+:\~âÍ=„’ıƒ½Şöxğ´?9Øßì÷¨9½:[k¯8®µBd\Od!BXõ âo½.5&O9#ÔSßCğéZÖ&l({V´‚+x-ŸïF=30¸Oèz¦Õ*²U>Ì¼„+œD}‰{ÍJ9õÅCôˆĞÚå*õªF	îÙsé¢††È€ca®c¬"uÆÔ¤n+Û¥Ç¦'dlJ¯¹ò9a—îˆùÙ^/’X+¥Ë6Ëµ|‰?Ôh2¤…CJG¨É„»
+YBrÁlÛ&Ël›¬¬PÂˆä’®‡ôØ~LR¨÷(Í&›*!Y@‚@`+KÈ¡=bY(¥i¾\}é#ëçÑÓ]“ßßÓ?K	^È°$’áèNçÓt¡¡ƒd…Œ+PUáaS]›_ñ\ŠĞ—ÜîµÓ‡½§½ÁÊ~šµL@ÊŸ®få³ÛyíıÑŞáÁvÒÿÙ£ŞáhÜß¹vú_'’ò‹3GÅ}W;ä"zâ•lİ¾ÓQ½™õ‘»©îiıTÂ ÆDùƒú–D"l¶j™§¥ÉÕ¢t"€dŒ™šz­^0›0c2>í=\¯ÃÇ†ê	¡W½
+÷Eˆ!òdpÍÉ~ÀÈ c»ƒÑh°7œìô‡:Øº­†2~@Œ\·Ñg×n4ÜOìwšåÆ°ê³ë*É-nnÕ>V®OsLwMÛ¥—ªıôìüÔI¶‡§ysk…ò~Íi9ŠÇf&•=6wsğ*j_êíò)ï˜Õµ«[şğÍ×ÿÎî§Ïe"•–+:(&›Wî•Hy§€ËI^2×Iøí’åËÀsR%\*³¯Ù1÷ØjÓ»p~¦¬Ÿ¸ª ¨“÷İ/YßÌ¢k¸®ë]~‹É­Ò"bñğÔ…ÑRi«z­ÜWÒgYä;Ã¿³]£°¯¾/°ë¡º(2’XşÉ<g‰Ü!¡¥@u‹İİ,¾xU#
+BFù¼‹İİzóúİ¿°‘©ûš¤¢Ôv%ãSruì5A¹$] k´X7¦¸(?øpœ.ÏW`²#bNº*!K(>GÅ²ñìyğ<|¿¸µ1m³&kVé›w:Å»ªbv¶sì7å¡½HPç(ióº¬üêâjIW®[×bÿ,o±—Z&YOå@%QŸky¨ûJ¯Ş}AÉ»‘¤p›ÒM¦¡•’xÚú4¨ÚµVuA‚œß òŸß*Hß®I7SÎ²†QÚ½:#±¤/l¡ß¤LoµcİÀttSß¯v›æ% £MõFÑBÑJE2{¨ÿ®nİfÛ´Y»Ë.È‰ètC1„è‘jï©æ†ÂQ}ß‘#pDï†¢ÔıP¾¸ü>R…[ÄğWĞXºéåwÔ¡ŒZªUHU¿î~Òh_õ–U<: `%º•.jW5Ã_Cöx&İ¥ù•¾<{úæÖI¿P§Ş¯E†-t“`Ş@#NkÚæö÷Æ0¬O\XP¸$Uo%qò“şğ©zÇ¨'n¢ŞájèVoÀ	æ|î9Ì›X©¯Åø©DÖEÉ/İÖ<%Ìõ–¯ßxJu½ë«×XSÌiÀ:g"° '0×‘â·k~=	ó¦IõaV7EfõE¡óK±38)Rá´èÍ·.kDŞh›ûÃ
+ñUêĞĞÙ"ãTìœ0Á‹:wŸbEzm³FÇVÈjú<ä¾œZG5‡&z÷Éá,İ_:tûÅİ›D~y”_î¥¤í¾e+—$,è©äŒ€dáÒaéòÊ]a¡ÛP.iHÂ¤ò›^ıÊ¤9LcO)ô-8õ¬|¦ÇKƒEIOJBeÆŠS&“pË¢ÚÏlúyxğd,÷AÌÒ«È¸§¥…®šu´¯m~Z9E5;[J§s_J/°2
+8AÛ.2åât÷µ€ùtZĞEÏš)euË
+-ªP
+ß #F-oÃBXàNL¶´–[”8[Ğë¶^a¥[µ
+$ÇXÚPgxi°`~ôŞp¸Ko&‚ZË3^¥ˆ‚f¬WÎFË@0~ŒÂ´­ßŸ<æÎ+ÍK3Ò-${Ï}Å­mX£`ó“f†¥/nî,°r¤¼·)[O©šÍ\Õ}¬¯”ü¤dtU7QàSreµkkP¬T~ÂÀhç­µÿ  ÿÿ nxÓÂ

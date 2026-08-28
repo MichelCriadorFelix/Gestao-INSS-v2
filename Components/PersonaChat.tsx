@@ -621,6 +621,161 @@ export const cleanPetitionDocument = (rawContent: string = ''): string => {
   return cleaned.trim();
 };
 
+export const cleanPatchFromResponse = (text: string): string => {
+  if (!text) return "";
+  let clean = text
+    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?[\s\S]*?```/gi, '')
+    .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, '')
+    .replace(/<<<AFTER[\s\S]*?===[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, '')
+    .replace(/<<<REMOVE[\s\S]*?(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi, '')
+    .replace(/SEARCH:[\s\S]*?REPLACE:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, '')
+    .replace(/AFTER:[\s\S]*?INSERT:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, '')
+    .replace(/REMOVE:[\s\S]*?(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi, '')
+    .replace(/<<<(?:SEARCH|AFTER|REMOVE|END)[^>]*>>>?/gi, '')
+    .replace(/===[^>\n]*>>>?/gi, '')
+    .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?/gi, '')
+    .trim();
+
+  return clean;
+};
+
+export const cleanSurgicalStreamMessage = (fullText: string): string => {
+  if (!fullText) return "";
+  const patchStartIdx = fullText.search(/(?:```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)|<<<SEARCH|<<<AFTER|<<<REMOVE|SEARCH:)/i);
+  if (patchStartIdx !== -1) {
+    const preamble = fullText.substring(0, patchStartIdx).trim();
+    if (preamble) {
+      return `${preamble}\n\n*[⚡ Aplicando alterações cirúrgicas diretamente no Artefato...]*`;
+    }
+    return "*[⚡ Aplicando alterações cirúrgicas diretamente no Artefato...]*";
+  }
+  return fullText;
+};
+
+function normalizeForPatchMatching(str: string): string {
+  return (str || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function stripMarkdownForPatch(str: string): string {
+  return (str || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/^[#\s*_-]+/gm, '')
+    .replace(/[*_`~>]/g, '')
+    .replace(/[“”"«»]/g, '"')
+    .replace(/[‘’'']/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+function flexibleLocalReplace(source: string, search: string, replacement: string): string {
+  if (!source || !search) return source;
+
+  // 1. Match exato direto
+  if (source.includes(search)) {
+    return source.replace(search, replacement);
+  }
+
+  // 2. Match sem espaços extras nas pontas
+  const cleanSearch = search.trim();
+  if (source.includes(cleanSearch)) {
+    return source.replace(cleanSearch, replacement);
+  }
+
+  // 3. Regex flexível para espaçamento e quebras de linha
+  try {
+    const escaped = cleanSearch
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '[\\s\\r\\n\\t]+');
+    const regex = new RegExp(escaped, 'i');
+    if (regex.test(source)) {
+      return source.replace(regex, replacement);
+    }
+  } catch {}
+
+  // 4. Match tolerante a Markdown (strip #, *, _, >)
+  try {
+    const strippedSearch = stripMarkdownForPatch(cleanSearch);
+    if (strippedSearch.length > 20) {
+      const words = strippedSearch.split(/\s+/).filter(w => w.length > 1);
+      if (words.length >= 3) {
+        const pattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\r\\n\\t#*_`~>-]+');
+        const regex = new RegExp(pattern, 'i');
+        if (regex.test(source)) {
+          return source.replace(regex, replacement);
+        }
+      }
+    }
+  } catch {}
+
+  // 5. Sliding Window / Token Anchors (Multi-word anchor search)
+  const normSearch = normalizeForPatchMatching(cleanSearch);
+  const normWords = normSearch.split(/\s+/).filter(w => w.length >= 3);
+  if (normWords.length >= 4) {
+    const headWords = normWords.slice(0, 3).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\S]{1,25}?');
+    const tailWords = normWords.slice(-3).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\S]{1,25}?');
+    try {
+      const anchorRegex = new RegExp(`(${headWords}[\\s\\S]*?${tailWords})`, 'i');
+      const match = anchorRegex.exec(source);
+      if (match && match[0] && Math.abs(match[0].length - search.length) < search.length * 0.5) {
+        return source.substring(0, match.index) + replacement + source.substring(match.index + match[0].length);
+      }
+    } catch {}
+  }
+
+  // 6. Match por Título de Seção (ex: "VIII. DO ROL DE DOCUMENTOS" ou "DOS FATOS")
+  const sectionTitleMatch = cleanSearch.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÁ-Ú\s]+|DA\s+[A-ZÁ-Ú\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|ROL\s+DE\s+DOCUMENTOS)\*{0,2}[:.]?/im);
+  if (sectionTitleMatch) {
+    const sectionName = sectionTitleMatch[1].trim();
+    try {
+      const secPattern = `(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos|Belford\\s+Roxo|Rio\\s+de\\s+Janeiro|MICHEL\\s+SANTOS|LUANA\\s+DE\\s+OLIVEIRA))|$)`;
+      const secRegex = new RegExp(secPattern, 'i');
+      if (secRegex.test(source)) {
+        return source.replace(secRegex, replacement);
+      }
+    } catch {}
+  }
+
+  return source;
+}
+
+function flexibleLocalInsertAfter(source: string, target: string, insertion: string): string {
+  if (!source || !target || !insertion) return source;
+
+  const idx = source.indexOf(target);
+  if (idx !== -1) {
+    const insertPos = idx + target.length;
+    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+  }
+
+  const cleanTarget = target.trim();
+  const cleanIdx = source.indexOf(cleanTarget);
+  if (cleanIdx !== -1) {
+    const insertPos = cleanIdx + cleanTarget.length;
+    return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+  }
+
+  try {
+    const escaped = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '[\\s\\r\\n\\t]+');
+    const regex = new RegExp(escaped, 'i');
+    const match = regex.exec(source);
+    if (match && match.index !== undefined) {
+      const insertPos = match.index + match[0].length;
+      return source.substring(0, insertPos) + '\n\n' + insertion + source.substring(insertPos);
+    }
+  } catch {}
+
+  // Se o target for o fecho/assinaturas
+  if (/assinatura|advogad|nestes termos|pede deferimento|oab/i.test(target)) {
+    return source + '\n\n' + insertion;
+  }
+
+  return source + '\n\n' + insertion;
+}
+
 export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: string): { updatedText: string; appliedCount: number } => {
   let doc = originalDoc;
   let appliedCount = 0;
@@ -640,61 +795,62 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
   }
 
   for (const block of blocksToProcess) {
-    // 1. <<<SEARCH ... === ... >>>
-    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>/g;
+    // 1. <<<SEARCH ... === ... (>>> ou fim do bloco)
+    const searchReplaceRegex = /<<<SEARCH\s*([\s\S]*?)\s*===\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))/gi;
     let srMatch;
     while ((srMatch = searchReplaceRegex.exec(block)) !== null) {
       const search = srMatch[1].trim();
       const replace = srMatch[2].trim();
-      if (search && doc.includes(search)) {
-        doc = doc.replace(search, replace);
-        appliedCount++;
-      } else if (search) {
-        const cleanSearch = search.replace(/\s+/g, ' ');
-        const cleanDoc = doc.replace(/\s+/g, ' ');
-        if (cleanDoc.includes(cleanSearch)) {
-          doc = doc.replace(new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'), 'i'), replace);
+      if (search) {
+        const newDoc = flexibleLocalReplace(doc, search, replace);
+        if (newDoc !== doc) {
+          doc = newDoc;
           appliedCount++;
         }
       }
     }
 
     // 2. SEARCH: ... REPLACE: ...
-    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$))/gi;
+    const labeledSRRegex = /SEARCH:\s*([\s\S]*?)\s*REPLACE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$))/gi;
     let lsrMatch;
     while ((lsrMatch = labeledSRRegex.exec(block)) !== null) {
       const search = lsrMatch[1].trim();
       const replace = lsrMatch[2].trim();
-      if (search && doc.includes(search)) {
-        doc = doc.replace(search, replace);
-        appliedCount++;
-      }
-    }
-
-    // 3. <<<AFTER ... === ... >>>
-    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)\s*>>>|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
-    let aiMatch;
-    while ((aiMatch = afterInsertRegex.exec(block)) !== null) {
-      const target = (aiMatch[1] || aiMatch[3] || '').trim();
-      const insert = (aiMatch[2] || aiMatch[4] || '').trim();
-      if (target && insert) {
-        const idx = doc.indexOf(target);
-        if (idx !== -1) {
-          const insertPos = idx + target.length;
-          doc = doc.substring(0, insertPos) + '\n\n' + insert + doc.substring(insertPos);
+      if (search) {
+        const newDoc = flexibleLocalReplace(doc, search, replace);
+        if (newDoc !== doc) {
+          doc = newDoc;
           appliedCount++;
         }
       }
     }
 
-    // 4. <<<REMOVE ... >>>
-    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)\s*>>>|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|$)))/gi;
+    // 3. <<<AFTER ... === ... (>>> ou fim do bloco)
+    const afterInsertRegex = /(?:<<<AFTER\s*([\s\S]*?)\s*===\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))|AFTER:\s*([\s\S]*?)\s*INSERT:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$)))/gi;
+    let aiMatch;
+    while ((aiMatch = afterInsertRegex.exec(block)) !== null) {
+      const target = (aiMatch[1] || aiMatch[3] || '').trim();
+      const insert = (aiMatch[2] || aiMatch[4] || '').trim();
+      if (target && insert) {
+        const newDoc = flexibleLocalInsertAfter(doc, target, insert);
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
+      }
+    }
+
+    // 4. <<<REMOVE ... (>>> ou fim do bloco)
+    const removeRegex = /(?:<<<REMOVE\s*([\s\S]*?)(?:>>>|```|(?=<<<SEARCH|<<<AFTER|<<<REMOVE|$))|REMOVE:\s*([\s\S]*?)(?=(?:SEARCH:|AFTER:|REMOVE:|```|<<<|$)))/gi;
     let rMatch;
     while ((rMatch = removeRegex.exec(block)) !== null) {
       const target = (rMatch[1] || rMatch[2] || '').trim();
-      if (target && doc.includes(target)) {
-        doc = doc.replace(target, '');
-        appliedCount++;
+      if (target) {
+        const newDoc = flexibleLocalReplace(doc, target, '');
+        if (newDoc !== doc) {
+          doc = newDoc;
+          appliedCount++;
+        }
       }
     }
   }
@@ -702,10 +858,10 @@ export const applyLocalArtifactPatches = (originalDoc: string, aiResponseText: s
   // 5. Fallback estrutural: se nenhum patch formal casou, mas o texto contém uma seção formal da petição
   if (appliedCount === 0 && originalDoc && aiResponseText.length > 80) {
     const cleanedAi = cleanPetitionDocument(aiResponseText);
-    const sectionMatch = cleanedAi.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÁ-Ú\s]+|DA\s+[A-ZÁ-Ú\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?)\*{0,2}[:.]?/im);
+    const sectionMatch = cleanedAi.match(/^(?:(?:\d+\.|\b[IVXLCDM]+\b\.?|-)\s*)?\*{0,2}(DOS?\s+[A-ZÁ-Ú\s]+|DA\s+[A-ZÁ-Ú\s]+|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|ROL\s+DE\s+DOCUMENTOS)\*{0,2}[:.]?/im);
     if (sectionMatch) {
       const sectionName = sectionMatch[1].trim();
-      const sectionRegex = new RegExp(`(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}${sectionName.replace(/\s+/g, '\\s+')}\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos))|$)`, 'i');
+      const sectionRegex = new RegExp(`(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\*{0,2}[:.]?[\\s\\S]*?(?=(?:\\n\\n(?:(?:\\d+\\.|\\b[IVXLCDM]+\\b\\.?|-)\\s*)?\\*{0,2}(?:DOS?|DA|PRELIMINARMENTE|PEDIDOS?|REQUERIMENTOS?|Nestes\\s+termos))|$)`, 'i');
       if (sectionRegex.test(doc)) {
         doc = doc.replace(sectionRegex, cleanedAi);
         appliedCount++;
@@ -2123,7 +2279,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                   if (data.text) {
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
                     fullText += data.text;
-                    setStreamingMessage(fullText);
+                    setStreamingMessage(isSurgicalCorrection ? cleanSurgicalStreamMessage(fullText) : fullText);
                     // Não ativa o painel de streaming se for uma edição cirúrgica de artefato existente
                     if (!isArtifactActive && isArtifactContent(fullText) && !isSurgicalCorrection) {
                       isArtifactActive = true;
@@ -2183,12 +2339,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       // Limpar blocos de código de artifact_patch do texto para a conversa ficar elegante e focada no parecer
       let displayContent = fullText || "Desculpe, não consegui gerar uma resposta.";
       if (finalArtifactUpdate || isSurgicalCorrection) {
-        displayContent = displayContent
-          .replace(/```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)?[\s\S]*?```/gi, '')
-          .replace(/<<<SEARCH[\s\S]*?===[\s\S]*?>>>/g, '')
-          .replace(/<<<AFTER[\s\S]*?===[\s\S]*?>>>/g, '')
-          .replace(/<<<REMOVE[\s\S]*?>>>/g, '')
-          .trim();
+        displayContent = cleanPatchFromResponse(displayContent);
         if (!displayContent) {
           displayContent = "✅ **Alteração aplicada com sucesso ao Artefato!** O documento foi atualizado cirurgicamente com a modificação solicitada mantendo todas as demais seções intactas.";
         }
