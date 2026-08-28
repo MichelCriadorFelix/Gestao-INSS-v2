@@ -58,7 +58,10 @@ export interface ChatSession {
   messages: Message[];
   ai_name: 'michel' | 'luana' | 'felix_castro' | 'fabricia';
   documents?: any[];
+  legalBaseArtifact?: any;
 }
+
+const LEGAL_BASE_ARTIFACT_MARKER = '[SYSTEM_LEGAL_BASE_ARTIFACT]';
 
 export interface SavedCalculation {
   id: string;
@@ -73,12 +76,23 @@ export const supabaseService = {
     const supabase = getSupabase();
     if (!supabase) return null;
     
-    let messagesToSave = session.messages.filter(m => !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]'));
+    let messagesToSave = session.messages.filter(m =>
+      !m.content?.startsWith('[SYSTEM_DOCUMENTS_METADATA]') &&
+      !m.content?.startsWith(LEGAL_BASE_ARTIFACT_MARKER)
+    );
     if (session.documents && session.documents.length > 0) {
       messagesToSave = [...messagesToSave, {
         id: 'system-documents-metadata',
         role: 'user',
         content: `[SYSTEM_DOCUMENTS_METADATA]\n${JSON.stringify(session.documents)}`,
+        timestamp: new Date().toISOString()
+      }];
+    }
+    if (session.legalBaseArtifact && session.legalBaseArtifact.items?.length > 0) {
+      messagesToSave = [...messagesToSave, {
+        id: 'system-legal-base-artifact',
+        role: 'user',
+        content: `${LEGAL_BASE_ARTIFACT_MARKER}\n${JSON.stringify(session.legalBaseArtifact)}`,
         timestamp: new Date().toISOString()
       }];
     }
@@ -165,7 +179,17 @@ export const supabaseService = {
         console.error('Error parsing documents metadata', e);
       }
     }
-    return { messages, documents };
+    let legalBaseArtifact: any = undefined;
+    const artifactIdx = messages.findIndex((m: any) => m.content?.startsWith(LEGAL_BASE_ARTIFACT_MARKER));
+    if (artifactIdx !== -1) {
+      try {
+        legalBaseArtifact = JSON.parse(messages[artifactIdx].content.replace(`${LEGAL_BASE_ARTIFACT_MARKER}\n`, ''));
+        messages = messages.filter((_: any, i: number) => i !== artifactIdx);
+      } catch (e) {
+        console.error('Error parsing legal base artifact', e);
+      }
+    }
+    return { messages, documents, legalBaseArtifact };
   },
 
   async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
@@ -201,10 +225,21 @@ export const supabaseService = {
           console.error('Error parsing documents metadata', e);
         }
       }
+      let legalBaseArtifact: any = undefined;
+      const artifactMsgIndex = messages.findIndex((m: any) => m.content?.startsWith(LEGAL_BASE_ARTIFACT_MARKER));
+      if (artifactMsgIndex !== -1) {
+        try {
+          legalBaseArtifact = JSON.parse(messages[artifactMsgIndex].content.replace(`${LEGAL_BASE_ARTIFACT_MARKER}\n`, ''));
+          messages = messages.filter((_: any, i: number) => i !== artifactMsgIndex);
+        } catch (e) {
+          console.error('Error parsing legal base artifact', e);
+        }
+      }
       return {
         ...session,
         messages,
-        documents
+        documents,
+        legalBaseArtifact
       };
     });
   },

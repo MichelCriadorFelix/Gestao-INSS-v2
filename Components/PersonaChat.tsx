@@ -35,7 +35,8 @@ import {
   EyeIcon as Eye,
   ArrowPathRoundedSquareIcon as RefreshCw,
   StopIcon as Stop,
-  PhotoIcon as Photo
+  PhotoIcon as Photo,
+  ScaleIcon as Scale
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -45,6 +46,7 @@ import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { getDbConfig } from '../supabaseClient';
 import EliteRedactionModal from './EliteRedactionModal';
 import { AiMemoryModal } from './AiMemoryModal';
+import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
 import { PersonaConfig } from './personaConfig';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 
@@ -79,6 +81,18 @@ interface Message {
   artifactType?: ArtifactTypeKey;
 }
 
+export interface LegalBaseArtifactItem {
+  id: string;
+  title: string;
+  content: string;
+  addedAt: string;
+}
+
+export interface LegalBaseArtifact {
+  items: LegalBaseArtifactItem[];
+  updatedAt: string;
+}
+
 interface ChatSession {
   id: string;
   title: string;
@@ -88,6 +102,7 @@ interface ChatSession {
   uploadKeyIndex?: number | null;
   clientId?: string;
   artifactTypes?: Record<string, ArtifactTypeKey>;
+  legalBaseArtifact?: LegalBaseArtifact;
 }
 
 interface PersonaChatProps {
@@ -571,6 +586,9 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(new Set());
   const [savingSuggestionId, setSavingSuggestionId] = useState<string | null>(null);
 
+  // Base Legal (Artefato de RAG) Modal State
+  const [showLegalBaseModal, setShowLegalBaseModal] = useState(false);
+
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
@@ -745,8 +763,17 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       if (cancelado || !carregado) return;
 
       setSessions(prev => prev.map(s => s.id === currentSessionId
-        ? { ...s, messages: carregado.messages, documents: carregado.documents, messagesLoaded: true } as any
+        ? { ...s, messages: carregado.messages, documents: carregado.documents, legalBaseArtifact: (carregado as any).legalBaseArtifact, messagesLoaded: true } as any
         : s));
+
+      // Hidrata o cache em memória do artefato de base legal com o que já
+      // estava salvo, para que a mesclagem entre turnos continue de onde parou.
+      const loadedArtifact = (carregado as any).legalBaseArtifact as LegalBaseArtifact | undefined;
+      if (loadedArtifact?.items?.length) {
+        const m = new Map<string, { title: string; content: string; addedAt: string }>();
+        loadedArtifact.items.forEach(it => m.set(it.id, { title: it.title, content: it.content, addedAt: it.addedAt }));
+        ragArtifactRef.current.set(currentSessionId, m);
+      }
 
       // Reabre o último artefato da conversa. Antes isso acontecia na carga
       // inicial; agora só é possível aqui, quando as mensagens de fato chegam.
@@ -762,6 +789,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         ...sess,
         messages: carregado.messages,
         documents: carregado.documents,
+        legalBaseArtifact: (carregado as any).legalBaseArtifact,
         messagesLoaded: true
       });
     })();
@@ -791,11 +819,13 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const artifactSheetRef = useRef<HTMLDivElement>(null);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
 
-  // ARTEFATO DE RAG: guarda por sessão os trechos legais já recuperados na
-  // conversa (chunk = título + trecho de conteúdo), para que um dispositivo
-  // já encontrado (lei, artigo, súmula) não "suma" do contexto em turnos
-  // seguintes só porque a busca daquele turno não o retrouxe de novo.
-  const ragArtifactRef = useRef<Map<string, Map<string, { title: string; content: string }>>>(new Map());
+  // ARTEFATO DE BASE LEGAL: guarda por sessão os dispositivos legais (lei,
+  // artigo, súmula) já recuperados via RAG na conversa. Serve a dois
+  // propósitos: (1) reinjetar no contexto enviado à IA um dispositivo já
+  // encontrado antes, mesmo que a busca do turno atual não o retorne de
+  // novo; (2) alimentar o artefato visível "Base Legal desta Conversa",
+  // que o advogado pode abrir, conferir e reaproveitar em peças/relatórios.
+  const ragArtifactRef = useRef<Map<string, Map<string, { title: string; content: string; addedAt: string }>>>(new Map());
 
   const handleArtifactFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1633,18 +1663,19 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       }
 
       // ============================================================
-      // ARTEFATO DE RAG: mescla os achados deste turno com o que já foi
-      // recuperado antes NESTA sessão, em vez de substituir. Assim, um
+      // ARTEFATO DE BASE LEGAL: mescla os achados deste turno com o que já
+      // foi recuperado antes NESTA sessão, em vez de substituir. Um
       // dispositivo legal (lei/artigo/súmula) já encontrado na conversa
-      // permanece disponível para o modelo mesmo que a busca deste turno
-      // específico não o traga de volta (ex.: pergunta de acompanhamento
-      // sem o vocabulário-gatilho, ou limite de relevância do vetor).
+      // (a) permanece disponível para o modelo mesmo que a busca deste
+      // turno não o traga de volta, e (b) fica salvo no artefato visível
+      // "Base Legal desta Conversa", que o advogado pode abrir e reaproveitar.
       if (shouldSendRag && session?.id) {
         const sessionKey = session.id;
         if (!ragArtifactRef.current.has(sessionKey)) {
           ragArtifactRef.current.set(sessionKey, new Map());
         }
         const artifact = ragArtifactRef.current.get(sessionKey)!;
+        const nowIso = new Date().toISOString();
 
         // Mesma assinatura de dedup usada no backend (/api/rag/plan):
         // título + primeiros 120 caracteres do conteúdo.
@@ -1654,14 +1685,19 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           ? ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0)
           : [];
 
-        const freshSignatures = new Set<string>();
-        freshPieces.forEach(piece => {
+        const freshEntries: Array<{ sig: string; title: string; content: string }> = freshPieces.map(piece => {
           const headerMatch = piece.match(/^FONTE:\s*(.+?)(?:\s*\[[^\]]*\])?\n([\s\S]*)$/);
           const title = headerMatch ? headerMatch[1].trim() : '';
           const content = headerMatch ? headerMatch[2] : piece;
-          const sig = chunkSignature(title, content);
-          freshSignatures.add(sig);
-          artifact.set(sig, { title, content: piece });
+          return { sig: chunkSignature(title, content), title, content };
+        });
+
+        let addedNew = 0;
+        freshEntries.forEach(({ sig, title, content }) => {
+          if (!artifact.has(sig)) {
+            artifact.set(sig, { title, content, addedAt: nowIso });
+            addedNew++;
+          }
         });
 
         // Reconstrói o ragContext final: achados deste turno primeiro
@@ -1670,21 +1706,38 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         // (mais recentes primeiro), respeitando um teto de caracteres
         // para não inflar o payload indefinidamente numa sessão longa.
         const RAG_ARTIFACT_CHAR_LIMIT = 300000;
-        const rebuilt: string[] = [...freshPieces];
-        let totalLen = freshPieces.reduce((acc, p) => acc + p.length, 0);
+        const freshSignatures = new Set(freshEntries.map(e => e.sig));
+        const rebuilt: string[] = freshEntries.map(e => `FONTE: ${e.title}\n${e.content}`);
+        let totalLen = rebuilt.reduce((acc, p) => acc + p.length, 0);
 
         const cachedEntries = Array.from(artifact.entries()).reverse();
         for (const [sig, chunk] of cachedEntries) {
           if (freshSignatures.has(sig)) continue;
-          if (totalLen + chunk.content.length > RAG_ARTIFACT_CHAR_LIMIT) continue;
-          rebuilt.push(chunk.content);
-          totalLen += chunk.content.length;
+          const piece = `FONTE: ${chunk.title} [Já usado antes nesta conversa]\n${chunk.content}`;
+          if (totalLen + piece.length > RAG_ARTIFACT_CHAR_LIMIT) continue;
+          rebuilt.push(piece);
+          totalLen += piece.length;
         }
 
-        if (rebuilt.length > freshPieces.length) {
-          console.log(`[RAG ARTEFATO] Reaproveitando ${rebuilt.length - freshPieces.length} dispositivo(s) já encontrado(s) antes nesta conversa (sem nova busca).`);
+        if (rebuilt.length > freshEntries.length) {
+          console.log(`[RAG ARTEFATO] Reaproveitando ${rebuilt.length - freshEntries.length} dispositivo(s) já encontrado(s) antes nesta conversa (sem nova busca).`);
         }
         ragContext = rebuilt.join('\n\n---\n\n');
+
+        // Sincroniza o artefato visível "Base Legal desta Conversa" com o
+        // que foi acumulado até agora, para o advogado poder abrir e
+        // reaproveitar em peças/relatórios.
+        if (addedNew > 0) {
+          const items: LegalBaseArtifactItem[] = Array.from(artifact.entries()).map(([id, chunk]) => ({
+            id,
+            title: chunk.title,
+            content: chunk.content,
+            addedAt: chunk.addedAt
+          }));
+          setSessions(prev => prev.map(s => s.id === sessionKey
+            ? { ...s, legalBaseArtifact: { items, updatedAt: nowIso } }
+            : s));
+        }
       }
 
       // ============================================================
@@ -2920,17 +2973,24 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       />
       
       {showAiMemoryModal && (
-        <AiMemoryModal 
+        <AiMemoryModal
           onClose={() => {
              setShowAiMemoryModal(false);
              setInitialMemoryRule("");
              setMemoryModalPersona("");
-          }} 
-          personaId={memoryModalPersona || persona.aiName} 
+          }}
+          personaId={memoryModalPersona || persona.aiName}
           initialRule={initialMemoryRule}
         />
       )}
-      
+
+      {showLegalBaseModal && (
+        <LegalBaseArtifactModal
+          onClose={() => setShowLegalBaseModal(false)}
+          artifact={currentSession?.legalBaseArtifact}
+        />
+      )}
+
       {/* SIDEBAR: HISTÓRICO */}
       <aside className={`${isSidebarOpen ? 'w-full md:w-80' : 'w-0'} absolute md:relative z-20 h-full overflow-hidden shrink-0 transition-all duration-300 border-r border-slate-200 dark:border-gold-500/20 flex flex-col bg-slate-50 dark:bg-bordeaux-950/60/50`}>
         <div className="p-4 border-b border-slate-200 dark:border-gold-500/20 flex items-center justify-between">
@@ -2963,6 +3023,18 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               title="Memória da IA (Treinamento)"
             >
               <Sparkles className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowLegalBaseModal(true)}
+              className="relative px-3 bg-white dark:bg-bordeaux-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-xl shadow-sm hover:bg-indigo-50 dark:hover:bg-bordeaux-900 hover:scale-105 transition-all outline-none flex items-center justify-center"
+              title="Base Legal desta Conversa"
+            >
+              <Scale className="w-5 h-5" />
+              {(currentSession?.legalBaseArtifact?.items?.length || 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {currentSession!.legalBaseArtifact!.items.length}
+                </span>
+              )}
             </button>
           </div>
 
