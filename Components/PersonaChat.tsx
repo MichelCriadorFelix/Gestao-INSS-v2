@@ -568,6 +568,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [showAiMemoryModal, setShowAiMemoryModal] = useState(false);
   const [initialMemoryRule, setInitialMemoryRule] = useState("");
   const [memoryModalPersona, setMemoryModalPersona] = useState("");
+  const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(new Set());
+  const [savingSuggestionId, setSavingSuggestionId] = useState<string | null>(null);
 
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
@@ -788,6 +790,12 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const artifactFileInputRef = useRef<HTMLInputElement>(null);
   const artifactSheetRef = useRef<HTMLDivElement>(null);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
+
+  // ARTEFATO DE RAG: guarda por sessão os trechos legais já recuperados na
+  // conversa (chunk = título + trecho de conteúdo), para que um dispositivo
+  // já encontrado (lei, artigo, súmula) não "suma" do contexto em turnos
+  // seguintes só porque a busca daquele turno não o retrouxe de novo.
+  const ragArtifactRef = useRef<Map<string, Map<string, { title: string; content: string }>>>(new Map());
 
   const handleArtifactFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1622,6 +1630,61 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
+      }
+
+      // ============================================================
+      // ARTEFATO DE RAG: mescla os achados deste turno com o que já foi
+      // recuperado antes NESTA sessão, em vez de substituir. Assim, um
+      // dispositivo legal (lei/artigo/súmula) já encontrado na conversa
+      // permanece disponível para o modelo mesmo que a busca deste turno
+      // específico não o traga de volta (ex.: pergunta de acompanhamento
+      // sem o vocabulário-gatilho, ou limite de relevância do vetor).
+      if (shouldSendRag && session?.id) {
+        const sessionKey = session.id;
+        if (!ragArtifactRef.current.has(sessionKey)) {
+          ragArtifactRef.current.set(sessionKey, new Map());
+        }
+        const artifact = ragArtifactRef.current.get(sessionKey)!;
+
+        // Mesma assinatura de dedup usada no backend (/api/rag/plan):
+        // título + primeiros 120 caracteres do conteúdo.
+        const chunkSignature = (title: string, content: string) => `${title}|${(content || '').substring(0, 120)}`;
+
+        const freshPieces = ragContext
+          ? ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0)
+          : [];
+
+        const freshSignatures = new Set<string>();
+        freshPieces.forEach(piece => {
+          const headerMatch = piece.match(/^FONTE:\s*(.+?)(?:\s*\[[^\]]*\])?\n([\s\S]*)$/);
+          const title = headerMatch ? headerMatch[1].trim() : '';
+          const content = headerMatch ? headerMatch[2] : piece;
+          const sig = chunkSignature(title, content);
+          freshSignatures.add(sig);
+          artifact.set(sig, { title, content: piece });
+        });
+
+        // Reconstrói o ragContext final: achados deste turno primeiro
+        // (prioridade máxima, ordem preservada), seguidos pelos
+        // dispositivos já conhecidos da conversa que não voltaram agora
+        // (mais recentes primeiro), respeitando um teto de caracteres
+        // para não inflar o payload indefinidamente numa sessão longa.
+        const RAG_ARTIFACT_CHAR_LIMIT = 300000;
+        const rebuilt: string[] = [...freshPieces];
+        let totalLen = freshPieces.reduce((acc, p) => acc + p.length, 0);
+
+        const cachedEntries = Array.from(artifact.entries()).reverse();
+        for (const [sig, chunk] of cachedEntries) {
+          if (freshSignatures.has(sig)) continue;
+          if (totalLen + chunk.content.length > RAG_ARTIFACT_CHAR_LIMIT) continue;
+          rebuilt.push(chunk.content);
+          totalLen += chunk.content.length;
+        }
+
+        if (rebuilt.length > freshPieces.length) {
+          console.log(`[RAG ARTEFATO] Reaproveitando ${rebuilt.length - freshPieces.length} dispositivo(s) já encontrado(s) antes nesta conversa (sem nova busca).`);
+        }
+        ragContext = rebuilt.join('\n\n---\n\n');
       }
 
       // ============================================================
@@ -2573,6 +2636,31 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     }
   };
 
+  const handleSaveSuggestedMemoryRule = async (msgId: string, ruleText: string) => {
+    if (!ruleText.trim() || savingSuggestionId) return;
+    setSavingSuggestionId(msgId);
+    try {
+      const res = await apiFetch('/api/ai-memory-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          persona: persona.aiName,
+          rule_text: ruleText.trim(),
+          active: true
+        })
+      });
+      if (res.ok) {
+        setSavedSuggestionIds(prev => new Set(prev).add(msgId));
+      } else {
+        console.error('Falha ao salvar regra de memória sugerida');
+      }
+    } catch (err) {
+      console.error('Erro ao salvar regra de memória sugerida:', err);
+    } finally {
+      setSavingSuggestionId(null);
+    }
+  };
+
   const handleGenerateMarketingFromChat = async (specificContent?: string, topicHint?: string) => {
     if (!currentSession) return;
     setIsGeneratingMarketing(true);
@@ -3278,7 +3366,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                           )}
 
                           {/* UI SUGERIR MEMÓRIA */}
-                          {memorySuggestionText && (
+                          {memorySuggestionText && !savedSuggestionIds.has(msg.id) && (
                             <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
                               <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
                                 <Lightbulb className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
@@ -3287,12 +3375,23 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                                 <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">💡 Sugestão de Aprendizado</p>
                                 <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{memorySuggestionText}</p>
                               </div>
-                              <button 
-                                onClick={() => { setMemoryModalPersona(persona.aiName); setInitialMemoryRule(memorySuggestionText); setShowAiMemoryModal(true); }}
-                                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                              <button
+                                onClick={() => handleSaveSuggestedMemoryRule(msg.id, memorySuggestionText)}
+                                disabled={savingSuggestionId === msg.id}
+                                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                               >
-                                ✨ Salvar Regra
+                                {savingSuggestionId === msg.id ? 'Salvando...' : '✨ Salvar Regra'}
                               </button>
+                            </div>
+                          )}
+
+                          {/* UI SUGESTÃO SALVA COM SUCESSO */}
+                          {memorySuggestionText && savedSuggestionIds.has(msg.id) && (
+                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
+                               <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                               <div className="text-sm text-emerald-800 dark:text-emerald-200">
+                                 <span className="font-bold">Diretriz gravada com sucesso:</span> {memorySuggestionText}
+                               </div>
                             </div>
                           )}
 
