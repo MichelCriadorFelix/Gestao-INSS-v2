@@ -3118,8 +3118,16 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       ? currentSession?.messages?.find(m => m.id === activeArtifactId) 
       : [...(currentSession?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content));
 
-    const meta = activeArtifactMsg 
-      ? getArtifactMeta(activeArtifactMsg.content, activeArtifactMsg.id, currentSession?.messages || [], customArtifactTypes[activeArtifactMsg.id])
+    // IMPORTANTE: NÃO usa customArtifactTypes (override manual/persistido)
+    // aqui — esse rótulo vai DIRETO pro prompt do modelo como "NATUREZA do
+    // artefato". Se ficar desatualizado (ex.: documento virou outra coisa
+    // numa correção anterior mas o override antigo ainda não foi limpo a
+    // tempo), o modelo recebe um sinal contraditório — cabeçalho dizendo
+    // "Quesitos" sobre um conteúdo que já é uma Manifestação, por exemplo —
+    // e isso já causou resposta cortada/desconexa em produção. Sempre
+    // detecta a partir do CONTEÚDO ATUAL, não do rótulo salvo/exibido.
+    const meta = activeArtifactMsg
+      ? getArtifactMeta(activeArtifactMsg.content, activeArtifactMsg.id, currentSession?.messages || [])
       : undefined;
 
     const artifactTargetHeader = meta 
