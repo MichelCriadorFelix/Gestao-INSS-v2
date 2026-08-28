@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { CloudIcon, CheckIcon, ExclamationTriangleIcon, ArchiveBoxArrowDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { CloudIcon, CheckIcon, ExclamationTriangleIcon, ArchiveBoxArrowDownIcon, ArrowPathIcon, KeyIcon } from '@heroicons/react/24/outline';
 import { getDbConfig, DB_CONFIG_KEY, validateSupabaseConnection } from '../supabaseClient';
 import { safeSetLocalStorage, getMinWage, setMinWage } from '../utils';
+import { ApiKeysDiagnosticsModal } from './ApiKeysDiagnosticsModal';
 
 const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: boolean, onClose: () => void, onSave: () => void, onRestoreBackup: () => void }) => {
     const [url, setUrl] = useState('');
@@ -10,6 +11,7 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
     const [isEnvManaged, setIsEnvManaged] = useState(false);
     const [minWage, setMinWageState] = useState(1621.00);
     const [testStatus, setTestStatus] = useState<{ loading: boolean, success?: boolean, message?: string } | null>(null);
+    const [showKeysDiagnostics, setShowKeysDiagnostics] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -207,6 +209,9 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
                 )}
                 
                 <div className="mt-6 pt-6 border-t border-slate-100 dark:border-gold-500/20 space-y-3">
+                    <button onClick={() => setShowKeysDiagnostics(true)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800/50 rounded-lg text-sm font-medium transition border border-primary-200 dark:border-primary-800">
+                        <KeyIcon className="h-4 w-4" /> Testar Chaves de API Gemini
+                    </button>
                     <button onClick={handleCleanupHeavyData} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-800/50 rounded-lg text-sm font-medium transition border border-amber-200 dark:border-amber-800">
                         <ArchiveBoxArrowDownIcon className="h-4 w-4" /> Otimizar Banco (Limpar Cache AI)
                     </button>
@@ -215,6 +220,10 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
                     </button>
                     <p className="text-[10px] text-center text-slate-400">Use isto caso a tabela esteja vazia (0 registros).</p>
                 </div>
+
+                {showKeysDiagnostics && (
+                    <ApiKeysDiagnosticsModal onClose={() => setShowKeysDiagnostics(false)} />
+                )}
 
                 <div className="flex gap-3 mt-6">
                     {!isEnvManaged && url && key && <button onClick={handleClear} className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-sm font-medium transition">Desconectar</button>}

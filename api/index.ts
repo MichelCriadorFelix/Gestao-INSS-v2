@@ -9019,6 +9019,110 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
   res.end();
 });
 
+// ====================================================================
+// DIAGNÓSTICO DE CHAVES GEMINI (usado pelo botão "Testar Chaves de API"
+// nas Configurações). Faz UMA chamada mínima real por chave para
+// classificar o status atual (saudável, esgotada, inválida, bloqueada,
+// não encontrada) e cruza com o estado compartilhado (gemini_key_state)
+// para estimar o uso na janela proativa de 60s. Protegido pelo mesmo
+// middleware de autenticação de sessão que cobre todo /api/*.
+app.post("/api/admin/test-gemini-keys", async (req, res) => {
+  try {
+    const keys = getApiKeys();
+    if (keys.length === 0) {
+      return res.json({ testedAt: new Date().toISOString(), totalKeys: 0, results: [], summary: {} });
+    }
+
+    const hashes = keys.map(keyHash);
+    const { data: stateRows } = await supabaseAdmin
+      .from(KEY_STATE_TABLE)
+      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count')
+      .in('key_hash', hashes);
+    const stateByHash = new Map((stateRows || []).map((r: any) => [r.key_hash, r]));
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Testa em pequenos lotes com pausa entre eles — 21 chamadas simultâneas
+    // criariam a mesma rajada artificial que este diagnóstico existe pra
+    // detectar.
+    const TEST_BATCH_SIZE = 4;
+    const TEST_MODEL = 'gemini-3.5-flash';
+    const results: any[] = [];
+
+    for (let i = 0; i < keys.length; i += TEST_BATCH_SIZE) {
+      const batch = keys.slice(i, i + TEST_BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (apiKey, bi) => {
+        const idx = i + bi;
+        const keyMask = `..${apiKey.slice(-6)}`;
+        const hash = keyHash(apiKey);
+        const state = stateByHash.get(hash);
+        const windowActive = state?.window_start ? (Date.now() - new Date(state.window_start).getTime()) < 60000 : false;
+        const windowCount = windowActive ? (state?.window_count || 0) : 0;
+        const dailyExhausted = state?.daily_exhausted_date === todayStr;
+        const start = Date.now();
+
+        const base = {
+          index: idx + 1,
+          keyMask,
+          windowCount,
+          windowLimit: PROACTIVE_RPM_PER_KEY,
+          percentFreeWindow: Math.max(0, Math.round((1 - windowCount / PROACTIVE_RPM_PER_KEY) * 100)),
+          dailyExhausted
+        };
+
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          await ai.models.generateContent({
+            model: TEST_MODEL,
+            contents: 'oi',
+            config: { maxOutputTokens: 1 }
+          });
+          recordKeyUsageShared(apiKey);
+          return { ...base, status: 'saudavel', statusLabel: '✅ Saudável', responseTimeMs: Date.now() - start };
+        } catch (error: any) {
+          const errorMessage = error?.message || String(error);
+          const is503 = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE');
+          const isRateLimit = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+          const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
+          const isInvalid = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+          const isPermission = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+          const isNotFound = errorMessage.includes('404') || errorMessage.includes('NOT_FOUND');
+
+          let status = 'erro';
+          let statusLabel = '⚠️ Erro desconhecido';
+          if (isInvalid) { status = 'invalida'; statusLabel = '❌ Inválida'; invalidKeys.add(apiKey); }
+          else if (isPermission) { status = 'bloqueada'; statusLabel = '🚫 Bloqueada / sem permissão'; }
+          else if (isNotFound) { status = 'nao_encontrada'; statusLabel = '❓ Modelo/recurso não encontrado'; }
+          else if (isDailyQuota) {
+            status = 'esgotada_diaria'; statusLabel = '📅 Esgotada (cota diária)';
+            markKeyExhaustedShared(apiKey, { daily: true });
+          } else if (isRateLimit) {
+            status = 'esgotada'; statusLabel = '⏳ Esgotada (limite por minuto)';
+            markKeyExhaustedShared(apiKey, { exhaustedUntil: Date.now() + 61000 });
+          } else if (is503) { status = 'sobrecarregada'; statusLabel = '🔥 Servidor Google sobrecarregado agora'; }
+
+          return {
+            ...base,
+            status,
+            statusLabel,
+            responseTimeMs: Date.now() - start,
+            errorDetail: errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 150)
+          };
+        }
+      }));
+      results.push(...batchResults);
+      if (i + TEST_BATCH_SIZE < keys.length) await new Promise(r => setTimeout(r, 400));
+    }
+
+    const summary: Record<string, number> = {};
+    for (const r of results) summary[r.status] = (summary[r.status] || 0) + 1;
+
+    res.json({ testedAt: new Date().toISOString(), totalKeys: keys.length, model: TEST_MODEL, results, summary });
+  } catch (error: any) {
+    console.error('Erro ao testar chaves Gemini:', error);
+    res.status(500).json({ error: error.message || 'Erro interno' });
+  }
+});
+
 // Manipulador 404 para rotas /api que não foram encontradas (deve ficar após todas as rotas de API legítimas)
 app.all("/api/*", (req, res) => {
   res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.originalUrl}` });
