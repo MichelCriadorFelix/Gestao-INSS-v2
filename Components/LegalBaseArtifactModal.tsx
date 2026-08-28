@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { X, BookOpen, Copy, Check, Scale, Trash2 } from "lucide-react";
+import { X, BookOpen, Copy, Check, Scale, Trash2, Filter } from "lucide-react";
 import type { LegalBaseArtifact } from "./PersonaChat";
 
 interface LegalBaseArtifactModalProps {
   onClose: () => void;
   artifact?: LegalBaseArtifact;
   onClear?: () => void;
+  onRemoveItem?: (id: string) => void;
+  onCleanIrrelevant?: () => void;
+  activeDomainName?: string;
 }
 
-export function LegalBaseArtifactModal({ onClose, artifact, onClear }: LegalBaseArtifactModalProps) {
+export function LegalBaseArtifactModal({ onClose, artifact, onClear, onRemoveItem, onCleanIrrelevant, activeDomainName }: LegalBaseArtifactModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const items = artifact?.items || [];
 
@@ -43,11 +46,25 @@ export function LegalBaseArtifactModal({ onClose, artifact, onClear }: LegalBase
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {items.length > 0 && onCleanIrrelevant && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Deseja limpar automaticamente dispositivos que não pertencem ao tema atual (${activeDomainName || 'da conversa'})?`)) {
+                    onCleanIrrelevant();
+                  }
+                }}
+                className="px-3 py-1.5 hover:bg-indigo-100 rounded-lg text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-indigo-200"
+                title="Limpar dispositivos fora do tema do caso"
+              >
+                <Filter size={14} />
+                Limpar Fora do Tema
+              </button>
+            )}
             {items.length > 0 && onClear && (
               <button
-                onClick={() => { if (window.confirm("Limpar a Base Legal desta conversa? Os dispositivos já encontrados serão removidos; novas buscas voltam a preenchê-la.")) onClear(); }}
+                onClick={() => { if (window.confirm("Limpar toda a Base Legal desta conversa? Os dispositivos já encontrados serão removidos; novas buscas voltam a preenchê-la.")) onClear(); }}
                 className="p-2 hover:bg-red-50 rounded-full text-gray-400 hover:text-red-500 transition-colors"
-                title="Limpar artefato"
+                title="Limpar todos os itens da base legal"
               >
                 <Trash2 size={18} />
               </button>
@@ -82,13 +99,24 @@ export function LegalBaseArtifactModal({ onClose, artifact, onClear }: LegalBase
                   <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <h4 className="text-sm font-bold text-gray-800 flex-1">{item.title || 'Fonte não identificada'}</h4>
-                      <button
-                        onClick={() => copy(`FONTE: ${item.title}\n${item.content}`, item.id)}
-                        className="shrink-0 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"
-                        title="Copiar este dispositivo"
-                      >
-                        {copiedId === item.id ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => copy(`FONTE: ${item.title}\n${item.content}`, item.id)}
+                          className="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"
+                          title="Copiar este dispositivo"
+                        >
+                          {copiedId === item.id ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        </button>
+                        {onRemoveItem && (
+                          <button
+                            onClick={() => onRemoveItem(item.id)}
+                            className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                            title="Remover este dispositivo da Base Legal"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-gray-600 whitespace-pre-wrap line-clamp-6 hover:line-clamp-none transition-all">
                       {item.content}

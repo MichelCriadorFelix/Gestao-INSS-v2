@@ -1710,6 +1710,12 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       const AGENT_AREAS = persona.agentAreas;
       let ragContext = '';
 
+      // Obter o texto e metadados do artefato atualmente ativo para contextualização
+      const currentActiveDoc = editableArtifactText || 
+        (activeArtifactId && activeArtifactId !== 'streaming' 
+          ? session?.messages?.find(m => m.id === activeArtifactId)?.content 
+          : [...(session?.messages || [])].reverse().find(m => m.role === 'assistant' && isArtifactContent(m.content))?.content);
+
       const isExplicitSurgicalEdit = 
         messageText.includes('[CORREÇÃO CIRÚRGICA') || 
         messageText.includes('[CORRECAO CIRURGICA') || 
@@ -1719,7 +1725,8 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         messageText.includes('[EDIÇÃO CIRÚRGICA') ||
         messageText.includes('[EDICAO CIRURGICA') ||
         messageText.includes('CORREÇÃO CIRÚRGICA NO ARTEFATO') ||
-        messageText.includes('CORRECAO CIRURGICA NO ARTEFATO');
+        messageText.includes('CORRECAO CIRURGICA NO ARTEFATO') ||
+        (!!currentActiveDoc && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText));
 
       // Se for uma edição cirúrgica pontual de trecho selecionado, verificamos se o usuário pediu especificamente leis/RAG ou menção a documentos
       const mentionsLawsOrRag = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(messageText);
@@ -2117,7 +2124,13 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                                    messageText.includes('[CORRECAO CIRURGICA') || 
                                    messageText.includes('[GERAÇÃO MODULAR') || 
                                    messageText.includes('[GERACAO MODULAR') ||
-                                   (!!activeDocText && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|abaixo|acima|antes|depois|corrija|ajuste|edite)/i.test(messageText));
+                                   messageText.includes('[EDIÇÃO CIRÚRGICA') ||
+                                   messageText.includes('[EDICAO CIRURGICA') ||
+                                   messageText.includes('[CORREÇÃO NO ARTEFATO') ||
+                                   messageText.includes('[CORRECAO NO ARTEFATO') ||
+                                   messageText.includes('CORREÇÃO CIRÚRGICA NO ARTEFATO') ||
+                                   messageText.includes('CORRECAO CIRURGICA NO ARTEFATO') ||
+                                   (!!activeDocText && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText));
 
       fullText = '';
       let isFinished = false;
@@ -3383,6 +3396,80 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         <LegalBaseArtifactModal
           onClose={() => setShowLegalBaseModal(false)}
           artifact={currentSession?.legalBaseArtifact}
+          activeDomainName={persona.displayName}
+          onRemoveItem={(itemId) => {
+            if (currentSessionId) {
+              const artMap = ragArtifactRef.current.get(currentSessionId);
+              if (artMap) {
+                artMap.delete(itemId);
+              }
+              setSessions(prev => prev.map(s => {
+                if (s.id !== currentSessionId) return s;
+                const currentItems = s.legalBaseArtifact?.items || [];
+                const updatedItems = currentItems.filter(it => it.id !== itemId);
+                return {
+                  ...s,
+                  legalBaseArtifact: {
+                    items: updatedItems,
+                    updatedAt: new Date().toISOString()
+                  }
+                };
+              }));
+            }
+          }}
+          onCleanIrrelevant={() => {
+            if (currentSessionId) {
+              const isConsumerOrCivil = persona.agentAreas.includes('CONSUMIDOR') || persona.agentAreas.includes('CIVEL');
+              const isOnlyPrevidenciario = persona.agentAreas.includes('INSS') && !persona.agentAreas.includes('CONSUMIDOR');
+              
+              setSessions(prev => prev.map(s => {
+                if (s.id !== currentSessionId) return s;
+                const currentItems = s.legalBaseArtifact?.items || [];
+                const updatedItems = currentItems.filter(it => {
+                  const titleAndContent = `${it.title} ${it.content}`.toLowerCase();
+                  if (persona.aiName === 'felix_castro' || (isConsumerOrCivil && !persona.agentAreas.includes('INSS'))) {
+                    if (titleAndContent.includes('lei nº 8.213') || 
+                        titleAndContent.includes('lei 8.213') || 
+                        titleAndContent.includes('decreto nº 3.048') ||
+                        titleAndContent.includes('decreto 3.048') ||
+                        (titleAndContent.includes('súmula') && titleAndContent.includes('tnu')) ||
+                        titleAndContent.includes('inss') ||
+                        titleAndContent.includes('bpc') ||
+                        titleAndContent.includes('loas') ||
+                        titleAndContent.includes('auxílio-doença') ||
+                        titleAndContent.includes('aposentadoria') ||
+                        titleAndContent.includes('clt') ||
+                        titleAndContent.includes('consolidação das leis do trabalho')) {
+                      return false;
+                    }
+                  } else if (isOnlyPrevidenciario) {
+                    if (titleAndContent.includes('código de defesa do consumidor') || titleAndContent.includes('cdc') || titleAndContent.includes('clt')) {
+                      return false;
+                    }
+                  }
+                  return true;
+                });
+                
+                const artMap = ragArtifactRef.current.get(currentSessionId);
+                if (artMap) {
+                  const updatedIds = new Set(updatedItems.map(it => it.id));
+                  for (const key of Array.from(artMap.keys())) {
+                    if (!updatedIds.has(key)) {
+                      artMap.delete(key);
+                    }
+                  }
+                }
+
+                return {
+                  ...s,
+                  legalBaseArtifact: {
+                    items: updatedItems,
+                    updatedAt: new Date().toISOString()
+                  }
+                };
+              }));
+            }
+          }}
           onClear={() => {
             if (currentSessionId) {
               ragArtifactRef.current.delete(currentSessionId);
