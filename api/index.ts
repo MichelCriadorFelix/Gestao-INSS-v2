@@ -3173,18 +3173,30 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
       console.log(`[Tentativa ${MAX_RETRIES - retries + 1}/${MAX_RETRIES}] Falha (${errorReason}) na chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}). Rotacionando chave... [Erro original: ${cleanErr}]`); 
 
+      // IMPORTANTE: 503 (servidor sobrecarregado) troca de CHAVE primeiro,
+      // mantendo o mesmo modelo escolhido; só rebaixa um nível após 3 falhas
+      // seguidas no mesmo modelo, e nunca abaixo de gemini-3.5-flash (mesma
+      // regra do callGeminiStream). Antes, este bloco capturava is503Overloaded
+      // já na 1ª falha e caía numa lista com modelos legados (2.5/1.5/2.0-flash).
       let nextParams = { ...params };
-      if (isDailyQuota || is503Overloaded) {
+      if (isDailyQuota) {
         const currentModel = params.model || "gemini-3.7-flash";
-        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
         let currentIndex = alternatives.indexOf(currentModel);
         if (currentIndex === -1) {
           currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
         }
-        const nextIndex = (currentIndex + 1) % alternatives.length;
-        const nextModel = alternatives[nextIndex];
-        console.warn(`[FAILOVER QUOTA/503 NON-STREAM] Modelo '${currentModel}' esgotado ou indisponível. Alternando para o modelo reserva: '${nextModel}'`);
-        nextParams.model = "direct:" + nextModel;
+        if (currentIndex !== -1 && currentIndex < alternatives.length - 1) {
+          const nextModel = alternatives[currentIndex + 1];
+          console.warn(`[FAILOVER QUOTA NON-STREAM] Modelo '${currentModel}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
+          nextParams.model = "direct:" + nextModel;
+        }
+      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
+        console.warn(`[FAILOVER 503 NON-STREAM] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
+        nextParams.model = 'gemini-3.5-flash';
+      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
+        console.warn(`[FAILOVER 503 NON-STREAM] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.6-flash...`);
+        nextParams.model = 'gemini-3.6-flash';
       }
 
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -3427,18 +3439,26 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       else if (isBadRequest) errorReason = 'parâmetro inválido (400)';
       else if (isNotFound) errorReason = 'modelo não encontrado (404)';
 
+      // IMPORTANTE: 503 (servidor sobrecarregado) é tratado primeiro trocando
+      // de CHAVE, mantendo o MESMO modelo escolhido pelo usuário — só depois
+      // de 3 falhas seguidas no mesmo modelo é que rebaixa um nível, e nunca
+      // abaixo de gemini-3.5-flash. Antes, este bloco também capturava
+      // is503Overloaded na primeira falha e percorria uma lista com modelos
+      // legados (2.5/1.5/2.0-flash), rebaixando o modelo mesmo com chaves
+      // novas disponíveis para tentar no modelo original.
       let nextParams = { ...params };
-      if (isDailyQuota || is503Overloaded) {
+      if (isDailyQuota) {
         const currentModel = params.model || "gemini-3.7-flash";
-        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
         let currentIndex = alternatives.indexOf(currentModel);
         if (currentIndex === -1) {
           currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
         }
-        const nextIndex = (currentIndex + 1) % alternatives.length;
-        const nextModel = alternatives[nextIndex];
-        console.warn(`[FAILOVER QUOTA/503 STREAM] Modelo '${currentModel}' esgotado ou indisponível. Alternando para o modelo reserva: '${nextModel}'`);
-        nextParams.model = "direct:" + nextModel;
+        if (currentIndex !== -1 && currentIndex < alternatives.length - 1) {
+          const nextModel = alternatives[currentIndex + 1];
+          console.warn(`[FAILOVER QUOTA STREAM] Modelo '${currentModel}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
+          nextParams.model = "direct:" + nextModel;
+        }
       } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
         console.warn(`[FAILOVER 503] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
         nextParams.model = 'gemini-3.5-flash';
