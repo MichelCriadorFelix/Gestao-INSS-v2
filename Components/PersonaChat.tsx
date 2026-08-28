@@ -121,6 +121,77 @@ interface PersonaChatProps {
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const PHASE_TIMEOUT = 180000; // 3 minutes in milliseconds
 
+// ============================================================
+// ARTEFATO DE BASE LEGAL — detecção de dispositivos realmente citados
+// ============================================================
+// Mesma assinatura de dedup usada no backend (/api/rag/plan): título +
+// primeiros 120 caracteres do conteúdo.
+const legalArtifactChunkSignature = (title: string, content: string) => `${title}|${(content || '').substring(0, 120)}`;
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Extrai o número que identifica o título (nº da lei/decreto/instrução
+// normativa, ou o número da súmula/tema), para servir de "âncora" e evitar
+// que um artigo de mesmo número em OUTRA lei seja confundido como citado.
+const extractLegalTitleAnchor = (title: string): string => {
+  const normalized = (title || '').replace(/(\d)\.(?=\d{3}\b)/g, '$1');
+  const numMatch = normalized.match(/n[ºo°]\.?\s*(\d+)/i);
+  if (numMatch) return numMatch[1];
+  const sumulaMatch = normalized.match(/s[uú]mula\s*(\d+)/i);
+  if (sumulaMatch) return sumulaMatch[1];
+  const temaMatch = normalized.match(/tema\s*(\d+)/i);
+  if (temaMatch) return temaMatch[1];
+  const generic = normalized.match(/\d{2,}/g);
+  return generic ? generic.sort((a, b) => b.length - a.length)[0] : '';
+};
+
+interface LegalDeviceKey {
+  kind: 'article' | 'sumula' | 'tema' | 'unknown';
+  num: string;
+  lawAnchor: string;
+}
+
+// Identifica o dispositivo específico que UM chunk representa (o artigo,
+// súmula ou tema com que o texto do chunk começa).
+const buildLegalDeviceKey = (title: string, content: string): LegalDeviceKey => {
+  const trimmed = (content || '').trim();
+  const lawAnchor = extractLegalTitleAnchor(title);
+  let m: RegExpMatchArray | null;
+  if ((m = trimmed.match(/^(?:Art\.?|Artigo)\s*(\d+[A-Za-zºª\-]*)/i))) {
+    return { kind: 'article', num: m[1].replace(/[ºª]/g, ''), lawAnchor };
+  }
+  if ((m = trimmed.match(/^S[uú]mula\s*(?:n[ºo°]\.?\s*)?(\d+)/i))) {
+    return { kind: 'sumula', num: m[1], lawAnchor };
+  }
+  if ((m = trimmed.match(/^Tema\s*(?:n[ºo°]\.?\s*)?(\d+(?:\.\d+)?)/i))) {
+    return { kind: 'tema', num: m[1], lawAnchor };
+  }
+  return { kind: 'unknown', num: '', lawAnchor };
+};
+
+// Só considera um dispositivo "citado" se o número específico (artigo,
+// súmula ou tema) aparecer no texto da resposta — e, no caso de artigo,
+// também exige que o número identificador da lei apareça, para não
+// confundir "Art. 86" da Lei 8.213 com um "Art. 86" de outra norma.
+const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string): boolean => {
+  if (!responseText) return false;
+  const normalizedResponse = responseText.replace(/(\d)\.(?=\d{3}\b)/g, '$1');
+  if (key.kind === 'sumula') {
+    return !!key.num && new RegExp(`S[uú]mula\\s*(?:n[ºo°]\\.?\\s*)?${escapeRegExp(key.num)}\\b`, 'i').test(responseText);
+  }
+  if (key.kind === 'tema') {
+    return !!key.num && new RegExp(`Tema\\s*(?:n[ºo°]\\.?\\s*)?${escapeRegExp(key.num).replace(/\\\./g, '\\.?')}\\b`, 'i').test(responseText);
+  }
+  if (key.kind === 'article' && key.num) {
+    const artCited = new RegExp(`(?:Art\\.?|Artigo)\\s*${escapeRegExp(key.num)}\\b`, 'i').test(responseText);
+    const lawCited = key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : true;
+    return artCited && lawCited;
+  }
+  // Chunk sem marcador de abertura reconhecível (ex.: início por "§" solto,
+  // continuação de parágrafo): só entra se ao menos a lei-mãe for citada.
+  return key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : false;
+};
+
 const isReportContent = (content: string = ''): boolean => {
   if (!content || content.trim().length < 350) return false;
   const trimmed = content.trim();
@@ -1663,93 +1734,43 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       }
 
       // ============================================================
-      // ARTEFATO DE BASE LEGAL: mescla os achados deste turno com o que já
-      // foi recuperado antes NESTA sessão, em vez de substituir. Um
-      // dispositivo legal (lei/artigo/súmula) já encontrado na conversa
-      // (a) permanece disponível para o modelo mesmo que a busca deste
-      // turno não o traga de volta, e (b) fica salvo no artefato visível
-      // "Base Legal desta Conversa", que o advogado pode abrir e reaproveitar.
+      // REINJEÇÃO DO ARTEFATO DE BASE LEGAL: reaproveita, no contexto deste
+      // turno, os dispositivos já salvos no artefato da conversa que a busca
+      // deste turno específico não trouxe de volta — assim um dispositivo
+      // já encontrado antes não "some" da resposta seguinte. A decisão do
+      // que ENTRA no artefato acontece depois, com base no que a IA de fato
+      // citar na resposta (ver bloco após o streaming terminar).
       if (shouldSendRag && session?.id) {
         const sessionKey = session.id;
-        if (!ragArtifactRef.current.has(sessionKey)) {
-          ragArtifactRef.current.set(sessionKey, new Map());
-        }
-        const artifact = ragArtifactRef.current.get(sessionKey)!;
-        const nowIso = new Date().toISOString();
-
-        // Mesma assinatura de dedup usada no backend (/api/rag/plan):
-        // título + primeiros 120 caracteres do conteúdo.
-        const chunkSignature = (title: string, content: string) => `${title}|${(content || '').substring(0, 120)}`;
-
-        const freshPieces = ragContext
-          ? ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0)
-          : [];
-
-        // O ragContext deste turno mistura duas fontes bem diferentes:
-        // (a) o plano CURADO do planner/safety-net (/api/rag/plan), marcado
-        //     "[Recuperação Exata]" — dispositivos que o próprio raciocínio
-        //     jurídico do caso escolheu como necessários; e
-        // (b) a busca semântica/palavra-chave/título bruta (até ~60
-        //     candidatos por turno, marcados "[Score: N%]"/"[Keyword
-        //     Match]") — recall amplo, SEM curadoria, só pra reforçar a
-        //     resposta deste turno.
-        // O artefato "Base Legal" só deve reter (a): salvar tudo de (b)
-        // inflava o artefato para centenas de itens irrelevantes ao caso.
-        const freshEntries: Array<{ sig: string; title: string; content: string; curated: boolean }> = freshPieces.map(piece => {
-          const headerMatch = piece.match(/^FONTE:\s*(.+?)\s*\[([^\]]*)\]\n([\s\S]*)$/);
-          const title = headerMatch ? headerMatch[1].trim() : (piece.match(/^FONTE:\s*(.+)$/m)?.[1]?.trim() || '');
-          const tag = headerMatch ? headerMatch[2].trim() : '';
-          const content = headerMatch ? headerMatch[3] : piece.replace(/^FONTE:.*\n/, '');
-          const curated = tag === 'Recuperação Exata';
-          return { sig: chunkSignature(title, content), title, content, curated };
-        });
-
-        let addedNew = 0;
-        freshEntries.forEach(({ sig, title, content, curated }) => {
-          if (curated && !artifact.has(sig)) {
-            artifact.set(sig, { title, content, addedAt: nowIso });
-            addedNew++;
-          }
-        });
-
-        // Reconstrói o ragContext final: achados deste turno primeiro
-        // (prioridade máxima, ordem preservada, curados e brutos — a
-        // resposta deste turno continua usando os dois), seguidos pelos
-        // dispositivos CURADOS já conhecidos da conversa que não voltaram
-        // agora (mais recentes primeiro), respeitando um teto de caracteres
-        // para não inflar o payload indefinidamente numa sessão longa.
-        const RAG_ARTIFACT_CHAR_LIMIT = 300000;
-        const freshSignatures = new Set(freshEntries.map(e => e.sig));
-        const rebuilt: string[] = freshEntries.map(e => `FONTE: ${e.title}\n${e.content}`);
-        let totalLen = rebuilt.reduce((acc, p) => acc + p.length, 0);
-
-        const cachedEntries = Array.from(artifact.entries()).reverse();
-        for (const [sig, chunk] of cachedEntries) {
-          if (freshSignatures.has(sig)) continue;
-          const piece = `FONTE: ${chunk.title} [Já usado antes nesta conversa]\n${chunk.content}`;
-          if (totalLen + piece.length > RAG_ARTIFACT_CHAR_LIMIT) continue;
-          rebuilt.push(piece);
-          totalLen += piece.length;
-        }
-
-        if (rebuilt.length > freshEntries.length) {
-          console.log(`[RAG ARTEFATO] Reaproveitando ${rebuilt.length - freshEntries.length} dispositivo(s) já encontrado(s) antes nesta conversa (sem nova busca).`);
-        }
-        ragContext = rebuilt.join('\n\n---\n\n');
-
-        // Sincroniza o artefato visível "Base Legal desta Conversa" com o
-        // que foi acumulado até agora, para o advogado poder abrir e
-        // reaproveitar em peças/relatórios.
-        if (addedNew > 0) {
-          const items: LegalBaseArtifactItem[] = Array.from(artifact.entries()).map(([id, chunk]) => ({
-            id,
-            title: chunk.title,
-            content: chunk.content,
-            addedAt: chunk.addedAt
+        const artifact = ragArtifactRef.current.get(sessionKey);
+        if (artifact && artifact.size > 0) {
+          const freshPieces = ragContext
+            ? ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0)
+            : [];
+          const freshSignatures = new Set(freshPieces.map(piece => {
+            const headerMatch = piece.match(/^FONTE:\s*(.+?)\s*\[[^\]]*\]\n([\s\S]*)$/);
+            const title = headerMatch ? headerMatch[1].trim() : (piece.match(/^FONTE:\s*(.+)$/m)?.[1]?.trim() || '');
+            const content = headerMatch ? headerMatch[2] : piece.replace(/^FONTE:.*\n/, '');
+            return legalArtifactChunkSignature(title, content);
           }));
-          setSessions(prev => prev.map(s => s.id === sessionKey
-            ? { ...s, legalBaseArtifact: { items, updatedAt: nowIso } }
-            : s));
+
+          const RAG_ARTIFACT_CHAR_LIMIT = 300000;
+          const rebuilt: string[] = [...freshPieces];
+          let totalLen = rebuilt.reduce((acc, p) => acc + p.length, 0);
+
+          const cachedEntries = Array.from(artifact.entries()).reverse();
+          for (const [sig, chunk] of cachedEntries) {
+            if (freshSignatures.has(sig)) continue;
+            const piece = `FONTE: ${chunk.title} [Já usado antes nesta conversa]\n${chunk.content}`;
+            if (totalLen + piece.length > RAG_ARTIFACT_CHAR_LIMIT) continue;
+            rebuilt.push(piece);
+            totalLen += piece.length;
+          }
+
+          if (rebuilt.length > freshPieces.length) {
+            console.log(`[RAG ARTEFATO] Reaproveitando ${rebuilt.length - freshPieces.length} dispositivo(s) já encontrado(s) antes nesta conversa (sem nova busca).`);
+          }
+          ragContext = rebuilt.join('\n\n---\n\n');
         }
       }
 
@@ -2075,6 +2096,49 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         content: displayContent,
         timestamp: new Date().toISOString()
       };
+
+      // ARTEFATO DE BASE LEGAL: só entra no artefato o dispositivo que a IA
+      // de fato CITOU nesta resposta — não tudo que a busca trouxe como
+      // candidato disponível. A busca (planner + safety-net + semântica)
+      // deliberadamente traz material de reforço/segurança que a resposta
+      // muitas vezes nem chega a usar; salvar tudo isso inflava o artefato
+      // para centenas de itens irrelevantes ao caso concreto.
+      if (shouldSendRag && sessionId && ragContext) {
+        if (!ragArtifactRef.current.has(sessionId)) {
+          ragArtifactRef.current.set(sessionId, new Map());
+        }
+        const artifact = ragArtifactRef.current.get(sessionId)!;
+        const nowIso = new Date().toISOString();
+
+        const candidatePieces = ragContext.split(/\n\n---\n\n/).filter(p => p.trim().length > 0);
+        let addedNew = 0;
+        candidatePieces.forEach(piece => {
+          const headerMatch = piece.match(/^FONTE:\s*(.+?)\s*\[[^\]]*\]\n([\s\S]*)$/);
+          const title = headerMatch ? headerMatch[1].trim() : (piece.match(/^FONTE:\s*(.+)$/m)?.[1]?.trim() || '');
+          const content = headerMatch ? headerMatch[2] : piece.replace(/^FONTE:.*\n/, '');
+          if (!title || !content) return;
+          const key = buildLegalDeviceKey(title, content);
+          if (!isLegalDeviceCitedInResponse(key, fullText)) return;
+          const sig = legalArtifactChunkSignature(title, content);
+          if (!artifact.has(sig)) {
+            artifact.set(sig, { title, content, addedAt: nowIso });
+            addedNew++;
+          }
+        });
+
+        if (addedNew > 0) {
+          console.log(`[RAG ARTEFATO] ${addedNew} dispositivo(s) citado(s) na resposta adicionados à Base Legal desta conversa.`);
+          const items: LegalBaseArtifactItem[] = Array.from(artifact.entries()).map(([id, chunk]) => ({
+            id,
+            title: chunk.title,
+            content: chunk.content,
+            addedAt: chunk.addedAt
+          }));
+          setSessions(prev => prev.map(s => s.id === sessionId
+            ? { ...s, legalBaseArtifact: { items, updatedAt: nowIso } }
+            : s));
+        }
+      }
 
       if (finalArtifactUpdate) {
         // Atualiza a mensagem do artefato anterior na conversa para que o documento fique sincronizado
