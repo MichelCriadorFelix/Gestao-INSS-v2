@@ -8915,28 +8915,357 @@ app.post("/api/admin/rechunk-large-docs", async (req, res) => {
         const parBreak  = text.lastIndexOf('\n\n', end);
         const sentBreak = text.lastIndexOf('. ', end);
         if (artBreak > pos + CHUNK_SIZE * 0.5)      end = artBreak;
-        else if xœÌZ[oIv~×¯(Şe÷˜jI±±¡FcP"m3–(E¤<»±ªÔ]"Ënvqú¢Ëh	,Ø ‹,v€õ¾d±‹ÉdA0Oƒ Aò¢â?ù	9§.İÕÍ–ììä!cDvW:u.ß¹T9soÇŒ¾!Ÿ‘¹HÈ=²óôhğl<ìÿm|DÖ½.!,
-ÈÉGŞ#÷7Wˆş°0a„Ÿ'aQú>JŠP1Ò¢´Ğ}%)ñ§Yô†¦ì"õ’ûÌš-$àziÌgk&âÚr¸²h’NaùŸ¬»$ÉNvğiâÍ³dªFäs¿-ÉÍ*ÙŞ;ÜíØäğõ§[¨œ ›êÕbEşæçŠ„bÒ&ÇïşøËÿş¯éò3ğ@6#w¯Š¥G’ÆÌŸŠä˜,€Ifm<a1aÆ	Mòî¿‡‘4Jf<ed‹IÌ’D€Ÿ”d³•BB<JXœ² MhtùâlçÅ+ÅhÈRÂâXÄ¸Çu½Ş©ˆ‰ƒo¸|>%U>áé½{.¹Ò’(í”wø¹×avÊAƒ‹µš-{wÜÊ÷Ğ&{4z±È€¤ÃÉÚÒÚ.˜ÈÆ:H|‘+)/s^Ì®siÁ.è9å`)4Ÿ°¸dÌÉ	¿à¯ÜÂLQ­wŠÙ?ÿyAÊØÍÖ–Ty±dşñSNE&U8ÏBâØÚŠt©’{÷ìg°©”G+-
-µ‚•ı^Ufµ‰½×–5`ÆR°—”¶ÉEÂ÷Ì£AS„9h9iœ±1Ÿğˆ†cp,lbD9ã˜G»hŞ"©Ha´|š´—4Iöì\ÊÅs©,@y©?%êÅ±´d[ş7Ii‚QA¾¢‰¦{N:aî¢¬Šª"7º÷÷_ÿî¿È†g¨O\È¨¤â×$ä„F¾@«/|m®2ÀÉ21 >¾ç1P8I	¯£mm°!˜±ú$›Óš°N –ïÆbæ4C6µ€³XGÒt=53ç¡™9U—¤ÓXœ“ˆKÑÆNS2öÕÁæãrqnÜw@
-€˜1¡ú8Šı%P3×c_8M4[Ú>K;ÉÉ×ìD2ÈÔNòq•,rDŞÇ‚İ|‘Ñ(­r¥ÔÆÜ+¢¼*f3
-€Mºğó¦Mi½xî;M/‡4°qu›- ãÁ¡hşô“õõõÜ^Õºùz°Ò Ë.â™AzeÁzu¦~Ew¯Rf¡X4È»¿ûİmÖœ€Å‹äî•"`²ä8 c,¤b÷˜€`›‹cãïˆXÛfÕ¼Ì›
-E&ïÛ–?Ÿ¨_f(2‡™
-·fˆâhÅ Kîw.ê£Zóû¯ûk²SË£>)Ÿñ/-ï‘@ğÏh¾B$¥³E½f®¬…J†jãç»¯ş•J{ÉçÌ-lÂZÙ	ùÃ\¢±£˜~Q¨>/¸|¿şî‚Ï„WÀ›4åV+˜ªÒ^i°2‡@3jJxå ˆ8ÂÔ#œ2’›¦	ÎrpéÁ)xø€mı€ÎïºûıÁ¨Mô;‡¤··İëvûƒ'CrĞ9ì¨”¾Ã¸Ş`Ôâœ-§ğ™™úC28ÚİEi†"e	fSpŞN)g€%–ñÒ’ìâ3¯&<`?xŸt>÷ ÅLÆó5Š+­ò‹Õ"l´M.#ùŒÙ‰K¶>“zDÁ',}Êh 8ĞÜQÉÀêèrÎ Jš˜1¯±3|”€CÓYSê¬:‹úS¶Šscâ´H¬úø¬~´ˆ"æ§\D8ôcóUò³úÁ?]íø>W·³ÓS†&¦È7•w*@KT!àˆ“×mÿâùştâ'ÉÇ	;Ç
-uï^ıõpà%Ònùé%Îv/£—Ñ±»™[ı†ó…\«H ÕªRĞÏØ%¬RõNDpùÈË‚íW¾a—6
-³‹9ğÉEA{"øÀ™×éîõãg½ŸI:e!èÒ§À¨XÕ8±zışÃæfOùªw ,ÂK8¥µ1¸ş³ 4K!Ò4‰†•ÑÄ,ÍâÈvH+ª)Ö·;£§ÀôÆƒÍj°›Ã„½¤çd¼Ò |`F¼/ÒİÅÍëâ¯Ÿê8/ÑdÔOáÉìG¥¤°73‡'N3÷
-eaènÖ¦joÿ,¤Â0†Å…Á…„Ù¸À"L£ceRIÙî,©<¹-¤`¬°hšÍtk,±eF^_C Àÿªæ˜Aİ‘™FO½ÿÒ-(q;K|YD–ÀMF~¨õ´²@‚æ±]šgâô|Ø*Ï§<dÄA~Š–Ó %×–±ÑSşwK–—'àï1”’©´LµÓÊ«{`­}¯E,!I[M|"¬šfi4š0GI¡e¤qO;Î*Ù0¢LÄl$S	óúªO(TR7ˆ[f¸‰³ª ÑÍ…¼ä“¶§mlÎ/UÚät?¢6ÃĞõù®À„÷î•_nAhÂv
-á˜Ïëù²ÁCyËxŠı%®¾-\Ëy”% 3‰í [F¥ûvGœjÖìÊé$ŠÌ†Ú:±Jär_àÃ;ªI¤Í©Tš£ä‹ù?şñroà³jg`©ÈÉæ`›·9¥Éàz˜¢‹‘ gp±4(/ÔeT#m+g±ºR E¹?Ÿ%}.)T…~UYZâT'Í cøãMŞÖ¢ª«õ€ˆèS, %’U(È¦\f?‚95ÍÍ‹ò‰¢ó”ÏÓ‹jTk†?¾}ŸXİº	“Á#/ùËl,J¿+•ùÔµ„¬=Ô6>ºÛªPŞ£İ4.û¹†ËHSæÅúUËW=Wïm…A¨qD±	*cÛı’Å«Xæ¶ÊWÁUQ¾,5„êy»³ê’ºGg÷‰òN€—d'*±tÖ[äázµgT°‡Í t€Pûñúú,LòlÛ2ä#LØ€A /s
-°K <ã	sbL~NG|ÆD–:qi»E§Ì¸¬>d„još	Uí€ÿI!9dE¥:g<E,‚ÖkpaAKRÃ[±v(µf*Lé’P‘@*Ca{°%ÈÅ±Õ
-Õ*®‡E+Ê˜â²Ì47á{mEf–3±vK·ñó·º=å(\ş©
-Ö&Fâ6®ÿ3Lûõ­Ùâ‘9Lâµ9p1äÿcú[j½È~®~RÀ^©S²Ô±7ˆé²`Òêßşeå‡Ùõ·¸SÂÇ:4$•&‘'Ûö‹¢äğíÆÍÿaßÂjU,w*~`ùn·+ºıÎ“ÁõÛá¨¿³Oº=²ó´ó¼7$OzPö‰0>7g!$ƒ"E@hŒP1€=Sézç ß@RèY èS>Ébzı/×ÿ%¿GÓ/ÉÑ^üšÎ0XÎ®¿øŒ¢µ†d¹”„$â ?¤IÂO¹/D°Rš%
--ˆ“Ğ,¸şæŒ…€ÉD`.İy]rüz
-p`|*ÙAnó‰ºèÏqö%•¾,!J8™ÁÒ)Ÿ‡_ÎDf[c¨›Ç¸6s‘’DCl#SàTDÉk±P&£4ågM®ƒµ "¦lÂØ@Á3Tf<BvNia(Â`@°MÔŸåY–€_ƒ|D]ˆò@D6X>òê[.`éªâyx¾­éRm%àp@ƒ	K;su{bJ3Ä%|yÃ¡’UÏ½NDVL° P€¡Ke»;ıá¾6tWç-¸Jü'ga
-ß_¼jÍ@®—mrµ(w§SšL±d•,{3:GöÂÃR‡Ù”tRm‡âüÃÀîYïgãá¨3êGíİŞÔ¡!àú`qSš°Ñ1 (/ÇÅcÌ[ZäœG8Gã‰Óü—DÊüW*Ş°È‚Uë ŒÊí–ö&÷´-÷{B)ïœb«€/^¹R6AĞû‹Ø+6¿rKDÁºè%hHS¬Ó›>·m¬[Ç¾°bŸ30Ö¢¨*İÑ±æ2³Ğ	†TìÜß0îŸ„Ï@÷×ÿ1š‚~Ì)ü›ABîà@_#V cpp~ÙN9“€ÓItıx£N|ÁyĞL©€¥ 8{ÖNG½áh,C«:Êß"ŸlV_ïíw{»ğ¦©½écïÁêiˆ)chÃµO¬åûºÓiË‹ğäNªm	™-CW²ç-œ¹4qsyŞ¡â-7z™yPC:r€4Tú<@&·º–A\ \ø„oVŞs{4Á«Çw÷JQÒÜ®>„´³:aªÌV;­^Ú­’ÆŒW+
-[÷ œœiáèÅ`åI€7ŸóÈ³}<"š´‰sÇ…L,·q9¸4ÖÅ…0qu\ÔöpÏ¯ÚÕ¢İ^ÙtJ|ÀŠeF¤ÛËŒÁrëõ¤FŞKKÆÍÄ$õ2©C)	éÆıkôãÖ
-áYÕ°1·¥nW5æhìæÙ°Ïµ¹Ø,.?Şå3¡äàp¿³3ê?ïöÆ½ClN/VÒ³ŸKA-Õ™³Ø¬z3ö¹¤§¯yÌè¢}åcl(g[ÁÚ¼–õ»VÏŒkn¸6[ee%œ¥‰úåÍŸ1	Ùuú¡•ËUêU…”{3@>Aœ2}Sº¯AˆÔ¶°²rÁBMdl
-Ş\z9!Şä Ñígé<K•PÚd£\Ë—øƒMÄx¢p„	òj2,ƒGÈ{"h™-5+˜0Br‰ÇCêÙ.=Á]È÷Ğd“M™ÌA€A`f–CyÄÂ*¥­4_,_úÈûyøvOç÷[êg)á/ê —¶¤A8y°ş±™¨é@² …LÀ ª‚—Myl~Ã{qÆâPĞ€·;twú»˜ı4k™8YHº™•OîÿÕ­kö†ûG‡;½qï§O;GÃQ¯{ëğ¿Éæ>c’û:®ºè"jàlİ°.?j1çW“İÓú¡
-„Ç€céò[–°¸éÖ2ÙÎ(”&7s¥$‰DJäĞ[å£3ÆıÁóÎnÿv>ÓTO½êExÀbH.¢[4û#Ûë‡ııÁ¸ÛôQ±uKDú¹m¡On]h°??Ş?t›åÆ°ì³«*’7œÜÜ¬}-]Çèîš,¶K—ªıô\òŒ$_ƒ«‡´¹¹DùO¿!}SÂk=Ëx•@/¿}j+¤¼b^×./ùı×ø7²mŞã­D™–K:PL6o\Ëh¤¼RDÅ¸(™ëvø–ì¡å‹5€ç,ÆJ¸Tfß²bá±Õ¦·¥?]ÖYÔí÷í¯HOÂcpİ€_ƒİ’!bÑøˆ;£¥Ò’õ"0´t^‰Ÿ…Íwïg»F`_}g±ru/j(2²Tü¯yÎ¹#,BKêy¸a_¼ªÙ
-„Œ²¾íîn½yışŸÉÅØ}uRQj	‚Ğ‰ˆ©T{MP.íÎè)Ö=“\”_¼?N—ÇK0é²”¢¬JÈ³yH¡bY{ñ2z¿L_İ[›´H“4+ôëöY•˜Îvıº<T÷]ån‹º¬|uq¹¤+×‹î‡µØ?)Zì¥–IŞS9”IÔ§j?Ø}Å«wŸaò®wbfÆx’©·à/bOi«]gù¡*H ç×¨ü—÷…¬İ·jÒMÃYŞ02ıÑ›“1Ü–™ÇÔMJsªª¦¯˜ê|µİÔ— ´4å ¹E’×lI¯!ÿÜÜºÍ;·¦Y»G#èDèTC1†­'²½'›GÕyGÀ	Ş…rPõCéüú»Dn	Š€jÀB ›\‹ÊÄ•­B¬úU§ğ£Fë¦;XjƒÀQuƒÇ‡¬H·ÒEmËføx{*‚…şe.ÏÅ¡>uRêäYŞ:C³ÍæÄyõV¨†xàz–@L£€†"bk]v¦Î58Ô"îŠ²ËƒıÃßÇ n›+&£°Hl‘mj¦‘³BJ—š÷ çÜEıÔ¾÷Ïk^ö?ö@JSó²óùp¼ÛÙÛîvÆPÎAâ3èìõj†êa£ÎğÙøp´‚"‘§Ø6÷ÊV­ÓaÍC·'ÙÃËUxdòòZÃ˜¶¼üÇHpÑ÷	ŸALÁ–¡gNÌûñ ê9†‘‚ÂšRêôÊYNãF5À5§,rÀü˜¯*ÛúÒª\”:FÕ×VÙ˜h
-WVë“r¨ƒÅËmÒHæ´ÑÊU³„üUÚThâxËW^A>±“Cb0rĞ„Z¤±îÉÿĞ!*ô
-°ÅÄ9;„gç_z$Î"y²åišÎÛkk¡ğñ86IÛw¯pÅ±}ÜZœ|€v=‰TT%	–PªñbP•ªî–Xi7$Våd
-ZÇàêF©V8’Ñîe¼y¼¢+²€f$]á¿A+H r; Øı°J§ŞkÁ£ÜBıó ±»‰ƒL¾oÂ.æxiAb÷CÇµ†aW¯ùQ³•rèeQğäà‹J-ÌÀváMÓY˜×]ùWzIá¶¼–ô-}«¢ãâWV`ËB*ê”B€B6Wş  ÿÿ ãüJ
+        else if (parBreak > pos + CHUNK_SIZE * 0.5)  end = parBreak + 2;
+        else if (sentBreak > pos + CHUNK_SIZE * 0.5) end = sentBreak + 2;
+      }
+      const chunk = text.slice(pos, end).trim();
+      if (chunk.length > 80) subChunks.push(chunk);
+      pos = end - OVERLAP;
+      if (pos <= 0) break;
+    }
+
+    send({ log: `âœ‚ï¸  Dividido em ${subChunks.length} trechos` });
+
+    // Gerar embeddings â€” transmite progresso de cada um
+    const inserted: any[] = [];
+    let errors = 0;
+
+    for (let i = 0; i < subChunks.length; i++) {
+      send({ log: `  âš™ï¸  Embedding ${i + 1}/${subChunks.length}...`, progress: Math.round((i / subChunks.length) * 100) });
+      try {
+        const embedding = await callGeminiEmbed(subChunks[i]);
+        if (!embedding || embedding.length === 0) {
+          send({ log: `  âš ï¸  Embedding ${i + 1} falhou â€” pulando` });
+          errors++;
+          continue;
+        }
+        inserted.push({
+          content: subChunks[i],
+          metadata: { ...doc.metadata, rechunked: true, original_id: doc.id,
+            chunk_index: i, total_chunks: subChunks.length },
+          embedding
+        });
+      } catch (embErr: any) {
+        send({ log: `  âš ï¸  Erro embedding ${i + 1}: ${String(embErr.message)}` });
+        errors++;
+      }
+    }
+
+    send({ log: `ğŸ’¾ Salvando ${inserted.length} trechos no banco...` });
+
+    if (inserted.length > 0) {
+      // Inserir novos
+      const { error: insertErr } = await supabaseAdmin.from('legal_documents').insert(inserted);
+      if (insertErr) throw new Error('Insert: ' + insertErr.message);
+      // Deletar original
+      const { error: deleteErr } = await supabaseAdmin.from('legal_documents').delete().eq('id', doc.id);
+      if (deleteErr) throw new Error('Delete: ' + deleteErr.message);
+    }
+
+    // Contar quantos restam
+    const { data: remainingData } = await supabaseAdmin
+      .rpc('count_large_legal_documents', { min_chars: 8000 });
+    const remaining = Number(remainingData) || 0;
+
+    send({
+      log: `âœ… "${titulo}" â†’ ${inserted.length} trechos salvos${errors > 0 ? ` (${errors} erros)` : ''}`,
+      done: remaining === 0,
+      remaining,
+      total_grandes: totalGrandes,
+      new_chunks: inserted.length,
+      errors
+    });
+
+    if (remaining === 0) {
+      send({ log: 'ğŸ‰ Base totalmente otimizada! Todos os documentos foram rechunked.' });
+    } else {
+      send({ log: `â© Restam ${remaining} documentos grandes. Clique em "Continuar" para processar o prÃ³ximo.` });
+    }
+
+  } catch (err: any) {
+    send({ error: String(err?.message || 'Erro interno desconhecido') });
+  }
+
+  res.end();
+});
+
+
+
+
+// ============================================================
+// ENDPOINT: GERAR EMBEDDINGS PARA CHUNKS PENDENTES
+// Processa chunks com embedding IS NULL em lotes de 15
+// Usa callGeminiEmbed + supabaseAdmin â€” 100% server-side
+// ============================================================
+app.post("/api/admin/fix-embeddings", async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const send = (obj: object) => {
+    try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {}
+  };
+
+  try {
+    const adminKey = req.body?.adminKey || req.body?.adminkey;
+    const expectedKey = process.env.ADMIN_KEY || 'felix-castro-rechunk-2026';
+    if (adminKey !== expectedKey) {
+      send({ error: "NÃ£o autorizado" });
+      return res.end();
+    }
+
+    const BATCH = 15;
+
+    // Contar pendentes
+    const { count: totalPendentes } = await supabaseAdmin
+      .from('legal_documents')
+      .select('id', { count: 'exact', head: true })
+      .is('embedding', null);
+
+    send({ log: `ğŸ“‹ ${totalPendentes || 0} chunks sem embedding encontrados` });
+
+    if (!totalPendentes || totalPendentes === 0) {
+      send({ log: 'âœ… Nenhum chunk pendente â€” base jÃ¡ estÃ¡ completa!', done: true });
+      return res.end();
+    }
+
+    // Buscar em lotes de 15
+    let processed = 0;
+    let errors = 0;
+    let offset = 0;
+
+    while (true) {
+      const { data: chunks, error: fetchErr } = await supabaseAdmin
+        .from('legal_documents')
+        .select('id, content, metadata')
+        .is('embedding', null)
+        .order('id', { ascending: true })
+        .range(offset, offset + BATCH - 1);
+
+      if (fetchErr) { send({ log: `âŒ Erro ao buscar: ${fetchErr.message}` }); break; }
+      if (!chunks || chunks.length === 0) break;
+
+      send({ log: `âš™ï¸  Lote: ${chunks.length} chunks a processar (Progresso: ${processed}/${totalPendentes} feitos, offset: ${offset})` });
+
+      let batchSuccessCount = 0;
+
+      for (const chunk of chunks) {
+        let success = false;
+        try {
+          const embedding = await callGeminiEmbed(chunk.content);
+          if (embedding && embedding.length > 0) {
+            const { error: updateErr } = await supabaseAdmin
+              .from('legal_documents')
+              .update({ embedding })
+              .eq('id', chunk.id);
+
+            if (!updateErr) {
+              processed++;
+              batchSuccessCount++;
+              success = true;
+
+              // Atualizar progresso a cada 5 ou no final do lote
+              if (processed % 5 === 0) {
+                send({ progress: processed, total: totalPendentes, log: `  âœ“ ${processed}/${totalPendentes} embeddings gerados...` });
+              }
+            } else {
+              errors++;
+              send({ log: `  âš ï¸  Erro DB para chunk ${chunk.id}: ${updateErr.message}` });
+            }
+          } else {
+            errors++;
+            send({ log: `  âš ï¸  Embedding retornado estÃ¡ vazio para o chunk ${chunk.id}` });
+          }
+        } catch (e: any) {
+          errors++;
+          send({ log: `  âš ï¸  Chunk ${chunk.id} falhou: ${String(e.message).substring(0, 60)}` });
+        }
+        // Pausa de 300ms entre embeddings para nÃ£o sobrecarregar
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      // Se atualizamos com sucesso N chunks, eles foram removidos do conjunto "embedding IS NULL".
+      // Para o prÃ³ximo lote, apenas precisamos pular aqueles que falharam e continuam com embedding IS NULL.
+      offset += (chunks.length - batchSuccessCount);
+
+      if (chunks.length < BATCH) break; // Ãºltimo lote
+    }
+
+    // Contar restantes reais
+    const { count: restantes } = await supabaseAdmin
+      .from('legal_documents')
+      .select('id', { count: 'exact', head: true })
+      .is('embedding', null);
+
+    send({
+      done: true,
+      processed,
+      errors,
+      remaining: restantes || 0,
+      log: `ğŸ‰ ConcluÃ­do! ${processed} embeddings gerados. ${errors} erros. ${restantes || 0} pendentes.`
+    });
+
+  } catch (err: any) {
+    send({ error: String(err?.message || 'Erro interno') });
+  }
+  res.end();
+});
+
+// ====================================================================
+// DIAGNÃ“STICO DE CHAVES GEMINI (usado pelo botÃ£o "Testar Chaves de API"
+// nas ConfiguraÃ§Ãµes). Faz UMA chamada mÃ­nima real por chave para
+// classificar o status atual (saudÃ¡vel, esgotada, invÃ¡lida, bloqueada,
+// nÃ£o encontrada) e cruza com o estado compartilhado (gemini_key_state)
+// para estimar o uso na janela proativa de 60s. Protegido pelo mesmo
+// middleware de autenticaÃ§Ã£o de sessÃ£o que cobre todo /api/*.
+app.post("/api/admin/test-gemini-keys", async (req, res) => {
+  try {
+    const keys = getApiKeys();
+    if (keys.length === 0) {
+      return res.json({ testedAt: new Date().toISOString(), totalKeys: 0, results: [], summary: {} });
+    }
+
+    const hashes = keys.map(keyHash);
+    const { data: stateRows } = await supabaseAdmin
+      .from(KEY_STATE_TABLE)
+      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count, window_tokens')
+      .in('key_hash', hashes);
+    const stateByHash = new Map((stateRows || []).map((r: any) => [r.key_hash, r]));
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Testa em pequenos lotes com pausa entre eles â€” 21 chamadas simultÃ¢neas
+    // criariam a mesma rajada artificial que este diagnÃ³stico existe pra
+    // detectar.
+    const TEST_BATCH_SIZE = 4;
+    const TEST_MODEL = 'gemini-3.5-flash';
+    const results: any[] = [];
+
+    for (let i = 0; i < keys.length; i += TEST_BATCH_SIZE) {
+      const batch = keys.slice(i, i + TEST_BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (apiKey, bi) => {
+        const idx = i + bi;
+        const keyMask = `..${apiKey.slice(-6)}`;
+        const hash = keyHash(apiKey);
+        const state = stateByHash.get(hash);
+        const windowActive = state?.window_start ? (Date.now() - new Date(state.window_start).getTime()) < 60000 : false;
+        const windowCount = windowActive ? (state?.window_count || 0) : 0;
+        const windowTokens = windowActive ? (state?.window_tokens || 0) : 0;
+        const dailyExhausted = state?.daily_exhausted_date === todayStr;
+        const start = Date.now();
+
+        const base = {
+          index: idx + 1,
+          keyMask,
+          windowCount,
+          windowLimit: PROACTIVE_RPM_PER_KEY,
+          windowTokens,
+          tokenLimit: PROACTIVE_TPM_PER_KEY,
+          percentFreeWindow: Math.max(0, Math.round((1 - Math.max(windowCount / PROACTIVE_RPM_PER_KEY, windowTokens / PROACTIVE_TPM_PER_KEY)) * 100)),
+          dailyExhausted
+        };
+
+        try {
+          const ai = new GoogleGenAI({ apiKey });
+          await ai.models.generateContent({
+            model: TEST_MODEL,
+            contents: 'oi',
+            config: { maxOutputTokens: 1 }
+          });
+          recordKeyUsageShared(apiKey);
+          return { ...base, status: 'saudavel', statusLabel: 'âœ… SaudÃ¡vel', responseTimeMs: Date.now() - start };
+        } catch (error: any) {
+          const errorMessage = error?.message || String(error);
+          const is503 = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE');
+          const isRateLimit = errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED') || errorMessage.includes('Quota exceeded');
+          const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
+          const isInvalid = errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID') || errorMessage.includes('Key not found');
+          const isPermission = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
+          const isNotFound = errorMessage.includes('404') || errorMessage.includes('NOT_FOUND');
+
+          let status = 'erro';
+          let statusLabel = 'âš ï¸ Erro desconhecido';
+          if (isInvalid) { status = 'invalida'; statusLabel = 'âŒ InvÃ¡lida'; invalidKeys.add(apiKey); }
+          else if (isPermission) { status = 'bloqueada'; statusLabel = 'ğŸš« Bloqueada / sem permissÃ£o'; }
+          else if (isNotFound) { status = 'nao_encontrada'; statusLabel = 'â“ Modelo/recurso nÃ£o encontrado'; }
+          else if (isDailyQuota) {
+            status = 'esgotada_diaria'; statusLabel = 'ğŸ“… Esgotada (cota diÃ¡ria)';
+            markKeyExhaustedShared(apiKey, { daily: true });
+          } else if (isRateLimit) {
+            status = 'esgotada'; statusLabel = 'â³ Esgotada (limite por minuto)';
+            markKeyExhaustedShared(apiKey, { exhaustedUntil: Date.now() + 61000 });
+          } else if (is503) { status = 'sobrecarregada'; statusLabel = 'ğŸ”¥ Servidor Google sobrecarregado agora'; }
+
+          return {
+            ...base,
+            status,
+            statusLabel,
+            responseTimeMs: Date.now() - start,
+            errorDetail: errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 150)
+          };
+        }
+      }));
+      results.push(...batchResults);
+      if (i + TEST_BATCH_SIZE < keys.length) await new Promise(r => setTimeout(r, 400));
+    }
+
+    const summary: Record<string, number> = {};
+    for (const r of results) summary[r.status] = (summary[r.status] || 0) + 1;
+
+    res.json({ testedAt: new Date().toISOString(), totalKeys: keys.length, model: TEST_MODEL, results, summary });
+  } catch (error: any) {
+    console.error('Erro ao testar chaves Gemini:', error);
+    res.status(500).json({ error: error.message || 'Erro interno' });
+  }
+});
+
+// Manipulador 404 para rotas /api que nÃ£o foram encontradas (deve ficar apÃ³s todas as rotas de API legÃ­timas)
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: `Rota API nÃ£o encontrada: ${req.method} ${req.originalUrl}` });
+});
+
+
+// Development server setup
+const PORT = 3000;
+
+if (process.env.NODE_ENV !== "production") {
+  // Use dynamic import to avoid loading Vite in production/Vercel
+  import("vite").then(({ createServer: createViteServer }) => {
+    createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    }).then((vite) => {
+      app.use(vite.middlewares);
+
+app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Development server running on http://localhost:${PORT}`);
+      });
+    });
+  }).catch(err => {
+    console.error("Failed to start development server:", err);
+  });
+} else {
+  // Production setup
+  const path = await import("path");
+  const url = await import("url");
+  const __filename = url.fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
+  const root = path.join(__dirname, "..");
+  const distPath = path.join(root, 'dist');
+  
+  // Serve static files from the React app
+  app.use(express.static(distPath));
+  
+  // The "catchall" handler: for any request that doesn't
+  // match one above, send back React's index.html file.
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Production server running on port ${PORT}`);
+  });
+}
+
+export default app;
