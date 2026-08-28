@@ -1258,6 +1258,15 @@ function buildOrHistory(history: any[]): any[] {
  * refletir um teto seguro de TAXA, não a capacidade do modelo.
  * DeepSeek/Qwen via OpenRouter: 163k tokens total — usar 120k como limite seguro.
  */
+// Teto do rascunho da peça reinjetado em revisões/correções cirúrgicas.
+// Era 200_000 caracteres (~57k tokens), um valor INDEPENDENTE do orçamento
+// de availableForContext/getInputBudget — ou seja, mesmo depois de corrigir
+// getInputBudget, esta injeção sozinha continuava contribuindo boa parte de
+// um total de ~294k tokens numa correção pontual (log da Vercel,
+// 2026-08-28). 80k caracteres ainda cobre a esmagadora maioria das peças
+// reais por inteiro, com folga bem maior para a cota de taxa.
+const DRAFT_REINJECT_CHAR_LIMIT = 80_000;
+
 function getInputBudget(modelProvider?: string, model?: string): number {
   if (modelProvider === 'openrouter') {
     // Aumentamos para 200k tokens para suportar documentos densos em modelos de elite
@@ -5561,79 +5570,16 @@ async function getOrBuildContextCache(
   modelName: string,
   res: any
 ): Promise<{ cacheName: string; keyIndex: number } | null> {
-  if (!documentText || documentText.length < 30000) {
-    return null;
-  }
-
-  const cacheKey = sessionId ? `${sessionId}_${modelName}` : `hash_${hashString(documentText)}_${modelName}`;
-  const existing = documentCaches.get(cacheKey);
-  const keys = getApiKeys();
-
-  if (keys.length === 0) return null;
-
-  if (existing && existing.textLength === documentText.length && existing.expiresAt > Date.now()) {
-    try {
-      const idx = existing.keyIndex % keys.length;
-      const aiCacheCheck = new GoogleGenAI({ apiKey: keys[idx] });
-      // Renovação deslizante: update estende o TTL por +1h
-      await aiCacheCheck.caches.update({ name: existing.cacheName, config: { ttl: '3600s' } });
-      existing.expiresAt = Date.now() + 3500 * 1000;
-      console.log(`[AUTO-CACHE] 💾 Reusando cache existente: ${existing.cacheName} (chave ${idx}) para ${modelName}`);
-      try {
-        res.write(`data: ${JSON.stringify({ status: `💾 [Cache Ativo] Usando cache inteligente de alta velocidade para o documento (${Math.round(documentText.length / 1000)}k caracteres)...` })}\n\n`);
-      } catch {}
-      return { cacheName: existing.cacheName, keyIndex: idx };
-    } catch (cacheErr: any) {
-      console.warn(`[AUTO-CACHE] Cache anterior inválido/expirado (${existing.cacheName}):`, cacheErr.message);
-      documentCaches.delete(cacheKey);
-    }
-  }
-
-  // Criar novo context cache
-  try {
-    console.log(`[AUTO-CACHE] ⚡ Criando novo cache de contexto para ${modelName} (~${Math.round(documentText.length / 1000)}k caracteres)...`);
-    try {
-      res.write(`data: ${JSON.stringify({ status: `⚡ [Otimização] Criando cache de contexto de alta velocidade para o documento (${Math.round(documentText.length / 1000)}k caracteres)...` })}\n\n`);
-    } catch {}
-
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-    const idx = currentKeyIndex;
-    const ai = new GoogleGenAI({ apiKey: keys[idx] });
-
-    const cache = await ai.caches.create({
-      model: modelName,
-      config: {
-        contents: [{ role: 'user', parts: [{ text: "DOCUMENTOS DO CASO (ÍNTEGRA PARA CONSULTA E CITAÇÃO LITERAL):\n\n" + documentText }] }],
-        ttl: '3600s',
-        displayName: `doc-cache-${Date.now()}`
-      }
-    });
-
-    if (!cache.name) {
-      throw new Error("Não foi possível gerar um nome para o cache.");
-    }
-
-    const cacheInfo: SessionCacheInfo = {
-      cacheName: cache.name as string,
-      keyIndex: idx,
-      expiresAt: Date.now() + 3500 * 1000,
-      textLength: documentText.length,
-      model: modelName
-    };
-
-    documentCaches.set(cacheKey, cacheInfo);
-    console.log(`[AUTO-CACHE] 💾 Criado com sucesso: ${cache.name} na chave ${idx} para modelo ${modelName}`);
-    try {
-      res.write(`data: ${JSON.stringify({ status: `💾 [Cache Ativo] Documento otimizado! Suas respostas e alterações serão processadas instantaneamente.` })}\n\n`);
-    } catch {}
-    return { cacheName: cache.name as string, keyIndex: idx };
-  } catch (err: any) {
-    console.warn("[AUTO-CACHE] Falha ao criar cache de contexto (fluxo segue sem cache):", err.message);
-    try {
-      res.write(`data: ${JSON.stringify({ status: `⚠️ [Aviso Cache] Não foi possível otimizar via cache (${err.message}). Processando texto integral...` })}\n\n`);
-    } catch {}
-    return null;
-  }
+  // DESATIVADO: confirmado em produção (log da Vercel, 2026-08-28) que
+  // ai.caches.create() SEMPRE falha nas nossas chaves gratuitas com 429 —
+  // "quota_limit_value":"0" para o quota_metric de API requests do projeto.
+  // Ou seja, o recurso de context caching não está disponível no tier
+  // gratuito destas chaves (nunca funcionou, não é intermitente). Cada
+  // tentativa desperdiçava uma chamada real de API — contando contra a
+  // MESMA cota compartilhada por minuto que já estava apertada — só para
+  // falhar e cair no fluxo sem cache de qualquer forma. Desativado até as
+  // chaves terem um tier que suporte caching de verdade.
+  return null;
 }
 
 // ====================================================================
@@ -6064,7 +6010,8 @@ ${ragTruncated}`;
       console.log(`[Dr.Michel] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (isSurgicalMode) {
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editor Jurídico de Elite no Artefato/Petição já existente.
 O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
@@ -6100,14 +6047,15 @@ Remoção de trecho:
 \`\`\`
 
 [ARTEFATO BASE ATUAL]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[...]' : ''}
 [FIM DO ARTEFATO BASE]
 
 [ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
       } else if (revisionIntent === 'FULL_REGENERATION') {
         // FULL_REGENERATION — não injeta peça anterior inteira (causa degradação). Injeta sumário estrutural.
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
 O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
@@ -6118,7 +6066,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -6882,7 +6830,8 @@ ${ragTruncated}`;
       console.log(`[Dra.Luana] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (isSurgicalMode) {
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editora Jurídica de Elite Previdenciária no Artefato/Petição já existente.
 O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
@@ -6918,13 +6867,14 @@ Remoção de trecho:
 \`\`\`
 
 [ARTEFATO BASE ATUAL]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[...]' : ''}
 [FIM DO ARTEFATO BASE]
 
 [ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
       } else if (revisionIntent === 'FULL_REGENERATION') {
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
 O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mas mantendo TODOS os fatos, datas, provas e citações presentes abaixo.
@@ -6935,7 +6885,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
@@ -7639,7 +7589,8 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       console.log(`[Dr.FelixCastro] Revisão detectada: ${revisionIntent} | Draft existe: ${!!draftContent}`);
 
       if (isSurgicalMode) {
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO EDITOR DE ARTEFATO — EDIÇÃO CIRÚRGICA DE ALTA PRECISÃO]
 Você está atuando como Editor Jurídico de Elite Civil/Consumidor no Artefato/Petição já existente.
 O usuário solicitou uma alteração, correção ou adição pontual. NÃO reescreva a petição inteira do zero (para economizar tokens e atualizar o artefato instantaneamente).
@@ -7675,13 +7626,14 @@ Remoção de trecho:
 \`\`\`
 
 [ARTEFATO BASE ATUAL]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[...]' : ''}
 [FIM DO ARTEFATO BASE]
 
 [ALTERAÇÕES SOLICITADAS PELO USUÁRIO]
 ${message}`;
       } else if (revisionIntent === 'FULL_REGENERATION') {
-        const draftParaRegen = draftContent.substring(0, 200000);
+        const draftParaRegen = draftContent.substring(0, DRAFT_REINJECT_CHAR_LIMIT);
+        console.log(`[Draft Reinject] ${draftContent.length} → ${draftParaRegen.length} chars (~${Math.round(draftParaRegen.length / 3.5 / 1000)}k tokens) reinjetados na revisão.`);
         finalMessage += `\n\n[MODO NOVA VERSÃO COMPLETA — REESCREVER DO ZERO COM MELHORIAS]
 O usuário pediu uma NOVA versão completa da petição. REESCREVA do zero incorporando as mudanças solicitadas.
 NÃO copie parágrafos inteiros — redija com palavras novas, mantendo TODOS os fatos, datas, provas e citações.
@@ -7692,7 +7644,7 @@ Densidade IGUAL OU SUPERIOR à versão anterior. Estrutura de tópicos idêntica
 2. Sua resposta DEVE COMEÇAR IMEDIATAMENTE NA PRIMEIRA LINHA com o cabeçalho oficial da petição (ex.: "AO JUÍZO DA..." ou "EXCELENTÍSSIMO...").
 
 [PETIÇÃO BASE ANTERIOR - IMPORTANTE]
-${draftParaRegen}${draftContent.length > 200000 ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
+${draftParaRegen}${draftContent.length > DRAFT_REINJECT_CHAR_LIMIT ? '\n[... peça continua — mantenha o padrão de densidade e citações da parte visível ...]' : ''}
 [FIM DA REFERÊNCIA]
 
 [MUDANÇAS SOLICITADAS PELO USUÁRIO]
