@@ -3080,7 +3080,16 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+  if (retries === MAX_RETRIES) {
+    await syncKeyStateFromShared(keys);
+    // Ponto de partida ALEATÓRIO a cada requisição nova (não sempre 0 ou o
+    // valor deixado pela última chave usada nesta instância). Sob carga, a
+    // Vercel sobe várias instâncias em paralelo, cada uma com seu próprio
+    // "currentKeyIndex" começando do zero — sem isso, todas convergiam pro
+    // início da lista, martelando as primeiras ~10 chaves e nunca alcançando
+    // as últimas (ex.: 11 a 21), mesmo com elas livres.
+    currentKeyIndex = Math.floor(Math.random() * keys.length);
+  }
 
   let activeKeyIndex = (forcedKeyIndex !== undefined) ? forcedKeyIndex : currentKeyIndex;
   let apiKey = keys[activeKeyIndex % keys.length];
@@ -3343,7 +3352,13 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+  if (retries === MAX_RETRIES) {
+    await syncKeyStateFromShared(keys);
+    // Ponto de partida ALEATÓRIO a cada requisição nova — ver explicação
+    // completa em callGemini. Evita que várias instâncias paralelas da
+    // Vercel convirjam sempre pro início da lista de chaves.
+    currentKeyIndex = Math.floor(Math.random() * keys.length);
+  }
 
   // CACHE: requisições com cachedContent ficam FIXAS na chave que criou o cache
   const cachePinned = !!(params?.config?.cachedContent) && forcedKeyIndex !== undefined;
@@ -3511,7 +3526,12 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error("Nenhuma chave de API encontrada. Configure API_KEY_1, API_KEY_2, etc. na Vercel.");
 
-  if (retries === MAX_RETRIES) await syncKeyStateFromShared(keys);
+  if (retries === MAX_RETRIES) {
+    await syncKeyStateFromShared(keys);
+    // Ponto de partida ALEATÓRIO a cada requisição nova — ver explicação
+    // completa em callGemini.
+    currentKeyIndex = Math.floor(Math.random() * keys.length);
+  }
 
   const available = getAvailableKey(keys, currentKeyIndex);
   if (available.waitMs === -1) {
