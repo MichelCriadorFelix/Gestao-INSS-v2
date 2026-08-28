@@ -1244,16 +1244,26 @@ function buildOrHistory(history: any[]): any[] {
 
 /**
  * Limites de input por provedor de IA. Garante margem para output.
- * Gemini Flash: 1M tokens contexto, mas com input gigante o output reduz.
+ *
+ * IMPORTANTE: isto NÃO é sobre o tamanho da janela de contexto do modelo
+ * (Gemini Flash de fato aceita 1M+ tokens numa chamada). É sobre a COTA DE
+ * TAXA (tokens por minuto) das nossas chaves gratuitas — um limite
+ * completamente diferente que não tem relação com a capacidade do modelo.
+ * Confirmado em produção (log da Vercel, 2026-08-28): uma única conversa
+ * grande mandou ~298k tokens numa chamada e a chave tomou 429 na hora,
+ * mesmo o modelo aceitando facilmente esse tamanho. O valor antigo (1.2M)
+ * fazia o sistema de orçamento por ratio abaixo (ragBudgetChars,
+ * maxDocCtxChars etc.) virar, na prática, um no-op — o teto era tão alto
+ * que a truncagem quase nunca era acionada de verdade. Este valor deve
+ * refletir um teto seguro de TAXA, não a capacidade do modelo.
  * DeepSeek/Qwen via OpenRouter: 163k tokens total — usar 120k como limite seguro.
  */
 function getInputBudget(modelProvider?: string, model?: string): number {
   if (modelProvider === 'openrouter') {
     // Aumentamos para 200k tokens para suportar documentos densos em modelos de elite
-    return 200_000; 
+    return 200_000;
   }
-  // Gemini 1.5/2.0/3.5 Flash suportam 1M+ tokens nativamente
-  return 1_200_000;
+  return 100_000;
 }
 
 /**
