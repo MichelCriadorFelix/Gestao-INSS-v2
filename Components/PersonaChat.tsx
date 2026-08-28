@@ -3262,6 +3262,41 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     }
   }, [activeArtifactId, currentSession?.messages]);
 
+  const handleDeleteArtifact = () => {
+    if (!activeArtifactId || activeArtifactId === 'streaming' || !currentSessionId) return;
+    const idToDelete = activeArtifactId;
+
+    if (!window.confirm('Excluir este artefato da conversa? A mensagem correspondente no chat também será removida. Essa ação não pode ser desfeita.')) {
+      return;
+    }
+
+    const sess = sessions.find(s => s.id === currentSessionId);
+    const remainingArtifacts = (sess?.messages || []).filter(
+      m => m.role === 'assistant' && isArtifactContent(m.content) && m.id !== idToDelete
+    );
+
+    setSessions(prev => prev.map(s => {
+      if (s.id !== currentSessionId) return s;
+      return { ...s, messages: s.messages.filter(m => m.id !== idToDelete) };
+    }));
+
+    // Limpa o tipo manual fixado pra essa mensagem, se houver
+    if (idToDelete in customArtifactTypes) {
+      setCustomArtifactTypes(prev => {
+        const { [idToDelete]: _removed, ...rest } = prev;
+        if (currentSessionId) {
+          setSessions(prevSessions => prevSessions.map(s => s.id === currentSessionId
+            ? { ...s, artifactTypes: rest }
+            : s));
+        }
+        return rest;
+      });
+    }
+
+    // Abre o artefato mais recente que sobrou, ou fecha o painel se não sobrou nenhum
+    setActiveArtifactId(remainingArtifacts.length > 0 ? remainingArtifacts[remainingArtifacts.length - 1].id : null);
+  };
+
   const handleSaveManualArtifact = async () => {
     if (!editableArtifactText || !currentSessionId) return;
     
@@ -4695,6 +4730,14 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                       )}
 
                       <div className="w-px h-4 bg-slate-200 dark:bg-bordeaux-900 mx-0.5"></div>
+
+                      <button
+                        onClick={handleDeleteArtifact}
+                        className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                        title="Excluir este artefato da conversa"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
 
                       <button
                         onClick={() => setActiveArtifactId(null)}
