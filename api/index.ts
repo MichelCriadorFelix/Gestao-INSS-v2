@@ -3159,7 +3159,17 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest || isEmpty) && retries > 0) {
       let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
       let nextFailures = failuresOnCurrentModel + 1;
-      
+
+      // BACKOFF ESCALONADO: várias das nossas chaves compartilham o mesmo
+      // projeto Google Cloud (19 chaves em ~6 projetos), então uma chave
+      // "nova" pode tomar 429 na hora por uma chave irmã já ter usado a cota
+      // do projeto. Depois de falhas seguidas por sobrecarga/cota, a pausa
+      // cresce em vez de continuar rotacionando na mesma velocidade — mesma
+      // lógica do callGeminiStream.
+      if (isOverloaded && nextFailures >= 3) {
+        delay = Math.min(2000 * (nextFailures - 2), 8000);
+      }
+
       const currentKeyDisplayIndex = (activeKeyIndex % keys.length) + 1;
       const keyMask = apiKey ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}` : 'N/A';
       
@@ -3431,7 +3441,20 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     if ((isOverloaded || isNotFound || isInvalidKey || isPermissionDenied || isBadRequest) && retries > 0) {
       let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
       let nextFailures = failuresOnCurrentModel + 1;
-      
+
+      // BACKOFF ESCALONADO: descobrimos que muitas das nossas chaves (19 no
+      // total) foram criadas em apenas ~6 projetos Google Cloud distintos —
+      // várias chaves compartilham a MESMA cota por baixo dos panos. Isso faz
+      // uma chave "nova" (nunca usada) tomar 429 na hora, porque uma chave
+      // irmã do mesmo projeto acabou de consumir a cota segundos antes. Como
+      // não dá pra saber pelo código qual chave pertence a qual projeto,
+      // depois de algumas falhas seguidas por sobrecarga/cota a pausa cresce
+      // (em vez de continuar tentando outra chave imediatamente), dando tempo
+      // real para as janelas de cota do Google se recuperarem.
+      if (isOverloaded && nextFailures >= 3) {
+        delay = Math.min(2000 * (nextFailures - 2), 8000);
+      }
+
       let errorReason = 'sobrecarga/cota';
       if (is503Overloaded) errorReason = 'servidor Google sobrecarregado (503)';
       else if (isInvalidKey) errorReason = 'chave inválida';
@@ -3552,9 +3575,16 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
     }
 
     console.error(`Erro ao gerar embedding com a chave ${activeKeyIndex}: ${errorMessage.substring(0, 90)}`);
-    
+
     if (retries > 0) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // BACKOFF ESCALONADO: mesma lógica do callGemini/callGeminiStream —
+      // várias chaves compartilham projeto Google Cloud, então depois de
+      // algumas falhas seguidas por sobrecarga/cota a pausa cresce.
+      const failuresSoFar = MAX_RETRIES - retries + 1;
+      const delay = (isRateLimit || is503Overloaded || isDailyQuota) && failuresSoFar >= 3
+        ? Math.min(2000 * (failuresSoFar - 2), 8000)
+        : 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
       return callGeminiEmbed(text, retries - 1);
     }
     
