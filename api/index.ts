@@ -1267,6 +1267,14 @@ function buildOrHistory(history: any[]): any[] {
 // reais por inteiro, com folga bem maior para a cota de taxa.
 const DRAFT_REINJECT_CHAR_LIMIT = 80_000;
 
+// Teto do processo/OCR enviado no início do caso (CNIS, laudos, autos).
+// Decidido junto com o Dr. Michel em 2026-08-28: meio-termo entre "cobre a
+// maioria dos casos reais" e "risco de estourar cota junto com RAG/
+// histórico" — não compartilha o pool de availableForContext (ver acima),
+// porque documento é tipicamente um envio grande e essencial no início do
+// caso, diferente de RAG/histórico que crescem a cada turno.
+const DOCUMENT_CONTEXT_CHAR_LIMIT = 450_000;
+
 function getInputBudget(modelProvider?: string, model?: string): number {
   if (modelProvider === 'openrouter') {
     // Aumentamos para 200k tokens para suportar documentos densos em modelos de elite
@@ -5811,12 +5819,16 @@ Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     
     // Dynamic Distribution
-    const ratioDoc = documentContext ? 0.60 : 0;
+    // Documento tem orçamento PRÓPRIO (DOCUMENT_CONTEXT_CHAR_LIMIT), fora do
+    // pool compartilhado com RAG/leis — o processo/OCR é tipicamente
+    // volumoso e essencial por inteiro (grounding nos autos), diferente de
+    // RAG/histórico que crescem a cada turno de uma conversa longa e foram
+    // a causa real do estouro de cota. Ver getInputBudget().
     const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
-    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    let ratioRag = 1.0 - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
-    
-    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+
+    const maxDocCtxChars = DOCUMENT_CONTEXT_CHAR_LIMIT;
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     // CACHE: valida ou cria o cache do documento no backend de forma transparente.
@@ -6627,12 +6639,16 @@ Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 
     const availableForContext = inputBudget - reservedTokens; // ~75k Gemini, ~95k OpenRouter
     
     // Dynamic Distribution
-    const ratioDoc = documentContext ? 0.60 : 0;
+    // Documento tem orçamento PRÓPRIO (DOCUMENT_CONTEXT_CHAR_LIMIT), fora do
+    // pool compartilhado com RAG/leis — o processo/OCR é tipicamente
+    // volumoso e essencial por inteiro (grounding nos autos), diferente de
+    // RAG/histórico que crescem a cada turno de uma conversa longa e foram
+    // a causa real do estouro de cota. Ver getInputBudget().
     const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
-    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    let ratioRag = 1.0 - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35; // Guarantee pelo menos 35%
-    
-    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+
+    const maxDocCtxChars = DOCUMENT_CONTEXT_CHAR_LIMIT;
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     // CACHE: valida ou cria o cache do documento no backend de forma transparente.
@@ -7431,13 +7447,13 @@ Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 
     const reservedTokens = 25_000;
     const availableForContext = inputBudget - reservedTokens;
     
-    // Dynamic Distribution
-    const ratioDoc = documentContext ? 0.60 : 0;
+    // Dynamic Distribution — documento tem orçamento próprio, fora do pool
+    // compartilhado com RAG/leis. Ver comentário em DOCUMENT_CONTEXT_CHAR_LIMIT.
     const ratioLaws = (customLaws && Array.isArray(customLaws) && customLaws.length > 0) ? 0.30 : 0;
-    let ratioRag = 1.0 - ratioDoc - ratioLaws;
+    let ratioRag = 1.0 - ratioLaws;
     if (ratioRag < 0.35) ratioRag = 0.35;
 
-    const maxDocCtxChars = Math.floor(availableForContext * ratioDoc * 3.5);
+    const maxDocCtxChars = DOCUMENT_CONTEXT_CHAR_LIMIT;
     const maxLawsChars = Math.floor(availableForContext * ratioLaws * 3.5);
 
     // CACHE: valida ou cria o cache do documento no backend de forma transparente.
@@ -8231,7 +8247,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
     const inputBudget = getInputBudget(modelProvider, model);
     const reservedTokens = 15_000;
     const availableForContext = inputBudget - reservedTokens;
-    const maxDocCtxChars = Math.floor(availableForContext * 0.80 * 3.5);
+    const maxDocCtxChars = DOCUMENT_CONTEXT_CHAR_LIMIT;
 
     // CACHE: valida ou cria o cache do documento no backend de forma transparente.
     // Evita transferir o documento inteiro em todas as mensagens de conversas longas.

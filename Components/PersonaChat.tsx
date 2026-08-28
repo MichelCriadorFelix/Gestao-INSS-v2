@@ -2278,11 +2278,13 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       if (finalArtifactUpdate) {
         // Atualiza a mensagem do artefato anterior na conversa para que o documento fique sincronizado
+        let updatedArtifactMsgId: string | null = null;
         setSessions(prev => prev.map(s => {
           if (s.id !== sessionId) return s;
           const updatedMessages = [...s.messages];
           for (let i = updatedMessages.length - 1; i >= 0; i--) {
             if (isArtifactContent(updatedMessages[i].content)) {
+              updatedArtifactMsgId = updatedMessages[i].id;
               updatedMessages[i] = {
                 ...updatedMessages[i],
                 content: finalArtifactUpdate!
@@ -2295,6 +2297,27 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
             messages: [...updatedMessages, assistantMsg]
           };
         }));
+
+        // Uma correção cirúrgica pode transformar a NATUREZA do documento
+        // (ex.: quesitos virando manifestação/petição intercorrente). Se o
+        // tipo tinha sido fixado manualmente antes da edição, ele ficava
+        // "preso" no tipo antigo mesmo com o conteúdo totalmente mudado —
+        // limpa o override pra o badge voltar a refletir o conteúdo atual
+        // (detecção automática). O usuário pode reescolher manualmente de
+        // novo se quiser, pelo seletor de tipo.
+        if (updatedArtifactMsgId) {
+          const msgId = updatedArtifactMsgId as string;
+          setCustomArtifactTypes(prev => {
+            if (!(msgId in prev)) return prev;
+            const { [msgId]: _removed, ...rest } = prev;
+            if (currentSessionId) {
+              setSessions(prevSessions => prevSessions.map(s => s.id === currentSessionId
+                ? { ...s, artifactTypes: rest }
+                : s));
+            }
+            return rest;
+          });
+        }
       } else {
         if ((isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) && !isSurgicalCorrection) {
           setStreamingAsArtifact(false);
