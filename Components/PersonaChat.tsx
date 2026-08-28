@@ -192,6 +192,50 @@ const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string)
   return key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : false;
 };
 
+interface ExplicitLegalRef {
+  kind: 'article' | 'sumula' | 'tema';
+  num: string;
+  lawAnchor: string;
+}
+
+// Varredura determinística (sem IA) de menções EXPLÍCITAS a um dispositivo
+// específico na mensagem do usuário — usada só para decidir se dá pra
+// responder direto do que já está na Base Legal da conversa, sem nova busca.
+// Se a mensagem não citar nada específico, retorna [] e a busca completa
+// continua acontecendo normalmente (nunca pula por "achismo").
+const extractExplicitLegalRefs = (text: string): ExplicitLegalRef[] => {
+  if (!text) return [];
+  const refs: ExplicitLegalRef[] = [];
+  const seen = new Set<string>();
+  const addRef = (ref: ExplicitLegalRef) => {
+    const k = `${ref.kind}|${ref.num}|${ref.lawAnchor}`;
+    if (!seen.has(k)) { seen.add(k); refs.push(ref); }
+  };
+
+  const artLawRegex = /art[a-zà-ÿ]*\.?\s*(\d+[A-Za-zºª\-]*)[^.\n]{0,40}?d[aoe]\s*(?:lei|decreto|instru[çc][ãa]o\s+normativa|resolu[çc][ãa]o|portaria)(?:\s*complementar)?\s*(?:pres\/?inss\s*)?(?:n[ºo°]\.?\s*)?(\d[\d\.]*)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = artLawRegex.exec(text))) {
+    addRef({ kind: 'article', num: m[1].replace(/[ºª]/g, ''), lawAnchor: m[2].replace(/\./g, '') });
+  }
+  const sumulaRegex = /s[uú]mula\s*(?:n[ºo°]\.?\s*)?(\d+)/gi;
+  while ((m = sumulaRegex.exec(text))) {
+    addRef({ kind: 'sumula', num: m[1], lawAnchor: m[1] });
+  }
+  const temaRegex = /tema\s*(?:n[ºo°]\.?\s*)?(\d+(?:\.\d+)?)/gi;
+  while ((m = temaRegex.exec(text))) {
+    addRef({ kind: 'tema', num: m[1], lawAnchor: m[1] });
+  }
+  return refs;
+};
+
+const legalDeviceKeyMatchesRef = (key: LegalDeviceKey, ref: ExplicitLegalRef): boolean => {
+  if (key.kind !== ref.kind) return false;
+  if (ref.kind === 'article') {
+    return key.num === ref.num && key.lawAnchor === ref.lawAnchor;
+  }
+  return key.num === ref.num;
+};
+
 const isReportContent = (content: string = ''): boolean => {
   if (!content || content.trim().length < 350) return false;
   const trimmed = content.trim();
@@ -1520,10 +1564,38 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isLegalDoubt: ${isLegalDoubt}, conversationAlreadyLegal: ${conversationAlreadyLegal}, isExplicitSurgical: ${isExplicitSurgicalEdit}, mentionsLaws: ${mentionsLawsOrRag}, mentionsDocs: ${mentionsDocsOrOcr})`);
 
+      // ATALHO DA BASE LEGAL: se a pergunta cita explicitamente um dispositivo
+      // (ex.: "art. 86 da lei 8.213/1991", "súmula 88 da TNU") que JÁ está
+      // salvo no artefato desta conversa, e não é pedido de peça/relatório/
+      // revisão (que exigem a fundamentação completa, não só o item citado),
+      // responde direto do artefato sem repetir a busca inteira. Se algum
+      // dispositivo citado ainda não estiver no artefato, ou não houver
+      // citação explícita nenhuma, a busca completa acontece normalmente —
+      // nunca pula por suposição.
+      const legalBaseItems = session?.legalBaseArtifact?.items || [];
+      let skipFullRagSearch = false;
+      if (shouldSendRag && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit && legalBaseItems.length > 0) {
+        const explicitRefs = extractExplicitLegalRefs(messageText);
+        if (explicitRefs.length > 0) {
+          const matchedItems = explicitRefs
+            .map(ref => legalBaseItems.find(item => legalDeviceKeyMatchesRef(buildLegalDeviceKey(item.title, item.content), ref)))
+            .filter((it): it is LegalBaseArtifactItem => !!it);
+          if (matchedItems.length === explicitRefs.length) {
+            skipFullRagSearch = true;
+            ragContext = matchedItems
+              .map(it => `FONTE: ${it.title} [Já usado antes nesta conversa]\n${it.content}`)
+              .join('\n\n---\n\n');
+            console.log(`[RAG ARTEFATO] Pergunta cita ${matchedItems.length} dispositivo(s) já salvo(s) na Base Legal desta conversa — reaproveitando sem nova busca.`);
+          }
+        }
+      }
+
       try {
         if (!shouldSendRag) {
           // Pular busca RAG completamente se não for peça, relatório ou dúvida
           ragContext = '';
+        } else if (skipFullRagSearch) {
+          // ragContext já foi montado acima a partir do artefato.
         } else {
         // Context-aware query enrichment for RAG:
         // When the user uses short command phrasing (e.g. "gerar relatório", "gerar peça"),
@@ -1740,7 +1812,10 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       // já encontrado antes não "some" da resposta seguinte. A decisão do
       // que ENTRA no artefato acontece depois, com base no que a IA de fato
       // citar na resposta (ver bloco após o streaming terminar).
-      if (shouldSendRag && session?.id) {
+      // Não se aplica quando skipFullRagSearch já respondeu com o(s) item(ns)
+      // específico(s) pedido(s) — reinjetar TODO o artefato aqui poluiria uma
+      // pergunta pontual com dispositivos que não têm nada a ver com ela.
+      if (shouldSendRag && !skipFullRagSearch && session?.id) {
         const sessionKey = session.id;
         const artifact = ragArtifactRef.current.get(sessionKey);
         if (artifact && artifact.size > 0) {
