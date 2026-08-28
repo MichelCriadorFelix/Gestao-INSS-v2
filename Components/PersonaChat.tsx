@@ -1564,29 +1564,39 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isLegalDoubt: ${isLegalDoubt}, conversationAlreadyLegal: ${conversationAlreadyLegal}, isExplicitSurgical: ${isExplicitSurgicalEdit}, mentionsLaws: ${mentionsLawsOrRag}, mentionsDocs: ${mentionsDocsOrOcr})`);
 
-      // ATALHO DA BASE LEGAL: se a pergunta cita explicitamente um dispositivo
-      // (ex.: "art. 86 da lei 8.213/1991", "súmula 88 da TNU") que JÁ está
-      // salvo no artefato desta conversa, e não é pedido de peça/relatório/
-      // revisão (que exigem a fundamentação completa, não só o item citado),
-      // responde direto do artefato sem repetir a busca inteira. Se algum
-      // dispositivo citado ainda não estiver no artefato, ou não houver
-      // citação explícita nenhuma, a busca completa acontece normalmente —
-      // nunca pula por suposição.
+      // ATALHO DA BASE LEGAL: o propósito do artefato é justamente evitar
+      // repetir a busca em RAG a cada pergunta — se o texto do dispositivo já
+      // está salvo na conversa, a IA já tem em mãos o que precisa, não tem
+      // por que buscar de novo. Então: sempre que a conversa já é jurídica
+      // (não é a primeira pergunta jurídica da sessão) e a mensagem não cita
+      // explicitamente nenhum dispositivo que ainda esteja FORA do artefato,
+      // a resposta usa direto tudo que já foi encontrado até agora — sem
+      // nova busca. Só quando a pergunta aponta para algo genuinamente novo
+      // (uma citação explícita que o artefato ainda não tem) é que a busca
+      // completa roda de novo, para trazer esse item novo. Não se aplica a
+      // pedido de peça/relatório/revisão, que sempre exigem fundamentação
+      // completa e atualizada, não só o que já está guardado.
       const legalBaseItems = session?.legalBaseArtifact?.items || [];
       let skipFullRagSearch = false;
-      if (shouldSendRag && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit && legalBaseItems.length > 0) {
+      if (shouldSendRag && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit && legalBaseItems.length > 0 && conversationAlreadyLegal) {
         const explicitRefs = extractExplicitLegalRefs(messageText);
-        if (explicitRefs.length > 0) {
-          const matchedItems = explicitRefs
-            .map(ref => legalBaseItems.find(item => legalDeviceKeyMatchesRef(buildLegalDeviceKey(item.title, item.content), ref)))
-            .filter((it): it is LegalBaseArtifactItem => !!it);
-          if (matchedItems.length === explicitRefs.length) {
-            skipFullRagSearch = true;
-            ragContext = matchedItems
-              .map(it => `FONTE: ${it.title} [Já usado antes nesta conversa]\n${it.content}`)
-              .join('\n\n---\n\n');
-            console.log(`[RAG ARTEFATO] Pergunta cita ${matchedItems.length} dispositivo(s) já salvo(s) na Base Legal desta conversa — reaproveitando sem nova busca.`);
+        const uncoveredRefs = explicitRefs.filter(ref =>
+          !legalBaseItems.some(item => legalDeviceKeyMatchesRef(buildLegalDeviceKey(item.title, item.content), ref))
+        );
+
+        if (uncoveredRefs.length === 0) {
+          skipFullRagSearch = true;
+          const RAG_ARTIFACT_CHAR_LIMIT = 300000;
+          const pieces: string[] = [];
+          let totalLen = 0;
+          for (const item of legalBaseItems) {
+            const piece = `FONTE: ${item.title} [Já usado antes nesta conversa]\n${item.content}`;
+            if (totalLen + piece.length > RAG_ARTIFACT_CHAR_LIMIT) break;
+            pieces.push(piece);
+            totalLen += piece.length;
           }
+          ragContext = pieces.join('\n\n---\n\n');
+          console.log(`[RAG ARTEFATO] Reaproveitando toda a Base Legal desta conversa (${pieces.length}/${legalBaseItems.length} dispositivo(s)) sem nova busca — nenhuma citação nova fora do artefato.`);
         }
       }
 
