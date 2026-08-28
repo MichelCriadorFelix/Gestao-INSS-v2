@@ -105,6 +105,11 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [currentPostStatus, setCurrentPostStatus] = useState<'draft' | 'pending_approval' | 'approved'>('draft');
   const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[]>([]);
+  // Marca quando o carregamento da biblioteca (assíncrono, via Supabase) já terminou —
+  // seja com sucesso ou falha. Sem isto, um post vindo do chat corria contra o fetch
+  // e sempre perdia: a imagem era decidida com a biblioteca ainda vazia (0 candidatos),
+  // caindo no fallback antes da busca por contexto ter uma chance real de achar algo.
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [newAssetDescription, setNewAssetDescription] = useState('');
@@ -116,43 +121,53 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
   const libraryFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (initialData) {
-      const targetPersona = (initialData.persona === 'luana' || initialData.persona === 'michel') ? initialData.persona : persona;
-      const targetTopic = initialData.topic || initialData.title || topic;
+    if (!initialData) return;
 
-      if (initialData.topic) setTopic(initialData.topic);
-      if (initialData.persona && (initialData.persona === 'michel' || initialData.persona === 'luana')) {
-        setPersona(initialData.persona);
-      }
-      if (initialData.strategy) setStrategy(initialData.strategy);
+    const targetPersona = (initialData.persona === 'luana' || initialData.persona === 'michel') ? initialData.persona : persona;
+    const targetTopic = initialData.topic || initialData.title || topic;
 
-      const incomingPost = initialData.postData || (initialData.title ? initialData : null);
-      if (incomingPost) {
-        setPostData({
-          audienceTag: incomingPost.audienceTag || 'DIREITO PREVIDENCIÁRIO',
-          title: incomingPost.title || '',
-          highlight: incomingPost.highlight || '',
-          points: Array.isArray(incomingPost.points) ? incomingPost.points : [],
-          caption: incomingPost.caption || '',
-          ctaCaption: incomingPost.ctaCaption || '📌 Salve e compartilhe com quem precisa!',
-          imagePrompt: incomingPost.imagePrompt || ''
-        });
+    if (initialData.topic) setTopic(initialData.topic);
+    if (initialData.persona && (initialData.persona === 'michel' || initialData.persona === 'luana')) {
+      setPersona(initialData.persona);
+    }
+    if (initialData.strategy) setStrategy(initialData.strategy);
 
-        // Define IMEDIATAMENTE a imagem: 1. Imagem do tema na Biblioteca -> 2. Foto oficial do Dr. Michel ou Dra. Luana
-        const bestAsset = findBestAssetForContext(targetTopic, libraryAssets, targetPersona, incomingPost.imagePrompt);
-        if (bestAsset) {
-          setUploadedImage(bestAsset.url);
-          setSelectedAsset(bestAsset);
-        } else {
-          setUploadedImage(getDefaultImage(targetTopic, targetPersona));
-        }
-      }
+    const incomingPost = initialData.postData || (initialData.title ? initialData : null);
+    if (incomingPost) {
+      // Texto do post aparece na hora — não depende da biblioteca.
+      setPostData({
+        audienceTag: incomingPost.audienceTag || 'DIREITO PREVIDENCIÁRIO',
+        title: incomingPost.title || '',
+        highlight: incomingPost.highlight || '',
+        points: Array.isArray(incomingPost.points) ? incomingPost.points : [],
+        caption: incomingPost.caption || '',
+        ctaCaption: incomingPost.ctaCaption || '📌 Salve e compartilhe com quem precisa!',
+        imagePrompt: incomingPost.imagePrompt || ''
+      });
+    }
 
-      if (onClearInitialData) {
-        onClearInitialData();
+    // A ESCOLHA DA IMAGEM espera a biblioteca terminar de carregar (fetch assíncrono
+    // ao Supabase). Antes, um post vindo do chat corria contra esse fetch: a busca por
+    // contexto rodava com 0 candidatos (biblioteca ainda vazia), nunca achava nada, e
+    // caía direto no genérico — e como initialData era limpo nessa mesma passada, a
+    // biblioteca terminando de carregar um instante depois não tinha mais chance de
+    // corrigir a escolha.
+    if (!libraryLoaded) return;
+
+    if (incomingPost) {
+      const bestAsset = findBestAssetForContext(targetTopic, libraryAssets, targetPersona, incomingPost.imagePrompt);
+      if (bestAsset) {
+        setUploadedImage(bestAsset.url);
+        setSelectedAsset(bestAsset);
+      } else {
+        setUploadedImage(getDefaultImage(targetTopic, targetPersona));
       }
     }
-  }, [initialData, libraryAssets]);
+
+    if (onClearInitialData) {
+      onClearInitialData();
+    }
+  }, [initialData, libraryAssets, libraryLoaded]);
 
   useEffect(() => {
     loadSavedPosts();
@@ -165,6 +180,8 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
       setLibraryAssets(assets);
     } catch (error) {
       console.error('Error loading library assets:', error);
+    } finally {
+      setLibraryLoaded(true);
     }
   };
 
@@ -711,7 +728,25 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
     return currentY;
   };
 
+  // Último recurso quando findBestAssetForContext não acha nada com contexto suficiente.
+  // ORDEM PEDIDA PELO USUÁRIO: (1) foto real do advogado NA BIBLIOTECA, (2) só se nem
+  // isso existir, um placeholder genérico — nunca o contrário. Antes disto, esta função
+  // pulava direto para fotos de banco de imagens (Unsplash) sem nunca checar a
+  // biblioteca — inclusive para "Dr. Michel"/"Dra. Luana", que JÁ estão cadastrados lá
+  // com fotos reais (ver biblioteca), tornando o "fallback oficial" sempre genérico.
   const getDefaultImage = (topicStr: string, currentPersona: 'michel' | 'luana' = persona) => {
+    const normalize = (str: string) =>
+      (str || '')
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase();
+
+    const lawyerNameNorm = currentPersona === 'luana' ? 'doutora luana castro' : 'doutor michel felix';
+    const lawyerAsset = libraryAssets.find(a => normalize(a.topic || '').includes(lawyerNameNorm));
+    if (lawyerAsset) return lawyerAsset.url;
+
+    // Placeholder de banco de imagens: só chega aqui se a foto do advogado nem sequer
+    // estiver cadastrada na biblioteca (biblioteca vazia/incompleta).
     const t = (topicStr || '').toLowerCase();
     if (t.includes('maternidade') || t.includes('gestante') || t.includes('mãe')) {
       return 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=800&auto=format&fit=crop';
@@ -725,7 +760,7 @@ export default function MarketingGenerator({ darkMode, user, initialData, onClea
     if (t.includes('rural') || t.includes('lavrador') || t.includes('agricultor') || t.includes('pescador')) {
       return 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=800&auto=format&fit=crop';
     }
-    // Default: Foto de Autoridade da Persona Titular (Dr. Michel Felix ou Dra. Luana Castro)
+    // Última linha de defesa: placeholder genérico fixo (não é foto real do advogado).
     return currentPersona === 'luana' ? OFFICIAL_LAWYER_PHOTOS.luana : OFFICIAL_LAWYER_PHOTOS.michel;
   };
 

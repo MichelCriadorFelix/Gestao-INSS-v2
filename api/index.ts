@@ -5087,6 +5087,7 @@ ESTRUTURA OBRIGATÓRIA (JSON PURO):
   * Gancho empático com a dor real da família/segurado.
   * Explicação clara e humana dos requisitos legais.
   * Passo a passo das soluções práticas.
+  * FORMATAÇÃO: parágrafos curtos, linhas em branco entre eles e emojis estratégicos ao longo de todo o texto (🏛️ ⚖️ 💡 ✅ ❌ 👉 📌 ⚠️) — não só no highlight/ctaCaption.
   * Chamada ética e 6 a 8 hashtags estratégicas no final.
 - "imagePrompt": Prompt em inglês para imagem conceitual de suporte.
 
