@@ -1381,16 +1381,35 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         /gerar\s+(peça|petição|relatório|relatorio|minuta|artigo)/i.test(messageText) ||
         /\b(gerar peça|gerar petição|gerar relatório|gerar relatorio|gerar minuta|criar peça|criar petição|criar relatório|criar minuta)\b/i.test(messageText);
 
-      const isLegalDoubt = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos)\b/i.test(messageText);
-      
+      // AMPLIADO: a lista original só reconhecia jargão técnico ("lei", "artigo",
+      // "súmula"...). Perguntas do dia a dia do escritório usam vocabulário do
+      // BENEFÍCIO, não da norma ("pedágio", "aposentadoria", "vantajosa", "RMI"),
+      // e passavam batido — o RAG nunca era acionado para elas. Resultado real
+      // observado: na mesma conversa, sobre o mesmo tema, a IA citava a EC 103/2019
+      // corretamente quando por acaso a mensagem continha "art.", e negava que ela
+      // estivesse na base quando a mensagem seguinte (ex.: "tanto o pedágio de 50%
+      // quanto de 100%...") não continha nenhuma palavra-gatilho.
+      const LEGAL_DOUBT_REGEX = /\b(lei|leis|artigo|artigos|art|art\.|arti|arti\.|arts|súmula|sumula|súmulas|sumulas|jurisprudência|jurisprudencia|precedente|precedentes|ementa|ementas|emenda|emendas|acórdão|acordao|tema|temas|recurso|repetitivo|STJ|STF|TNU|TST|TRF|CPC|CLT|CF|CPP|CC|FGTS|código|codigo|portaria|resolução|resolucao|instrução normativa|instrucao|inss|decreto|decretos|enunciado|o que diz|o que está escrito|qual\s+dispositivo|qual\s+regra|qual\s+regras|como\s+fundamentar|fundamentação|fundamentacao|fundamento|base|dispositivo|dispositivos|aposentadoria|aposentar|aposentando|benefício|beneficio|benefícios|beneficios|pedágio|pedagio|transição|transicao|RMI|renda mensal inicial|salário.de.benefício|salario.de.beneficio|carência|carencia|auxílio|auxilio|BPC|LOAS|pensão|pensao|revisão|revisao|requisito|requisitos|vantajosa|vantajoso|vantagem|vantagens|fator previdenciário|fator previdenciario|regra de transição|regras de transição|idade mínima|idade minima|tempo de contribuição|tempo de contribuicao|contribuição|contribuicao|salário mínimo|salario minimo|teto do RGPS|RGPS|CNIS|perícia|pericia|incapacidade|invalidez|salário.maternidade|salario.maternidade|rescisão|rescisao|verbas?\s+rescisórias|verbas?\s+rescisorias|indenização|indenizacao|dano moral|CDC)\b/i;
+      const isLegalDoubt = LEGAL_DOUBT_REGEX.test(messageText);
+
       const isRevision = (/\b(refaz|refaça|refaca|reescrev|acrescenta|adiciona|inclui|insere|complementa|incluir|adicionar|corrig|ajust|substitui|troca|mud[ae]|altera|melhore|tira|tire|curta|longa|falta|faltou|esqueceu)\b/i.test(messageText) || messageText.includes("[GERAÇÃO MODULAR") || messageText.includes("[GERACAO MODULAR")) && !isExplicitSurgicalEdit;
 
-      const shouldSendRag = isReportOrPeca || isLegalDoubt || (isRevision && !isExplicitSurgicalEdit) || (isExplicitSurgicalEdit && mentionsLawsOrRag);
+      // RAG "GRUDENTO": uma vez que a conversa vira jurídica, mensagens de
+      // continuação (ex.: "e se for X?", "tanto o Y quanto o Z...") não repetem o
+      // vocabulário-gatilho, mas seguem o MESMO tema — precisam do mesmo RAG.
+      // Olha as últimas mensagens da sessão; se alguma já disparou RAG ou trouxe
+      // uma citação de fonte (marcador "FONTE:"), a conversa continua em modo RAG.
+      const recentMsgs = (session?.messages || []).slice(-4);
+      const conversationAlreadyLegal = recentMsgs.some((m: any) =>
+        typeof m.content === 'string' && (LEGAL_DOUBT_REGEX.test(m.content) || m.content.includes('FONTE:'))
+      );
+
+      const shouldSendRag = isReportOrPeca || isLegalDoubt || conversationAlreadyLegal || (isRevision && !isExplicitSurgicalEdit) || (isExplicitSurgicalEdit && mentionsLawsOrRag);
 
       // Economia de tokens máxima na Edição Cirúrgica: só envia docSummaries se o usuário fez menção explícita a dados de documento/OCR
       const effectiveDocSummaries = (isExplicitSurgicalEdit && !mentionsDocsOrOcr) ? '' : docSummaries;
 
-      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isExplicitSurgical: ${isExplicitSurgicalEdit}, mentionsLaws: ${mentionsLawsOrRag}, mentionsDocs: ${mentionsDocsOrOcr})`);
+      console.log(`[RAG DECISION] Necessita RAG? ${shouldSendRag} (isLegalDoubt: ${isLegalDoubt}, conversationAlreadyLegal: ${conversationAlreadyLegal}, isExplicitSurgical: ${isExplicitSurgicalEdit}, mentionsLaws: ${mentionsLawsOrRag}, mentionsDocs: ${mentionsDocsOrOcr})`);
 
       try {
         if (!shouldSendRag) {
