@@ -3681,28 +3681,22 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
   const ai = new GoogleGenAI({ apiKey });
 
   try {
+    // IMPORTANTE: mantido em "gemini-embedding-001" de propósito — é o modelo
+    // usado pra gerar os embeddings dos 2.432 documentos já indexados em
+    // legal_documents. Mesmo com a mesma dimensionalidade (768), um modelo
+    // de embedding DIFERENTE (ex.: text-embedding-004) produz um espaço
+    // vetorial diferente — comparar por similaridade de cosseno entre
+    // vetores de modelos diferentes não é confiável, mesmo sem erro
+    // nenhum aparecer. Só trocar o modelo aqui com segurança se TODA a
+    // base for reindexada com o modelo novo.
     const response = await ai.models.embedContent({
-      model: "text-embedding-004",
+      model: "gemini-embedding-001",
       contents: text,
       config: { outputDimensionality: 768 }
     });
     return response.embeddings?.[0]?.values || [];
   } catch (error: any) {
     const errorMessage = error.message || String(error);
-    
-    // Tentativa secundária com gemini-embedding-001 se a versão text-embedding-004 falhar
-    if (errorMessage.includes("NOT_FOUND") || errorMessage.includes("not found")) {
-      try {
-        const altResponse = await ai.models.embedContent({
-          model: "gemini-embedding-001",
-          contents: text,
-          config: { outputDimensionality: 768 }
-        });
-        return altResponse.embeddings?.[0]?.values || [];
-      } catch (e) {
-        // Ignora para seguir o fluxo padrão de retry
-      }
-    }
     
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
     const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
