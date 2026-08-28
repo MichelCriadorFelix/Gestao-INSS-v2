@@ -2708,6 +2708,15 @@ const invalidKeys = new Set<string>();
 // em vez de só reagir depois. Ajustável via env sem precisar de deploy de código
 // (o limite real do tier gratuito pode variar por modelo/conta).
 const PROACTIVE_RPM_PER_KEY = Number(process.env.GEMINI_RPM_PER_KEY) || 8;
+// Limite proativo de TOKENS por chave por minuto. O Google limita tanto por
+// QUANTIDADE de chamadas (RPM) quanto por VOLUME de tokens (TPM) — uma
+// conversa grande (histórico longo + RAG + artefato de base legal) pode
+// estourar o teto de tokens numa ÚNICA chamada, mesmo respeitando o limite
+// de chamadas por minuto. Isso explica 429 aparecer só em conversas
+// "grandes" (10+ mensagens) e nunca em conversas novas/curtas. Estimativa
+// grosseira de ~4 caracteres por token (proporção usual para PT/EN
+// misturado); ajustável via env sem deploy.
+const PROACTIVE_TPM_PER_KEY = Number(process.env.GEMINI_TPM_PER_KEY) || 200000;
 const KEY_STATE_TABLE = 'gemini_key_state';
 
 interface KeyStatus {
@@ -2715,6 +2724,7 @@ interface KeyStatus {
   dailyExhausted: boolean; // Para Cota Diária (ex: 25M tokens)
   windowStart: number; // Início da janela de contagem proativa (~60s)
   windowCount: number; // Chamadas já feitas nesta janela
+  windowTokens: number; // Tokens estimados já enviados nesta janela
 }
 const keyStatusRegistry: Record<string, KeyStatus> = {};
 
@@ -2735,7 +2745,7 @@ async function syncKeyStateFromShared(keys: string[]): Promise<void> {
     const hashes = keys.map(keyHash);
     const { data, error } = await supabaseAdmin
       .from(KEY_STATE_TABLE)
-      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count')
+      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count, window_tokens')
       .in('key_hash', hashes);
 
     if (error || !data) return;
@@ -2758,7 +2768,8 @@ async function syncKeyStateFromShared(keys: string[]): Promise<void> {
         exhaustedUntil: Math.max(local?.exhaustedUntil || 0, remoteExhaustedUntil),
         dailyExhausted: (local?.dailyExhausted || false) || remoteDaily,
         windowStart: remoteWindowStart,
-        windowCount: row.window_count || 0
+        windowCount: row.window_count || 0,
+        windowTokens: row.window_tokens || 0
       };
     }
   } catch (e) {
@@ -2781,8 +2792,8 @@ function markKeyExhaustedShared(apiKey: string, opts: { exhaustedUntil?: number;
     });
 }
 
-/** Registra uso da chave para o limitador proativo de janela deslizante. Best-effort. */
-function recordKeyUsageShared(apiKey: string): void {
+/** Registra uso da chave (chamadas + volume estimado de tokens) para o limitador proativo de janela deslizante. Best-effort. */
+function recordKeyUsageShared(apiKey: string, estimatedTokens: number = 0): void {
   const key = apiKey;
   const status = keyStatusRegistry[key];
   const now = Date.now();
@@ -2792,7 +2803,8 @@ function recordKeyUsageShared(apiKey: string): void {
     exhaustedUntil: status?.exhaustedUntil || 0,
     dailyExhausted: status?.dailyExhausted || false,
     windowStart: windowExpired ? now : status.windowStart,
-    windowCount: windowExpired ? 1 : (status.windowCount + 1)
+    windowCount: windowExpired ? 1 : (status.windowCount + 1),
+    windowTokens: windowExpired ? estimatedTokens : (status.windowTokens + estimatedTokens)
   };
 
   const hash = keyHash(key);
@@ -2803,6 +2815,7 @@ function recordKeyUsageShared(apiKey: string): void {
       key_hash: hash,
       window_start: new Date(updated.windowStart).toISOString(),
       window_count: updated.windowCount,
+      window_tokens: updated.windowTokens,
       updated_at: new Date().toISOString()
     }, { onConflict: 'key_hash' })
     .then(({ error }: any) => {
@@ -2828,9 +2841,11 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
     if (status.dailyExhausted) continue; // Pula chaves esgotadas para o dia todo
 
     // Limite proativo por minuto: mesmo sem 429 ainda, evita bater numa chave
-    // que já fez muitas chamadas nesta janela — espalha a carga de propósito.
+    // que já fez muitas chamadas OU já enviou muitos tokens nesta janela —
+    // uma conversa grande pode estourar o teto de volume numa única
+    // chamada, mesmo respeitando o limite de quantidade de chamadas.
     const windowActive = (now - status.windowStart) < 60000;
-    const proactivelyBusy = windowActive && status.windowCount >= PROACTIVE_RPM_PER_KEY;
+    const proactivelyBusy = windowActive && (status.windowCount >= PROACTIVE_RPM_PER_KEY || status.windowTokens >= PROACTIVE_TPM_PER_KEY);
     const rateLimited = status.exhaustedUntil > now;
 
     if (!proactivelyBusy && !rateLimited) {
@@ -3107,7 +3122,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
 
   activeKeyIndex = available.index;
   apiKey = available.key;
-  recordKeyUsageShared(apiKey);
+  recordKeyUsageShared(apiKey, estimateTokens(JSON.stringify(params)));
 
   if (retries === MAX_RETRIES) {
     currentKeyIndex = (activeKeyIndex + 1) % keys.length;
@@ -3383,7 +3398,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
 
     activeKeyIndex = available.index;
     apiKey = available.key;
-    recordKeyUsageShared(apiKey);
+    recordKeyUsageShared(apiKey, estimateTokens(JSON.stringify(params)));
 
     // Rotaciona round-robin para a próxima requisição inicial
     if (retries === MAX_RETRIES) {
@@ -3545,7 +3560,7 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 
   const activeKeyIndex = available.index;
   const apiKey = available.key;
-  recordKeyUsageShared(apiKey);
+  recordKeyUsageShared(apiKey, estimateTokens(text));
 
   if (retries === MAX_RETRIES) {
     currentKeyIndex = (activeKeyIndex + 1) % keys.length;
@@ -9036,7 +9051,7 @@ app.post("/api/admin/test-gemini-keys", async (req, res) => {
     const hashes = keys.map(keyHash);
     const { data: stateRows } = await supabaseAdmin
       .from(KEY_STATE_TABLE)
-      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count')
+      .select('key_hash, exhausted_until, daily_exhausted_date, window_start, window_count, window_tokens')
       .in('key_hash', hashes);
     const stateByHash = new Map((stateRows || []).map((r: any) => [r.key_hash, r]));
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -9057,6 +9072,7 @@ app.post("/api/admin/test-gemini-keys", async (req, res) => {
         const state = stateByHash.get(hash);
         const windowActive = state?.window_start ? (Date.now() - new Date(state.window_start).getTime()) < 60000 : false;
         const windowCount = windowActive ? (state?.window_count || 0) : 0;
+        const windowTokens = windowActive ? (state?.window_tokens || 0) : 0;
         const dailyExhausted = state?.daily_exhausted_date === todayStr;
         const start = Date.now();
 
@@ -9065,7 +9081,9 @@ app.post("/api/admin/test-gemini-keys", async (req, res) => {
           keyMask,
           windowCount,
           windowLimit: PROACTIVE_RPM_PER_KEY,
-          percentFreeWindow: Math.max(0, Math.round((1 - windowCount / PROACTIVE_RPM_PER_KEY) * 100)),
+          windowTokens,
+          tokenLimit: PROACTIVE_TPM_PER_KEY,
+          percentFreeWindow: Math.max(0, Math.round((1 - Math.max(windowCount / PROACTIVE_RPM_PER_KEY, windowTokens / PROACTIVE_TPM_PER_KEY)) * 100)),
           dailyExhausted
         };
 

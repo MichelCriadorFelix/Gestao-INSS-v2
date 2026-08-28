@@ -10,6 +10,8 @@ interface KeyTestResult {
   responseTimeMs: number;
   windowCount: number;
   windowLimit: number;
+  windowTokens: number;
+  tokenLimit: number;
   percentFreeWindow: number;
   dailyExhausted: boolean;
   errorDetail?: string;
@@ -189,7 +191,7 @@ export function ApiKeysDiagnosticsModal({ onClose }: ApiKeysDiagnosticsModalProp
                             </div>
                             <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">{r.percentFreeWindow}% livre</span>
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{r.windowCount}/{r.windowLimit} chamadas registradas</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{r.windowCount}/{r.windowLimit} chamadas · {(r.windowTokens / 1000).toFixed(0)}k/{(r.tokenLimit / 1000).toFixed(0)}k tokens</p>
                         </td>
                         <td className="px-4 py-2.5 text-[11px] text-slate-400 max-w-[220px] truncate" title={r.errorDetail}>
                           {r.errorDetail || '—'}
@@ -204,7 +206,7 @@ export function ApiKeysDiagnosticsModal({ onClose }: ApiKeysDiagnosticsModalProp
 
           {data && (
             <p className="text-[11px] text-slate-400 mt-3">
-              % livre na janela é uma estimativa baseada no que o próprio app já tentou nos últimos 60s (não é a cota real do Google, que não é exposta pela API). Modelo testado: {data.model}.
+              % livre na janela considera tanto quantidade de chamadas quanto volume estimado de tokens enviados nos últimos 60s (conversas grandes consomem mais tokens por chamada). É uma estimativa baseada no que o próprio app já tentou — não é a cota real do Google, que não é exposta pela API. Modelo testado: {data.model}.
             </p>
           )}
         </div>
