@@ -16,6 +16,7 @@ export interface PersonaConfig {
   footer: string;            // aviso de rodapé
   sendMinWage: boolean;      // envia salário mínimo ao backend (relevante p/ valor da causa previdenciário/trabalhista)
   oabNumber?: string;        // registro na OAB, exibido junto ao nome no chat — omitir para quem não é advogado(a) inscrito(a)
+  avatarUrl?: string;        // foto real da pessoa (galeria de marketing), exibida no avatar do chat — omitir para usar o ícone genérico
 }
 
 export const MICHEL_PERSONA: PersonaConfig = {
@@ -33,6 +34,7 @@ export const MICHEL_PERSONA: PersonaConfig = {
   footer: 'Dr. Michel Felix IA pode cometer erros. Verifique informações importantes.',
   sendMinWage: true,
   oabNumber: 'OAB/RJ 231.640',
+  avatarUrl: 'https://nnhatyvrtlbkyfadumqo.supabase.co/storage/v1/object/public/marketing/assets/doutor_michel_felix_1775412917204.png',
 };
 
 export const FELIX_CASTRO_PERSONA: PersonaConfig = {
@@ -65,6 +67,8 @@ export const LUANA_PERSONA: PersonaConfig = {
   petitionTitlePrefix: 'Petição Dra. Luana',
   footer: 'Dra. Luana Castro IA pode cometer erros. Verifique informações importantes.',
   sendMinWage: true,
+  oabNumber: 'OAB/RJ 226.749',
+  avatarUrl: 'https://nnhatyvrtlbkyfadumqo.supabase.co/storage/v1/object/public/marketing/assets/doutora_luana_castro__1775412943513.png',
 };
 
 export const FABRICIA_PERSONA: PersonaConfig = {
@@ -81,4 +85,5 @@ export const FABRICIA_PERSONA: PersonaConfig = {
   petitionTitlePrefix: 'Triagem Sec. Fabrícia',
   footer: 'Secretária Fabrícia Felix IA pode cometer erros. Verifique as datas importantes.',
   sendMinWage: false,
+  avatarUrl: 'https://nnhatyvrtlbkyfadumqo.supabase.co/storage/v1/object/public/marketing/assets/secretaria_fabricia_felix_1775413029956.png',
 };

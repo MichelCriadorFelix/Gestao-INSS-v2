@@ -3844,8 +3844,12 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                     ) : (
                       // BUBBLE DA IA — estilo Claude com Artefatos
                       <div className="w-full flex gap-3 sm:gap-4">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40">
-                          <Bot className="w-5 h-5 text-white" />
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-900/30 ring-2 ring-primary-200/50 dark:ring-primary-900/40 overflow-hidden">
+                          {persona.avatarUrl ? (
+                            <img src={persona.avatarUrl} alt={persona.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            <Bot className="w-5 h-5 text-white" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="flex items-baseline gap-2 flex-wrap">
