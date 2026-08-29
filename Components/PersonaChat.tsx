@@ -3850,7 +3850,9 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                         <div className="flex-1 min-w-0 space-y-2">
                           <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{persona.displayName}</span>
-                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">OAB/RJ 231.640</span>
+                            {persona.oabNumber && (
+                              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">{persona.oabNumber}</span>
+                            )}
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto">
                               {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>

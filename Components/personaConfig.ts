@@ -15,6 +15,7 @@ export interface PersonaConfig {
   petitionTitlePrefix: string; // prefixo do título de petição gerada
   footer: string;            // aviso de rodapé
   sendMinWage: boolean;      // envia salário mínimo ao backend (relevante p/ valor da causa previdenciário/trabalhista)
+  oabNumber?: string;        // registro na OAB, exibido junto ao nome no chat — omitir para quem não é advogado(a) inscrito(a)
 }
 
 export const MICHEL_PERSONA: PersonaConfig = {
@@ -31,6 +32,7 @@ export const MICHEL_PERSONA: PersonaConfig = {
   petitionTitlePrefix: 'Petição Dr. Michel',
   footer: 'Dr. Michel Felix IA pode cometer erros. Verifique informações importantes.',
   sendMinWage: true,
+  oabNumber: 'OAB/RJ 231.640',
 };
 
 export const FELIX_CASTRO_PERSONA: PersonaConfig = {
