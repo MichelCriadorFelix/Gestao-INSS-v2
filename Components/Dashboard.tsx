@@ -1366,7 +1366,13 @@ export default function Dashboard({
 
               // Propaga para a Manutenção Periódica e para o sininho, para que o
               // mesmo compromisso não continue pendente nos outros painéis.
+              // IMPORTANTE: o sininho ("Alertas Urgentes") filtra por
+              // resolvedAlerts, não por agendaEvents[].status — sem chamar
+              // handleResolveAlert aqui, resolver pela agenda atualizava a
+              // própria agenda, o cliente e a manutenção periódica, mas o
+              // sininho continuava mostrando o mesmo compromisso.
               resolveFocusTask(`agenda-${eventId}`);
+              handleResolveAlert(eventId, true);
               if (eventId.startsWith('v-')) {
                   // Evento virtual de prazo: v-{clientId}-{campoDoPrazo}
                   const semPrefixo = eventId.slice(2);
