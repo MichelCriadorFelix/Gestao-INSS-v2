@@ -242,8 +242,14 @@ const isReportContent = (content: string = ''): boolean => {
   const trimmed = content.trim();
 
   const hasReportHeader = /(?:^|\n)(?:#+\s*)?(?:RELATÓRIO\s+DE\s+ANÁLISE|RELATÓRIO\s+DO\s+PROCESSO|AUDITORIA\s+PROCESSUAL|RELATÓRIO\s+PREVIDENCIÁRIO|RELATÓRIO\s+TRABALHISTA|RELATÓRIO\s+JURÍDICO|COMPILADO\s+INTEGRAL\s+DO\s+PROCESSO|RELATÓRIO\s+DE\s+AUDITORIA)/i.test(trimmed);
-  const hasReportSections = /(?:STATUS\s+DA\s+LEITURA|DOCUMENTOS\s+ANALISADOS)/i.test(trimmed) &&
-    /(?:RESUMO\s+DOS\s+FATOS|PARECER\s+DE\s+VIABILIDADE|DIAGNÓSTICO\s+JURÍDICO|CÁLCULO\s+ESTIMADO|ORIENTAÇÃO\s+DE\s+REDAÇÃO)/i.test(trimmed);
+  // Segundo template de relatório: começa conversacionalmente ("Colega, analisei... elaborei o
+  // diagnóstico técnico...") em vez de um cabeçalho formal, e numera as seções a partir da
+  // identificação do cliente/caso em vez de "STATUS DA LEITURA". Sem isso, esse formato passava
+  // batido tanto por isReportContent quanto por isPetitionContent (que exige "Pede deferimento",
+  // ausente num relatório interno) e a resposta inteira — às vezes incluindo a peça que vinha
+  // logo depois no mesmo streaming — ficava como texto solto no chat, nunca virava artefato.
+  const hasReportSections = /(?:STATUS\s+DA\s+LEITURA|DOCUMENTOS\s+ANALISADOS|IDENTIFICAÇÃO\s+DA\s+CLIENTE|IDENTIFICAÇÃO\s+DO\s+CASO|DIAGNÓSTICO\s+TÉCNICO)/i.test(trimmed) &&
+    /(?:RESUMO\s+DOS\s+FATOS|PARECER\s+DE\s+VIABILIDADE|DIAGNÓSTICO\s+JURÍDICO|CÁLCULO\s+ESTIMADO|ORIENTAÇÃO\s+DE\s+REDAÇÃO|OMISSÃO\s+ADMINISTRATIVA)/i.test(trimmed);
 
   return hasReportHeader || hasReportSections;
 };
