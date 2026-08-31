@@ -2489,7 +2489,13 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       // Limpar blocos de código de artifact_patch do texto para a conversa ficar elegante e focada no parecer
       let displayContent = fullText || "Desculpe, não consegui gerar uma resposta.";
-      if (finalArtifactUpdate || isSurgicalCorrection) {
+      // isSurgicalCorrection é uma PREVISÃO (heurística sobre a mensagem do USUÁRIO, ex.: verbos
+      // "altere/corrija/troque"). Uma pergunta em linguagem livre (ex.: "busque na base de
+      // conhecimento...") não bate nela, mas o MODELO pode decidir fazer uma correção cirúrgica
+      // mesmo assim — nesse caso a previsão erra e o bloco <<<SEARCH cru vazava direto pro chat,
+      // nunca limpo. Detecta direto na RESPOSTA (fonte da verdade) como rede de segurança.
+      const containsPatchMarkers = /```(?:artifact_patch|patch|diff|surgical_edit|correcao_cirurgica)|<<<SEARCH|<<<AFTER|<<<REMOVE/i.test(fullText);
+      if (finalArtifactUpdate || isSurgicalCorrection || containsPatchMarkers) {
         displayContent = cleanPatchFromResponse(displayContent);
         if (!displayContent) {
           displayContent = "✅ **Alteração aplicada com sucesso ao Artefato!** O documento foi atualizado cirurgicamente com a modificação solicitada mantendo todas as demais seções intactas.";
