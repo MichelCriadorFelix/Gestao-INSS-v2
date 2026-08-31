@@ -6207,7 +6207,12 @@ ${message}`;
 
     // Destravando limites conforme solicitado pelo Dr. Felix
     if (isSurgicalMode) {
-      maxOutputTokens = 4096;
+      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
+      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
+      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
+      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
+      // reduz a frequência de precisar continuar no meio de um patch.
+      maxOutputTokens = 8192;
       thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
     } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
@@ -7057,7 +7062,12 @@ ${message}`;
     let thinkingConfig: any = undefined;
 
     if (isSurgicalMode) {
-      maxOutputTokens = 4096;
+      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
+      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
+      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
+      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
+      // reduz a frequência de precisar continuar no meio de um patch.
+      maxOutputTokens = 8192;
       thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
     } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
@@ -7803,7 +7813,12 @@ ${message}`;
     let thinkingConfig: any = undefined;
 
     if (isSurgicalMode) {
-      maxOutputTokens = 4096;
+      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
+      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
+      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
+      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
+      // reduz a frequência de precisar continuar no meio de um patch.
+      maxOutputTokens = 8192;
       thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
     } else if (isGenerationRequest) {
       maxOutputTokens = 16383;
