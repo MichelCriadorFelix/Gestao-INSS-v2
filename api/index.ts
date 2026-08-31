@@ -3232,12 +3232,15 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   apiKey = available.key;
   recordKeyUsageShared(apiKey, estimateTokens(JSON.stringify(params)));
 
-  if (retries === MAX_RETRIES) {
-    currentKeyIndex = (activeKeyIndex + 1) % keys.length;
-  }
+  // Avança o cursor de rotação SEMPRE (não só na 1ª tentativa) — senão um erro
+  // 503 (que não marca a chave como esgotada, pois não é um problema de cota
+  // dela) faz o retry cair de novo na mesma chave via getAvailableKey, já que
+  // currentKeyIndex ficaria parado. Isso fazia o failover só trocar de MODELO
+  // e nunca de chave em sequências de 503.
+  currentKeyIndex = (activeKeyIndex + 1) % keys.length;
 
   const ai = new GoogleGenAI({ apiKey });
-  
+
   const requestedModel = params.model || MODEL_HIERARCHY[0];
   let currentModel = getEffectiveModel(requestedModel);
 
@@ -3508,10 +3511,12 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     apiKey = available.key;
     recordKeyUsageShared(apiKey, estimateTokens(JSON.stringify(params)));
 
-    // Rotaciona round-robin para a próxima requisição inicial
-    if (retries === MAX_RETRIES) {
-      currentKeyIndex = (activeKeyIndex + 1) % keys.length;
-    }
+    // Avança o cursor de rotação SEMPRE (não só na 1ª tentativa) — senão um
+    // 503 (que não marca a chave como esgotada, pois não é cota dela) faz o
+    // retry cair de novo na mesma chave via getAvailableKey, ja que
+    // currentKeyIndex ficaria parado. Isso fazia o failover só trocar de
+    // MODELO e nunca de chave em sequências de 503.
+    currentKeyIndex = (activeKeyIndex + 1) % keys.length;
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -3670,9 +3675,8 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
   const apiKey = available.key;
   recordKeyUsageShared(apiKey, estimateTokens(text));
 
-  if (retries === MAX_RETRIES) {
-    currentKeyIndex = (activeKeyIndex + 1) % keys.length;
-  }
+  // Avança o cursor SEMPRE — ver explicação completa em callGemini.
+  currentKeyIndex = (activeKeyIndex + 1) % keys.length;
 
   const ai = new GoogleGenAI({ apiKey });
 
