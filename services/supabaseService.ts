@@ -1610,7 +1610,19 @@ export const supabaseService = {
        }
 
        // 4. Correspondência por palavras-chave principais do título (ex: "Transportes", "Consumidor")
-       const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5);
+       // Ignora rótulos genéricos de categoria — aparecem em dezenas de títulos da MESMA
+       // área e não distinguem nada. Sem isso, qualquer caso previdenciário "puxava" toda
+       // jurisprudência previdenciária da base só por compartilhar a palavra "previdenciário"
+       // ou "jurisprudência" com o título, gerando falsos positivos (ex.: jurisprudência de
+       // "Adicional Sexta Parte" entrando num caso de BPC/LOAS) e uma rajada de buscas
+       // paralelas desnecessárias que estourava limite de conexões do Supabase.
+       const genericTitleLabels = new Set([
+         'jurisprudencia', 'sumula', 'sumulas', 'tema', 'temas', 'acordao', 'acordaos',
+         'previdenciario', 'previdenciaria', 'trabalhista', 'administrativo', 'administrativa',
+         'consumidor', 'assistencial', 'beneficio', 'beneficios', 'concessao', 'restabelecimento',
+         'social', 'federal', 'direito', 'processual', 'geral', 'especial', 'civel'
+       ]);
+       const keywords = normTitle.split(/[^a-z0-9]/).filter(w => w.length >= 5 && !genericTitleLabels.has(w));
        for (const kw of keywords) {
          if (normQuery.includes(kw)) {
            return true;
