@@ -2114,8 +2114,14 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
             console.log('[RAG] diagnóstico completo:', diagnostico);
             if (deterministicRag && deterministicRag.trim().length > 0) {
               console.log(`[RAG Determinístico] ${chunksFound} chunks recuperados com sucesso por plano determinístico.`);
+              // ORDEM CRÍTICA: resultados do cliente (título exato/vetorial/keyword — específicos
+              // desta pergunta) SEMPRE antes dos chunks do planner determinístico. O planner pode
+              // devolver centenas de chunks (visto: 580); se vierem primeiro, o corte por
+              // orçamento de caracteres (smartTruncate) elimina o que vem depois — exatamente os
+              // resultados específicos da busca do advogado. Já corrigido uma vez (ver memória
+              // feedback-rag-truncation); regrediu para planner-primeiro em algum commit externo.
               ragContext = ragContext
-                ? `${deterministicRag}\n\n---\n\n${ragContext}`
+                ? `${ragContext}\n\n---\n\n${deterministicRag}`
                 : deterministicRag;
             } else {
               console.log(`[RAG Determinístico] Nenhum chunk específico exigido pelo planner.`);
