@@ -6250,6 +6250,7 @@ ${message}`;
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         let maxTokensHit = false;
+        let forceContinue = false;
         let attemptText = "";
 
         try {
@@ -6349,6 +6350,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
             maxTokensHit = true; // Força fluxo de continuação automática
+            forceContinue = true; // Ignora o teto de palavras — sem isso, correções cirúrgicas/relatórios (sem wordTarget) nunca continuavam após um erro de stream, pois targetReached fica sempre true quando não há alvo de palavras
           } else {
             totalStreamFailures++;
             if (totalStreamFailures >= 5) {
@@ -6386,8 +6388,10 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         const currentWordCount = countWords(fullResponseText);
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-        // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
+        // stream/rotação de chave — nesse caso o alvo de palavras é irrelevante, precisa continuar
+        // sempre, senão correções cirúrgicas/relatórios sem wordTarget nunca retomavam)
+        if ((forceContinue || (maxTokensHit && !targetReached)) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.Michel] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           if (modelProvider !== 'openrouter') {
@@ -7086,6 +7090,7 @@ ${message}`;
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         let maxTokensHit = false;
+        let forceContinue = false;
         let attemptText = "";
 
         try {
@@ -7196,13 +7201,14 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
           console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dra. Luana:`, streamError.message);
           const keys = getApiKeys();
-          
+
           if (attemptText.length > 100) {
             res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
             if (keys.length > 0) {
               currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
             maxTokensHit = true;
+            forceContinue = true;
           } else {
             totalStreamFailures++;
             if (totalStreamFailures >= 5) {
@@ -7238,8 +7244,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         const currentWordCount = countWords(fullResponseText);
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-        // CONTINUAÇÃO APENAS em MAX_TOKENS — não força após STOP natural
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
+        // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
+        if ((forceContinue || (maxTokensHit && !targetReached)) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dra.Luana] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           if (modelProvider !== 'openrouter') {
@@ -7838,6 +7845,7 @@ ${message}`;
       while (!isFinished && attempt < MAX_ATTEMPTS) {
         attempt++;
         let maxTokensHit = false;
+        let forceContinue = false;
         let attemptText = "";
 
         try {
@@ -7928,13 +7936,14 @@ REGRAS ABSOLUTAS:
           }
           console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dr. Felix Castro:`, streamError.message);
           const keys = getApiKeys();
-          
+
           if (attemptText.length > 100) {
             res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
             if (keys.length > 0) {
               currentKeyIndex = (currentKeyIndex + 1) % keys.length;
             }
             maxTokensHit = true;
+            forceContinue = true;
           } else {
             totalStreamFailures++;
             if (totalStreamFailures >= 5) {
@@ -7971,7 +7980,9 @@ REGRAS ABSOLUTAS:
         const currentWordCount = countWords(fullResponseText);
         const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-        if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+        // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
+        // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
+        if ((forceContinue || (maxTokensHit && !targetReached)) && attempt < MAX_ATTEMPTS) {
           console.log(`[Dr.FelixCastro] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
           const anchor = fullResponseText.slice(-600);
           if (modelProvider !== 'openrouter') {
@@ -8585,6 +8596,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
         : undefined);
 
   let maxTokensHit = false;
+  let forceContinue = false;
   let attemptText = "";
 
   try {
@@ -8627,6 +8639,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
         currentKeyIndex = (currentKeyIndex + 1) % keys.length;
       }
       maxTokensHit = true;
+      forceContinue = true;
     } else {
       totalStreamFailures++;
       if (totalStreamFailures >= 5) {
@@ -8663,8 +8676,9 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
   const currentWordCount = countWords(fullResponseText);
   const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
 
-  // CONTINUAÇÃO APENAS em MAX_TOKENS
-  if (maxTokensHit && !targetReached && attempt < MAX_ATTEMPTS) {
+  // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
+  // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
+  if ((forceContinue || (maxTokensHit && !targetReached)) && attempt < MAX_ATTEMPTS) {
     console.log(`[Sec.Fabricia] MAX_TOKENS no ciclo ${attempt} (${currentWordCount}/${wordTarget || '∞'} palavras). Continuando...`);
     const anchor = fullResponseText.slice(-600);
     currentContents.push({ role: "model", parts: [{ text: attemptText }] });
