@@ -1459,10 +1459,10 @@ export const supabaseService = {
     }
   },
 
-  async getLegalDocumentTitles(): Promise<string[]> {
+  async getLegalDocumentTitles(): Promise<{ title: string; areas: string[] }[]> {
     const supabase = await getLegalClient();
     if (!supabase) return [];
-    
+
     let allData: any[] = [];
     let page = 0;
     const pageSize = 1000;
@@ -1473,12 +1473,12 @@ export const supabaseService = {
         .from('legal_documents')
         .select('metadata')
         .range(page * pageSize, (page + 1) * pageSize - 1);
-        
+
       if (error) {
         console.error('Error fetching legal document titles from Supabase:', error);
         break;
       }
-      
+
       if (data && data.length > 0) {
         allData = [...allData, ...data];
         if (data.length < pageSize) {
@@ -1490,17 +1490,41 @@ export const supabaseService = {
         hasMore = false;
       }
     }
-    
-    // Filter unique titles manually
-    const titles = allData.map(item => {
+
+    // Agrega t\u00edtulo -> \u00e1reas (um mesmo t\u00edtulo pode ter chunks com \u00e1reas levemente
+    // diferentes marcadas; a \u00e1rea do documento \u00e9 a UNI\u00c3O de todas). Preservar a \u00e1rea
+    // aqui \u00e9 o que permite ao chamador restringir a busca por t\u00edtulo \u00e0 \u00e1rea de atua\u00e7\u00e3o
+    // da persona \u2014 sem isso, qualquer t\u00edtulo da base inteira (de qualquer \u00e1rea) podia
+    // ser puxado por coincid\u00eancia de palavra, mesmo sendo de uma \u00e1rea totalmente
+    // diferente da persona (ex.: jurisprud\u00eancia TRABALHISTA entrando num caso 100%
+    // previdenci\u00e1rio do Dr. Michel).
+    const titleAreas = new Map<string, Set<string>>();
+    allData.forEach(item => {
       const metadata = item.metadata as any;
-      return metadata?.title ? String(metadata.title) : null;
-    }).filter(Boolean) as string[];
-    
-    return [...new Set(titles)].sort();
+      const title = metadata?.title ? String(metadata.title) : null;
+      if (!title) return;
+      const areas: string[] = Array.isArray(metadata?.areas) ? metadata.areas : [];
+      if (!titleAreas.has(title)) titleAreas.set(title, new Set());
+      areas.forEach((a: string) => titleAreas.get(title)!.add(a));
+    });
+
+    return Array.from(titleAreas.entries())
+      .map(([title, areas]) => ({ title, areas: Array.from(areas) }))
+      .sort((a, b) => a.title.localeCompare(b.title));
   },
 
-  filterLawTitles(allLawTitles: string[], queryText: string): string[] {
+  filterLawTitles(allLawTitlesInput: { title: string; areas: string[] }[], queryText: string, personaAreas?: string[]): string[] {
+    // Restringe o universo de t\u00edtulos candidatos \u00e0(s) \u00e1rea(s) de atua\u00e7\u00e3o da persona ANTES de
+    // qualquer casamento por palavra-chave. T\u00edtulo sem \u00e1rea marcada (areas.length === 0) passa
+    // \u2014 trata-se de metadado incompleto, n\u00e3o de "fora da \u00e1rea". Esta \u00e9 a defesa estrutural
+    // contra vazamento entre \u00e1reas (ex.: t\u00edtulo TRABALHISTA entrando num caso previdenci\u00e1rio
+    // do Dr. Michel s\u00f3 por coincid\u00eancia de palavra em algum trecho longo do hist\u00f3rico).
+    const areaFilterSet = personaAreas && personaAreas.length > 0 ? new Set(personaAreas) : null;
+    const allLawTitles: string[] = (areaFilterSet
+      ? allLawTitlesInput.filter(t => t.areas.length === 0 || t.areas.some(a => areaFilterSet.has(a)))
+      : allLawTitlesInput
+    ).map(t => t.title);
+
     const normQuery = queryText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // 1. Conceitos Semânticos e Leis Principais Mapeadas

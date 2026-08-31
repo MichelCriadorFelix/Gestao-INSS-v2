@@ -599,7 +599,7 @@ export default function KnowledgeBase() {
     setIsLoadingDocs(true);
     try {
       const docs = await supabaseService.getLegalDocumentTitles();
-      setExistingDocs(docs);
+      setExistingDocs(docs.map(d => d.title));
     } catch (error) {
       console.error('Error fetching docs:', error);
     } finally {
