@@ -3627,11 +3627,29 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               setSessions(prev => prev.map(s => {
                 if (s.id !== currentSessionId) return s;
                 const currentItems = s.legalBaseArtifact?.items || [];
+                // Rede de segurança: detecta a área do item por um conjunto AMPLO de sinais,
+                // não só 2-3 strings literais. Antes só pegava 'clt'/'cdc' — um julgado
+                // trabalhista do TST que cita "FGTS" e "Lei nº 8.036/90" mas nunca escreve a
+                // sigla "CLT" passava batido pelo filtro antigo, mesmo sendo claramente de
+                // outra área. Cada lista é de termos fortemente indicativos DAQUELA área
+                // específica, evitando palavras genéricas que cruzam áreas (ex.: "insalubre"
+                // aparece tanto em trabalhista quanto em aposentadoria especial do INSS, por
+                // isso não entra em nenhuma lista abaixo).
+                const trabalhistaSignals = ['clt', 'consolidação das leis do trabalho', 'trabalhista', 'reclamação trabalhista', 'reclamante', 'vara do trabalho', ' tst ', ' trt', 'sdi-1', 'sdi-2', 'orientação jurisprudencial', 'aviso prévio', 'hora extra', 'verbas rescisórias', 'justa causa', 'carteira de trabalho', 'ctps', 'vínculo empregatício', 'rescisão indireta', 'fgts', 'lei nº 8.036', 'lei 8.036'];
+                const consumidorSignals = ['código de defesa do consumidor', 'cdc', 'relação de consumo', 'fornecedor', 'vício do produto', 'súmula 297', 'súmula 479'];
+                const hasSignal = (signals: string[], text: string) => signals.some(s => text.includes(s));
+
                 const updatedItems = currentItems.filter(it => {
-                  const titleAndContent = `${it.title} ${it.content}`.toLowerCase();
+                  const titleAndContent = ` ${it.title} ${it.content} `.toLowerCase();
+                  const isTrabalhista = hasSignal(trabalhistaSignals, titleAndContent);
+                  const isConsumidorSig = hasSignal(consumidorSignals, titleAndContent);
+
+                  if (isTrabalhista && !persona.agentAreas.includes('TRABALHISTA')) return false;
+                  if (isConsumidorSig && !persona.agentAreas.includes('CONSUMIDOR')) return false;
+
                   if (persona.aiName === 'felix_castro' || (isConsumerOrCivil && !persona.agentAreas.includes('INSS'))) {
-                    if (titleAndContent.includes('lei nº 8.213') || 
-                        titleAndContent.includes('lei 8.213') || 
+                    if (titleAndContent.includes('lei nº 8.213') ||
+                        titleAndContent.includes('lei 8.213') ||
                         titleAndContent.includes('decreto nº 3.048') ||
                         titleAndContent.includes('decreto 3.048') ||
                         (titleAndContent.includes('súmula') && titleAndContent.includes('tnu')) ||
@@ -3639,13 +3657,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                         titleAndContent.includes('bpc') ||
                         titleAndContent.includes('loas') ||
                         titleAndContent.includes('auxílio-doença') ||
-                        titleAndContent.includes('aposentadoria') ||
-                        titleAndContent.includes('clt') ||
-                        titleAndContent.includes('consolidação das leis do trabalho')) {
-                      return false;
-                    }
-                  } else if (isOnlyPrevidenciario) {
-                    if (titleAndContent.includes('código de defesa do consumidor') || titleAndContent.includes('cdc') || titleAndContent.includes('clt')) {
+                        titleAndContent.includes('aposentadoria')) {
                       return false;
                     }
                   }
