@@ -478,10 +478,19 @@ export const detectArtifactType = (content: string = '', userPrompt: string = ''
     return 'intercorrente';
   }
 
+  // 4.5 Mandado de Segurança — ação constitucional autônoma perante o Judiciário.
+  // Precisa vir ANTES do check de "Administrativa": um MS contra omissão do INSS
+  // sempre narra nos fatos o requerimento administrativo que ficou sem resposta,
+  // o que disparava falso-positivo pra 'administrativa' (peça vinha classificada
+  // como Processo Administrativo mesmo endereçada "AO JUÍZO DA Vara Federal...").
+  if (/mandado de segurança/i.test(clean) || /mandado de segurança/i.test(promptLower)) {
+    return 'inicial';
+  }
+
   // 5. Administrativa (INSS/CRPS)
   if (
     (/requerimento administrativo|junta de recursos|crps|agência da previdência social|in 128\/2022|recurso ordinário administrativo|pedido de prorrogação/i.test(clean) &&
-    !/ao juízo do|excelentíssimo senhor doutor/i.test(clean)) ||
+    !/ao ju[íi]zo d[ao]|excelent[íi]ssimo|merit[íi]ssimo/i.test(clean)) ||
     /requerimento administrativo|inss administrativo|recurso crps/i.test(promptLower)
   ) {
     return 'administrativa';
