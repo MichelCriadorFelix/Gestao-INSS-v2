@@ -1985,7 +1985,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         // futuramente será encontrada automaticamente,
         // desde que o título siga os padrões da base:
         const allLawTitles = await supabaseService.getLegalDocumentTitles();
-        const allTitles = supabaseService.filterLawTitles(allLawTitles, enrichedQueryText);
+        // Restringe a busca por título à(s) área(s) desta persona (AGENT_AREAS) — sem isso,
+        // um título de QUALQUER área da base podia ser puxado por coincidência de palavra,
+        // mesmo sendo de área totalmente diferente da persona (ex.: jurisprudência
+        // TRABALHISTA entrando num caso 100% previdenciário do Dr. Michel).
+        const allTitles = supabaseService.filterLawTitles(allLawTitles, enrichedQueryText, AGENT_AREAS);
 
         console.log(`[RAG LITERAL MATCH] Filtro de títulos encontrou:`, allTitles);
 
@@ -2090,17 +2094,25 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
             const seen = new Set<number>();
             const merged: any[] = [];
             
-            // Título exato primeiro (relevância máxima garantida)
-            titleResults.forEach((r: any) => {
-              seen.add(r.id);
-              merged.push({ ...r, source: 'title_exact' });
-            });
-
-            // Vetorial primeiro (mais relevante)
+            // ORDEM: vetorial (semântico) PRIMEIRO, título exato DEPOIS, keyword por último.
+            // Busca por vetor usa embedding — entende do que a pergunta TRATA (ex.: distingue
+            // "demora na análise do requerimento" de "demora na implantação do benefício",
+            // mesmo as duas frases compartilhando várias palavras) e só retorna acima de um
+            // limiar de similaridade (0.25). Busca por título exato é puramente léxica — casa
+            // por PALAVRA, sem noção de significado — e foi a fonte recorrente de conteúdo de
+            // área/tema errado entrando no contexto e na Base Legal (ex.: jurisprudência
+            // TRABALHISTA num caso previdenciário, jurisprudência de "implantação" quando o
+            // pedido era de "análise"). Título exato ainda tem valor (pega citação literal por
+            // número que o vetorial pode perder), por isso continua entrando — só não mais
+            // na frente do que de fato entende o caso.
             vectorResults.forEach((r: any) => {
+              seen.add(r.id);
+              merged.push({ ...r, source: 'vector' });
+            });
+            titleResults.forEach((r: any) => {
               if (!seen.has(r.id)) {
                 seen.add(r.id);
-                merged.push({ ...r, source: 'vector' });
+                merged.push({ ...r, source: 'title_exact' });
               }
             });
             // Keyword depois (complementar)
