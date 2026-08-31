@@ -1632,8 +1632,15 @@ export const supabaseService = {
        return false;
     });
 
-    // Combinar ambas as estratégias sem duplicatas
-    const finalTitles = new Set<string>([...matchedByConcept, ...matchedByGeneral]);
+    // Combinar ambas as estratégias sem duplicatas — matchedByGeneral PRIMEIRO: são casamentos
+    // específicos (título citado, número de lei/súmula/tema, palavra distintiva do próprio
+    // título), enquanto matchedByConcept é uma rede ampla que entra quase sempre que a pergunta
+    // é previdenciária (ou trabalhista, cível...). A ORDEM deste array vira a ordem de busca em
+    // searchByTitles() e, por sua vez, a ordem no ragContext — se as leis-base genéricas vierem
+    // primeiro, elas competem pelo orçamento de caracteres com a jurisprudência específica que
+    // o advogado pediu (visto: leis-base do RGPS voltavam, mas a súmula/jurisprudência
+    // especificamente citada na pergunta ficava de fora do corte). Matches específicos primeiro.
+    const finalTitles = new Set<string>([...matchedByGeneral, ...matchedByConcept]);
     return [...finalTitles];
   },
 
