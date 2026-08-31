@@ -147,13 +147,26 @@ const extractLegalTitleAnchor = (title: string): string => {
 };
 
 interface LegalDeviceKey {
-  kind: 'article' | 'sumula' | 'tema' | 'unknown';
+  kind: 'article' | 'sumula' | 'tema' | 'jurisprudencia' | 'unknown';
   num: string;
   lawAnchor: string;
 }
 
+// Ementas de jurisprudência não abrem com "Art./Súmula/Tema" — a âncora que as identifica é o
+// número do processo, normalmente citado entre parênteses no fecho do julgado (ex.: "(TRF-2 -
+// RemNec: 50508307020244025101 RJ, Relator...)"). Aceita tanto o formato CNJ pontuado
+// (NNNNNNN-DD.AAAA.J.TR.OOOO) quanto uma sequência corrida de dígitos.
+const extractProcessNumber = (text: string): string => {
+  const candidates = (text || '').match(/\d[\d.\-]{13,25}\d/g) || [];
+  for (const c of candidates) {
+    const digits = c.replace(/\D/g, '');
+    if (digits.length >= 15 && digits.length <= 21) return digits;
+  }
+  return '';
+};
+
 // Identifica o dispositivo específico que UM chunk representa (o artigo,
-// súmula ou tema com que o texto do chunk começa).
+// súmula, tema ou julgado com que o texto do chunk começa/se identifica).
 const buildLegalDeviceKey = (title: string, content: string): LegalDeviceKey => {
   const trimmed = (content || '').trim();
   const lawAnchor = extractLegalTitleAnchor(title);
@@ -166,6 +179,15 @@ const buildLegalDeviceKey = (title: string, content: string): LegalDeviceKey => 
   }
   if ((m = trimmed.match(/^Tema\s*(?:n[ºo°]\.?\s*)?(\d+(?:\.\d+)?)/i))) {
     return { kind: 'tema', num: m[1], lawAnchor };
+  }
+  // Jurisprudência/ementa: sem esse número como âncora, o chunk caía em 'unknown' com
+  // lawAnchor vazio (título descritivo, sem número nenhum — ex.: "JURISPRUDÊNCIA TRF —
+  // PREVIDENCIÁRIO — Demora injustificada..."), e isLegalDeviceCitedInResponse nunca
+  // conseguia confirmar a citação — jurisprudência NUNCA entrava na Base Legal da
+  // conversa, mesmo quando genuinamente citada na resposta.
+  const processNumber = extractProcessNumber(trimmed);
+  if (processNumber) {
+    return { kind: 'jurisprudencia', num: processNumber, lawAnchor };
   }
   return { kind: 'unknown', num: '', lawAnchor };
 };
@@ -187,6 +209,14 @@ const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string)
     const artCited = new RegExp(`(?:Art\\.?|Artigo)\\s*${escapeRegExp(key.num)}\\b`, 'i').test(responseText);
     const lawCited = key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : true;
     return artCited && lawCited;
+  }
+  if (key.kind === 'jurisprudencia') {
+    if (!key.num) return false;
+    // Aceita o número completo do processo ou um prefixo longo o bastante (o modelo às vezes
+    // reproduz o número reformatado/truncado ao citar em texto corrido, fora de blockquote).
+    const respDigits = responseText.replace(/\D/g, '');
+    const prefixLen = Math.min(15, key.num.length);
+    return respDigits.includes(key.num) || respDigits.includes(key.num.slice(0, prefixLen));
   }
   // Chunk sem marcador de abertura reconhecível (ex.: início por "§" solto,
   // continuação de parágrafo): só entra se ao menos a lei-mãe for citada.
