@@ -6391,7 +6391,13 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        // Sem wordTarget (correção cirúrgica/relatório/revisão — não é geração de peça nova),
+        // "alvo atingido" NUNCA é verdade só por não ter alvo: um corte por MAX_TOKENS nesses
+        // casos é sempre involuntário (o texto ficou pela metade, ex.: "...do acórd"), então
+        // precisa continuar sempre que houver espaço em MAX_ATTEMPTS. Antes, "!wordTarget"
+        // tornava targetReached vacuosamente true e o gate de continuação nunca disparava
+        // fora de geração de petição nova — mesmo com maxTokensHit verdadeiro.
+        const targetReached = wordTarget ? currentWordCount >= Math.floor(wordTarget * 0.85) : false;
 
         // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
         // stream/rotação de chave — nesse caso o alvo de palavras é irrelevante, precisa continuar
@@ -7247,7 +7253,13 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        // Sem wordTarget (correção cirúrgica/relatório/revisão — não é geração de peça nova),
+        // "alvo atingido" NUNCA é verdade só por não ter alvo: um corte por MAX_TOKENS nesses
+        // casos é sempre involuntário (o texto ficou pela metade, ex.: "...do acórd"), então
+        // precisa continuar sempre que houver espaço em MAX_ATTEMPTS. Antes, "!wordTarget"
+        // tornava targetReached vacuosamente true e o gate de continuação nunca disparava
+        // fora de geração de petição nova — mesmo com maxTokensHit verdadeiro.
+        const targetReached = wordTarget ? currentWordCount >= Math.floor(wordTarget * 0.85) : false;
 
         // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
         // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
@@ -7983,7 +7995,13 @@ REGRAS ABSOLUTAS:
         }
 
         const currentWordCount = countWords(fullResponseText);
-        const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+        // Sem wordTarget (correção cirúrgica/relatório/revisão — não é geração de peça nova),
+        // "alvo atingido" NUNCA é verdade só por não ter alvo: um corte por MAX_TOKENS nesses
+        // casos é sempre involuntário (o texto ficou pela metade, ex.: "...do acórd"), então
+        // precisa continuar sempre que houver espaço em MAX_ATTEMPTS. Antes, "!wordTarget"
+        // tornava targetReached vacuosamente true e o gate de continuação nunca disparava
+        // fora de geração de petição nova — mesmo com maxTokensHit verdadeiro.
+        const targetReached = wordTarget ? currentWordCount >= Math.floor(wordTarget * 0.85) : false;
 
         // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
         // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
@@ -8679,7 +8697,8 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
   }
 
   const currentWordCount = countWords(fullResponseText);
-  const targetReached = !wordTarget || currentWordCount >= Math.floor(wordTarget * 0.85);
+  // Sem wordTarget, "alvo atingido" nunca é vacuosamente true — ver explicação em callGemini.
+  const targetReached = wordTarget ? currentWordCount >= Math.floor(wordTarget * 0.85) : false;
 
   // CONTINUAÇÃO em MAX_TOKENS (respeitando o alvo de palavras) OU forceContinue (erro de
   // stream/rotação de chave — precisa continuar sempre, independente do alvo de palavras)
