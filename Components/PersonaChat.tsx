@@ -36,7 +36,8 @@ import {
   ArrowPathRoundedSquareIcon as RefreshCw,
   StopIcon as Stop,
   PhotoIcon as Photo,
-  ScaleIcon as Scale
+  ScaleIcon as Scale,
+  ChartBarIcon as ChartBar
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -1241,6 +1242,31 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   }, [pendingAudit]);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
+
+  // Estimativa de uso de contexto desta conversa (histórico + documentos + Base Legal reaproveitada),
+  // espelhando o que de fato é enviado ao backend em cada turno, para sugerir compactação proativamente.
+  const contextUsage = React.useMemo(() => {
+    if (!currentSession || currentSession.messages.length === 0) return null;
+    const CHARS_PER_TOKEN = 3.5;
+    const budgetTokens = selectedModelProvider === 'openrouter' ? 200000 : 100000;
+
+    const historyChars = currentSession.messages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+
+    const docTextLimit = selectedModel?.includes('claude') ? 100000 : 2500000;
+    const docsChars = (currentSession.documents || []).reduce((sum, d: any) => {
+      return sum + (d.fullText ? Math.min(d.fullText.length, docTextLimit) : 0) + (d.summary?.length || 0);
+    }, 0);
+
+    const legalBaseChars = Math.min(
+      (currentSession.legalBaseArtifact?.items || []).reduce((sum, item) => sum + (item.content?.length || 0), 0),
+      300000 // mesmo teto do reaproveitamento (RAG_ARTIFACT_CHAR_LIMIT)
+    );
+
+    const estTokens = Math.round((historyChars + docsChars + legalBaseChars) / CHARS_PER_TOKEN);
+    const percent = Math.min(100, Math.round((estTokens / budgetTokens) * 100));
+
+    return { estTokens, budgetTokens, percent };
+  }, [currentSession, selectedModelProvider, selectedModel]);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -4203,6 +4229,30 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         {/* INPUT AREA */}
         <div className="p-3.5 sm:p-6 border-t border-slate-200 dark:border-gold-500/20 bg-white dark:bg-bordeaux-950">
           <div className="max-w-4xl mx-auto relative">
+
+            {/* Contador de Contexto da Conversa — sugere compactação antes de estourar o orçamento seguro de tokens */}
+            {contextUsage && contextUsage.percent >= 40 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (contextUsage.percent >= 70) {
+                    handleCompactHistory();
+                  }
+                }}
+                title={contextUsage.percent >= 70
+                  ? "Contexto ficando grande — clique para compactar o histórico agora"
+                  : "Uso estimado de contexto desta conversa"}
+                className={`mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  contextUsage.percent >= 70
+                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800 cursor-pointer hover:scale-105 active:scale-95'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/60 cursor-default'
+                }`}
+              >
+                <ChartBar className="w-3.5 h-3.5" />
+                Contexto: ~{Math.round(contextUsage.estTokens / 1000)}k tokens ({contextUsage.percent}%)
+                {contextUsage.percent >= 70 && ' · Compactar agora'}
+              </button>
+            )}
 
             {/* Badge de Tier de Petição Ativo */}
             {petitionLength !== 'Padrão (Livre)' && (
