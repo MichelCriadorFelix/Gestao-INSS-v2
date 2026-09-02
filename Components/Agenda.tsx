@@ -280,6 +280,20 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           `❌ O fato de o câncer estar "controlado" ou em tratamento não significa capacidade. Destaque que a imunidade impossibilita pegar transporte público ou estar em locais com outras pessoas.\n` +
           `⚠️ *Se perguntar da melhora:* não diga que está "melhorando". Diga que os dias pós-tratamento são de cama e que não tem forças físicas para nenhuma rotina.`;
         postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Se sentir fraqueza, vertigem ou precisar de apoio para levantar/sentar, demonstre.`;
+      } else if (diseaseType === 'epilepsia') {
+        respostas = `✅ Relate a *frequência real das crises* (quantas por semana/mês), se há aviso (aura) antes, se perde a consciência, se cai, se morde a língua ou tem incontinência durante a crise.\n` +
+          `❌ *Não minimize dizendo "é raro" ou "controlado".* Mesmo poucas crises por ano podem incapacitar — o que importa é a *imprevisibilidade* (não dá pra saber quando vai acontecer) e o *risco* (cair da escada, se machucar, ficar sozinho(a) na rua ou dirigir).\n` +
+          `⚠️ Relate os efeitos da medicação: sonolência, lentidão de raciocínio, falhas de memória — e o estado *após* a crise (confusão, dor de cabeça, exaustão, precisar dormir horas).\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale que precisa de alguém por perto o tempo todo, que evita ficar sozinho(a) em ambientes de risco (cozinha, banheiro, escada) e que não pode dirigir nem trabalhar em altura ou com máquinas.`;
+        postura = `Não tenha vergonha de detalhar as crises, mesmo que pareça constrangedor. O ${perito} precisa entender o risco real, não só "eu tenho epilepsia".`;
+        acomp = `Leve um acompanhante de confiança. ⚠️ *Atenção:* o ${perito} pode chamá-lo separadamente. Ele precisa relatar como são as crises que já presenciou (duração, sintomas, o que faz para ajudar) e a real necessidade de supervisão ${pronoun2}.`;
+      } else if (diseaseType === 'visual') {
+        respostas = `✅ Fale com precisão o que consegue e o que NÃO consegue enxergar: ler texto (mesmo com óculos/lupa), reconhecer rostos à distância, enxergar degraus, buracos ou obstáculos, atravessar a rua com segurança.\n` +
+          `❌ *Não diga "enxergo um pouco" sem explicar o que isso significa na prática.* Se anda com dificuldade em local desconhecido, se precisa de bengala/apoio, se depende de alguém para ir a lugares novos — diga isso claramente.\n` +
+          `⚠️ Relate se usa bengala, cão-guia ou outro auxílio, e há quanto tempo. Se a visão piora à noite ou em ambientes com pouca luz, informe.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale sobre o que só consegue fazer porque já decorou o ambiente (memória do espaço), e o que não consegue fazer sozinho(a) fora de casa — pegar transporte, atravessar rua, reconhecer pessoas, ler contas e bulas.`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não force contato visual nem tente disfarçar a dificuldade de enxergar o ambiente do consultório.`;
+        acomp = `Leve um acompanhante de confiança para orientá-lo(a) no trajeto e na sala de espera. ⚠️ *Atenção:* o ${perito} pode chamá-lo separadamente para relatar as dificuldades reais que observa no dia a dia ${pronoun2}.`;
       } else {
         // ortopedica / padrao / outra
         respostas = `✅ Fale *somente sobre as limitações e dificuldades físicas* — o que ${pronoun} NÃO consegue fazer, as dores, o que piora, o que impede de ter uma rotina normal.\n` +
@@ -820,6 +834,8 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                           <option value="autismo">🧩 Autismo / TDAH / Neurodivergência</option>
                           <option value="cardiologica">🫀 Cardiológica / Pulmonar</option>
                           <option value="oncologica">🎗️ Oncológica (Câncer)</option>
+                          <option value="epilepsia">⚡ Epilepsia / Convulsões</option>
+                          <option value="visual">👁️ Deficiência Visual</option>
                           <option value="outra">📝 Outra / Geral</option>
                         </select>
                       </div>
