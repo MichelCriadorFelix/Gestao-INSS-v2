@@ -170,7 +170,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   // Quantidade de salários das cláusulas administrativas — só a esfera ADMINISTRATIVA
   // cobra em salários (a judicial, definitivo ou temporário, é sempre 30% + sucumbência).
   // Era fixo em 2 (Definitivo) e 1 (Temporário), agora o advogado escolhe cada um (1 a 10).
-  const [definitivoSalarios, setDefinitivoSalarios] = useState<number>(2);
+  const [definitivoSalarios, setDefinitivoSalarios] = useState<number>(3);
   const [temporarioSalarios, setTemporarioSalarios] = useState<number>(1);
   // "Temporário - Esfera Administrativa" pode cobrar em salário (padrão) OU em percentual
   // sobre os atrasados administrativos, à escolha do advogado (a esfera judicial já é
