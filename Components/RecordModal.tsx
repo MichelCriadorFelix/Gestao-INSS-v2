@@ -12,6 +12,13 @@ import { supabaseService } from '../services/supabaseService';
 import { apiFetch } from '../services/apiService';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 
+const SALARIOS_EXTENSO = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez'];
+const salariosClausulaTexto = (n: number): string => {
+  const safe = Math.max(1, Math.min(10, Math.round(n) || 1));
+  const extenso = SALARIOS_EXTENSO[safe] || String(safe);
+  return `${String(safe).padStart(2, '0')} (${extenso})`;
+};
+
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
         // BUCKETS PRIVADOS: converte URL pública gravada no banco em URL assinada (1h)
@@ -147,6 +154,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   const [isContractSelectorOpen, setIsContractSelectorOpen] = useState(false);
   const [contractTargetAction, setContractTargetAction] = useState<'editor' | 'pdf' | null>(null);
   const [selectedContractClauses, setSelectedContractClauses] = useState<string[]>(['definitivo_judicial']);
+  // Quantidade de salários da cláusula "Benefício de Caráter Definitivo" (judicial e
+  // administrativa) — era fixo em 2, agora o advogado escolhe (1 a 10).
+  const [definitivoSalarios, setDefinitivoSalarios] = useState<number>(2);
 
   const handleContractClick = (action: 'editor' | 'pdf') => {
       setContractTargetAction(action);
@@ -772,12 +782,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
 
           if (contractClauses.includes('definitivo_judicial') || contractClauses.includes('definitivo_adm')) {
               clauseSecondHTML += `<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.${subIdx}. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):</p>`;
+              const salariosTxtHTML = salariosClausulaTexto(definitivoSalarios);
+              const salarioPalavraHTML = Math.max(1, Math.round(definitivoSalarios) || 1) === 1 ? 'salário' : 'salários';
               if (contractClauses.includes('definitivo_adm')) {
-                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${salariosTxtHTML} ${salarioPalavraHTML} do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
               }
               if (contractClauses.includes('definitivo_judicial')) {
                   const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
-                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${salariosTxtHTML} ${salarioPalavraHTML} do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
               }
               subIdx++;
           }
@@ -1229,12 +1241,14 @@ ${clauseSecondHTML}
 
           if (contractClauses.includes('definitivo_judicial') || contractClauses.includes('definitivo_adm')) {
               writeText(`2.${subIdx}. PARA BENEFÍCIOS DE CARÁTER DEFINITIVO (APOSENTADORIAS, PENSÃO POR MORTE, BPC, ENTRE OUTROS):`, { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
+              const salariosTxt = salariosClausulaTexto(definitivoSalarios);
+              const salarioPalavra = Math.max(1, Math.round(definitivoSalarios) || 1) === 1 ? 'salário' : 'salários';
               if (contractClauses.includes('definitivo_adm')) {
-                  writeText("a) Na esfera administrativa: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.", { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+                  writeText(`a) Na esfera administrativa: Os CONTRATADOS farão jus a ${salariosTxt} ${salarioPalavra} do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
               }
               if (contractClauses.includes('definitivo_judicial')) {
                   const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
-                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a 02 (dois) salários do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
+                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a ${salariosTxt} ${salarioPalavra} do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
               }
               subIdx++;
           }
@@ -2275,7 +2289,7 @@ ${clauseSecondHTML}
                   />
                   <div className="text-xs leading-relaxed">
                     <span className="font-bold block text-slate-900 dark:text-white">Definitivo - Esfera Judicial</span>
-                    2 salários do benefício concedido (Aposentadorias, BPC, Pensão por Morte)
+                    {definitivoSalarios} {definitivoSalarios === 1 ? 'salário' : 'salários'} do benefício concedido (Aposentadorias, BPC, Pensão por Morte)
                   </div>
                 </label>
 
@@ -2297,9 +2311,24 @@ ${clauseSecondHTML}
                   />
                   <div className="text-xs leading-relaxed">
                     <span className="font-bold block text-slate-900 dark:text-white">Definitivo - Esfera Administrativa</span>
-                    2 salários do benefício concedido no INSS
+                    {definitivoSalarios} {definitivoSalarios === 1 ? 'salário' : 'salários'} do benefício concedido no INSS
                   </div>
                 </label>
+
+                {(selectedContractClauses.includes('definitivo_judicial') || selectedContractClauses.includes('definitivo_adm')) && (
+                  <div className="flex items-center gap-2 pl-3 -mt-1 mb-1">
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Quantidade de salários (Definitivo):</label>
+                    <select
+                      value={definitivoSalarios}
+                      onChange={(e) => setDefinitivoSalarios(Number(e.target.value))}
+                      className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-bordeaux-900/40 text-slate-800 dark:text-white"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <label className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${selectedContractClauses.includes('temporario_judicial') ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-500 text-amber-950 dark:text-amber-100' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'}`}>
                   <input 
