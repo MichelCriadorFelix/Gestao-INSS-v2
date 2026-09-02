@@ -215,10 +215,27 @@ const CustomParagraph = Paragraph.extend({
       },
       style: {
         default: null,
-        parseHTML: element => element.getAttribute('style'),
+        // Remove qualquer "text-align" que já viesse embutido no style bruto (ex.: HTML colado) —
+        // o alinhamento é governado exclusivamente pelo atributo textAlign da extensão TextAlign,
+        // nunca por este style solto, senão os dois brigam pelo mesmo style="" do parágrafo.
+        parseHTML: element => {
+          const raw = element.getAttribute('style');
+          if (!raw) return null;
+          const cleaned = raw.replace(/text-align\s*:\s*[^;]+;?/gi, '').trim();
+          return cleaned || null;
+        },
         renderHTML: attributes => {
-          if (!attributes.style) return {};
-          return { style: attributes.style };
+          // Combina o style customizado (fonte, etc.) com o textAlign — os dois attrs deste nó
+          // renderizam pro mesmo style="" do HTML, e o merge de atributos do TipTap NÃO concatena
+          // strings de "style" como faz com "class" (a última a ser processada vence e apaga a
+          // outra). Sem essa combinação explícita aqui, clicar em "centralizar" não fazia efeito
+          // nenhum (ou desfazia sozinho) sempre que o parágrafo também tinha um style customizado
+          // (ex.: parágrafos com font-size importado de PDF).
+          const parts: string[] = [];
+          if (attributes.style) parts.push(attributes.style.replace(/;\s*$/, ''));
+          if (attributes.textAlign && attributes.textAlign !== 'left') parts.push(`text-align: ${attributes.textAlign}`);
+          if (parts.length === 0) return {};
+          return { style: parts.join('; ') + ';' };
         },
       },
     };
@@ -261,10 +278,20 @@ const CustomHeading = Heading.extend({
       ...this.parent?.(),
       style: {
         default: null,
-        parseHTML: element => element.getAttribute('style'),
+        // Mesmo motivo do CustomParagraph: text-align não pode ficar embutido neste style
+        // solto, senão compete com o atributo textAlign pelo mesmo style="" renderizado.
+        parseHTML: element => {
+          const raw = element.getAttribute('style');
+          if (!raw) return null;
+          const cleaned = raw.replace(/text-align\s*:\s*[^;]+;?/gi, '').trim();
+          return cleaned || null;
+        },
         renderHTML: attributes => {
-          if (!attributes.style) return {};
-          return { style: attributes.style };
+          const parts: string[] = [];
+          if (attributes.style) parts.push(attributes.style.replace(/;\s*$/, ''));
+          if (attributes.textAlign && attributes.textAlign !== 'left') parts.push(`text-align: ${attributes.textAlign}`);
+          if (parts.length === 0) return {};
+          return { style: parts.join('; ') + ';' };
         },
       },
     };
