@@ -789,7 +789,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
               }
               if (contractClauses.includes('definitivo_judicial')) {
                   const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
-                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${salariosTxtHTML} ${salarioPalavraHTML} do benefício concedido, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.</p>`;
+                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">${letter} <strong>Na esfera judicial:</strong> Os <strong>CONTRATADOS</strong> farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) <strong>CONTRATANTE</strong> ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos <strong>CONTRATADOS</strong>.</p>`;
               }
               subIdx++;
           }
@@ -1248,7 +1248,7 @@ ${clauseSecondHTML}
               }
               if (contractClauses.includes('definitivo_judicial')) {
                   const letter = contractClauses.includes('definitivo_adm') ? 'b)' : 'a)';
-                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a ${salariosTxt} ${salarioPalavra} do benefício concedido, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS, mediante desconto autorizado na primeira parcela do benefício ou por outro meio a ser acordado, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
+                  writeText(`${letter} Na esfera judicial: Os CONTRATADOS farão jus a 30% (trinta por cento) sobre o valor total dos atrasados, corrigidos monetariamente e acrescidos de juros, a serem recebidos pelo(a) CONTRATANTE ao final da demanda judicial, além de eventual condenação do INSS em honorários de sucumbência, que pertencerão integralmente aos CONTRATADOS.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1.5 });
               }
               subIdx++;
           }
@@ -2289,7 +2289,7 @@ ${clauseSecondHTML}
                   />
                   <div className="text-xs leading-relaxed">
                     <span className="font-bold block text-slate-900 dark:text-white">Definitivo - Esfera Judicial</span>
-                    {definitivoSalarios} {definitivoSalarios === 1 ? 'salário' : 'salários'} do benefício concedido (Aposentadorias, BPC, Pensão por Morte)
+                    30% sobre os atrasados + sucumbência (Aposentadorias, BPC, Pensão por Morte)
                   </div>
                 </label>
 
@@ -2315,9 +2315,9 @@ ${clauseSecondHTML}
                   </div>
                 </label>
 
-                {(selectedContractClauses.includes('definitivo_judicial') || selectedContractClauses.includes('definitivo_adm')) && (
+                {selectedContractClauses.includes('definitivo_adm') && (
                   <div className="flex items-center gap-2 pl-3 -mt-1 mb-1">
-                    <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Quantidade de salários (Definitivo):</label>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Quantidade de salários (Definitivo - Administrativa):</label>
                     <select
                       value={definitivoSalarios}
                       onChange={(e) => setDefinitivoSalarios(Number(e.target.value))}
