@@ -19,6 +19,19 @@ const salariosClausulaTexto = (n: number): string => {
   return `${String(safe).padStart(2, '0')} (${extenso})`;
 };
 
+const PCT_UNITS = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const PCT_TEENS = ['dez', 'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const PCT_TENS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const percentualExtenso = (n: number): string => {
+  const v = Math.max(1, Math.min(100, Math.round(n) || 1));
+  if (v === 100) return 'cem';
+  if (v < 10) return PCT_UNITS[v];
+  if (v < 20) return PCT_TEENS[v - 10];
+  const dezena = Math.floor(v / 10);
+  const unidade = v % 10;
+  return unidade === 0 ? PCT_TENS[dezena] : `${PCT_TENS[dezena]} e ${PCT_UNITS[unidade]}`;
+};
+
 const downloadFileRobust = async (docUrl: string, docName: string) => {
     try {
         // BUCKETS PRIVADOS: converte URL pública gravada no banco em URL assinada (1h)
@@ -159,6 +172,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
   // Era fixo em 2 (Definitivo) e 1 (Temporário), agora o advogado escolhe cada um (1 a 10).
   const [definitivoSalarios, setDefinitivoSalarios] = useState<number>(2);
   const [temporarioSalarios, setTemporarioSalarios] = useState<number>(1);
+  // "Temporário - Esfera Administrativa" pode cobrar em salário (padrão) OU em percentual
+  // sobre os atrasados administrativos, à escolha do advogado (a esfera judicial já é
+  // sempre percentual, não precisa dessa opção).
+  const [temporarioAdmMode, setTemporarioAdmMode] = useState<'salario' | 'percentual'>('salario');
+  const [temporarioAdmPercentual, setTemporarioAdmPercentual] = useState<number>(30);
 
   const handleContractClick = (action: 'editor' | 'pdf') => {
       setContractTargetAction(action);
@@ -799,9 +817,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSave, init
           if (contractClauses.includes('temporario_judicial') || contractClauses.includes('temporario_adm')) {
               clauseSecondHTML += `<p class="no-indent" style="font-weight: bold; font-size: 8.5pt; margin-top: 4px; margin-bottom: 2px;">2.${subIdx}. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):</p>`;
               if (contractClauses.includes('temporario_adm')) {
-                  const salariosTempHTML = salariosClausulaTexto(temporarioSalarios);
-                  const salarioPalavraTempHTML = Math.max(1, Math.round(temporarioSalarios) || 1) === 1 ? 'salário' : 'salários';
-                  clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${salariosTempHTML} ${salarioPalavraTempHTML} do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>`;
+                  if (temporarioAdmMode === 'percentual') {
+                      clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${temporarioAdmPercentual}% (${percentualExtenso(temporarioAdmPercentual)} por cento) sobre o valor total das parcelas retroativas (atrasados) do benefício concedido na via administrativa, corrigidas monetariamente, pagos pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong> após a efetiva disponibilização dos valores.</p>`;
+                  } else {
+                      const salariosTempHTML = salariosClausulaTexto(temporarioSalarios);
+                      const salarioPalavraTempHTML = Math.max(1, Math.round(temporarioSalarios) || 1) === 1 ? 'salário' : 'salários';
+                      clauseSecondHTML += `<p class="no-indent" style="margin-left: 14px; margin-bottom: 3px; text-align: justify; line-height: 1.3; font-size: 8.5pt;">a) <strong>Na esfera administrativa:</strong> Os <strong>CONTRATADOS</strong> farão jus a ${salariosTempHTML} ${salarioPalavraTempHTML} do benefício pretendido, pago pelo(a) <strong>CONTRATANTE</strong> diretamente aos <strong>CONTRATADOS</strong>, após a efetiva concessão e disponibilização do benefício.</p>`;
+                  }
               }
               if (contractClauses.includes('temporario_judicial')) {
                   const letter = contractClauses.includes('temporario_adm') ? 'b)' : 'a)';
@@ -1260,9 +1282,13 @@ ${clauseSecondHTML}
           if (contractClauses.includes('temporario_judicial') || contractClauses.includes('temporario_adm')) {
               writeText(`2.${subIdx}. PARA BENEFÍCIOS TEMPORÁRIOS (BENEFÍCIO POR INCAPACIDADE, AUXÍLIO-ACIDENTE, SALÁRIO-MATERNIDADE, ENTRE OUTROS):`, { fontStyle: 'bold', fontSize: 8.5, align: 'left', marginTop: 1, marginBottom: 0.8 });
               if (contractClauses.includes('temporario_adm')) {
-                  const salariosTempTxt = salariosClausulaTexto(temporarioSalarios);
-                  const salarioPalavraTemp = Math.max(1, Math.round(temporarioSalarios) || 1) === 1 ? 'salário' : 'salários';
-                  writeText(`a) Na esfera administrativa: Os CONTRATADOS farão jus a ${salariosTempTxt} ${salarioPalavraTemp} do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+                  if (temporarioAdmMode === 'percentual') {
+                      writeText(`a) Na esfera administrativa: Os CONTRATADOS farão jus a ${temporarioAdmPercentual}% (${percentualExtenso(temporarioAdmPercentual)} por cento) sobre o valor total das parcelas retroativas (atrasados) do benefício concedido na via administrativa, corrigidas monetariamente, pagos pelo(a) CONTRATANTE diretamente aos CONTRATADOS após a efetiva disponibilização dos valores.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+                  } else {
+                      const salariosTempTxt = salariosClausulaTexto(temporarioSalarios);
+                      const salarioPalavraTemp = Math.max(1, Math.round(temporarioSalarios) || 1) === 1 ? 'salário' : 'salários';
+                      writeText(`a) Na esfera administrativa: Os CONTRATADOS farão jus a ${salariosTempTxt} ${salarioPalavraTemp} do benefício pretendido, pago pelo(a) CONTRATANTE diretamente aos CONTRATADOS, após a efetiva concessão e disponibilização do benefício.`, { fontSize: 8.5, align: 'justify', indent: 3, marginBottom: 1 });
+                  }
               }
               if (contractClauses.includes('temporario_judicial')) {
                   const letter = contractClauses.includes('temporario_adm') ? 'b)' : 'a)';
@@ -2376,20 +2402,55 @@ ${clauseSecondHTML}
                   />
                   <div className="text-xs leading-relaxed flex-1">
                     <span className="font-bold block text-slate-900 dark:text-white">Temporário - Esfera Administrativa</span>
-                    {temporarioSalarios} {temporarioSalarios === 1 ? 'salário' : 'salários'} do benefício pretendido no INSS
+                    {temporarioAdmMode === 'percentual'
+                      ? `${temporarioAdmPercentual}% sobre os atrasados administrativos do benefício pretendido no INSS`
+                      : `${temporarioSalarios} ${temporarioSalarios === 1 ? 'salário' : 'salários'} do benefício pretendido no INSS`}
                     {selectedContractClauses.includes('temporario_adm') && (
-                      <div className="flex items-center gap-2 mt-1.5" onClick={(e) => e.preventDefault()}>
-                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Quantidade de salários:</span>
-                        <select
-                          value={temporarioSalarios}
-                          onChange={(e) => setTemporarioSalarios(Number(e.target.value))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-bordeaux-900/40 text-slate-800 dark:text-white"
-                        >
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                            <option key={n} value={n}>{n}</option>
-                          ))}
-                        </select>
+                      <div className="mt-1.5 space-y-1.5" onClick={(e) => e.preventDefault()}>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setTemporarioAdmMode('salario'); }}
+                            className={`text-[11px] px-2 py-0.5 rounded-full border transition ${temporarioAdmMode === 'salario' ? 'bg-amber-500 border-amber-500 text-white font-semibold' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}
+                          >
+                            Salário
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setTemporarioAdmMode('percentual'); }}
+                            className={`text-[11px] px-2 py-0.5 rounded-full border transition ${temporarioAdmMode === 'percentual' ? 'bg-amber-500 border-amber-500 text-white font-semibold' : 'bg-white dark:bg-bordeaux-900/40 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}
+                          >
+                            Percentual
+                          </button>
+                        </div>
+                        {temporarioAdmMode === 'percentual' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Percentual (%):</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={temporarioAdmPercentual}
+                              onChange={(e) => setTemporarioAdmPercentual(Number(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-16 text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-bordeaux-900/40 text-slate-800 dark:text-white"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Quantidade de salários:</span>
+                            <select
+                              value={temporarioSalarios}
+                              onChange={(e) => setTemporarioSalarios(Number(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-bordeaux-900/40 text-slate-800 dark:text-white"
+                            >
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
