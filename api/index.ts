@@ -2814,6 +2814,16 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 // é replicada para lá — para que a PRÓXIMA instância, seja ela qual for,
 // veja o estado atualizado.
 const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender a conexão por minutos desnecessários
+
+// Teto de segurança por TENTATIVA individual (uma chave, uma chamada/stream completo). Antes não
+// existia nenhum — se a chamada ao Gemini travasse (sem erro, sem dado, sem nada) o código ficava
+// esperando indefinidamente em vez de desistir e rotacionar pra próxima chave, mesmo com 34
+// tentativas de retry configuradas: elas só ajudam se uma tentativa efetivamente FALHA rápido.
+// Observado ao vivo: poucas chaves tentadas no log, mas minutos de espera — exatamente a
+// assinatura de uma chamada travada sem timeout. 120s dá folga generosa pra geração legítima
+// (mesmo peças longas normalmente terminam bem antes disso) sem deixar uma conexão travada
+// consumir minutos do orçamento de 800s da função.
+const PER_CALL_TIMEOUT_MS = 120_000;
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
@@ -3255,19 +3265,34 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   }
 
   const finalParams = { ...params, model: currentModel };
-  
+
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
       delete finalParams.config.tools;
     }
   }
 
+  // Teto de segurança por tentativa: aborta a chamada travada e cai no catch abaixo, que já
+  // sabe rotacionar chave/retry — sem isso uma chamada sem resposta nem erro prendia a
+  // requisição por minutos, ignorando as 34 tentativas de retry configuradas.
+  const callTimeoutController = new AbortController();
+  const callTimeoutId = setTimeout(() => callTimeoutController.abort(), PER_CALL_TIMEOUT_MS);
+  finalParams.config = { ...(finalParams.config || {}), abortSignal: callTimeoutController.signal };
+
   try {
-    return await ai.models.generateContent(finalParams);
+    const result = await ai.models.generateContent(finalParams);
+    clearTimeout(callTimeoutId);
+    return result;
   } catch (error: any) {
+    clearTimeout(callTimeoutId);
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
-    const errorMessage = error.message || errorStr;
-    
+    const errorMessage = callTimeoutController.signal.aborted
+      // Inclui "UNAVAILABLE" de propósito: reaproveita a classificação is503Overloaded já
+      // existente logo abaixo (mesma resposta de rotacionar chave e tentar de novo), sem
+      // precisar de uma flag nova espalhada pela lógica de retry inteira.
+      ? `TIMEOUT (UNAVAILABLE): chamada travada sem resposta por mais de ${PER_CALL_TIMEOUT_MS / 1000}s`
+      : (error.message || errorStr);
+
     const isEmpty = errorMessage.includes('Response was empty');
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
     const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
@@ -3537,19 +3562,32 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   if (onStatus) onStatus(msgTrial);
   
   const finalParams = { ...params, model: currentModel };
-  
+
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
       delete finalParams.config.tools;
     }
   }
 
+  // Teto de segurança cobrindo a chamada inicial E a leitura dos chunks (o for-await de quem
+  // chama roda DEPOIS que esta função retorna) — por isso o timer NÃO é limpo no sucesso, só
+  // no erro. Se o exchange inteiro (conexão + streaming) passar de PER_CALL_TIMEOUT_MS, aborta
+  // a conexão e o for-await do chamador recebe o erro, caindo no retry/rotação de chave já
+  // existente lá. Sem isso, um stream que trava no meio (conecta mas para de mandar chunks)
+  // prendia a requisição por minutos sem nunca cair em nenhum catch.
+  const callTimeoutController = new AbortController();
+  const callTimeoutId = setTimeout(() => callTimeoutController.abort(), PER_CALL_TIMEOUT_MS);
+  finalParams.config = { ...(finalParams.config || {}), abortSignal: callTimeoutController.signal };
+
   try {
     return await ai.models.generateContentStream(finalParams);
   } catch (error: any) {
+    clearTimeout(callTimeoutId);
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
-    const errorMessage = error.message || errorStr;
-    
+    const errorMessage = callTimeoutController.signal.aborted
+      ? `TIMEOUT (UNAVAILABLE): chamada travada sem resposta por mais de ${PER_CALL_TIMEOUT_MS / 1000}s`
+      : (error.message || errorStr);
+
     if (params?.config?.cachedContent && (errorMessage.includes('CachedContent') || /cached?\s*content/i.test(errorMessage) || errorMessage.includes('NOT_FOUND') || errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT'))) {
       throw new Error('CACHE_INVALID');
     }
@@ -3685,6 +3723,10 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 
   const ai = new GoogleGenAI({ apiKey });
 
+  // Teto de segurança por tentativa — ver explicação completa em callGemini/callGeminiStream.
+  const callTimeoutController = new AbortController();
+  const callTimeoutId = setTimeout(() => callTimeoutController.abort(), PER_CALL_TIMEOUT_MS);
+
   try {
     // IMPORTANTE: mantido em "gemini-embedding-001" de propósito — é o modelo
     // usado pra gerar os embeddings dos 2.432 documentos já indexados em
@@ -3697,12 +3739,16 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
     const response = await ai.models.embedContent({
       model: "gemini-embedding-001",
       contents: text,
-      config: { outputDimensionality: 768 }
+      config: { outputDimensionality: 768, abortSignal: callTimeoutController.signal }
     });
+    clearTimeout(callTimeoutId);
     return response.embeddings?.[0]?.values || [];
   } catch (error: any) {
-    const errorMessage = error.message || String(error);
-    
+    clearTimeout(callTimeoutId);
+    const errorMessage = callTimeoutController.signal.aborted
+      ? `TIMEOUT (UNAVAILABLE): chamada travada sem resposta por mais de ${PER_CALL_TIMEOUT_MS / 1000}s`
+      : (error.message || String(error));
+
     const isDailyQuota = errorMessage.includes('25000000') || (errorMessage.includes('Quota exceeded') && errorMessage.includes('tokens_per_model_per_user'));
     const isCacheLimit = errorMessage.includes('TotalCachedContentStorageTokensPerModelFreeTier') || errorMessage.includes('limit=0');
     const is503Overloaded = errorMessage.includes('503') || errorMessage.includes('overloaded') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('Service Unavailable');
