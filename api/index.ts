@@ -2820,10 +2820,17 @@ const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender
 // esperando indefinidamente em vez de desistir e rotacionar pra próxima chave, mesmo com 34
 // tentativas de retry configuradas: elas só ajudam se uma tentativa efetivamente FALHA rápido.
 // Observado ao vivo: poucas chaves tentadas no log, mas minutos de espera — exatamente a
-// assinatura de uma chamada travada sem timeout. 120s dá folga generosa pra geração legítima
-// (mesmo peças longas normalmente terminam bem antes disso) sem deixar uma conexão travada
-// consumir minutos do orçamento de 800s da função.
-const PER_CALL_TIMEOUT_MS = 120_000;
+// assinatura de uma chamada travada sem timeout.
+//
+// NÃO calibrado por tipo de tarefa de propósito — mesma lição já aprendida (e documentada) na
+// Bíblia ADMA: um teto por tarefa (curto pra dúvida, longo pra peça) quebra toda vez que o tempo
+// real de geração muda, e teve que ser recalibrado repetidas vezes até virarem um teto único e
+// alto pra qualquer tarefa. Aqui: 400s, bem generoso pra uma peça densa (5-7 mil palavras, alto
+// nível de "thinking") ou leitura de OCR grande (100k+ caracteres) legitimamente demorada, mas
+// ainda uma fração real do orçamento de 800s da função — sobra espaço pra ao menos uma rotação
+// de chave completa se a tentativa realmente travar, em vez de consumir o orçamento inteiro
+// numa única conexão travada sem chance de recuperação.
+const PER_CALL_TIMEOUT_MS = 400_000;
 let currentKeyIndex = 0;
 const invalidKeys = new Set<string>();
 
