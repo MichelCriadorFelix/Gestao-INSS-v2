@@ -3311,8 +3311,12 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
-    
-    if (isInvalidKey) invalidKeys.add(apiKey);
+
+    // 403 sem ser de arquivo expirado = API do Gemini desativada/sem permissão naquele projeto
+    // Google Cloud — tão permanente quanto uma chave inválida (nenhum retry resolve). Antes só
+    // isInvalidKey excluía a chave de tentativas futuras; uma chave assim ficava sendo
+    // retentada pra sempre, em toda nova requisição, desperdiçando uma tentativa garantida.
+    if (isInvalidKey || (isPermissionDenied && !isExpiredFile)) invalidKeys.add(apiKey);
     if (isDailyQuota) {
       keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true } as KeyStatus;
       markKeyExhaustedShared(apiKey, { daily: true });
@@ -3609,8 +3613,12 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     const isBadRequest = errorMessage.includes('400') || errorMessage.includes('INVALID_ARGUMENT');
     const isPermissionDenied = errorMessage.includes('403') || errorMessage.includes('PERMISSION_DENIED');
     const isExpiredFile = isPermissionDenied && (errorMessage.includes('File') || errorMessage.includes('file'));
-    
-    if (isInvalidKey) invalidKeys.add(apiKey);
+
+    // 403 sem ser de arquivo expirado = API do Gemini desativada/sem permissão naquele projeto
+    // Google Cloud — tão permanente quanto uma chave inválida (nenhum retry resolve). Antes só
+    // isInvalidKey excluía a chave de tentativas futuras; uma chave assim ficava sendo
+    // retentada pra sempre, em toda nova requisição, desperdiçando uma tentativa garantida.
+    if (isInvalidKey || (isPermissionDenied && !isExpiredFile)) invalidKeys.add(apiKey);
     if (isDailyQuota) {
       keyStatusRegistry[apiKey] = { ...keyStatusRegistry[apiKey], dailyExhausted: true } as KeyStatus;
       markKeyExhaustedShared(apiKey, { daily: true });
