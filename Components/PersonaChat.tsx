@@ -1913,18 +1913,19 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       // completa roda de novo, para trazer esse item novo. Não se aplica a
       // pedido de peça/relatório/revisão, que sempre exigem fundamentação
       // completa e atualizada, não só o que já está guardado.
-      // Pedido EXPLÍCITO de nova busca ("busque/pesquise/procure na base de conhecimento a
-      // jurisprudência sobre X") não necessariamente cita um número de artigo/súmula/tema —
-      // é linguagem natural. Sem este check, extractExplicitLegalRefs não encontrava nenhuma
-      // referência numérica "descoberta" e o atalho abaixo reaproveitava cegamente o artefato
-      // antigo mesmo quando o advogado pedia expressamente por algo novo/diferente do que já
-      // está salvo (ex.: trocar jurisprudência de "implantação" por "demora na análise").
-      const isExplicitSearchRequest = isLegalDoubt &&
-        /\b(busque|busca|busca-se|pesquise|pesquisa|procure|procura|encontre|localize|traga|trazer|ache|verifique|confira)\b/i.test(messageText);
-
+      // ATALHO INVERTIDO: em vez de tentar adivinhar "isso parece um pedido de busca?" batendo
+      // a mensagem numa lista fixa de verbos (busque/pesquise/procure/etc — frágil, qualquer
+      // frase nova que o advogado usasse e não estivesse na lista continuava caindo no atalho
+      // errado, reaproveitando artefato desatualizado), a regra agora é: só considera pular a
+      // busca quando a MENSAGEM ATUAL não tem nenhum conteúdo jurídico próprio (isLegalDoubt já
+      // é o detector amplo de vocabulário jurídico/de benefício usado em todo o resto do
+      // arquivo — cobre muito mais frases do que qualquer lista de verbos conseguiria). Se a
+      // mensagem atual tem QUALQUER palavra jurídica, busca de novo, ponto — só é pulada quando
+      // é um gesto de continuação genérico ("sim", "pode", "ok") sustentado só pelo momentum da
+      // conversa (conversationAlreadyLegal), sem nenhum conteúdo jurídico próprio.
       const legalBaseItems = session?.legalBaseArtifact?.items || [];
       let skipFullRagSearch = false;
-      if (shouldSendRag && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit && !isExplicitSearchRequest && legalBaseItems.length > 0 && conversationAlreadyLegal) {
+      if (shouldSendRag && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit && !isLegalDoubt && legalBaseItems.length > 0 && conversationAlreadyLegal) {
         const explicitRefs = extractExplicitLegalRefs(messageText);
         const uncoveredRefs = explicitRefs.filter(ref =>
           !legalBaseItems.some(item => legalDeviceKeyMatchesRef(buildLegalDeviceKey(item.title, item.content), ref))
