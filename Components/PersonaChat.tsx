@@ -180,6 +180,16 @@ const buildLegalDeviceKey = (title: string, content: string): LegalDeviceKey => 
   if ((m = trimmed.match(/^Tema\s*(?:n[ºo°]\.?\s*)?(\d+(?:\.\d+)?)/i))) {
     return { kind: 'tema', num: m[1], lawAnchor };
   }
+  // Fallback por TÍTULO: o enunciado de uma súmula/tema muitas vezes não repete "Súmula N"/
+  // "Tema N" no início do próprio texto (ex.: conteúdo começa direto em "A Carteira de
+  // Trabalho..."), só o TÍTULO do documento segue esse padrão ("SÚMULA 75 TNU — ..."). Sem
+  // isto, esses chunks caíam no fallback genérico de 'unknown' abaixo — o mais fraco de todos.
+  if ((m = title.match(/^S[uú]mula\s*(?:n[ºo°]\.?\s*)?(\d+)/i))) {
+    return { kind: 'sumula', num: m[1], lawAnchor };
+  }
+  if ((m = title.match(/^Tema\s*(?:n[ºo°]\.?\s*)?(\d+(?:\.\d+)?)/i))) {
+    return { kind: 'tema', num: m[1], lawAnchor };
+  }
   // Jurisprudência/ementa: sem esse número como âncora, o chunk caía em 'unknown' com
   // lawAnchor vazio (título descritivo, sem número nenhum — ex.: "JURISPRUDÊNCIA TRF —
   // PREVIDENCIÁRIO — Demora injustificada..."), e isLegalDeviceCitedInResponse nunca
@@ -196,7 +206,13 @@ const buildLegalDeviceKey = (title: string, content: string): LegalDeviceKey => 
 // súmula ou tema) aparecer no texto da resposta — e, no caso de artigo,
 // também exige que o número identificador da lei apareça, para não
 // confundir "Art. 86" da Lei 8.213 com um "Art. 86" de outra norma.
-const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string): boolean => {
+// Normaliza só espaço/pontuação/caixa pra comparação de substring — mantém acentos de propósito
+// (tanto o conteúdo salvo no Supabase quanto a resposta do modelo são português acentuado
+// normalmente; o objetivo aqui é tolerar diferença de espaçamento/markdown, não de acentuação).
+const normalizeForCitationMatch = (s: string): string =>
+  (s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string, chunkContent: string = ''): boolean => {
   if (!responseText) return false;
   const normalizedResponse = responseText.replace(/(\d)\.(?=\d{3}\b)/g, '$1');
   if (key.kind === 'sumula') {
@@ -218,9 +234,19 @@ const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string)
     const prefixLen = Math.min(15, key.num.length);
     return respDigits.includes(key.num) || respDigits.includes(key.num.slice(0, prefixLen));
   }
-  // Chunk sem marcador de abertura reconhecível (ex.: início por "§" solto,
-  // continuação de parágrafo): só entra se ao menos a lei-mãe for citada.
-  return key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : false;
+  // Chunk sem marcador de abertura reconhecível nem correspondência por título (parágrafo solto
+  // de uma lei, continuação de texto): exigir só que a lei-mãe apareça em QUALQUER lugar da
+  // resposta era fraco demais — qualquer menção da lei "confirmava" a citação de TODOS os
+  // parágrafos dela já buscados alguma vez na conversa, e âncoras numéricas curtas (ex.: uma
+  // súmula "75") batem por coincidência em qualquer texto longo (datas, valores, percentuais).
+  // Visto ao vivo: Súmula 75 TNU (CTPS/tempo de serviço) e vários §§ soltos do Estatuto da
+  // PcD entrando na Base Legal de um caso de BPC/microcefalia sem relação nenhuma com eles.
+  // Exige uma fatia real do PRÓPRIO conteúdo do chunk aparecer na resposta — prova que o
+  // trecho específico foi de fato citado/transcrito, não só que a lei-mãe foi mencionada.
+  if (!chunkContent) return false;
+  const normalizedChunk = normalizeForCitationMatch(chunkContent);
+  const snippet = normalizedChunk.slice(0, 60);
+  return snippet.length >= 20 && normalizeForCitationMatch(responseText).includes(snippet);
 };
 
 interface ExplicitLegalRef {
@@ -2575,7 +2601,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           const content = headerMatch ? headerMatch[2] : piece.replace(/^FONTE:.*\n/, '');
           if (!title || !content) return;
           const key = buildLegalDeviceKey(title, content);
-          if (!isLegalDeviceCitedInResponse(key, fullText)) return;
+          if (!isLegalDeviceCitedInResponse(key, fullText, content)) return;
           const sig = legalArtifactChunkSignature(title, content);
           if (!artifact.has(sig)) {
             artifact.set(sig, { title, content, addedAt: nowIso });
