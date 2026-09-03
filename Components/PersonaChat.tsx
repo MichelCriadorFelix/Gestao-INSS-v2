@@ -976,7 +976,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
   // Anexos pendentes para envio junto com a instrução do usuário
