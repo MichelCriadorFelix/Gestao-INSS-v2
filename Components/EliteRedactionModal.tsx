@@ -52,6 +52,20 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
           </button>
 
           <button
+            onClick={() => onConfirm('gemini', 'gemini-3.7-flash')}
+            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
+                  Gemini 3.7 Flash (Nativo Google)
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">Modelo mais recente do Google — use se o padrão estiver instável.</p>
+              </div>
+            </div>
+          </button>
+
+          <button
             onClick={() => onConfirm('gemini', 'gemini-3.6-flash')}
             className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
           >
