@@ -2815,6 +2815,16 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 // veja o estado atualizado.
 const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender a conexão por minutos desnecessários
 
+// Teto de falha rápida especificamente para 503 (servidor Google sobrecarregado) quando o
+// modelo já está no "piso" da hierarquia (gemini-3.5-flash, sem mais nível pra rebaixar).
+// Diferente de 429/cota (onde CADA CHAVE tem seu próprio limite e rotacionar genuinamente
+// ajuda), 503 é sobrecarga do MODELO inteiro nos servidores do Google — rotacionar chave não
+// resolve isso, só adia o mesmo erro. Deixar rodar até MAX_RETRIES (34) nesse caso só empilha
+// minutos de espera sem chance real de sucesso (observado ao vivo: ~9min de espera numa
+// mensagem trivial, todas as chaves batendo 503 no mesmo modelo). Falha cedo com um erro claro
+// em vez disso — o usuário decide se tenta de novo.
+const MAX_CONSECUTIVE_503_ON_FLOOR_MODEL = 6;
+
 // Teto de segurança por TENTATIVA individual (uma chave, uma chamada/stream completo). Antes não
 // existia nenhum — se a chamada ao Gemini travasse (sem erro, sem dado, sem nada) o código ficava
 // esperando indefinidamente em vez de desistir e rotacionar pra próxima chave, mesmo com 34
@@ -3341,6 +3351,13 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
       let nextFailures = failuresOnCurrentModel + 1;
 
+      // FALHA RÁPIDA: 503 seguido no modelo-piso (sem mais nível pra rebaixar) é sobrecarga do
+      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro por mais
+      // 28 tentativas. Ver comentário completo em MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
+      if (is503Overloaded && nextFailures >= MAX_CONSECUTIVE_503_ON_FLOOR_MODEL && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
+        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
+      }
+
       // BACKOFF ESCALONADO: várias das nossas chaves compartilham o mesmo
       // projeto Google Cloud (19 chaves em ~6 projetos), então uma chave
       // "nova" pode tomar 429 na hora por uma chave irmã já ter usado a cota
@@ -3370,6 +3387,15 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       // regra do callGeminiStream). Antes, este bloco capturava is503Overloaded
       // já na 1ª falha e caía numa lista com modelos legados (2.5/1.5/2.0-flash).
       let nextParams = { ...params };
+      // MAX_OUTPUT_TOKENS_FALLBACK: se a API rejeitou por causa do teto de saída
+      // (maxOutputTokens acima do limite real do modelo), rotacionar chave não
+      // resolve nada — é o mesmo erro de configuração em qualquer chave. Cai pro
+      // valor já testado (16383) em vez de queimar as 34 tentativas inteiras
+      // batendo no mesmo 400 repetidamente.
+      if (isBadRequest && /max.?output.?tokens/i.test(errorMessage) && (nextParams.config?.maxOutputTokens || 0) > 16383) {
+        console.warn(`[maxOutputTokens] Valor ${nextParams.config.maxOutputTokens} rejeitado pela API (400) — caindo para 16383 (teto já testado).`);
+        nextParams.config = { ...nextParams.config, maxOutputTokens: 16383 };
+      }
       if (isDailyQuota) {
         const currentModel = params.model || "gemini-3.7-flash";
         const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
@@ -3648,6 +3674,13 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       let delay = (isInvalidKey || isPermissionDenied || isBadRequest || isNotFound) ? 500 : 1000;
       let nextFailures = failuresOnCurrentModel + 1;
 
+      // FALHA RÁPIDA: 503 seguido no modelo-piso (sem mais nível pra rebaixar) é sobrecarga do
+      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro por mais
+      // 28 tentativas. Ver comentário completo em MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
+      if (is503Overloaded && nextFailures >= MAX_CONSECUTIVE_503_ON_FLOOR_MODEL && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
+        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
+      }
+
       // BACKOFF ESCALONADO: descobrimos que muitas das nossas chaves (19 no
       // total) foram criadas em apenas ~6 projetos Google Cloud distintos —
       // várias chaves compartilham a MESMA cota por baixo dos panos. Isso faz
@@ -3676,6 +3709,15 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       // legados (2.5/1.5/2.0-flash), rebaixando o modelo mesmo com chaves
       // novas disponíveis para tentar no modelo original.
       let nextParams = { ...params };
+      // MAX_OUTPUT_TOKENS_FALLBACK: se a API rejeitou por causa do teto de saída
+      // (maxOutputTokens acima do limite real do modelo), rotacionar chave não
+      // resolve nada — é o mesmo erro de configuração em qualquer chave. Cai pro
+      // valor já testado (16383) em vez de queimar as 34 tentativas inteiras
+      // batendo no mesmo 400 repetidamente.
+      if (isBadRequest && /max.?output.?tokens/i.test(errorMessage) && (nextParams.config?.maxOutputTokens || 0) > 16383) {
+        console.warn(`[maxOutputTokens] Valor ${nextParams.config.maxOutputTokens} rejeitado pela API (400) — caindo para 16383 (teto já testado).`);
+        nextParams.config = { ...nextParams.config, maxOutputTokens: 16383 };
+      }
       if (isDailyQuota) {
         const currentModel = params.model || "gemini-3.7-flash";
         const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
@@ -6264,32 +6306,23 @@ ${message}`;
     const tools = undefined;
 
 
-    let maxOutputTokens = 8192;
+    // maxOutputTokens é um TETO, não uma meta — o modelo para sozinho ao terminar
+    // a resposta (stop natural), então usar sempre o maior teto possível não deixa
+    // nada mais lento, só evita cortar no meio uma resposta que precisou de mais
+    // espaço (ex.: patch cirúrgico com ementa jurisprudencial inteira colada).
+    // Antes havia tetos menores (8192/4096) para modos "rápidos" — isso não acelerava
+    // nada (a resposta curta já parava sozinha bem antes do teto) e só criava risco
+    // de corte no meio do bloco <<<SEARCH, cuja continuação automática não é
+    // patch-aware (reemite o marcador do zero, duplicando/quebrando o formato).
+    // 32766 a pedido do Dr. Michel; se a API rejeitar por exceder o limite real do
+    // modelo (400/INVALID_ARGUMENT), há um fallback automático pra 16383 (valor já
+    // testado) em callGemini/callGeminiStream — ver MAX_OUTPUT_TOKENS_FALLBACK.
+    let maxOutputTokens = 32766;
     // Gemini 3.5 Flash usa thinkingLevel (não thinkingBudget do 2.5).
     // high = máximo raciocínio (geração de petição)
     // medium = análise/relatório
     // low = armazenamento/ciência (velocidade máxima)
     let thinkingConfig: any = undefined;
-
-    // Destravando limites conforme solicitado pelo Dr. Felix
-    if (isSurgicalMode) {
-      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
-      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
-      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
-      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
-      // reduz a frequência de precisar continuar no meio de um patch.
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
-    } else if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined; // Máximo raciocínio para petições
-    } else if (isReportRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined; // Optimization: avoid overthinking for reports
-    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined; // Velocidade para armazenamento/ciência
-    }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
@@ -7124,24 +7157,11 @@ ${message}`;
     const tools = undefined;
 
 
-    let maxOutputTokens = 8192;
+    // maxOutputTokens é um TETO, não uma meta — ver comentário equivalente no
+    // endpoint do Dr. Michel. 32766 a pedido do Dr. Michel, com fallback
+    // automático pra 16383 se a API rejeitar (ver MAX_OUTPUT_TOKENS_FALLBACK).
+    let maxOutputTokens = 32766;
     let thinkingConfig: any = undefined;
-
-    if (isSurgicalMode) {
-      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
-      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
-      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
-      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
-      // reduz a frequência de precisar continuar no meio de um patch.
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
-    } else if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined; // Optimization: fast execution
-    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined;
-    }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
@@ -7875,27 +7895,11 @@ ${message}`;
     const tools = undefined;
 
 
-    let maxOutputTokens = 8192;
+    // maxOutputTokens é um TETO, não uma meta — ver comentário equivalente no
+    // endpoint do Dr. Michel. 32766 a pedido do Dr. Michel, com fallback
+    // automático pra 16383 se a API rejeitar (ver MAX_OUTPUT_TOKENS_FALLBACK).
+    let maxOutputTokens = 32766;
     let thinkingConfig: any = undefined;
-
-    if (isSurgicalMode) {
-      // 8192 (era 4096): um patch de correção cirúrgica que insere uma ementa jurisprudencial
-      // inteira + parecer explicativo pode passar de 4096 tokens, cortando o modelo NO MEIO do
-      // bloco <<<SEARCH — a continuação automática então reemite o marcador do zero (duplicando
-      // e quebrando o formato), porque a instrução de continuação não é patch-aware. Mais folga
-      // reduz a frequência de precisar continuar no meio de um patch.
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined; // Resposta ultrarrápida para patches cirúrgicos
-    } else if (isGenerationRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined;
-    } else if (isReportRequest) {
-      maxOutputTokens = 16383;
-      thinkingConfig = undefined; // Optimization: avoid overthinking for reports
-    } else if ((message || "").includes("FASE DE TOMADA DE CIÊNCIA")) {
-      maxOutputTokens = 8192;
-      thinkingConfig = undefined;
-    }
 
     if (modelProvider === 'openrouter') {
       maxOutputTokens = 16383;
