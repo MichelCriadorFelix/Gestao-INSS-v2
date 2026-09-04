@@ -2836,7 +2836,13 @@ const DEFAULT_SAFETY_SETTINGS = [
 // minutos de espera sem chance real de sucesso (observado ao vivo: ~9min de espera numa
 // mensagem trivial, todas as chaves batendo 503 no mesmo modelo). Falha cedo com um erro claro
 // em vez disso — o usuário decide se tenta de novo.
-const MAX_CONSECUTIVE_503_ON_FLOOR_MODEL = 6;
+// Valor inicial (6) revisado pra 12 após observação ao vivo: durante um período de sobrecarga
+// real e sustentada do Google (não um pico isolado), 6 tentativas desistia rápido demais mesmo
+// em mensagens triviais — o diagnóstico de chaves (ping de 1 token) mostrava a maioria saudável
+// porque é uma chamada muito mais leve que uma geração completa. 12 dá mais chance real de pegar
+// uma janela livre sem voltar a empilhar minutos de espera (o bug do loop externo reiniciando do
+// zero, corrigido em ac05681, já não multiplica mais esse teto).
+const MAX_CONSECUTIVE_503_ON_FLOOR_MODEL = 12;
 
 // Teto de segurança por TENTATIVA individual (uma chave, uma chamada/stream completo). Antes não
 // existia nenhum — se a chamada ao Gemini travasse (sem erro, sem dado, sem nada) o código ficava
