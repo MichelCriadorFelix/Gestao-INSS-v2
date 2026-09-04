@@ -556,8 +556,14 @@ export const detectArtifactType = (content: string = '', userPrompt: string = ''
   }
 
   // 6. Contrato / Notificação
+  // Precisa do MESMO guard "não é endereçado a um Juízo" que a regra de Administrativa acima já
+  // usa: quase toda petição menciona "contrato de honorários"/"procuração" na qualificação das
+  // partes (boilerplate padrão: "...por seus advogados, consoante procuração e contrato de
+  // honorários anexos..."), o que fazia QUALQUER petição inicial cair aqui por engano — o
+  // documento real de contrato/notificação nunca é endereçado "AO JUÍZO DE..."
   if (
-    /notificação extrajudicial|contrato de honorários|contrato de prestação de serviços|procuração ad judicia|termo de renúncia|acordo extrajudicial/i.test(clean) ||
+    (/notificação extrajudicial|contrato de honorários|contrato de prestação de serviços|procuração ad judicia|termo de renúncia|acordo extrajudicial/i.test(clean) &&
+    !/ao ju[íi]zo d[ao]|excelent[íi]ssimo|merit[íi]ssimo/i.test(clean)) ||
     /notificação|contrato|procuração/i.test(promptLower)
   ) {
     return 'contrato';
@@ -2648,13 +2654,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       if (finalArtifactUpdate) {
         // Atualiza a mensagem do artefato anterior na conversa para que o documento fique sincronizado
-        let updatedArtifactMsgId: string | null = null;
         setSessions(prev => prev.map(s => {
           if (s.id !== sessionId) return s;
           const updatedMessages = [...s.messages];
           for (let i = updatedMessages.length - 1; i >= 0; i--) {
             if (isArtifactContent(updatedMessages[i].content)) {
-              updatedArtifactMsgId = updatedMessages[i].id;
               updatedMessages[i] = {
                 ...updatedMessages[i],
                 content: finalArtifactUpdate!
@@ -2668,26 +2672,16 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           };
         }));
 
-        // Uma correção cirúrgica pode transformar a NATUREZA do documento
-        // (ex.: quesitos virando manifestação/petição intercorrente). Se o
-        // tipo tinha sido fixado manualmente antes da edição, ele ficava
-        // "preso" no tipo antigo mesmo com o conteúdo totalmente mudado —
-        // limpa o override pra o badge voltar a refletir o conteúdo atual
-        // (detecção automática). O usuário pode reescolher manualmente de
-        // novo se quiser, pelo seletor de tipo.
-        if (updatedArtifactMsgId) {
-          const msgId = updatedArtifactMsgId as string;
-          setCustomArtifactTypes(prev => {
-            if (!(msgId in prev)) return prev;
-            const { [msgId]: _removed, ...rest } = prev;
-            if (currentSessionId) {
-              setSessions(prevSessions => prevSessions.map(s => s.id === currentSessionId
-                ? { ...s, artifactTypes: rest }
-                : s));
-            }
-            return rest;
-          });
-        }
+        // ANTES: uma correção cirúrgica limpava o tipo escolhido manualmente pelo usuário, pra
+        // "voltar a refletir a detecção automática". Na prática isso quebrava o caso oposto e
+        // mais comum: usuário corrige manualmente um tipo mal detectado (ex.: petição inicial
+        // classificada como "Contrato" por causa do boilerplate "...consoante procuração e
+        // contrato de honorários anexos..." presente em quase toda peça) e, ao pedir a PRÓXIMA
+        // correção cirúrgica (rotina), o override sumia e voltava pro tipo errado — exatamente o
+        // "eu mudo manualmente mas não permanece" relatado. Escolha manual agora é definitiva até
+        // o usuário trocar de novo pelo seletor; a raiz do falso-positivo em 'contrato' também foi
+        // corrigida em detectArtifactType (mesmo guard "não é endereçado a um Juízo" que a regra
+        // de Administrativa já usava).
       } else {
         if ((isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) && !isSurgicalCorrection && sessionId === currentSessionIdRef.current) {
           setStreamingAsArtifact(false);

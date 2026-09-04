@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import BulletList from '@tiptap/extension-bullet-list';
@@ -829,21 +829,30 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
   }, [initialPetition, initialClientId, editor, clients]);
 
   // Efeito adicional para garantir que o cliente seja selecionado se a petição já estiver carregada
-  // mas o cliente não estiver selecionado (ex: ao abrir do modal do cliente)
+  // mas o cliente não estiver selecionado (ex: ao abrir do modal do cliente).
+  // BUG CORRIGIDO: `selectedClient` estava nas dependências, então clicar no lápis pra trocar de
+  // cliente (que chama setSelectedClient(null)) disparava este mesmo efeito de novo — como
+  // initialPetition/initialClientId não mudaram, ele reselecionava IMEDIATAMENTE o mesmo cliente
+  // antigo, antes do usuário conseguir abrir o dropdown de busca. Por fora parecia "a tela pisca
+  // mas não deixa selecionar". Agora só roda quando a PETIÇÃO muda (via ref), nunca por causa da
+  // própria seleção manual do usuário.
+  const autoSelectedForPetitionIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialPetition && !selectedClient && clients) {
-        let client = null;
-        if (initialClientId) {
-          client = clients.find(c => c.id === initialClientId);
-        }
-        if (!client) {
-          client = clients.find(c => c.petitions?.some(p => p.id === initialPetition.id));
-        }
-        if (client) {
-            setSelectedClient(client);
-        }
+    if (!initialPetition || !clients) return;
+    if (autoSelectedForPetitionIdRef.current === initialPetition.id) return;
+    autoSelectedForPetitionIdRef.current = initialPetition.id;
+
+    let client = null;
+    if (initialClientId) {
+      client = clients.find(c => c.id === initialClientId);
     }
-  }, [initialPetition, initialClientId, selectedClient, clients]);
+    if (!client) {
+      client = clients.find(c => c.petitions?.some(p => p.id === initialPetition.id));
+    }
+    if (client) {
+        setSelectedClient(client);
+    }
+  }, [initialPetition, initialClientId, clients]);
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (!editor) return;
