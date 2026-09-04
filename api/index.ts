@@ -2842,6 +2842,10 @@ const DEFAULT_SAFETY_SETTINGS = [
 // porque é uma chamada muito mais leve que uma geração completa. 12 dá mais chance real de pegar
 // uma janela livre sem voltar a empilhar minutos de espera (o bug do loop externo reiniciando do
 // zero, corrigido em ac05681, já não multiplica mais esse teto).
+// Este é só o PISO: no ponto de uso o teto real é max(keys.length, este valor) — a pedido do
+// Dr. Michel, que mantém várias chaves justamente pra isso (inclusive recém-adicionadas
+// "virgens"), o sistema sempre dá uma chance a CADA chave configurada antes de desistir, mesmo
+// que sejam mais de 12.
 const MAX_CONSECUTIVE_503_ON_FLOOR_MODEL = 12;
 
 // Teto de segurança por TENTATIVA individual (uma chave, uma chamada/stream completo). Antes não
@@ -3371,9 +3375,12 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       let nextFailures = failuresOnCurrentModel + 1;
 
       // FALHA RÁPIDA: 503 seguido no modelo-piso (sem mais nível pra rebaixar) é sobrecarga do
-      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro por mais
-      // 28 tentativas. Ver comentário completo em MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
-      if (is503Overloaded && nextFailures >= MAX_CONSECUTIVE_503_ON_FLOOR_MODEL && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
+      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro. Mas
+      // desistir antes de dar uma chance a CADA chave configurada (a pedido do Dr. Michel, que
+      // mantém várias chaves justamente pra isso, incluindo recém-adicionadas "virgens") é
+      // desperdiçar chaves saudáveis que nem chegaram a ser tentadas. Ver comentário completo em
+      // MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
+      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
         throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
       }
 
@@ -3694,9 +3701,12 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       let nextFailures = failuresOnCurrentModel + 1;
 
       // FALHA RÁPIDA: 503 seguido no modelo-piso (sem mais nível pra rebaixar) é sobrecarga do
-      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro por mais
-      // 28 tentativas. Ver comentário completo em MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
-      if (is503Overloaded && nextFailures >= MAX_CONSECUTIVE_503_ON_FLOOR_MODEL && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
+      // MODELO inteiro no Google — rotacionar chave não resolve, só adia o mesmo erro. Mas
+      // desistir antes de dar uma chance a CADA chave configurada (a pedido do Dr. Michel, que
+      // mantém várias chaves justamente pra isso, incluindo recém-adicionadas "virgens") é
+      // desperdiçar chaves saudáveis que nem chegaram a ser tentadas. Ver comentário completo em
+      // MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
+      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
         throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
       }
 
