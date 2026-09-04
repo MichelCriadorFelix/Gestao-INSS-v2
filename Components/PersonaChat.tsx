@@ -1212,7 +1212,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       if (cancelado || !carregado) return;
 
       setSessions(prev => prev.map(s => s.id === currentSessionId
-        ? { ...s, messages: carregado.messages, documents: carregado.documents, legalBaseArtifact: (carregado as any).legalBaseArtifact, messagesLoaded: true } as any
+        ? { ...s, messages: carregado.messages, documents: carregado.documents, legalBaseArtifact: (carregado as any).legalBaseArtifact, clientId: (carregado as any).clientId || (s as any).clientId, messagesLoaded: true } as any
         : s));
 
       // Hidrata o cache em memória do artefato de base legal com o que já

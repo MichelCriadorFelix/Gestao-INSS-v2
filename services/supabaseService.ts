@@ -59,6 +59,7 @@ export interface ChatSession {
   ai_name: 'michel' | 'luana' | 'felix_castro' | 'fabricia';
   documents?: any[];
   legalBaseArtifact?: any;
+  clientId?: string;
 }
 
 const LEGAL_BASE_ARTIFACT_MARKER = '[SYSTEM_LEGAL_BASE_ARTIFACT]';
@@ -104,7 +105,12 @@ export const supabaseService = {
         lawyer_type: session.ai_name,
         title: session.title,
         date: session.date,
-        messages: messagesToSave
+        messages: messagesToSave,
+        // Sem isso, o vínculo cliente<->conversa (feito ao anexar um cliente no chat) nunca era
+        // persistido — ficava só no estado React em memória e sumia ao recarregar a página ou
+        // reabrir a conversa depois. Causa raiz de o Editor de Petições abrir sem o cliente certo
+        // pré-selecionado mesmo quando o GED foi feito vinculado a ele.
+        client_id: session.clientId || null
       });
       
     if (error) {
@@ -131,7 +137,7 @@ export const supabaseService = {
 
     const { data, error } = await supabase
       .from('ai_conversations')
-      .select('id, lawyer_type, title, date, updated_at')
+      .select('id, lawyer_type, title, date, updated_at, client_id')
       .eq('lawyer_type', aiName)
       .order('updated_at', { ascending: false })
       .limit(30);
@@ -145,6 +151,7 @@ export const supabaseService = {
       ...s,
       messages: [],
       documents: [],
+      clientId: s.client_id || undefined,
       // Marca que o conteudo ainda nao veio. O PersonaChat usa isto para
       // (a) buscar sob demanda e (b) NUNCA salvar uma conversa nao carregada,
       // o que sobrescreveria o historico com uma lista vazia.
@@ -159,7 +166,7 @@ export const supabaseService = {
 
     const { data, error } = await supabase
       .from('ai_conversations')
-      .select('messages')
+      .select('messages, client_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -189,7 +196,7 @@ export const supabaseService = {
         console.error('Error parsing legal base artifact', e);
       }
     }
-    return { messages, documents, legalBaseArtifact };
+    return { messages, documents, legalBaseArtifact, clientId: data.client_id || undefined };
   },
 
   async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
@@ -239,7 +246,8 @@ export const supabaseService = {
         ...session,
         messages,
         documents,
-        legalBaseArtifact
+        legalBaseArtifact,
+        clientId: session.client_id || undefined
       };
     });
   },
