@@ -24,16 +24,13 @@ import {
   ShieldExclamationIcon as ShieldExclamation,
   ArrowsPointingOutIcon as Maximize2,
   ArrowsPointingInIcon as Minimize2,
-  ArchiveBoxIcon as Archive,
   ArrowUturnLeftIcon as Undo,
   ArrowUturnRightIcon as Redo,
-  BookmarkIcon as Pin,
   DocumentCheckIcon as Save,
   PencilSquareIcon as EditSquare,
   BoltIcon as Bolt,
   LightBulbIcon as Lightbulb,
   EyeIcon as Eye,
-  ArrowPathRoundedSquareIcon as RefreshCw,
   StopIcon as Stop,
   PhotoIcon as Photo,
   ScaleIcon as Scale,
@@ -1024,6 +1021,14 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const lastPastedSizeRef = useRef<number>(0);
   const lastRealStatusAtRef = useRef<number>(0);
 
+  // Guarda a sessão que o usuário está OLHANDO agora, para o loop de streaming (que roda em
+  // background e pode levar minutos) checar antes de escrever no texto do artefato/streaming —
+  // sem isso, gerar na Conversa A e trocar pra Conversa B durante a geração faz o conteúdo de A
+  // vazar pra tela de B (setEditableArtifactText/setStreamingMessage são estado GLOBAL, não por
+  // sessão). Sincronizado via useEffect logo abaixo.
+  const currentSessionIdRef = useRef<string | null>(null);
+  useEffect(() => { currentSessionIdRef.current = currentSessionId; }, [currentSessionId]);
+
   const processPastedImages = (
     clipboardData: DataTransfer | null, 
     isArtifactTarget: boolean, 
@@ -1138,7 +1143,6 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [editableArtifactText, setEditableArtifactText] = useState<string>('');
   const [artifactHistory, setArtifactHistory] = useState<string[]>([]);
   const [artifactHistoryIndex, setArtifactHistoryIndex] = useState<number>(-1);
-  const [isArtifactPinned, setIsArtifactPinned] = useState<boolean>(true);
   const [artifactQuickCommand, setArtifactQuickCommand] = useState<string>('');
   const [artifactAttachedFiles, setArtifactAttachedFiles] = useState<File[]>([]);
   const [artifactUpdatePulse, setArtifactUpdatePulse] = useState<boolean>(false);
@@ -2472,20 +2476,26 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                   if (data.artifactUpdate) {
                     console.log(`[SSE ARTIFACT UPDATE] Recebido patch do documento (${data.artifactUpdate.length} chars)`);
                     receivedArtifactUpdate = data.artifactUpdate;
-                    setEditableArtifactText(data.artifactUpdate);
-                    setArtifactUpdatePulse(true);
-                    setTimeout(() => setArtifactUpdatePulse(false), 2500);
+                    if (sessionId === currentSessionIdRef.current) {
+                      setEditableArtifactText(data.artifactUpdate);
+                      setArtifactUpdatePulse(true);
+                      setTimeout(() => setArtifactUpdatePulse(false), 2500);
+                    }
                   }
-                  
+
                   if (data.text) {
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
                     fullText += data.text;
-                    setStreamingMessage(isSurgicalCorrection ? cleanSurgicalStreamMessage(fullText) : fullText);
+                    if (sessionId === currentSessionIdRef.current) {
+                      setStreamingMessage(isSurgicalCorrection ? cleanSurgicalStreamMessage(fullText) : fullText);
+                    }
                     // Não ativa o painel de streaming se for uma edição cirúrgica de artefato existente
                     if (!isArtifactActive && isArtifactContent(fullText) && !isSurgicalCorrection) {
                       isArtifactActive = true;
-                      setStreamingAsArtifact(true);
-                      setActiveArtifactId('streaming');
+                      if (sessionId === currentSessionIdRef.current) {
+                        setStreamingAsArtifact(true);
+                        setActiveArtifactId('streaming');
+                      }
                     }
                   } else if (!data.artifactUpdate) {
                     console.log("[SSE UNKNOWN] Recebido objeto JSON sem text/status:", data);
@@ -2522,7 +2532,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
       console.log(`[GENERATION COMPLETED] Texto final gerado com sucesso! Comprimento total: ${fullText.length} caracteres.`);
 
-      setStreamingMessage('');
+      if (sessionId === currentSessionIdRef.current) setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
 
       // Fallback local: se for cirúrgico e o backend não enviou artifactUpdate, tenta aplicar patches localmente
@@ -2531,9 +2541,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         const localRes = applyLocalArtifactPatches(activeDocText, fullText);
         if (localRes.appliedCount > 0) {
           finalArtifactUpdate = localRes.updatedText;
-          setEditableArtifactText(finalArtifactUpdate);
-          setArtifactUpdatePulse(true);
-          setTimeout(() => setArtifactUpdatePulse(false), 2500);
+          if (sessionId === currentSessionIdRef.current) {
+            setEditableArtifactText(finalArtifactUpdate);
+            setArtifactUpdatePulse(true);
+            setTimeout(() => setArtifactUpdatePulse(false), 2500);
+          }
         }
       }
 
@@ -2677,7 +2689,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           });
         }
       } else {
-        if ((isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) && !isSurgicalCorrection) {
+        if ((isArtifactActive || activeArtifactId === 'streaming' || isArtifactContent(fullText)) && !isSurgicalCorrection && sessionId === currentSessionIdRef.current) {
           setStreamingAsArtifact(false);
           setActiveArtifactId(assistantMsg.id);
         }
@@ -2932,9 +2944,14 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                 if (ocrRes.ok) {
                   const ocrData = await ocrRes.json();
                   fullTextContent = ocrData.text || '';
+                } else {
+                  throw new Error("Não foi possível processar a imagem do GED no servidor.");
                 }
               } catch (e: any) {
                 console.error("Erro na leitura de imagem GED:", e);
+                // Sem isso, o documento entrava na sessão com fullText vazio e nenhum aviso — a
+                // IA simplesmente não recebia nada da imagem, sem o advogado saber que falhou.
+                fullTextContent = `[IMAGEM / PRINT] ${filename}: falha ao processar esta imagem do GED — o conteúdo NÃO foi lido pela IA.`;
               }
             } else if (isPDF) {
               setProgressText(`Analisando estrutura do PDF do GED ${filename}...`);
@@ -3323,7 +3340,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     if (!currentSession) return;
     setIsGeneratingMarketing(true);
     try {
-      const activePersonaKey = (persona.aiName === 'luana' || persona.displayName?.toLowerCase().includes('luana')) ? 'luana' : 'michel';
+      const activePersonaKey = persona.aiName;
       const response = await apiFetch('/api/marketing/from-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4129,7 +4146,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                                   onClick={() => onOpenMarketing && onOpenMarketing({ 
                                     postData: marketingPostData, 
                                     topic: marketingPostData.title || currentSession?.title || 'Tema Jurídico',
-                                    persona: (persona.aiName === 'luana' || persona.displayName?.toLowerCase().includes('luana')) ? 'luana' : 'michel',
+                                    persona: persona.aiName,
                                     strategy: 'educacional'
                                   })}
                                   className="px-3.5 py-2 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95"

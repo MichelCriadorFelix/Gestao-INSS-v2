@@ -5366,9 +5366,15 @@ app.post("/api/marketing/from-chat", async (req, res) => {
     const chatSnippet = recentMessages.map((m: any) => `${m.role === 'user' ? 'Advogado/Usuário' : 'Especialista IA'}: ${m.content}`).join("\n\n");
     const fullSourceText = specificContent ? `TRECHO ESPECÍFICO SELECIONADO:\n${specificContent}\n\nCONTEXTO GERAL DA CONVERSA:\n${chatSnippet}` : chatSnippet;
 
-    const personaDesc = persona === 'michel' 
-      ? 'Dr. Michel Felix: Direto, estratégico, de alta autoridade e conexão com os segurados.'
-      : 'Dra. Luana Castro: Acolhedora, empática, didática e de fácil entendimento.';
+    // Antes só distinguia michel/luana (binário) — persona vinda do frontend com 'felix_castro'
+    // ou 'fabricia' caía sempre no fallback da Luana, saindo com a voz errada.
+    const PERSONA_MARKETING_VOICES: Record<string, string> = {
+      michel: 'Dr. Michel Felix: Direto, estratégico, de alta autoridade e conexão com os segurados.',
+      luana: 'Dra. Luana Castro: Acolhedora, empática, didática e de fácil entendimento.',
+      felix_castro: 'Dr. Felix e Castro: Técnico e direto em Direito do Consumidor e Civil, com autoridade acessível ao leigo.',
+      fabricia: 'Secretária Fabrícia Felix: Tom prático e acolhedor de atendimento/triagem do escritório.'
+    };
+    const personaDesc = PERSONA_MARKETING_VOICES[persona] || PERSONA_MARKETING_VOICES.michel;
 
     const prompt = `Você é o estrategista chefe de marketing jurídico do escritório Felix & Castro Advocacia.
 ${CURRENT_SYSTEM_YEAR_KNOWLEDGE}

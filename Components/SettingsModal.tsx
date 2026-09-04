@@ -58,32 +58,34 @@ const SettingsModal = ({ isOpen, onClose, onSave, onRestoreBackup }: { isOpen: b
         setTestStatus({ loading: true, message: 'Otimizando banco de dados...' });
         try {
             const { supabaseService } = await import('../services/supabaseService');
-            const michelSessions = await supabaseService.getAIConversations('michel');
-            const luanaSessions = await supabaseService.getAIConversations('luana');
-            
-            const allSessions = [...michelSessions, ...luanaSessions];
+            // Antes só varria 'michel' e 'luana' — as conversas de 'felix_castro' e 'fabricia'
+            // nunca eram otimizadas, acumulando o mesmo tipo de payload pesado sem alívio.
+            const personaNames = ['michel', 'luana', 'felix_castro', 'fabricia'] as const;
             let count = 0;
 
-            for (const session of allSessions) {
-                const hasFullText = session.documents?.some((d: any) => d.fullText);
-                const hasLongMessages = session.messages?.some((m: any) => m.content.length > 50000);
+            for (const aiName of personaNames) {
+                const sessions = await supabaseService.getAIConversations(aiName);
+                for (const session of sessions) {
+                    const hasFullText = session.documents?.some((d: any) => d.fullText);
+                    const hasLongMessages = session.messages?.some((m: any) => m.content.length > 50000);
 
-                if (hasFullText || hasLongMessages) {
-                    const sanitized = {
-                        ...session,
-                        documents: session.documents?.map((d: any) => ({ ...d, fullText: undefined })),
-                        messages: session.messages?.map((m: any) => {
-                            if (m.content.length > 50000) {
-                                return { ...m, content: m.content.substring(0, 50000) + '... [Truncado]' };
-                            }
-                            return m;
-                        })
-                    };
-                    await supabaseService.saveAIConversation({
-                        ...sanitized,
-                        ai_name: session.ai_name || (michelSessions.includes(session) ? 'michel' : 'luana')
-                    });
-                    count++;
+                    if (hasFullText || hasLongMessages) {
+                        const sanitized = {
+                            ...session,
+                            documents: session.documents?.map((d: any) => ({ ...d, fullText: undefined })),
+                            messages: session.messages?.map((m: any) => {
+                                if (m.content.length > 50000) {
+                                    return { ...m, content: m.content.substring(0, 50000) + '... [Truncado]' };
+                                }
+                                return m;
+                            })
+                        };
+                        await supabaseService.saveAIConversation({
+                            ...sanitized,
+                            ai_name: session.ai_name || aiName
+                        });
+                        count++;
+                    }
                 }
             }
 

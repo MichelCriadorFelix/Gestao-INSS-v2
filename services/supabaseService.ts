@@ -1025,27 +1025,11 @@ export const supabaseService = {
     return data;
   },
 
-  async searchLegalDocuments(embedding: number[], matchThreshold = 0.25, matchCount = 5): Promise<Array<{id: number, content: string, metadata: any, similarity: number, is_single_chunk: boolean | null}>> {
-    const supabase = await getLegalClient();
-    if (!supabase) return [];
-    
-    const { data, error } = await supabase
-      .rpc('match_legal_documents_smart', {
-        query_embedding: embedding,
-        match_threshold: matchThreshold,
-        match_count: matchCount
-      });
-      
-    if (error) {
-      if (error.message?.includes('timeout')) {
-        console.warn('Supabase RAG search timeout - possibly missing index or too many records. Continuing without extra context.');
-      } else {
-        console.error('Error searching legal documents in Supabase:', error);
-      }
-      return [];
-    }
-    return data || [];
-  },
+  // searchLegalDocuments (busca vetorial SEM filtro de área) foi removida: não tinha nenhuma
+  // chamada em todo o repositório — superada por searchLegalDocumentsByArea abaixo, que é a
+  // única realmente usada. Deixá-la reaparecer sem o filtro por área reabriria o bug de
+  // "jurisprudência de área errada entrando no contexto" que os comentários abaixo descrevem
+  // terem corrigido.
 
   async searchLegalDocumentsByArea(
     embedding: number[],
