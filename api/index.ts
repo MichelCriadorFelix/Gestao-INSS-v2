@@ -2815,6 +2815,19 @@ ATENÇÃO: Esses valores são REFERÊNCIA. O advogado define o valor no relatór
 // veja o estado atualizado.
 const MAX_RETRIES = 34; // Limite equilibrado para rotação rápida sem prender a conexão por minutos desnecessários
 
+// Desliga o bloqueio de segurança padrão do Gemini para conteúdo jurídico sensível (laudos de
+// incapacidade, relatos de violência/assédio em CDC, descrições de acidentes/lesões corporais)
+// — sem isso o Gemini pode retornar finishReason 'SAFETY' e cortar a peça no meio, sem
+// continuação automática (só MAX_TOKENS aciona o loop de continuação). Antes só a Dra. Luana
+// tinha isso configurado; Dr. Michel, Dr. Felix Castro e Sec. Fabrícia ficavam sem essa proteção,
+// causa provável de "resposta cortada no meio" nessas 3 personas.
+const DEFAULT_SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+];
+
 // Teto de falha rápida especificamente para 503 (servidor Google sobrecarregado) quando o
 // modelo já está no "piso" da hierarquia (gemini-3.5-flash, sem mais nível pra rebaixar).
 // Diferente de 429/cota (onde CADA CHAVE tem seu próprio limite e rotacionar genuinamente
@@ -3951,7 +3964,7 @@ async function callOpenRouterStream(params: any, res: any, shouldEndStream = tru
   } catch (error: any) {
     console.error("OpenRouter backend execution error:", error);
     (() => {
-    let _errStr = error.message || "Erro na geração do OpenRouter" ;
+    let _errStr = error?.message || "Erro na geração do OpenRouter" ;
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -5509,34 +5522,11 @@ app.get("/api/bcdata/minimum-wage/current", async (req, res) => {
 // AI MEMORY RULES (Memória Contínua)
 // ====================================================================
 
-async function getActiveMemoryRulesPrompt(personaId: string): Promise<string> {
-  try {
-    const { data: rules } = await supabaseAdmin
-      .from('ai_memory_rules')
-      .select('persona, rule_text')
-      .eq('active', true);
-
-    if (!rules || rules.length === 0) return "";
-
-    const relevantRules = rules.filter((r: any) => r.persona === 'global' || r.persona === personaId);
-    if (relevantRules.length === 0) return "";
-
-    const formatted = relevantRules.map((r: any, idx: number) => {
-      const scope = r.persona === 'global' ? '[DIRETRIZ GLOBAL DO ESCRITÓRIO]' : `[DIRETRIZ ESPECÍFICA - ${personaId.toUpperCase()}]`;
-      return `${idx + 1}. ${scope}: ${r.rule_text}`;
-    }).join('\n');
-
-    return `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MEMÓRIA CONTÍNUA FIXADA PELO ADVOGADO (DIRETRIZES OBRIGATÓRIAS)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-As seguintes regras e preferências foram registradas pelo advogado no banco de dados para serem seguidas em TODAS as gerações e análises:
-${formatted}
-⚠️ CUMPRA RIGOROSAMENTE CADA UMA DAS DIRETRIZES ACIMA.\n`;
-  } catch (e) {
-    console.warn("Aviso ao carregar regras de memória da IA:", e);
-    return "";
-  }
-}
+// getActiveMemoryRulesPrompt foi removida: era uma segunda função fazendo a mesma coisa que
+// injectAiMemoryRules (linha ~126), com uma convenção de personaId incompatível ('michel' vs
+// 'dr-michel' etc.) — nunca achava as regras salvas pela própria persona, só as 'global'.
+// injectAiMemoryRules (chamada no fim do prompt de cada persona, para prioridade máxima) é agora
+// a única fonte, com IDs unificados ('michel', 'luana', 'felix', 'fabricia').
 
 app.get("/api/ai-memory-rules", async (req, res) => {
   try {
@@ -5756,28 +5746,6 @@ app.delete("/api/ai-memory-rules/:id", async (req, res) => {
 });
 
 // Auto-seeding removido para permitir que o usuário gerencie e exclua regras livremente sem recriação automática pelo servidor.
-
-// Evita reenviar documentos gigantes em todas as mensagens do chat.
-// Vincula o cache de contexto ao modelo selecionado e rotaciona chaves.
-// ====================================================================
-interface SessionCacheInfo {
-  cacheName: string;
-  keyIndex: number;
-  expiresAt: number;
-  textLength: number;
-  model: string;
-}
-
-const documentCaches = new Map<string, SessionCacheInfo>();
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
 
 async function getOrBuildContextCache(
   sessionId: string | undefined,
@@ -6012,11 +5980,10 @@ Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marke
 [GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
 Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
-    // Injeção de Regras da Memória Contínua (Dr. Michel + Globais)
-    const memoryRulesMichel = await getActiveMemoryRulesPrompt('michel');
-    if (memoryRulesMichel) {
-      selectedSystemPrompt += memoryRulesMichel;
-    }
+    // Injeção de Regras da Memória Contínua: removida daqui — era uma chamada redundante com
+    // ID incompatível ('michel' vs 'dr-michel' usado por injectAiMemoryRules mais abaixo), então
+    // nunca achava as regras salvas por essa mesma persona. injectAiMemoryRules já faz essa
+    // injeção corretamente no fim do prompt (prioridade máxima) com o ID unificado ('michel').
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
     // Calcula orçamento de input por provedor (Gemini: 100k | OpenRouter: 120k tokens)
@@ -6345,7 +6312,7 @@ ${message}`;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
-      selectedSystemPrompt = await injectAiMemoryRules('dr-michel', selectedSystemPrompt);
+      selectedSystemPrompt = await injectAiMemoryRules('michel', selectedSystemPrompt);
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
@@ -6384,7 +6351,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               const anchor = fullResponseText.slice(-600);
               orMessages.push({
                 role: 'user',
-                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO \${attempt}]\nA API foi cortada por limite de tokens (teto de \${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "\${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
               });
             } else {
               orMessages.push({ role: "user", content: finalMessage });
@@ -6416,8 +6383,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
+              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || "gemini-3.5-flash",
               contents: streamContents,
@@ -6680,7 +6647,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
                                     message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
-    if (isExplicitSurgicalLuana && draftContent) {
+    if (isExplicitSurgicalLuana && draftContent && revisionIntent !== 'FULL_REGENERATION') {
       revisionIntent = 'POINT_CORRECTION';
     }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
@@ -6851,11 +6818,10 @@ Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marke
 [GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
 Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
-    // Injeção de Regras da Memória Contínua (Dra. Luana + Globais)
-    const memoryRulesLuana = await getActiveMemoryRulesPrompt('luana');
-    if (memoryRulesLuana) {
-      selectedSystemPrompt += memoryRulesLuana;
-    }
+    // Injeção de Regras da Memória Contínua: removida daqui — chamada redundante com ID
+    // incompatível ('luana' vs 'dra-luana' usado por injectAiMemoryRules mais abaixo), nunca
+    // achava as regras salvas por essa mesma persona. injectAiMemoryRules já injeta corretamente
+    // no fim do prompt (prioridade máxima) com o ID unificado ('luana').
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
     // Calcula orçamento de input por provedor (Gemini: 100k | OpenRouter: 120k tokens)
@@ -7196,7 +7162,7 @@ ${message}`;
       const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
-      selectedSystemPrompt = await injectAiMemoryRules('dra-luana', selectedSystemPrompt);
+      selectedSystemPrompt = await injectAiMemoryRules('luana', selectedSystemPrompt);
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
@@ -7273,15 +7239,9 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               : (keyIndex !== undefined 
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
-            const luanaSafety = [
-                  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                ];
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: luanaSafety, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: luanaSafety };
+              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || "gemini-3.5-flash",
               contents: streamContents,
@@ -7301,8 +7261,6 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                 const candidate = chunk.candidates[0];
                 if (candidate.finishReason === 'MAX_TOKENS') {
                   maxTokensHit = true;
-                } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
-                  text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
                 } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
                   text = `\n\n[Aviso: Geração interrompida. Motivo: ${candidate.finishReason}]`;
                 }
@@ -7483,7 +7441,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
     clearInterval(heartbeat);
     console.error("Error in chat (Dra. Luana):", error);
     (() => {
-    let _errStr = error.message || "Falha no chat" ;
+    let _errStr = error?.message || "Falha no chat" ;
     if (typeof _errStr === "string" && (_errStr.includes("429") || _errStr.includes("Quota") || _errStr.includes("RESOURCE_EXHAUSTED"))) {
       _errStr = "⚠️ As chaves de API atingiram o limite de uso por minuto. Aguarde ~60 segundos e tente novamente.";
     }
@@ -7552,13 +7510,13 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
                                     message.includes("[GERACAO MODULAR");
 
     let revisionIntent = detectRevisionIntent(message, !!draftContent);
-    if (isExplicitSurgicalFelix && draftContent) {
+    if (isExplicitSurgicalFelix && draftContent && revisionIntent !== 'FULL_REGENERATION') {
       revisionIntent = 'POINT_CORRECTION';
     }
     const isRevisionRequested = revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION' || revisionIntent === 'FULL_REGENERATION';
     const isSurgicalMode = (revisionIntent === 'POINT_CORRECTION' || revisionIntent === 'ADDITION') && !!draftContent;
 
-    const intent = await detectUserIntent(message);
+    const intent = (isExplicitSurgicalFelix || isRevisionRequested) ? "[GERAÇÃO]" : await detectUserIntent(message);
     const msgUpper = (message || "").toUpperCase();
     
     // Identificar relatórios e auditorias de forma consolidada e precoce
@@ -7673,11 +7631,10 @@ Se o usuário solicitar criar uma postagem para o Instagram, gerar post de marke
 [GERAR_POST_MARKETING: {"topic": "Tema conciso", "audienceTag": "NICHO EM CAIXA ALTA", "title": "Título de Impacto", "highlight": "Alerta Principal", "points": ["1) PONTO CHAVE: Explicação familiar", "2) PONTO CHAVE: Explicação familiar", "3) PONTO CHAVE: Explicação familiar"], "ctaCaption": "📌 Salve este post e compartilhe!", "caption": "Legenda completa do Instagram (1.300 a 1.700 caracteres, emojis e hashtags)", "imagePrompt": "Prompt em inglês", "strategy": "educacional"}]
 Use SEMPRE os valores vigentes de 2026 (Salário Mínimo R$ 1.621,00, regras de 2026).`;
 
-    // Injeção de Regras da Memória Contínua (Dr. Felix & Castro + Globais)
-    const memoryRulesFelix = await getActiveMemoryRulesPrompt('felix');
-    if (memoryRulesFelix) {
-      selectedSystemPrompt += memoryRulesFelix;
-    }
+    // Injeção de Regras da Memória Contínua: removida daqui — chamada redundante com ID
+    // incompatível ('felix' vs 'dr-felix-castro' usado por injectAiMemoryRules mais abaixo),
+    // nunca achava as regras salvas por essa mesma persona. injectAiMemoryRules já injeta
+    // corretamente no fim do prompt (prioridade máxima) com o ID unificado ('felix').
 
     // ====== COMPRESSÃO INTELIGENTE DE INPUT (Padrão Ouro) ======
     const inputBudget = getInputBudget(modelProvider, model);
@@ -7957,7 +7914,7 @@ ${message}`;
       const MAX_ATTEMPTS = 3;
 
       // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
-      selectedSystemPrompt = await injectAiMemoryRules('dr-felix-castro', selectedSystemPrompt);
+      selectedSystemPrompt = await injectAiMemoryRules('felix_castro', selectedSystemPrompt);
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
       console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
@@ -7994,7 +7951,7 @@ REGRAS ABSOLUTAS:
               const anchor = fullResponseText.slice(-600);
               orMessages.push({
                 role: 'user',
-                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO \${attempt}]\nA API foi cortada por limite de tokens (teto de \${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "\${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
+                content: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt}]\nA API foi cortada por limite de tokens (teto de ${maxOutputTokens} de saída). Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.`
               });
             } else {
               orMessages.push({ role: "user", content: finalMessage });
@@ -8026,8 +7983,8 @@ REGRAS ABSOLUTAS:
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
+              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || "gemini-3.5-flash",
               contents: streamContents,
@@ -8188,7 +8145,7 @@ REGRAS ABSOLUTAS:
         if (memoryCommandMatch && memoryCommandMatch[1]) {
            const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
            await supabaseAdmin.from('ai_memory_rules').insert({
-               persona: 'felix',
+               persona: 'felix_castro',
                rule_text: ruleToSave,
                active: true
            });
@@ -8203,7 +8160,7 @@ REGRAS ABSOLUTAS:
     } catch (err: any) {
       clearInterval(heartbeat);
       (() => {
-    let _errStr = err.message ;
+    let _errStr = err?.message ;
     if (_errStr === 'CACHE_INVALID') {
       try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
       _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
@@ -8218,7 +8175,7 @@ REGRAS ABSOLUTAS:
   } catch (err: any) {
     clearInterval(heartbeat);
     (() => {
-    let _errStr = err.message ;
+    let _errStr = err?.message ;
     if (_errStr === 'CACHE_INVALID') {
       try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
       _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
@@ -8664,36 +8621,34 @@ files.forEach((file: any) => currentMessageParts.push({ fileData: { mimeType: fi
     const finalTemperature = isReportRequest ? 0.25 : intent === "[DÚVIDA]" ? 0.1 : temperature;
 
     if (modelProvider === 'openrouter') {
-clearInterval(heartbeat);
-const orSystemPrompt = selectedSystemPrompt + `
+      // FIX: era um trecho colado do prompt do Dr. Michel sem adaptar — falava em "gerar peça
+      // jurídica" para a Fabrícia, que por design NUNCA gera petições (ver comentário
+      // "FIX RESIDUAL #3" mais acima). Também usava max_tokens:2000 fixo (ignorando o
+      // maxOutputTokens já calculado pra essa requisição) e limpava o heartbeat ANTES de esperar
+      // a resposta do OpenRouter (não é streaming de verdade — stream:false — a chamada pode
+      // levar dezenas de segundos com reasoning_effort alto), deixando a conexão SSE sem nenhum
+      // pacote por todo esse tempo — risco real de parecer travada.
+      const orSystemPrompt = selectedSystemPrompt + `
 
 [INSTRUÇÃO CRÍTICA PARA MODELOS OPENROUTER]
-Você está gerando uma peça jurídica para o escritório Felix & Castro Advocacia Previdenciária.
-REGRAS ABSOLUTAS E INEGOCIÁVEIS:
-1. SIGA RIGOROSAMENTE A ESTRUTURA OBRIGATÓRIA do tipo de ação identificado — não pule nenhum tópico, não invente tópicos que não estão na estrutura.
-2. PARA APOSENTADORIA POR IDADE: É PROIBIDO incluir o tópico "DA OBSERVÂNCIA À LEI 14.331/2022" — este tópico é exclusivo de Benefícios por Incapacidade (Auxílio-Doença/Aposentadoria por Invalidez).
-3. CITAÇÕES COM RECUO: Toda súmula, artigo de lei ou ementa deve ser transcrita em blockquote (>) — NUNCA dentro de aspas no meio do parágrafo.
-4. SÚMULAS NOS PEDIDOS: É TERMINANTEMENTE PROIBIDO transcrever ou citar súmulas dentro da seção de Pedidos. Súmulas vão na seção DO DIREITO, com blockquote.
-5. DENSIDADE: A petição deve herdar entre 4000 e 6000 palavras. Não resuma. Não corte argumentos.
-6. VALOR DA CAUSA: Nunca invente. Se não houver dados salariais, calcule com salário mínimo vigente (R$ 1.621,00 em 2026): parcelas vencidas (meses DER→ajuizamento × R$ 1.621,00) + 12 vincendas (R$ 19.452,00). Escreva o valor calculado com nota de que é estimado. NUNCA use placeholder.
-7. TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
+Você é a Sec. Fabrícia, secretária/atendente do escritório Felix & Castro Advocacia Previdenciária. Você NUNCA gera petições ou peças jurídicas — isso é papel do Dr. Michel/Dra. Luana/Dr. Felix Castro. Responda dúvidas de atendimento, gere mensagens de WhatsApp e relatórios de triagem conforme o restante das suas instruções de sistema.
+TAGS PROIBIDAS: Jamais inclua "(RAG)", "[RAG]", "Base de Conhecimento" ou qualquer tag de sistema no texto final.`;
 
-const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
-orMessages.push({ role: "user", content: finalMessage });
-await callOpenRouterStream({
-  model: model || "deepseek/deepseek-chat",
-  messages: orMessages,
-  temperature: finalTemperature,
-  max_tokens: 2000,
-  provider: {
-    data_collection: false,
-    require_reasoning: true
-  }
-}, res);
-return;
+      const orMessages: any[] = [{ role: 'system', content: orSystemPrompt }, ...buildOrHistory(history)];
+      orMessages.push({ role: "user", content: finalMessage });
+      await callOpenRouterStream({
+        model: model || "deepseek/deepseek-chat",
+        messages: orMessages,
+        temperature: finalTemperature,
+        max_tokens: maxOutputTokens || 4096,
+        provider: {
+          data_collection: false,
+          require_reasoning: true
+        }
+      }, res);
+      clearInterval(heartbeat);
+      return;
     }
-
-    isReportRequest = (message || "").includes("GERAR RELATÓRIO") || (message || "").includes("GERAR RELATORIO");
 
     // Temperature calibrada por intenção:
     // - Relatório: 0.25 (narrativa fluida + precisão jurídica)
@@ -8710,7 +8665,7 @@ const wordTarget = isGenerationRequest ? parsePetitionTarget(petitionLength) : n
 const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Ensure AI memory rules are injected at the very end of the system prompt to prevent overwriting and maximize priority
-      selectedSystemPrompt = await injectAiMemoryRules('sec-fabricia', selectedSystemPrompt);
+      selectedSystemPrompt = await injectAiMemoryRules('fabricia', selectedSystemPrompt);
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
@@ -8728,8 +8683,8 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
     : currentContents;
   const streamConfig: any = activeDocCache
-    ? { temperature: finalTemperature, maxOutputTokens, cachedContent: activeDocCache }
-    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools };
+    ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
   const pinnedKey = activeDocCache
     ? (parseInt(String(cacheKeyIndex)))
     : (keyIndex !== undefined 
@@ -8872,7 +8827,7 @@ res.end();
     } catch (err: any) {
 clearInterval(heartbeat);
 (() => {
-    let _errStr = err.message ;
+    let _errStr = err?.message ;
     if (_errStr === 'CACHE_INVALID') {
       try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
       _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
@@ -8887,7 +8842,7 @@ res.end();
   } catch (err: any) {
     clearInterval(heartbeat);
     (() => {
-    let _errStr = err.message ;
+    let _errStr = err?.message ;
     if (_errStr === 'CACHE_INVALID') {
       try { res.write(`data: ${JSON.stringify({ cacheInvalid: true })}\n\n`); } catch {}
       _errStr = "💾 O cache do documento ficou inválido durante a geração. Reenvie a mensagem — o sistema usará o documento completo automaticamente.";
