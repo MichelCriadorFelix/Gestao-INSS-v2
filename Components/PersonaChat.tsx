@@ -1022,6 +1022,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   // Suporte a colar Print / Imagem da Área de Transferência (Ctrl+V) com Desduplicação e Debounce
   const lastPasteTimeRef = useRef<number>(0);
   const lastPastedSizeRef = useRef<number>(0);
+  const lastRealStatusAtRef = useRef<number>(0);
 
   const processPastedImages = (
     clipboardData: DataTransfer | null, 
@@ -1542,6 +1543,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     let interval: NodeJS.Timeout;
     if (isLoading && !isUploading) {
       setProgress(0);
+      lastRealStatusAtRef.current = 0;
       const startTime = Date.now();
       interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
@@ -1571,7 +1573,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
         }
 
         setProgress(Math.min(Math.round(newProgress), 99));
-        setProgressText(newText);
+        // Não sobrescreve o texto se um status REAL chegou do backend (rotação
+        // de chave, tentativa, servidor sobrecarregado, etc.) nos últimos 4s —
+        // senão este timer, que roda a cada 1s, apaga a mensagem real quase
+        // instantaneamente e o usuário nunca vê o que está de fato acontecendo,
+        // parecendo travado mesmo quando o backend está ativamente tentando
+        // várias chaves.
+        if (Date.now() - lastRealStatusAtRef.current > 4000) {
+          setProgressText(newText);
+        }
       }, 1000);
     } else if (!isLoading) {
       setProgress(100);
@@ -2454,6 +2464,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
                   if (data.status) {
                     console.log(`[SSE STATUS] ${data.status}`);
+                    lastRealStatusAtRef.current = Date.now();
                     setProgressText(data.status);
                     continue;
                   }
