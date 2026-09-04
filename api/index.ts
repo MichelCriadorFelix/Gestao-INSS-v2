@@ -2896,7 +2896,12 @@ async function syncKeyStateFromShared(keys: string[]): Promise<void> {
         // Sempre confia no maior valor conhecido (local ou remoto) — nunca
         // "esquece" uma exaustão que outra instância descobriu.
         exhaustedUntil: Math.max(local?.exhaustedUntil || 0, remoteExhaustedUntil),
-        dailyExhausted: (local?.dailyExhausted || false) || remoteDaily,
+        // NÃO faz OR com o valor local aqui: remoteDaily já é comparado
+        // contra a data de HOJE (linha acima). Se ficasse em OR com o local,
+        // uma chave marcada como esgotada ontem continuaria "true" para
+        // sempre nesta instância (o cache local nunca reseta sozinho quando
+        // a data muda), mesmo o Supabase já dizendo que hoje ela está livre.
+        dailyExhausted: remoteDaily,
         windowStart: remoteWindowStart,
         windowCount: row.window_count || 0,
         windowTokens: row.window_tokens || 0

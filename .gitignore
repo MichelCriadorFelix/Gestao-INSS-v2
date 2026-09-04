@@ -34,3 +34,5 @@ dist-ssr
 *.backup
 *.bak
 *.backup_restored
+.vercel
+.env*
