@@ -145,6 +145,36 @@ const injectAiMemoryRules = async (personaId: string, currentPrompt: string): Pr
   return currentPrompt;
 };
 
+// Extrai e salva TODOS os comandos [COMANDO_SALVAR_MEMORIA: "..."] emitidos numa resposta —
+// antes cada persona fazia isso individualmente com fullResponseText.match(...) SEM a flag /g,
+// que só captura a PRIMEIRA ocorrência. Se o modelo emitisse duas diretrizes na mesma resposta
+// (comportamento legítimo, o próprio prompt não proíbe), a segunda era silenciosamente
+// descartada. Com matchAll captura todas. Também adiciona a verificação de duplicata que só
+// existia no endpoint manual /api/ai-memory-rules — sem isso, pedir a IA pra "reafirmar" uma
+// regra já salva criava uma linha duplicada a cada resposta, piorando o crescimento do banco.
+async function saveMemoryCommandsFromResponse(fullResponseText: string, persona: string): Promise<void> {
+  try {
+    const matches = [...fullResponseText.matchAll(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/g)];
+    for (const m of matches) {
+      const ruleToSave = (m[1] || '').replace(/["']/g, "").trim();
+      if (!ruleToSave) continue;
+
+      const { data: existing } = await supabaseAdmin
+        .from('ai_memory_rules')
+        .select('id')
+        .eq('persona', persona)
+        .ilike('rule_text', ruleToSave)
+        .maybeSingle();
+      if (existing) continue;
+
+      await supabaseAdmin.from('ai_memory_rules').insert({ persona, rule_text: ruleToSave, active: true });
+      console.log(`[Memória Contínua] Diretriz salva para ${persona}: ${ruleToSave}`);
+    }
+  } catch (e) {
+    console.error(`Erro ao salvar diretriz(es) de memória (${persona}):`, e);
+  }
+}
+
 // Apply authentication to all /api routes except health, config and official public economic data (BCB/IBGE)
 app.use("/api", (req, res, next) => {
   if (
@@ -6567,21 +6597,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
-      // Extracão de Memória Contínua (Silenciosa)
-      try {
-        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
-        if (memoryCommandMatch && memoryCommandMatch[1]) {
-           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
-           await supabaseAdmin.from('ai_memory_rules').insert({
-               persona: 'michel',
-               rule_text: ruleToSave,
-               active: true
-           });
-           console.log(`[Dr.Michel] Diretriz salva na memória contínua: ${ruleToSave}`);
-        }
-      } catch (e) {
-        console.error("Erro ao salvar diretriz de memória (DrMichel):", e);
-      }
+      // Extracão de Memória Contínua (Silenciosa) — ver saveMemoryCommandsFromResponse
+      await saveMemoryCommandsFromResponse(fullResponseText, 'michel');
 
       res.write(`data: [DONE]\n\n`);
       res.end();
@@ -7421,21 +7438,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
         }
       }
 
-      // Extracão de Memória Contínua (Silenciosa)
-      try {
-        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
-        if (memoryCommandMatch && memoryCommandMatch[1]) {
-           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
-           await supabaseAdmin.from('ai_memory_rules').insert({
-               persona: 'luana',
-               rule_text: ruleToSave,
-               active: true
-           });
-           console.log(`[Dra.Luana] Diretriz salva na memória contínua: ${ruleToSave}`);
-        }
-      } catch (e) {
-        console.error("Erro ao salvar diretriz de memória (DraLuana):", e);
-      }
+      // Extracão de Memória Contínua (Silenciosa) — ver saveMemoryCommandsFromResponse
+      await saveMemoryCommandsFromResponse(fullResponseText, 'luana');
 
       res.write(`data: [DONE]\n\n`);
       res.end();
@@ -8161,21 +8165,8 @@ REGRAS ABSOLUTAS:
         }
       }
 
-      // Extracão de Memória Contínua (Silenciosa)
-      try {
-        const memoryCommandMatch = fullResponseText.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
-        if (memoryCommandMatch && memoryCommandMatch[1]) {
-           const ruleToSave = memoryCommandMatch[1].replace(/["']/g, "").trim();
-           await supabaseAdmin.from('ai_memory_rules').insert({
-               persona: 'felix_castro',
-               rule_text: ruleToSave,
-               active: true
-           });
-           console.log(`[Dr.FelixCastro] Diretriz salva na memória contínua: ${ruleToSave}`);
-        }
-      } catch (e) {
-        console.error("Erro ao salvar diretriz de memória (DrFelixCastro):", e);
-      }
+      // Extracão de Memória Contínua (Silenciosa) — ver saveMemoryCommandsFromResponse
+      await saveMemoryCommandsFromResponse(fullResponseText, 'felix_castro');
 
       res.write(`data: [DONE]\n\n`);
       res.end();

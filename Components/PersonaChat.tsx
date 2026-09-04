@@ -3961,23 +3961,29 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                 {currentSession.messages.map(msg => {
                   let cleanedContent = msg.content || '';
                   
-                  let memorySuggestionText = '';
+                  // ANTES: usava .match() sem a flag /g, que só captura a PRIMEIRA ocorrência —
+                  // se a IA emitisse duas sugestões/comandos na mesma resposta, a segunda tag
+                  // ficava sem ser removida do texto e aparecia crua ("[SUGESTAO_MEMORIA: ...]")
+                  // na bolha do chat, além de nunca virar um card clicável. matchAll captura todas.
+                  let memorySuggestionTexts: string[] = [];
                   const hasSuggestion = cleanedContent.includes('[SUGESTAO_MEMORIA:');
                   if (hasSuggestion) {
-                    const match = cleanedContent.match(/\[SUGESTAO_MEMORIA:\s*(.*?)\]/);
-                    if (match && match[1]) {
-                      memorySuggestionText = match[1].replace(/["']/g, "");
-                      cleanedContent = cleanedContent.replace(match[0], '').trim();
+                    for (const match of cleanedContent.matchAll(/\[SUGESTAO_MEMORIA:\s*(.*?)\]/g)) {
+                      if (match[1]) {
+                        memorySuggestionTexts.push(match[1].replace(/["']/g, ""));
+                        cleanedContent = cleanedContent.replace(match[0], '').trim();
+                      }
                     }
                   }
 
-                  let memoryCommandText = '';
+                  let memoryCommandTexts: string[] = [];
                   const hasCommand = cleanedContent.includes('[COMANDO_SALVAR_MEMORIA:');
                   if (hasCommand) {
-                    const match = cleanedContent.match(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/);
-                    if (match && match[1]) {
-                      memoryCommandText = match[1].replace(/["']/g, "");
-                      cleanedContent = cleanedContent.replace(match[0], '').trim();
+                    for (const match of cleanedContent.matchAll(/\[COMANDO_SALVAR_MEMORIA:\s*(.*?)\]/g)) {
+                      if (match[1]) {
+                        memoryCommandTexts.push(match[1].replace(/["']/g, ""));
+                        cleanedContent = cleanedContent.replace(match[0], '').trim();
+                      }
                     }
                   }
 
@@ -4202,51 +4208,49 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                             </div>
                           )}
 
-                          {/* UI SUGERIR MEMÓRIA */}
-                          {(() => {
-                            const isSuggestionSaved = savedSuggestionIds.has(msg.id) || (memorySuggestionText ? savedRuleTexts.has(memorySuggestionText.trim().toLowerCase()) : false);
-                            if (memorySuggestionText && !isSuggestionSaved) {
+                          {/* UI SUGERIR MEMÓRIA — uma por sugestão, não só a primeira da resposta */}
+                          {memorySuggestionTexts.map((suggestionText, suggIdx) => {
+                            const suggestionKey = `${msg.id}::${suggIdx}`;
+                            const isSuggestionSaved = savedSuggestionIds.has(suggestionKey) || savedRuleTexts.has(suggestionText.trim().toLowerCase());
+                            if (!isSuggestionSaved) {
                               return (
-                                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
+                                <div key={suggestionKey} className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center dark:bg-indigo-900/20 dark:border-indigo-800/50">
                                   <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full shrink-0">
                                     <Lightbulb className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                                   </div>
                                   <div className="flex-1">
                                     <p className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-1">💡 Sugestão de Aprendizado</p>
-                                    <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{memorySuggestionText}</p>
+                                    <p className="text-sm text-indigo-800 dark:text-indigo-200/90 leading-relaxed">{suggestionText}</p>
                                   </div>
                                   <button
-                                    onClick={() => handleSaveSuggestedMemoryRule(msg.id, memorySuggestionText)}
-                                    disabled={savingSuggestionId === msg.id}
+                                    onClick={() => handleSaveSuggestedMemoryRule(suggestionKey, suggestionText)}
+                                    disabled={savingSuggestionId === suggestionKey}
                                     className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                                   >
-                                    {savingSuggestionId === msg.id ? 'Salvando...' : '✨ Salvar Regra'}
+                                    {savingSuggestionId === suggestionKey ? 'Salvando...' : '✨ Salvar Regra'}
                                   </button>
                                 </div>
                               );
                             }
-                            if (memorySuggestionText && isSuggestionSaved) {
-                              return (
-                                <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
-                                   <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                                   <div className="text-sm text-emerald-800 dark:text-emerald-200">
-                                     <span className="font-bold">Diretriz gravada com sucesso:</span> {memorySuggestionText}
-                                   </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
+                            return (
+                              <div key={suggestionKey} className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
+                                 <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                                 <div className="text-sm text-emerald-800 dark:text-emerald-200">
+                                   <span className="font-bold">Diretriz gravada com sucesso:</span> {suggestionText}
+                                 </div>
+                              </div>
+                            );
+                          })}
 
-                          {/* UI COMANDO MEMÓRIA SUCESSO */}
-                          {memoryCommandText && (
-                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
+                          {/* UI COMANDO MEMÓRIA SUCESSO — uma por comando, não só o primeiro da resposta */}
+                          {memoryCommandTexts.map((commandText, cmdIdx) => (
+                            <div key={`${msg.id}::cmd::${cmdIdx}`} className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg shadow-sm flex items-start gap-2 dark:bg-emerald-900/20 dark:border-emerald-800/50">
                                <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                                <div className="text-sm text-emerald-800 dark:text-emerald-200">
-                                 <span className="font-bold">Diretriz gravada com sucesso:</span> {memoryCommandText}
+                                 <span className="font-bold">Diretriz gravada com sucesso:</span> {commandText}
                                </div>
                             </div>
-                          )}
+                          ))}
 
                         <div className="flex items-center gap-1.5 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
