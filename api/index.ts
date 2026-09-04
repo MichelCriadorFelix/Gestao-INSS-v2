@@ -6451,7 +6451,20 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           }
           console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dr. Michel:`, streamError.message);
           const keys = getApiKeys();
-          
+
+          // callGeminiStream já esgotou TODA a rotação interna de chaves (rápida via 503 ou
+          // completa via MAX_RETRIES) antes de chegar até aqui — reiniciar o ciclo do zero
+          // (como o bloco abaixo faz) só reseta o contador interno e faz o mesmo esgotamento
+          // se repetir mais 4 vezes (até totalStreamFailures>=5), multiplicando a espera em vez
+          // de respeitar a falha rápida. Aborta direto com uma mensagem clara.
+          if (attemptText.length <= 100 && /^(ALL_KEYS_EXHAUSTED|FALHA CRÍTICA APÓS)/.test(streamError.message || '')) {
+            console.error(`[STREAM FAIL] Rotação interna de chaves já esgotada para Dr. Michel — abortando sem reiniciar o ciclo.`);
+            const isOverloadMsg = /sobrecarregad|503/i.test(streamError.message || '');
+            res.write(`data: ${JSON.stringify({ error: "ERRO_COTA_LIMITE", text: isOverloadMsg ? "\n\n[Sistema: O Gemini está temporariamente sobrecarregado neste modelo (Google). Tente novamente em alguns minutos.]" : "\n\n[Sistema: Limite temporário de requisições excedido nas chaves de API. Aguarde alguns minutos e tente novamente.]" })}\n\n`);
+            isFinished = true;
+            break;
+          }
+
           if (attemptText.length > 100) {
             // Conseguimos extrair uma parte decente do texto, podemos tentar rotacionar chave e continuar
             res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
@@ -7309,6 +7322,16 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
           console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dra. Luana:`, streamError.message);
           const keys = getApiKeys();
 
+          // Ver comentário equivalente no endpoint do Dr. Michel: callGeminiStream já esgotou
+          // toda a rotação interna — reiniciar o ciclo do zero só multiplica a espera.
+          if (attemptText.length <= 100 && /^(ALL_KEYS_EXHAUSTED|FALHA CRÍTICA APÓS)/.test(streamError.message || '')) {
+            console.error(`[STREAM FAIL] Rotação interna de chaves já esgotada para Dra. Luana — abortando sem reiniciar o ciclo.`);
+            const isOverloadMsg = /sobrecarregad|503/i.test(streamError.message || '');
+            res.write(`data: ${JSON.stringify({ error: "ERRO_COTA_LIMITE", text: isOverloadMsg ? "\n\n[Sistema: O Gemini está temporariamente sobrecarregado neste modelo (Google). Tente novamente em alguns minutos.]" : "\n\n[Sistema: Limite temporário de requisições excedido nas chaves de API. Aguarde alguns minutos e tente novamente.]" })}\n\n`);
+            isFinished = true;
+            break;
+          }
+
           if (attemptText.length > 100) {
             res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
             if (keys.length > 0) {
@@ -8039,6 +8062,16 @@ REGRAS ABSOLUTAS:
           console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Dr. Felix Castro:`, streamError.message);
           const keys = getApiKeys();
 
+          // Ver comentário equivalente no endpoint do Dr. Michel: callGeminiStream já esgotou
+          // toda a rotação interna — reiniciar o ciclo do zero só multiplica a espera.
+          if (attemptText.length <= 100 && /^(ALL_KEYS_EXHAUSTED|FALHA CRÍTICA APÓS)/.test(streamError.message || '')) {
+            console.error(`[STREAM FAIL] Rotação interna de chaves já esgotada para Dr. Felix Castro — abortando sem reiniciar o ciclo.`);
+            const isOverloadMsg = /sobrecarregad|503/i.test(streamError.message || '');
+            res.write(`data: ${JSON.stringify({ error: "ERRO_COTA_LIMITE", text: isOverloadMsg ? "\n\n[Sistema: O Gemini está temporariamente sobrecarregado neste modelo (Google). Tente novamente em alguns minutos.]" : "\n\n[Sistema: Limite temporário de requisições excedido nas chaves de API. Aguarde alguns minutos e tente novamente.]" })}\n\n`);
+            isFinished = true;
+            break;
+          }
+
           if (attemptText.length > 100) {
             res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
             if (keys.length > 0) {
@@ -8740,7 +8773,17 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     }
     console.error(`[STREAM FAIL] Erro de streaming no ciclo ${attempt} para Sec. Fabricia:`, streamError.message);
     const keys = getApiKeys();
-    
+
+    // Ver comentário equivalente no endpoint do Dr. Michel: callGeminiStream já esgotou
+    // toda a rotação interna — reiniciar o ciclo do zero só multiplica a espera.
+    if (attemptText.length <= 100 && /^(ALL_KEYS_EXHAUSTED|FALHA CRÍTICA APÓS)/.test(streamError.message || '')) {
+      console.error(`[STREAM FAIL] Rotação interna de chaves já esgotada para Sec. Fabricia — abortando sem reiniciar o ciclo.`);
+      const isOverloadMsg = /sobrecarregad|503/i.test(streamError.message || '');
+      res.write(`data: ${JSON.stringify({ error: "ERRO_COTA_LIMITE", text: isOverloadMsg ? "\n\n[Sistema: O Gemini está temporariamente sobrecarregado neste modelo (Google). Tente novamente em alguns minutos.]" : "\n\n[Sistema: Limite temporário de requisições excedido nas chaves de API. Aguarde alguns minutos e tente novamente.]" })}\n\n`);
+      isFinished = true;
+      break;
+    }
+
     if (attemptText.length > 100) {
       res.write(`data: ${JSON.stringify({ status: "⚠️ Conexão de streaming instável ou limite atingido. Rotacionando chave e continuando..." })}\n\n`);
       if (keys.length > 0) {
