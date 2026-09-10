@@ -34,7 +34,8 @@ import {
   StopIcon as Stop,
   PhotoIcon as Photo,
   ScaleIcon as Scale,
-  ChartBarIcon as ChartBar
+  ChartBarIcon as ChartBar,
+  RectangleStackIcon as Layers
 } from '@heroicons/react/24/outline';
 import { CheckIcon as Check } from '@heroicons/react/24/solid';
 import { supabaseService } from '../services/supabaseService';
@@ -43,6 +44,8 @@ import { apiFetch } from '../services/apiService';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { getDbConfig } from '../supabaseClient';
 import EliteRedactionModal from './EliteRedactionModal';
+import { CoreDispositivosModal } from './CoreDispositivosModal';
+import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
 import { PersonaConfig } from './personaConfig';
@@ -980,6 +983,15 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [showAiMemoryModal, setShowAiMemoryModal] = useState(false);
   const [initialMemoryRule, setInitialMemoryRule] = useState("");
   const [memoryModalPersona, setMemoryModalPersona] = useState("");
+
+  // Dispositivos Núcleo por Tipo de Caso — gerenciamento (modal) + seleção pra ESTA conversa.
+  // Seleção NÃO é persistida no Supabase por enquanto (só estado local, some ao recarregar a
+  // página) — mantido simples de propósito pra validar o mecanismo antes de investir numa
+  // migração de schema; se funcionar bem, persistir junto com a sessão é o próximo passo natural.
+  const [showCoreDispositivosModal, setShowCoreDispositivosModal] = useState(false);
+  const [isCaseTypePickerOpen, setIsCaseTypePickerOpen] = useState(false);
+  const [selectedCaseTypes, setSelectedCaseTypes] = useState<string[]>([]);
+  const coreDispositivosCacheRef = useRef<Map<string, { id: number; title: string; content: string }[]>>(new Map());
   const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(() => {
     try {
       const local = localStorage.getItem("fc_saved_memory_suggestion_ids");
@@ -2224,6 +2236,34 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         } // fecha bloco else (não-casual)
       } catch (err) {
         console.warn("RAG search failed:", err);
+      }
+
+      // ============================================================
+      // DISPOSITIVOS NÚCLEO POR TIPO DE CASO: se o advogado selecionou um ou mais
+      // tipos de caso pra esta conversa, os dispositivos curados manualmente pra
+      // esse(s) subtipo(s) entram DIRETO no início do contexto — sem depender da
+      // busca RAG (embedding/planner/título) pra encontrá-los, então bugs de
+      // extração/truncamento do pipeline de busca não têm como derrubá-los. Vão
+      // na FRENTE de tudo (mesma lógica de ordem do smartTruncate — cabeça do
+      // texto sobrevive ao corte, meio não). Cache local por combinação de tipos
+      // evita rebuscar no banco a cada mensagem da mesma conversa.
+      if (shouldSendRag && selectedCaseTypes.length > 0) {
+        const cacheKey = [...selectedCaseTypes].sort().join('|');
+        let coreItems = coreDispositivosCacheRef.current.get(cacheKey);
+        if (!coreItems) {
+          try {
+            coreItems = await supabaseService.getCoreDispositivos(selectedCaseTypes);
+            coreDispositivosCacheRef.current.set(cacheKey, coreItems);
+          } catch (e) {
+            console.warn('Erro ao buscar dispositivos núcleo:', e);
+            coreItems = [];
+          }
+        }
+        if (coreItems.length > 0) {
+          const corePieces = coreItems.map(item => `FONTE: ${item.title} [Dispositivo núcleo pré-cadastrado para este tipo de caso]\n${item.content}`);
+          console.log(`[NÚCLEO] Injetando ${corePieces.length} dispositivo(s) pré-curado(s) direto no contexto (sem busca RAG).`);
+          ragContext = ragContext ? `${corePieces.join('\n\n---\n\n')}\n\n---\n\n${ragContext}` : corePieces.join('\n\n---\n\n');
+        }
       }
 
       // ============================================================
@@ -3643,6 +3683,10 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         />
       )}
 
+      {showCoreDispositivosModal && (
+        <CoreDispositivosModal onClose={() => setShowCoreDispositivosModal(false)} />
+      )}
+
       {showLegalBaseModal && (
         <LegalBaseArtifactModal
           onClose={() => setShowLegalBaseModal(false)}
@@ -3776,6 +3820,13 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               title="Memória da IA (Treinamento)"
             >
               <Sparkles className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowCoreDispositivosModal(true)}
+              className="px-3 bg-white dark:bg-bordeaux-900/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm hover:bg-amber-50 dark:hover:bg-bordeaux-900 hover:scale-105 transition-all outline-none flex items-center justify-center"
+              title="Dispositivos Núcleo por Tipo de Caso"
+            >
+              <Layers className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowLegalBaseModal(true)}
@@ -4526,6 +4577,49 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                 {isGeneratingMarketing ? <Loader2 className="w-3.5 h-3.5 animate-spin text-pink-600 dark:text-pink-400" /> : <Sparkles className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />}
                 📱 Post Instagram do Caso
               </button>
+            </div>
+
+            {/* Seletor de Tipo(s) de Caso — dispara injeção dos Dispositivos Núcleo pré-curados
+                pra este subtipo, sem precisar de nova busca RAG pra eles. Seleção vale só nesta
+                sessão do navegador (não persistida ainda — ver comentário no estado). */}
+            <div className="relative mb-2 flex items-center flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCaseTypePickerOpen(!isCaseTypePickerOpen)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                title="Selecionar tipo(s) de caso — usa dispositivos núcleo pré-cadastrados em vez de buscar via RAG"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                {selectedCaseTypes.length > 0 ? `${selectedCaseTypes.length} tipo(s) de caso` : 'Tipo de caso (núcleo)'}
+              </button>
+
+              {selectedCaseTypes.map(ct => (
+                <span key={ct} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                  {CORE_DISPOSITIVOS_CASE_TYPES.find(t => t.key === ct)?.label || ct}
+                  <button type="button" onClick={() => setSelectedCaseTypes(prev => prev.filter(k => k !== ct))} className="hover:text-rose-600">
+                    <XMark className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+
+              {isCaseTypePickerOpen && (
+                <div className="absolute z-20 top-full left-0 mt-2 w-72 bg-white dark:bg-bordeaux-900/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-lg p-2 max-h-72 overflow-y-auto">
+                  {CORE_DISPOSITIVOS_CASE_TYPES.map(t => {
+                    const checked = selectedCaseTypes.includes(t.key);
+                    return (
+                      <label key={t.key} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-bordeaux-800/60 cursor-pointer text-sm text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setSelectedCaseTypes(prev => checked ? prev.filter(k => k !== t.key) : [...prev, t.key])}
+                          className="rounded"
+                        />
+                        {t.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="bg-white dark:bg-bordeaux-950/60 border border-slate-200 dark:border-gold-500/15 rounded-2xl shadow-lg focus-within:ring-2 focus-within:ring-emerald-500 transition-all overflow-hidden">

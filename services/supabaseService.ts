@@ -1381,6 +1381,88 @@ export const supabaseService = {
     return data || [];
   },
 
+  // ====================================================================
+  // DISPOSITIVOS NÚCLEO POR TIPO DE CASO
+  // Conjunto curado manualmente de artigos/súmulas que SEMPRE se aplicam a um
+  // subtipo de caso (ex.: BPC-Deficiência, Auxílio-Doença) — evita repetir a
+  // busca RAG (embedding + planner + buscas paralelas) pros itens que já são
+  // sabidamente relevantes, e imuniza esses itens contra bugs de
+  // extração/truncamento do pipeline de busca (não passam por ele).
+  // ====================================================================
+
+  /** Busca o conteúdo dos dispositivos núcleo de 1+ tipos de caso, pronto pra injetar direto no ragContext. */
+  async getCoreDispositivos(caseTypes: string[]): Promise<Array<{ id: number; title: string; content: string }>> {
+    const supabase = await getLegalClient();
+    if (!supabase || caseTypes.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('legal_core_dispositivos')
+      .select('legal_document_id, legal_documents(id, content, metadata)')
+      .in('case_type', caseTypes)
+      .eq('active', true);
+
+    if (error) {
+      console.error('Erro ao buscar dispositivos núcleo:', error);
+      return [];
+    }
+
+    const seen = new Set<number>();
+    const out: Array<{ id: number; title: string; content: string }> = [];
+    (data || []).forEach((row: any) => {
+      const doc = row.legal_documents;
+      if (doc && !seen.has(doc.id)) {
+        seen.add(doc.id);
+        out.push({ id: doc.id, title: doc.metadata?.title || '', content: doc.content || '' });
+      }
+    });
+    return out;
+  },
+
+  /** Lista os dispositivos já curados de UM tipo de caso — usado na tela de gerenciamento. */
+  async listCoreDispositivosByType(caseType: string): Promise<Array<{ linkId: string; id: number; title: string; content: string }>> {
+    const supabase = await getLegalClient();
+    if (!supabase) return [];
+
+    const { data, error } = await supabase
+      .from('legal_core_dispositivos')
+      .select('id, legal_document_id, legal_documents(id, content, metadata)')
+      .eq('case_type', caseType)
+      .eq('active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao listar dispositivos núcleo:', error);
+      return [];
+    }
+
+    return (data || [])
+      .filter((row: any) => row.legal_documents)
+      .map((row: any) => ({
+        linkId: row.id,
+        id: row.legal_documents.id,
+        title: row.legal_documents.metadata?.title || '',
+        content: row.legal_documents.content || ''
+      }));
+  },
+
+  /** Adiciona um dispositivo (já existente em legal_documents) ao núcleo de um tipo de caso. */
+  async addCoreDispositivo(caseType: string, legalDocumentId: number): Promise<void> {
+    const supabase = await getLegalClient();
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('legal_core_dispositivos')
+      .upsert({ case_type: caseType, legal_document_id: legalDocumentId, active: true }, { onConflict: 'case_type,legal_document_id' });
+    if (error) throw error;
+  },
+
+  /** Remove um dispositivo do núcleo (pelo id do VÍNCULO, não do legal_document). */
+  async removeCoreDispositivo(linkId: string): Promise<void> {
+    const supabase = await getLegalClient();
+    if (!supabase) return;
+    const { error } = await supabase.from('legal_core_dispositivos').delete().eq('id', linkId);
+    if (error) throw error;
+  },
+
   // Busca documentos maiores que minChars — usado para rechunking no browser
   async getLargeDocuments(minChars: number = 8000, batchLimit: number = 1): Promise<Array<{id: number, content: string, metadata: any}>> {
     const supabase = await getLegalClient();
