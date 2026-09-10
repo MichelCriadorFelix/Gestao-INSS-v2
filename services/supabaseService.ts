@@ -1151,6 +1151,20 @@ export const supabaseService = {
       [...query.matchAll(/(?:art(?:igo|s|\.)?|§|parágrafo)\s*(\d{1,4})/gi)]
         .forEach(m => add(m[1]));
 
+      // 3.5. Lista de números após UM único prefixo, separados por vírgula e/ou "e":
+      //      "Arts. 42, 45, 59 e 86" ou "Súmulas 47, 80 e 88 da TNU". Sem isso, as
+      //      regras acima só capturavam o PRIMEIRO número (colado no prefixo, ex.
+      //      "Arts. 42") — os do meio de uma lista com vírgula (45, 59) nunca eram
+      //      extraídos, pois nada os precede diretamente além de uma vírgula. Também
+      //      adiciona "súmula(s)"/"tema(s)" como prefixos válidos: antes só
+      //      art./§/parágrafo disparavam a extração, então uma citação como "Súmula
+      //      nº 47" nunca virava um número buscável mesmo a súmula existindo no
+      //      banco — a query pedia a busca, mas nenhum número saía dela.
+      [...query.matchAll(/(?:art(?:igo|s|\.)?|§|parágrafo|súmulas?|temas?)\s*(?:n[ºo°]?\.?\s*)?(\d{1,4}(?:\s*,\s*\d{1,4})*(?:\s+e\s+\d{1,4})?)/gi)]
+        .forEach(m => {
+          m[1].split(/[^0-9]+/).filter(Boolean).forEach(add);
+        });
+
       // 4. "e NNN" após artigo já detectado: "arts. 124 e 127"
       [...query.matchAll(/\be\s+(\d{1,4})\b/gi)]
         .forEach(m => add(m[1]));
