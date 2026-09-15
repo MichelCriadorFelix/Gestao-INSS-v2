@@ -102,6 +102,7 @@ interface ChatSession {
   documents?: ChatDocument[];
   uploadKeyIndex?: number | null;
   clientId?: string;
+  caseTypes?: string[];
   artifactTypes?: Record<string, ArtifactTypeKey>;
   legalBaseArtifact?: LegalBaseArtifact;
 }
@@ -985,9 +986,8 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [memoryModalPersona, setMemoryModalPersona] = useState("");
 
   // Dispositivos Núcleo por Tipo de Caso — gerenciamento (modal) + seleção pra ESTA conversa.
-  // Seleção NÃO é persistida no Supabase por enquanto (só estado local, some ao recarregar a
-  // página) — mantido simples de propósito pra validar o mecanismo antes de investir numa
-  // migração de schema; se funcionar bem, persistir junto com a sessão é o próximo passo natural.
+  // Persistida em ai_conversations.case_types (ver saveAIConversation), espelhada aqui em
+  // selectedCaseTypes pra alimentar o dropdown/chips sem reler `sessions` a cada render.
   const [showCoreDispositivosModal, setShowCoreDispositivosModal] = useState(false);
   const [isCaseTypePickerOpen, setIsCaseTypePickerOpen] = useState(false);
   const [selectedCaseTypes, setSelectedCaseTypes] = useState<string[]>([]);
@@ -1224,7 +1224,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
       if (cancelado || !carregado) return;
 
       setSessions(prev => prev.map(s => s.id === currentSessionId
-        ? { ...s, messages: carregado.messages, documents: carregado.documents, legalBaseArtifact: (carregado as any).legalBaseArtifact, clientId: (carregado as any).clientId || (s as any).clientId, messagesLoaded: true } as any
+        ? { ...s, messages: carregado.messages, documents: carregado.documents, legalBaseArtifact: (carregado as any).legalBaseArtifact, clientId: (carregado as any).clientId || (s as any).clientId, caseTypes: (carregado as any).caseTypes || (s as any).caseTypes, messagesLoaded: true } as any
         : s));
 
       // Hidrata o cache em memória do artefato de base legal com o que já
@@ -1336,6 +1336,22 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   }, [pendingAudit]);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
+
+  // Ao trocar de conversa, reflete no seletor o(s) tipo(s) de caso já salvos para ELA
+  // (ai_conversations.case_types) — sem isso o seletor ficava sempre vazio ao reabrir/F5,
+  // obrigando remarcar toda vez mesmo já tendo marcado antes.
+  useEffect(() => {
+    setSelectedCaseTypes((sessions.find(s => s.id === currentSessionId) as any)?.caseTypes || []);
+  }, [currentSessionId]);
+
+  // Atualiza o seletor E grava o(s) tipo(s) de caso na sessão atual (autosave de `sessions`
+  // já cuida de persistir no Supabase — ver useEffect "Save to Supabase with debounce").
+  const setCaseTypesForCurrentSession = (next: string[]) => {
+    setSelectedCaseTypes(next);
+    if (currentSessionId) {
+      setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, caseTypes: next } as any : s));
+    }
+  };
 
   // Estimativa de uso de contexto desta conversa (histórico + documentos + Base Legal reaproveitada),
   // espelhando o que de fato é enviado ao backend em cada turno, para sugerir compactação proativamente.
@@ -4596,7 +4612,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               {selectedCaseTypes.map(ct => (
                 <span key={ct} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
                   {CORE_DISPOSITIVOS_CASE_TYPES.find(t => t.key === ct)?.label || ct}
-                  <button type="button" onClick={() => setSelectedCaseTypes(prev => prev.filter(k => k !== ct))} className="hover:text-rose-600">
+                  <button type="button" onClick={() => setCaseTypesForCurrentSession(selectedCaseTypes.filter(k => k !== ct))} className="hover:text-rose-600">
                     <XMark className="w-3 h-3" />
                   </button>
                 </span>
@@ -4611,7 +4627,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => setSelectedCaseTypes(prev => checked ? prev.filter(k => k !== t.key) : [...prev, t.key])}
+                          onChange={() => setCaseTypesForCurrentSession(checked ? selectedCaseTypes.filter(k => k !== t.key) : [...selectedCaseTypes, t.key])}
                           className="rounded"
                         />
                         {t.label}

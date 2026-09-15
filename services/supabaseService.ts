@@ -60,6 +60,7 @@ export interface ChatSession {
   documents?: any[];
   legalBaseArtifact?: any;
   clientId?: string;
+  caseTypes?: string[];
 }
 
 const LEGAL_BASE_ARTIFACT_MARKER = '[SYSTEM_LEGAL_BASE_ARTIFACT]';
@@ -110,7 +111,11 @@ export const supabaseService = {
         // persistido — ficava só no estado React em memória e sumia ao recarregar a página ou
         // reabrir a conversa depois. Causa raiz de o Editor de Petições abrir sem o cliente certo
         // pré-selecionado mesmo quando o GED foi feito vinculado a ele.
-        client_id: session.clientId || null
+        client_id: session.clientId || null,
+        // Mesma lógica do client_id acima: sem isso, o(s) tipo(s) de caso marcado(s) pro núcleo
+        // de dispositivos (BPC, Auxílio-Doença etc.) ficava só em estado React local e resetava
+        // a cada F5/reabertura da conversa, obrigando remarcar toda vez.
+        case_types: session.caseTypes && session.caseTypes.length > 0 ? session.caseTypes : null
       });
       
     if (error) {
@@ -137,7 +142,7 @@ export const supabaseService = {
 
     const { data, error } = await supabase
       .from('ai_conversations')
-      .select('id, lawyer_type, title, date, updated_at, client_id')
+      .select('id, lawyer_type, title, date, updated_at, client_id, case_types')
       .eq('lawyer_type', aiName)
       .order('updated_at', { ascending: false })
       .limit(30);
@@ -152,6 +157,7 @@ export const supabaseService = {
       messages: [],
       documents: [],
       clientId: s.client_id || undefined,
+      caseTypes: s.case_types || undefined,
       // Marca que o conteudo ainda nao veio. O PersonaChat usa isto para
       // (a) buscar sob demanda e (b) NUNCA salvar uma conversa nao carregada,
       // o que sobrescreveria o historico com uma lista vazia.
@@ -166,7 +172,7 @@ export const supabaseService = {
 
     const { data, error } = await supabase
       .from('ai_conversations')
-      .select('messages, client_id')
+      .select('messages, client_id, case_types')
       .eq('id', id)
       .maybeSingle();
 
@@ -196,7 +202,7 @@ export const supabaseService = {
         console.error('Error parsing legal base artifact', e);
       }
     }
-    return { messages, documents, legalBaseArtifact, clientId: data.client_id || undefined };
+    return { messages, documents, legalBaseArtifact, clientId: data.client_id || undefined, caseTypes: data.case_types || undefined };
   },
 
   async getAIConversations(aiName: 'michel' | 'luana' | 'felix_castro' | 'fabricia') {
@@ -247,7 +253,8 @@ export const supabaseService = {
         messages,
         documents,
         legalBaseArtifact,
-        clientId: session.client_id || undefined
+        clientId: session.client_id || undefined,
+        caseTypes: session.case_types || undefined
       };
     });
   },
