@@ -4603,7 +4603,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
               ))}
 
               {isCaseTypePickerOpen && (
-                <div className="absolute z-20 top-full left-0 mt-2 w-72 bg-white dark:bg-bordeaux-900/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-lg p-2 max-h-72 overflow-y-auto">
+                <div className="absolute z-20 bottom-full left-0 mb-2 w-72 bg-white dark:bg-bordeaux-900/90 border border-slate-200 dark:border-gold-500/20 rounded-xl shadow-lg p-2 max-h-72 overflow-y-auto">
                   {CORE_DISPOSITIVOS_CASE_TYPES.map(t => {
                     const checked = selectedCaseTypes.includes(t.key);
                     return (
