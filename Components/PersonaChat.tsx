@@ -1336,13 +1336,19 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   }, [pendingAudit]);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
+  const currentSessionCaseTypes = (currentSession as any)?.caseTypes;
 
   // Ao trocar de conversa, reflete no seletor o(s) tipo(s) de caso já salvos para ELA
   // (ai_conversations.case_types) — sem isso o seletor ficava sempre vazio ao reabrir/F5,
   // obrigando remarcar toda vez mesmo já tendo marcado antes.
+  // IMPORTANTE: depende também de currentSessionCaseTypes, não só de currentSessionId — a
+  // lista de conversas (e o caseTypes de cada uma) chega de forma assíncrona depois do
+  // primeiro render, então se o efeito dependesse só do id ele rodava ANTES do dado chegar
+  // e nunca era refeito quando o valor real aparecia em `sessions` (bug real observado:
+  // conversa com case_types certo no Supabase, mas seletor aparecendo vazio na tela).
   useEffect(() => {
-    setSelectedCaseTypes((sessions.find(s => s.id === currentSessionId) as any)?.caseTypes || []);
-  }, [currentSessionId]);
+    setSelectedCaseTypes(currentSessionCaseTypes || []);
+  }, [currentSessionId, currentSessionCaseTypes]);
 
   // Atualiza o seletor E grava o(s) tipo(s) de caso na sessão atual (autosave de `sessions`
   // já cuida de persistir no Supabase — ver useEffect "Save to Supabase with debounce").
