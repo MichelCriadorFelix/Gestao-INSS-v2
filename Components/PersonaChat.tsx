@@ -986,11 +986,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [memoryModalPersona, setMemoryModalPersona] = useState("");
 
   // Dispositivos Núcleo por Tipo de Caso — gerenciamento (modal) + seleção pra ESTA conversa.
-  // Persistida em ai_conversations.case_types (ver saveAIConversation), espelhada aqui em
-  // selectedCaseTypes pra alimentar o dropdown/chips sem reler `sessions` a cada render.
+  // Persistida em ai_conversations.case_types (ver saveAIConversation); selectedCaseTypes é
+  // derivado direto da sessão atual (ver mais abaixo, perto de `currentSession`), sem estado
+  // paralelo — mesmo padrão de legalBaseArtifact/clientId.
   const [showCoreDispositivosModal, setShowCoreDispositivosModal] = useState(false);
   const [isCaseTypePickerOpen, setIsCaseTypePickerOpen] = useState(false);
-  const [selectedCaseTypes, setSelectedCaseTypes] = useState<string[]>([]);
   const coreDispositivosCacheRef = useRef<Map<string, { id: number; title: string; content: string }[]>>(new Map());
   const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(() => {
     try {
@@ -1336,24 +1336,19 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   }, [pendingAudit]);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
-  const currentSessionCaseTypes = (currentSession as any)?.caseTypes;
 
-  // Ao trocar de conversa, reflete no seletor o(s) tipo(s) de caso já salvos para ELA
-  // (ai_conversations.case_types) — sem isso o seletor ficava sempre vazio ao reabrir/F5,
-  // obrigando remarcar toda vez mesmo já tendo marcado antes.
-  // IMPORTANTE: depende também de currentSessionCaseTypes, não só de currentSessionId — a
-  // lista de conversas (e o caseTypes de cada uma) chega de forma assíncrona depois do
-  // primeiro render, então se o efeito dependesse só do id ele rodava ANTES do dado chegar
-  // e nunca era refeito quando o valor real aparecia em `sessions` (bug real observado:
-  // conversa com case_types certo no Supabase, mas seletor aparecendo vazio na tela).
-  useEffect(() => {
-    setSelectedCaseTypes(currentSessionCaseTypes || []);
-  }, [currentSessionId, currentSessionCaseTypes]);
+  // Tipo(s) de caso desta conversa: lido DIRETO da sessão a cada render, igual já se faz
+  // com legalBaseArtifact/clientId — nada de estado paralelo pra sincronizar. Um estado
+  // separado (useState + useEffect copiando de `sessions`) foi a causa raiz de um bug real
+  // (conversa com case_types certo no Supabase, mas seletor aparecendo vazio na tela porque
+  // a cópia só era refeita em condições que nem sempre disparavam de novo). Lendo direto daqui
+  // essa classe de bug não pode mais existir: não tem cópia, não tem como ficar desatualizada.
+  const selectedCaseTypes: string[] = (currentSession as any)?.caseTypes || [];
 
-  // Atualiza o seletor E grava o(s) tipo(s) de caso na sessão atual (autosave de `sessions`
-  // já cuida de persistir no Supabase — ver useEffect "Save to Supabase with debounce").
+  // Grava o(s) tipo(s) de caso na sessão atual (autosave de `sessions` já cuida de persistir
+  // no Supabase — ver useEffect "Save to Supabase with debounce"). selectedCaseTypes reflete
+  // a mudança automaticamente no próximo render, por vir direto de `sessions`.
   const setCaseTypesForCurrentSession = (next: string[]) => {
-    setSelectedCaseTypes(next);
     if (currentSessionId) {
       setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, caseTypes: next } as any : s));
     }
