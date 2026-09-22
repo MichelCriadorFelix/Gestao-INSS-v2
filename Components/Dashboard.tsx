@@ -2589,6 +2589,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                         <ThSortable label="Valor Total" columnKey="totalFee" />
                                         <th className="px-4 py-3.5 font-bold text-slate-700 dark:text-slate-300">Pagamento</th>
                                         <ThSortable label="Status" columnKey="status" />
+                                        <th className="px-4 py-3.5 font-bold text-slate-700 dark:text-slate-300">Situação</th>
                                         <th className="px-4 py-3.5 text-right">Ações</th>
                                     </tr>
                                 </thead>
@@ -2627,6 +2628,22 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                                           'bg-slate-100 text-slate-500 border-slate-200'}`}>
                                                          {contract.status}
                                                      </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex flex-col gap-1 items-start">
+                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.caseNature === 'Judicial' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-bordeaux-900/40 dark:text-slate-400'}`}>
+                                                            {contract.caseNature === 'Judicial' ? '⚖️ Judicial' : '📋 Administrativo'}
+                                                        </span>
+                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.documentStatus === 'Completa' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400'}`}>
+                                                            {contract.documentStatus === 'Completa' ? '✅ Doc. Completa' : '📄 Doc. Pendente'}
+                                                        </span>
+                                                        <span
+                                                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400'}`}
+                                                            title={contract.readiness !== 'Pronto' ? (contract.readinessReason || 'Sem motivo informado') : undefined}
+                                                        >
+                                                            {contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex justify-end gap-1">
@@ -2673,6 +2690,18 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                              <div className="text-slate-600 dark:text-slate-400 font-medium italic">{contract.serviceType}</div>
                                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.lawyer === 'Michel' ? 'bg-primary-50 text-primary-800 border-primary-200/50' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
                                                  {contract.lawyer === 'Michel' ? 'Michel' : 'Luana'}
+                                             </span>
+                                         </div>
+
+                                         <div className="flex flex-wrap gap-1">
+                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.caseNature === 'Judicial' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                                 {contract.caseNature === 'Judicial' ? '⚖️ Judicial' : '📋 Administrativo'}
+                                             </span>
+                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.documentStatus === 'Completa' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                                 {contract.documentStatus === 'Completa' ? '✅ Doc. Completa' : '📄 Doc. Pendente'}
+                                             </span>
+                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                                 {contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
                                              </span>
                                          </div>
 

@@ -921,7 +921,11 @@ export const supabaseService = {
       payments: contract.payments || [],
       created_at: contract.createdAt || new Date().toISOString(),
       concluded_at: contract.concludedAt || null,
-      lawyer_split: contract.lawyerSplit ?? 60
+      lawyer_split: contract.lawyerSplit ?? 60,
+      case_nature: contract.caseNature || null,
+      document_status: contract.documentStatus || null,
+      readiness: contract.readiness || null,
+      readiness_reason: contract.readiness === 'Aguardando' ? (contract.readinessReason || null) : null
     };
 
     const { data, error } = await supabase
@@ -969,7 +973,11 @@ export const supabaseService = {
       payments: c.payments,
       createdAt: c.created_at,
       concludedAt: c.concluded_at,
-      lawyerSplit: c.lawyer_split ?? 60
+      lawyerSplit: c.lawyer_split ?? 60,
+      caseNature: c.case_nature ?? undefined,
+      documentStatus: c.document_status ?? undefined,
+      readiness: c.readiness ?? undefined,
+      readinessReason: c.readiness_reason ?? undefined
     };
   },
 

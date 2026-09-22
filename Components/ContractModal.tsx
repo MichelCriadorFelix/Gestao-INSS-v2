@@ -62,12 +62,15 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                 cpf: formatCpf(initialData.cpf || '')
             });
         } else {
-            setFormData({ 
-                status: 'Pendente', 
+            setFormData({
+                status: 'Pendente',
                 paymentMethod: 'Parcelado',
                 installmentsCount: 1,
                 payments: [],
-                createdAt: new Date().toISOString().split('T')[0]
+                createdAt: new Date().toISOString().split('T')[0],
+                caseNature: 'Administrativo',
+                documentStatus: 'Pendente',
+                readiness: 'Aguardando'
             });
         }
         setNewPaymentAmount('');
@@ -426,7 +429,42 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                              <option value="Parcelado">Parcelado</option>
                          </select>
                      </div>
-                     
+
+                     <div className="md:col-span-2 mt-2">
+                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-gold-500/20 pb-2 mb-4">Andamento Processual</h4>
+                     </div>
+
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Esfera</label>
+                         <select name="caseNature" value={formData.caseNature || 'Administrativo'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                             <option value="Administrativo">Administrativo</option>
+                             <option value="Judicial">Judicial</option>
+                         </select>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Documentação</label>
+                         <select name="documentStatus" value={formData.documentStatus || 'Pendente'} onChange={handleChange} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                             <option value="Pendente">Faltando documentos</option>
+                             <option value="Completa">Completa</option>
+                         </select>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Prontidão pra Protocolar</label>
+                         <select name="readiness" value={formData.readiness || 'Aguardando'} onChange={(e) => {
+                             const value = e.target.value as 'Pronto' | 'Aguardando';
+                             setFormData(prev => ({ ...prev, readiness: value, readinessReason: value === 'Pronto' ? '' : prev.readinessReason }));
+                         }} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
+                             <option value="Aguardando">Aguardando</option>
+                             <option value="Pronto">Pronto pra protocolar</option>
+                         </select>
+                     </div>
+                     {formData.readiness === 'Aguardando' && (
+                     <div className="md:col-span-2">
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Motivo da Espera</label>
+                         <input type="text" name="readinessReason" value={formData.readinessReason || ''} onChange={handleChange} placeholder="Ex: aguardando laudo médico atualizado, aguardando resposta do cliente..." className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white" />
+                     </div>
+                     )}
+
                      {formData.paymentMethod === 'Parcelado' && (
                          <div className="md:col-span-2 bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
                              <div className="flex items-center justify-between gap-4 mb-4">

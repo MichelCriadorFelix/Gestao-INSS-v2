@@ -179,6 +179,10 @@ export interface ContractRecord {
   createdAt: string;
   concludedAt?: string;
   lawyerSplit?: number;
+  caseNature?: 'Administrativo' | 'Judicial';
+  documentStatus?: 'Completa' | 'Pendente';
+  readiness?: 'Pronto' | 'Aguardando';
+  readinessReason?: string; // Motivo da espera — só relevante quando readiness === 'Aguardando'
 }
 
 // --- Interfaces de Componentes (Movidas do App.tsx) ---
