@@ -1661,7 +1661,12 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
             ((c.lastName || '').toLowerCase().includes(lowerSearch)) ||
             ((c.cpf || '').includes(lowerSearch))
           ).sort((a, b) => {
-             // Contracts sort logic
+             // Contracts sort logic — prontos pra protocolar (doc. completa + pronto) sempre no topo,
+             // pra não precisar caçar entre os que ainda estão aguardando algo.
+             const aReadyScore = (a.documentStatus === 'Completa' ? 1 : 0) + (a.readiness === 'Pronto' ? 1 : 0);
+             const bReadyScore = (b.documentStatus === 'Completa' ? 1 : 0) + (b.readiness === 'Pronto' ? 1 : 0);
+             if (aReadyScore !== bReadyScore) return bReadyScore - aReadyScore; // Maior score primeiro
+
              if (sortConfig) {
                   const aVal = (a as any)[sortConfig.key] || '';
                   const bVal = (b as any)[sortConfig.key] || '';
