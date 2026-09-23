@@ -140,6 +140,7 @@ export default function Dashboard({
 }: DashboardProps) {
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'sec_fabricia' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
+  const [contractStatusFilter, setContractStatusFilter] = useState<'todos' | 'Pendente' | 'Em Andamento' | 'Concluído'>('todos');
   // PERF: trava contra cargas simultâneas (ver fetchData)
   const isFetchingRef = useRef(false);
   // Distingue a 1ª conexão do Realtime de uma RE-conexão (ver .subscribe abaixo)
@@ -529,7 +530,7 @@ export default function Dashboard({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage, currentView, clientFilter]);
+  }, [searchTerm, itemsPerPage, currentView, clientFilter, contractStatusFilter]);
 
   // PERF: dispara a carga pesada só quando a tela é realmente aberta.
   useEffect(() => {
@@ -1656,11 +1657,14 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
               return (a.name || '').localeCompare(b.name || '');
           });
       } else {
-          return contracts.filter(c => 
-            ((c.firstName || '').toLowerCase().includes(lowerSearch)) ||
-            ((c.lastName || '').toLowerCase().includes(lowerSearch)) ||
-            ((c.cpf || '').includes(lowerSearch))
-          ).sort((a, b) => {
+          return contracts.filter(c => {
+            const searchMatch =
+              ((c.firstName || '').toLowerCase().includes(lowerSearch)) ||
+              ((c.lastName || '').toLowerCase().includes(lowerSearch)) ||
+              ((c.cpf || '').includes(lowerSearch));
+            const statusMatch = contractStatusFilter === 'todos' || c.status === contractStatusFilter;
+            return searchMatch && statusMatch;
+          }).sort((a, b) => {
              // Contracts sort logic — prontos pra protocolar (doc. completa + pronto) sempre no topo,
              // pra não precisar caçar entre os que ainda estão aguardando algo.
              const aReadyScore = (a.documentStatus === 'Completa' ? 1 : 0) + (a.readiness === 'Pronto' ? 1 : 0);
@@ -2550,6 +2554,27 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  <>
                     <FinancialStats contracts={contracts} />
 
+                    <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 p-1 rounded-xl w-fit mb-4 flex-wrap">
+                        {([
+                            { key: 'todos', label: 'Todos' },
+                            { key: 'Pendente', label: 'Pendente' },
+                            { key: 'Em Andamento', label: 'Em Andamento' },
+                            { key: 'Concluído', label: 'Concluído' },
+                        ] as const).map(opt => {
+                            const count = opt.key === 'todos' ? contracts.length : contracts.filter(c => c.status === opt.key).length;
+                            return (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => setContractStatusFilter(opt.key)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${contractStatusFilter === opt.key ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    {opt.label}
+                                    <span className="text-[10px] font-bold opacity-70">({count})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <div className="relative w-full md:w-[400px] group">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -2599,6 +2624,13 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {paginatedList.length === 0 && (
+                                        <tr>
+                                            <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                                                Nenhum contrato encontrado{contractStatusFilter !== 'todos' ? ` com status "${contractStatusFilter}"` : ''}.
+                                            </td>
+                                        </tr>
+                                    )}
                                     {paginatedList.map((contract: any) => {
                                         const totalPaid = (contract.payments || []).reduce((sum: number, p: any) => p.isPaid ? sum + p.amount : sum, 0);
                                         const totalFee = Number(contract.totalFee) || 0;
