@@ -451,11 +451,12 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, onSave, 
                      <div>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Prontidão pra Protocolar</label>
                          <select name="readiness" value={formData.readiness || 'Aguardando'} onChange={(e) => {
-                             const value = e.target.value as 'Pronto' | 'Aguardando';
-                             setFormData(prev => ({ ...prev, readiness: value, readinessReason: value === 'Pronto' ? '' : prev.readinessReason }));
+                             const value = e.target.value as 'Pronto' | 'Aguardando' | 'Protocolado';
+                             setFormData(prev => ({ ...prev, readiness: value, readinessReason: value === 'Aguardando' ? prev.readinessReason : '' }));
                          }} className="w-full px-4 py-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-300 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:text-white">
                              <option value="Aguardando">Aguardando</option>
                              <option value="Pronto">Pronto pra protocolar</option>
+                             <option value="Protocolado">Protocolado</option>
                          </select>
                      </div>
                      {formData.readiness === 'Aguardando' && (

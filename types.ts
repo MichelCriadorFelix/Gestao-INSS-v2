@@ -181,7 +181,7 @@ export interface ContractRecord {
   lawyerSplit?: number;
   caseNature?: 'Administrativo' | 'Judicial';
   documentStatus?: 'Completa' | 'Pendente';
-  readiness?: 'Pronto' | 'Aguardando';
+  readiness?: 'Pronto' | 'Aguardando' | 'Protocolado';
   readinessReason?: string; // Motivo da espera — só relevante quando readiness === 'Aguardando'
 }
 

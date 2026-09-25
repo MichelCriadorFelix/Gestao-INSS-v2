@@ -1667,8 +1667,13 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
           }).sort((a, b) => {
              // Contracts sort logic — prontos pra protocolar (doc. completa + pronto) sempre no topo,
              // pra não precisar caçar entre os que ainda estão aguardando algo.
-             const aReadyScore = (a.documentStatus === 'Completa' ? 1 : 0) + (a.readiness === 'Pronto' ? 1 : 0);
-             const bReadyScore = (b.documentStatus === 'Completa' ? 1 : 0) + (b.readiness === 'Pronto' ? 1 : 0);
+             // Já protocolado não exige mais ação — vai pro fim da lista (score -1), abaixo até
+             // dos que ainda estão aguardando, pra não competir por atenção com "pronto pra protocolar".
+             const readyScore = (c: any) => c.readiness === 'Protocolado'
+                 ? -1
+                 : (c.documentStatus === 'Completa' ? 1 : 0) + (c.readiness === 'Pronto' ? 1 : 0);
+             const aReadyScore = readyScore(a);
+             const bReadyScore = readyScore(b);
              if (aReadyScore !== bReadyScore) return bReadyScore - aReadyScore; // Maior score primeiro
 
              if (sortConfig) {
@@ -2675,10 +2680,10 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                                             {contract.documentStatus === 'Completa' ? '✅ Doc. Completa' : '📄 Doc. Pendente'}
                                                         </span>
                                                         <span
-                                                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400'}`}
-                                                            title={contract.readiness !== 'Pronto' ? (contract.readinessReason || 'Sem motivo informado') : undefined}
+                                                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Protocolado' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400' : contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400'}`}
+                                                            title={(contract.readiness !== 'Pronto' && contract.readiness !== 'Protocolado') ? (contract.readinessReason || 'Sem motivo informado') : undefined}
                                                         >
-                                                            {contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
+                                                            {contract.readiness === 'Protocolado' ? '📨 Protocolado' : contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -2737,8 +2742,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.documentStatus === 'Completa' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
                                                  {contract.documentStatus === 'Completa' ? '✅ Doc. Completa' : '📄 Doc. Pendente'}
                                              </span>
-                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                                 {contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
+                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${contract.readiness === 'Protocolado' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : contract.readiness === 'Pronto' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                                 {contract.readiness === 'Protocolado' ? '📨 Protocolado' : contract.readiness === 'Pronto' ? '🟢 Pronto' : '⏳ Aguardando'}
                                              </span>
                                          </div>
 
