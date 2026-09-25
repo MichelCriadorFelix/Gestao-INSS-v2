@@ -764,7 +764,16 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
     
     if (editor) {
       if (initialPetition) {
-        if (loadedPetitionIdRef.current !== initialPetition.id || loadedPetitionContentRef.current !== initialPetition.content) {
+        // BUG CORRIGIDO (cursor/seleção pulando pro fim do texto): antes esta condição também
+        // recarregava o editor quando o CONTEÚDO da petição mudava. Só que, a cada autosave (5s
+        // depois de qualquer edição), o Dashboard devolve a petição salva como `initialPetition`
+        // (setActivePetition) — conteúdo diferente do carregado originalmente — e o efeito chamava
+        // setContent() por cima do que o usuário estava digitando: o ProseMirror perde a seleção e
+        // o scroll (Ctrl+A, apagar, editar no meio: tudo "levava pro final"). Com o mesmo id, o
+        // editor já é a fonte da verdade; só recarrega quando abre OUTRA petição.
+        if (loadedPetitionIdRef.current === initialPetition.id) {
+          loadedPetitionContentRef.current = initialPetition.content;
+        } else {
           console.log('[PetitionEditor] Setting new content. Length:', initialPetition.content?.length);
           try { 
             editor.commands.setContent(initialPetition.content); 
@@ -977,6 +986,21 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       };
       sanitizePdfMakeNodes(pdfMakeContent);
 
+      // `text-indent` inline num <p> (o editor preserva o style do HTML colado) vira `leadingIndent`
+      // em CADA trecho filho na conversão do html-to-pdfmake, e o pdfmake dá preferência ao valor do
+      // trecho sobre o do parágrafo — então zerar/definir o recuo só no <p> não adiantava: a citação
+      // (blockquote) saía no PDF com recuo de 1ª linha mesmo o editor mostrando sem. O recuo é
+      // decidido apenas no <p> (applyIndent), por isso aqui os filhos são limpos.
+      const stripInlineIndent = (children: any) => {
+        if (!Array.isArray(children)) return;
+        children.forEach(child => {
+          if (child && typeof child === 'object') {
+            delete child.leadingIndent;
+            stripInlineIndent(child.text);
+          }
+        });
+      };
+
       // Apply text-indent to paragraphs
       const applyIndent = (nodes: any[], inBlockquote = false, inTable = false, isSmallTable = false) => {
         if (!Array.isArray(nodes)) return;
@@ -1023,6 +1047,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
                 node.margin = [0, 0, 0, 4];
               }
             }
+            stripInlineIndent(node.text);
           }
 
           if (node.nodeName === 'TABLE' && node.table && node.table.body && node.table.body.length > 0) {
