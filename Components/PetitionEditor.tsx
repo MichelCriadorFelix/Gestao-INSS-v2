@@ -904,7 +904,7 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
 
   const generatePDF = async () => {
     if (!editor) return;
-    
+
     setIsSaving(true);
 
     try {
@@ -912,6 +912,37 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
       // Ensure empty paragraphs take up space
       rawHtml = rawHtml.replace(/<p><\/p>/g, '<p>&nbsp;</p>');
       rawHtml = rawHtml.replace(/<p><br><\/p>/g, '<p>&nbsp;</p>');
+      // Conteúdo colado do Word (citações de jurisprudência, tabelas) chega com
+      // style="margin: T R B L; line-height: normal;" — duas coisas que o
+      // html-to-pdfmake não sabe processar direito nesse formato:
+      // 1) "line-height: normal" não bate no regex de unidade da lib (pt/px/em/cm/in) e vira
+      //    lineHeight: false — que o pdfmake usa como fator de espaçamento entre linhas, colapsando
+      //    a altura da linha a zero. Resultado: todo o parágrafo é desenhado sobreposto em cima de
+      //    si mesmo (texto ilegível, "embaralhado" — era exatamente esse o "bugou tudo" reportado).
+      // 2) "margin" com os 4 lados de uma vez só é mesclado pela lib só quando os lados vêm
+      //    separados (margin-left/top/right/bottom); o shorthand inteiro é descartado em silêncio
+      //    quando o nó já tem uma margem padrão — por isso o recuo da citação colada sumia no PDF.
+      // Confirmado reproduzindo a conversão isolada (html-to-pdfmake puro, fora do app) com o HTML
+      // real de uma citação colada: sem este sanitize, lineHeight saía `false` e o margin-left saía
+      // 0 em vez do recuo esperado; com o sanitize, lineHeight cai no padrão (1.5) e o margin-left
+      // é preservado corretamente.
+      const sanitizeHtmlForPdf = (html: string): string => {
+        return html.replace(/style="([^"]*)"/gi, (_full, styleContent) => {
+          let s = styleContent
+            .replace(/line-height\s*:\s*normal\s*;?/gi, '')
+            .replace(/margin\s*:\s*([^;]+);?/gi, (_m: string, val: string) => {
+              const parts = val.trim().split(/\s+/);
+              let top, right, bottom, left;
+              if (parts.length === 1) { top = right = bottom = left = parts[0]; }
+              else if (parts.length === 2) { top = bottom = parts[0]; left = right = parts[1]; }
+              else if (parts.length === 3) { top = parts[0]; left = right = parts[1]; bottom = parts[2]; }
+              else { [top, right, bottom, left] = parts; }
+              return `margin-top: ${top}; margin-right: ${right}; margin-bottom: ${bottom}; margin-left: ${left};`;
+            });
+          return `style="${s}"`;
+        });
+      };
+      rawHtml = sanitizeHtmlForPdf(rawHtml);
 
       const isContractDoc = title.toUpperCase().includes('CONTRATO') || 
                             category.toUpperCase().includes('CONTRATO') ||
