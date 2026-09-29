@@ -695,6 +695,14 @@ const PetitionEditor: React.FC<PetitionEditorProps> = ({ clients, onBack, initia
         bulletList: false,
         orderedList: false,
         listItem: false,
+        // O StarterKit do TipTap v3 passou a incluir a extensão Link por padrão, com autolink
+        // ativado — ela roda um detector de URL (linkifyjs) sobre texto digitado/colado e decide
+        // sozinha o que "parece" um link. Números de tópico tipo "VII.VI" batem no padrão dele
+        // (letras.letras) e viram <a href="http://VII.VI">, um link falso que sai sublinhado e
+        // azul tanto na tela quanto no PDF. Este editor não tem nem botão pra inserir link de
+        // propósito, então desativar a extensão inteira remove essa classe de bug sem tirar
+        // nenhuma função que alguém realmente usa.
+        link: false,
       }),
       CustomParagraph,
       CustomHeading,
