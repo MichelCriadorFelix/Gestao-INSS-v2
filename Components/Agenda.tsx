@@ -269,6 +269,15 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           `⚠️ Relate as crises: quantas vezes ocorrem, qual o gatilho, se há autoagressão, seletividade alimentar severa ou dependência de terceiros.`;
         postura = `Seja você mesmo(a). Evite forçar contato visual ou esconder movimentos repetitivos (stims) se eles costumam acontecer para te acalmar.`;
         acomp = `⚠️ *MUITO IMPORTANTE:* O acompanhante tem papel crucial aqui. O perito precisa saber das crises (meltdowns) que só a família vê. O acompanhante deve relatar tudo o que o paciente precisa de ajuda para fazer.`;
+      } else if (diseaseType === 'neurologica') {
+        respostas = `✅ Fale sobre as *limitações do dia a dia*: o que ${pronoun} NÃO consegue fazer sem ajuda — andar, se equilibrar, falar, entender ordens, cuidar da higiene, se alimentar, se vestir.\n` +
+          `✅ Como a condição neurológica geralmente é *permanente ou de longa duração*, o foco é o *impedimento de longo prazo* e a *dependência de terceiros*. Diga desde quando a condição existe (ex.: "desde o nascimento") e que não tem cura.\n` +
+          `❌ *Não minimize.* Evite dizer "se vira", "faz algumas coisas" ou "ajuda um pouco" sem explicar o que isso significa na prática. Se faz algo, diga *com qual ajuda* e *com que dificuldade*.\n` +
+          `⚠️ Relate também: dificuldade de aprendizado e de memória, de concentração, de comunicação e de entender perigos; tremores, perda de força ou de coordenação; crises, quedas, dores de cabeça e uso de medicação (com os efeitos dela, como sonolência).\n` +
+          `⚠️ Se houver acompanhamento com neurologista, fisioterapia, fonoaudiologia ou terapia ocupacional, informe e leve os laudos.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3} e de quem ajuda e em quê.`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Não esconda nem disfarce as dificuldades de movimento, fala ou compreensão — o ${perito} precisa observá-las como realmente são. Se ${pronoun} tiver dificuldade para entender as perguntas, deixe o acompanhante ajudar a responder.`;
+        acomp = `⚠️ *MUITO IMPORTANTE:* o acompanhante tem papel central. Se ${pronoun} tiver dificuldade para falar, entender as perguntas ou lembrar dos fatos, o acompanhante *deve* explicar a rotina e a dependência — o que precisa de ajuda para fazer, desde quando, e como são as crises ou dificuldades que só a família vê. O ${perito} pode chamá-lo separadamente: ele deve falar somente das dificuldades, nunca de melhorias.`;
       } else if (diseaseType === 'cardiologica') {
         respostas = `✅ Fale *somente sobre o cansaço, falta de ar e palpitações*.\n` +
           `❌ *Não diga apenas "eu ando".* Diga: "Se eu andar até o portão, sinto uma dor no peito e uma falta de ar insuportável, preciso parar e sentar."\n` +
@@ -832,6 +841,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                           <option value="ortopedica">🦴 Ortopédica / Física (Coluna, Joelho, etc)</option>
                           <option value="psiquiatrica">🧠 Psiquiátrica (Depressão, Ansiedade, etc)</option>
                           <option value="autismo">🧩 Autismo / TDAH / Neurodivergência</option>
+                          <option value="neurologica">🧬 Neurológica (Microcefalia, Paralisia Cerebral, AVC, etc)</option>
                           <option value="cardiologica">🫀 Cardiológica / Pulmonar</option>
                           <option value="oncologica">🎗️ Oncológica (Câncer)</option>
                           <option value="epilepsia">⚡ Epilepsia / Convulsões</option>
