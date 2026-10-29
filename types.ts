@@ -27,7 +27,7 @@ export interface AgendaEvent {
   gender?: 'M' | 'F';
   extraInstructions?: string;
   benefitType?: 'incapacidade' | 'bpc';
-  diseaseType?: 'ortopedica' | 'psiquiatrica' | 'autismo' | 'neurologica' | 'cardiologica' | 'oncologica' | 'epilepsia' | 'visual' | 'outra';
+  diseaseType?: 'ortopedica' | 'membros_superiores' | 'psiquiatrica' | 'autismo' | 'neurologica' | 'cardiologica' | 'oncologica' | 'epilepsia' | 'visual' | 'outra';
 }
 
 export interface Petition {

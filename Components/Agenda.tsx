@@ -269,6 +269,14 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
           `⚠️ Relate as crises: quantas vezes ocorrem, qual o gatilho, se há autoagressão, seletividade alimentar severa ou dependência de terceiros.`;
         postura = `Seja você mesmo(a). Evite forçar contato visual ou esconder movimentos repetitivos (stims) se eles costumam acontecer para te acalmar.`;
         acomp = `⚠️ *MUITO IMPORTANTE:* O acompanhante tem papel crucial aqui. O perito precisa saber das crises (meltdowns) que só a família vê. O acompanhante deve relatar tudo o que o paciente precisa de ajuda para fazer.`;
+      } else if (diseaseType === 'membros_superiores') {
+        respostas = `✅ Fale com precisão sobre as limitações das *mãos, punhos, braços e ombros*: o que ${pronoun} NÃO consegue fazer ou só faz com muita dor — segurar objetos (copo, panela, sacola), abotoar, escrever, usar o celular, torcer roupa, abrir tampas e potes, pentear o cabelo, levantar o braço.\n` +
+          `✅ Descreva os sintomas como eles são: *formigamento e dormência* nas mãos, *perda de força* (deixar cair objetos), dor que irradia para o antebraço ou ombro, e se piora à noite ou com movimentos repetitivos.\n` +
+          `❌ *Não diga apenas "tenho dor na mão".* Explique o que isso impede na prática e se precisa de ajuda de alguém para tarefas simples do dia a dia.\n` +
+          `⚠️ Informe há quanto tempo tem os sintomas e *quais movimentos do trabalho* os provocam ou pioram (digitar, esforço repetitivo, pegar peso). Se já fez *cirurgia* (liberação do túnel do carpo), fisioterapia ou infiltração, conte também se os sintomas *persistiram ou voltaram* depois.\n` +
+          `⚠️ Leve os exames (eletroneuromiografia, ultrassom, ressonância) e informe se usa tala/órtese e quais medicações toma.\n` +
+          `⚠️ *Se perguntar o que faz em casa:* fale somente do que NÃO consegue fazer ${pronoun3} ou do que depende de ajuda.`;
+        postura = `${isFem ? 'Seja respeitosa e calma' : 'Seja respeitoso e calmo'}. Se sentir dormência, dor ou perder a força durante a perícia (ao segurar a caneta ou nas manobras que o ${perito} pedir), diga na hora e demonstre naturalmente, sem forçar e sem exagerar.`;
       } else if (diseaseType === 'neurologica') {
         respostas = `✅ Fale sobre as *limitações do dia a dia*: o que ${pronoun} NÃO consegue fazer sem ajuda — andar, se equilibrar, falar, entender ordens, cuidar da higiene, se alimentar, se vestir.\n` +
           `✅ Como a condição neurológica geralmente é *permanente ou de longa duração*, o foco é o *impedimento de longo prazo* e a *dependência de terceiros*. Diga desde quando a condição existe (ex.: "desde o nascimento") e que não tem cura.\n` +
@@ -839,6 +847,7 @@ const Agenda: React.FC<AgendaProps> = ({ events, clients, contracts, user, darkM
                           className="w-full p-2.5 bg-white dark:bg-bordeaux-900/40 border border-slate-200 dark:border-gold-500/15 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 dark:text-white text-sm"
                         >
                           <option value="ortopedica">🦴 Ortopédica / Física (Coluna, Joelho, etc)</option>
+                          <option value="membros_superiores">🖐️ Membros superiores (Túnel do Carpo, LER/DORT, Ombro)</option>
                           <option value="psiquiatrica">🧠 Psiquiátrica (Depressão, Ansiedade, etc)</option>
                           <option value="autismo">🧩 Autismo / TDAH / Neurodivergência</option>
                           <option value="neurologica">🧬 Neurológica (Microcefalia, Paralisia Cerebral, AVC, etc)</option>
