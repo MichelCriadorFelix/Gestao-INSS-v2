@@ -151,6 +151,11 @@ export default function Dashboard({
     const paid = (c.payments || []).reduce((sum: number, p: any) => p.isPaid ? sum + (Number(p.amount) || 0) : sum, 0);
     return paid >= fee - 0.005 ? 'quitado' : 'em_pagamento';
   };
+
+  // Percentual exibido: só mostra 100% (ou mais) quando está de fato quitado. Antes usava
+  // Math.round, então R$ 4.552 pagos de R$ 4.554 (99,96%) apareciam como "100%" sem estar quitado.
+  const formatPaidPercent = (c: any, percentPaid: number): number =>
+    getContractPaymentState(c) === 'quitado' ? Math.round(percentPaid) : Math.min(99, Math.floor(percentPaid));
   // PERF: trava contra cargas simultâneas (ver fetchData)
   const isFetchingRef = useRef(false);
   // Distingue a 1ª conexão do Realtime de uma RE-conexão (ver .subscribe abaixo)
@@ -2693,7 +2698,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                                     </div>
                                                     <div className="text-[10px] text-slate-500 dark:text-slate-400 flex justify-between">
                                                         <span>Pago: {formatCurrency(totalPaid)}</span>
-                                                        <span>{Math.round(percentPaid)}%</span>
+                                                        <span>{formatPaidPercent(contract, percentPaid)}%</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -2783,7 +2788,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                          <div className="space-y-1">
                                              <div className="flex justify-between text-[10px] items-center mb-1">
                                                  <span className="text-slate-500">Valor Total: <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(totalFee)}</span></span>
-                                                 <span className="text-slate-500 font-bold">{Math.round(percentPaid)}%</span>
+                                                 <span className="text-slate-500 font-bold">{formatPaidPercent(contract, percentPaid)}%</span>
                                              </div>
                                              <div className="w-full bg-slate-100 dark:bg-bordeaux-900/40 rounded-full h-1.5 overflow-hidden">
                                                  <div className={`h-1.5 rounded-full ${percentPaid >= 100 ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${Math.min(percentPaid, 100)}%` }}></div>
