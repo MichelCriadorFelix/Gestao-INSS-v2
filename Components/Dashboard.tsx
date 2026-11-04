@@ -141,6 +141,16 @@ export default function Dashboard({
   const [currentView, setCurrentView] = useState<'clients' | 'contracts' | 'labor_calc' | 'social_calc' | 'dr_michel' | 'dra_luana' | 'dr_felix_castro' | 'sec_fabricia' | 'agenda' | 'petition_editor' | 'legislation' | 'jurisprudence' | 'meu_inss' | 'knowledge_base' | 'marketing'>('agenda');
   const [clientFilter, setClientFilter] = useState<'active' | 'archived' | 'referral'>('active');
   const [contractStatusFilter, setContractStatusFilter] = useState<'todos' | 'Pendente' | 'Em Andamento' | 'Concluído'>('todos');
+  const [contractPaymentFilter, setContractPaymentFilter] = useState<'todos' | 'quitado' | 'em_pagamento'>('todos');
+
+  // Situação financeira do contrato: quitado = parcelas pagas somam o valor total (ou mais, como
+  // nos casos de 103% pago); em_pagamento = ainda falta receber; sem_valor = honorários não preenchidos.
+  const getContractPaymentState = (c: any): 'quitado' | 'em_pagamento' | 'sem_valor' => {
+    const fee = Number(c.totalFee) || 0;
+    if (fee <= 0) return 'sem_valor';
+    const paid = (c.payments || []).reduce((sum: number, p: any) => p.isPaid ? sum + (Number(p.amount) || 0) : sum, 0);
+    return paid >= fee - 0.005 ? 'quitado' : 'em_pagamento';
+  };
   // PERF: trava contra cargas simultâneas (ver fetchData)
   const isFetchingRef = useRef(false);
   // Distingue a 1ª conexão do Realtime de uma RE-conexão (ver .subscribe abaixo)
@@ -530,7 +540,7 @@ export default function Dashboard({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage, currentView, clientFilter, contractStatusFilter]);
+  }, [searchTerm, itemsPerPage, currentView, clientFilter, contractStatusFilter, contractPaymentFilter]);
 
   // PERF: dispara a carga pesada só quando a tela é realmente aberta.
   useEffect(() => {
@@ -1663,7 +1673,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
               ((c.lastName || '').toLowerCase().includes(lowerSearch)) ||
               ((c.cpf || '').includes(lowerSearch));
             const statusMatch = contractStatusFilter === 'todos' || c.status === contractStatusFilter;
-            return searchMatch && statusMatch;
+            const paymentMatch = contractPaymentFilter === 'todos' || getContractPaymentState(c) === contractPaymentFilter;
+            return searchMatch && statusMatch && paymentMatch;
           }).sort((a, b) => {
              // Contracts sort logic — prontos pra protocolar (doc. completa + pronto) sempre no topo,
              // pra não precisar caçar entre os que ainda estão aguardando algo.
@@ -2559,7 +2570,8 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                  <>
                     <FinancialStats contracts={contracts} />
 
-                    <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 p-1 rounded-xl w-fit mb-4 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 p-1 rounded-xl w-fit flex-wrap">
                         {([
                             { key: 'todos', label: 'Todos' },
                             { key: 'Pendente', label: 'Pendente' },
@@ -2578,6 +2590,27 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                 </button>
                             );
                         })}
+                    </div>
+
+                    <div className="flex bg-slate-200 dark:bg-bordeaux-900/40 p-1 rounded-xl w-fit flex-wrap" title="Situação do pagamento dos honorários">
+                        {([
+                            { key: 'todos', label: 'Todos' },
+                            { key: 'quitado', label: '✅ Quitados' },
+                            { key: 'em_pagamento', label: '💳 Em pagamento' },
+                        ] as const).map(opt => {
+                            const count = opt.key === 'todos' ? contracts.length : contracts.filter(c => getContractPaymentState(c) === opt.key).length;
+                            return (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => setContractPaymentFilter(opt.key)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${contractPaymentFilter === opt.key ? 'bg-white dark:bg-bordeaux-900/60 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    {opt.label}
+                                    <span className="text-[10px] font-bold opacity-70">({count})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                     </div>
 
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -2632,7 +2665,7 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                     {paginatedList.length === 0 && (
                                         <tr>
                                             <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
-                                                Nenhum contrato encontrado{contractStatusFilter !== 'todos' ? ` com status "${contractStatusFilter}"` : ''}.
+                                                Nenhum contrato encontrado{contractStatusFilter !== 'todos' ? ` com status "${contractStatusFilter}"` : ''}{contractPaymentFilter !== 'todos' ? ` (${contractPaymentFilter === 'quitado' ? 'quitados' : 'em pagamento'})` : ''}.
                                             </td>
                                         </tr>
                                     )}
