@@ -355,7 +355,7 @@ app.post("/api/ocr", async (req, res) => {
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: { role: "user", parts },
       config: {
         temperature: 0.1,
@@ -605,7 +605,7 @@ ${specialInstructions}`;
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: {
         role: "user",
         parts: [
@@ -704,7 +704,7 @@ DIRETRIZES:
                     "X-Title": "Felix & Castro Advocacia"
                   },
                   body: JSON.stringify({
-                    model: "google/gemini-2.0-flash-001",
+                    model: "google/gemini-3.6-flash",
                     messages: [
                       {
                         role: "user",
@@ -804,7 +804,7 @@ REGRAS:
       try {
         const response = await callGemini({
           bypassOpenRouter: true,
-          model: "gemini-3.5-flash",
+          model: "gemini-3.6-flash",
           contents: { role: "user", parts },
           config: { temperature: 0.1, maxOutputTokens: 16383 }
         }, MAX_RETRIES, 0, 0, usedKeyIndex);
@@ -2859,7 +2859,7 @@ const DEFAULT_SAFETY_SETTINGS = [
 ];
 
 // Teto de falha rápida especificamente para 503 (servidor Google sobrecarregado) quando o
-// modelo já está no "piso" da hierarquia (gemini-3.5-flash, sem mais nível pra rebaixar).
+// modelo já está no "piso" da hierarquia (o último de MODEL_HIERARCHY, sem mais nível pra rebaixar).
 // Diferente de 429/cota (onde CADA CHAVE tem seu próprio limite e rotacionar genuinamente
 // ajuda), 503 é sobrecarga do MODELO inteiro nos servidores do Google — rotacionar chave não
 // resolve isso, só adia o mesmo erro. Deixar rodar até MAX_RETRIES (34) nesse caso só empilha
@@ -3074,42 +3074,60 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
   return { key: minWaitKey, index: minWaitIdx, waitMs: minWait };
 }
 
+// ====================================================================
+// MODELOS GEMINI — alinhado à documentação oficial em 17/11/2026
+// (ai.google.dev: Release notes, Deprecations, "What's new" do Hydrogen / 3.8 / 3.6).
+//
+//  - gemini-4-hydrogen (GA em 12/11/2026): NOVO PADRÃO. Gratuito no free tier (as chaves daqui
+//    são gratuitas), 1M de contexto unificado, saída de 64K. Chega a cortar mais de 5x as
+//    afirmações inventadas em relação ao 3.8 ("sinaliza contexto ausente em vez de chutar").
+//  - gemini-3.8-flash (GA em 02/09/2026): 1ª reserva.
+//  - gemini-3.6-flash: geração anterior, ainda suportada e sem data de desligamento: piso da cadeia.
+//  - gemini-3.7-flash e gemini-3.5-flash estão DESCONTINUADOS (08/10/2026): o endpoint não sai do
+//    ar, mas o Google redireciona sozinho (3.7 -> 3.8 e 3.5 -> 3.6). Por isso eles NÃO servem mais
+//    como "plano B": cair de 3.6 para 3.5 era cair no MESMO modelo já sobrecarregado.
+//  - Carbon/Argon não estão no free tier — ficam fora da cadeia automática.
+// ====================================================================
 const MODEL_HIERARCHY = [
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash",
-  "gemini-3-flash-preview"
+  "gemini-4-hydrogen",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash"
 ];
+const DEFAULT_GEMINI_MODEL = MODEL_HIERARCHY[0];
 
 /**
- * IMPORTANTE: este mapa NÃO deve colapsar os modelos atuais em um só.
- * Ele fazia isso — todo modelo virava "gemini-3.7-flash" — o que tornava o
- * seletor da interface puramente decorativo: o usuário escolhia 3.5 e o
- * backend chamava 3.7. Agora só os nomes LEGADOS são redirecionados; os
- * modelos atuais são respeitados como escolhidos.
+ * IMPORTANTE: este mapa NÃO deve colapsar os modelos atuais em um só — senão o seletor da
+ * interface vira decorativo (o usuário escolhe um e o backend chama outro). Só os nomes LEGADOS
+ * são redirecionados, exatamente para o mesmo destino que o próprio Google já aplica; os modelos
+ * atuais são respeitados como escolhidos.
  * (O failover por cota/503 continua livre para trocar de modelo em runtime,
  * via prefixo "direct:" — ver callGeminiStream.)
  */
 const MODEL_MAPPING: Record<string, string> = {
   // Legados / descontinuados -> modelo atual equivalente
-  "gemini-2.0-flash-exp": "gemini-3.7-flash",
-  "gemini-1.5-flash-latest": "gemini-3.7-flash",
-  "gemini-1.5-flash": "gemini-3.7-flash",
-  "gemini-1.5-pro": "gemini-3.7-flash",
-  "gemini-2.5-flash": "gemini-3.7-flash",
+  "gemini-2.0-flash-exp": DEFAULT_GEMINI_MODEL,
+  "gemini-1.5-flash-latest": DEFAULT_GEMINI_MODEL,
+  "gemini-1.5-flash": DEFAULT_GEMINI_MODEL,
+  "gemini-1.5-pro": DEFAULT_GEMINI_MODEL,
+  "gemini-2.5-flash": DEFAULT_GEMINI_MODEL,
+  "gemini-3.5-flash": "gemini-3.6-flash",
+  "gemini-3.7-flash": "gemini-3.8-flash",
+  "google/gemini-3.5-flash": "gemini-3.6-flash",
+  "google/gemini-3.7-flash": "gemini-3.8-flash",
   // Modelos atuais -> respeitam a escolha do seletor
-  "gemini-3.5-flash": "gemini-3.5-flash",
+  "gemini-4-hydrogen": "gemini-4-hydrogen",
+  "gemini-3.8-flash": "gemini-3.8-flash",
   "gemini-3.6-flash": "gemini-3.6-flash",
-  "gemini-3.7-flash": "gemini-3.7-flash",
   "gemini-3-flash-preview": "gemini-3-flash-preview",
-  "google/gemini-3.5-flash": "gemini-3.5-flash",
+  "google/gemini-4-hydrogen": "gemini-4-hydrogen",
+  "google/gemini-3.8-flash": "gemini-3.8-flash",
   "google/gemini-3.6-flash": "gemini-3.6-flash",
   "google/gemini-3-flash-preview": "gemini-3-flash-preview"
 };
 
 function getEffectiveModel(modelName?: string): string {
-  if (!modelName) return MODEL_HIERARCHY[0];
-  
+  if (!modelName) return DEFAULT_GEMINI_MODEL;
+
   // Se houver prefixo "direct:", retorna o modelo solicitado diretamente (bypass para failover de quota)
   if (modelName.startsWith("direct:")) {
     return modelName.substring(7);
@@ -3117,15 +3135,96 @@ function getEffectiveModel(modelName?: string): string {
 
   const mapped = MODEL_MAPPING[modelName];
   if (mapped) return mapped;
-  
+
   // Fallback para variantes não mapeadas (ex.: "models/gemini-3.5-flash").
-  // Mesma regra: respeita o modelo pedido, não colapsa tudo em 3.7.
-  if (modelName.includes('3.7-flash')) return "gemini-3.7-flash";
+  // Mesma regra: respeita o modelo pedido, só redireciona os descontinuados.
+  // "flash-lite" primeiro: "gemini-3.5-flash-lite" contém "3.5-flash" mas é OUTRO modelo (não descontinuado).
+  if (modelName.includes('flash-lite')) return modelName;
+  if (modelName.includes('4-hydrogen')) return "gemini-4-hydrogen";
+  if (modelName.includes('3.8-flash')) return "gemini-3.8-flash";
+  if (modelName.includes('3.7-flash')) return "gemini-3.8-flash";
   if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
-  if (modelName.includes('3.5-flash')) return "gemini-3.5-flash";
+  if (modelName.includes('3.5-flash')) return "gemini-3.6-flash";
   if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
-  if (modelName.includes('deepseek')) return modelName;
   return modelName;
+}
+
+/** Posição do modelo na cadeia de failover (-1 = fora da cadeia: DeepSeek/OpenRouter, preview, etc.). */
+function failoverIndex(model?: string): number {
+  return MODEL_HIERARCHY.indexOf(getEffectiveModel(model));
+}
+
+/** true quando não há nível abaixo para rebaixar (piso da cadeia, ou modelo fora dela). */
+function isFloorModel(model?: string): boolean {
+  const idx = failoverIndex(model);
+  return idx === -1 || idx >= MODEL_HIERARCHY.length - 1;
+}
+
+/** Próximo modelo da cadeia — usado quando a cota DIÁRIA do modelo atual acabou. */
+function nextLowerModel(model?: string): string | null {
+  return isFloorModel(model) ? null : MODEL_HIERARCHY[failoverIndex(model) + 1];
+}
+
+/**
+ * 503 é sobrecarga do MODELO inteiro no Google — trocar de chave sozinho não resolve. Cada nível da
+ * cadeia recebe 3 tentativas (em chaves diferentes) antes de descer ao próximo; `consecutiveFailures`
+ * é o contador acumulado da requisição (não zera ao trocar de modelo).
+ */
+function nextLowerModelOnOverload(model: string | undefined, consecutiveFailures: number): string | null {
+  if (isFloorModel(model)) return null;
+  const idx = failoverIndex(model);
+  return consecutiveFailures >= 3 * (idx + 1) ? MODEL_HIERARCHY[idx + 1] : null;
+}
+
+// --------------------------------------------------------------------
+// API nova dos modelos recentes (documentação "What's new" do 3.6, 3.8 e Hydrogen):
+//  - temperature / top_p / top_k: depreciados desde o 3.6 — a API ignora (e, em gerações futuras,
+//    devolve 400). Determinismo vem do systemInstruction, não de temperatura. candidateCount não
+//    existe a partir do Gemini 3.
+//  - thinking: nível explícito (thinkingConfig.thinkingLevel). O padrão do Hydrogen é "high" (o do
+//    3.6/3.8 é "medium"); "minimal" é ERRO no 3.8 e no Gemini 4. Os tokens de raciocínio contam
+//    dentro do maxOutputTokens, então um nível alto demais pode comer o teto e cortar a resposta.
+//  - Gemini 4 NÃO suporta cache explícito (cachedContents / caches.create) — só implícito.
+// --------------------------------------------------------------------
+const GEMINI_NO_SAMPLING_RE = /^gemini-(4-|3\.(5|6|7|8)-)/;
+const GEMINI_THINKING_LEVEL_RE = /^gemini-(4-(hydrogen|carbon|argon)|3\.(6|8)-flash)$/;
+// "medium" = o comportamento que o app já tinha (padrão do 3.6/3.8), agora fixado também no Hydrogen,
+// que sem isso passaria a "high" (mais lento, mais caro em tokens e mais perto do teto de saída).
+const GEMINI_DEFAULT_THINKING_LEVEL = 'medium';
+
+function supportsExplicitCaching(model?: string): boolean {
+  return !/^gemini-4-/.test(getEffectiveModel(model));
+}
+
+/** Ajusta o config ao que o modelo efetivo aceita (cópia — não muta o objeto do chamador). */
+function sanitizeGeminiConfig(model: string, config: any): any {
+  const clean = { ...(config || {}) };
+  delete clean.candidateCount;
+  if (GEMINI_NO_SAMPLING_RE.test(model)) {
+    delete clean.temperature;
+    delete clean.topP;
+    delete clean.topK;
+  }
+  // `thinkingConfig: null` = o chamador (ou o fallback do 400) pediu para NÃO enviar nenhum nível.
+  if (clean.thinkingConfig === null) {
+    delete clean.thinkingConfig;
+  } else if (GEMINI_THINKING_LEVEL_RE.test(model) && clean.thinkingConfig === undefined && !clean.imageConfig) {
+    clean.thinkingConfig = { thinkingLevel: GEMINI_DEFAULT_THINKING_LEVEL };
+  }
+  return clean;
+}
+
+/**
+ * Rede de segurança: se a API devolver 400 reclamando do thinking (ex.: nível não aceito pelo
+ * modelo), tentar de novo SEM o thinkingConfig — o modelo usa o próprio padrão, que é exatamente o
+ * comportamento anterior à migração — em vez de repetir o mesmo 400 em todas as chaves.
+ */
+function dropThinkingConfigOn400(isBadRequest: boolean, errorMessage: string, config: any): any {
+  if (isBadRequest && /thinking/i.test(errorMessage) && config && config.thinkingConfig !== null) {
+    console.warn('[thinkingConfig] API rejeitou o nível de raciocínio (400) — repetindo sem thinkingConfig (padrão do modelo).');
+    return { ...config, thinkingConfig: null };
+  }
+  return config;
 }
 
 function getApiKeys() {
@@ -3213,7 +3312,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     if (orModel.includes("gemini")) {
       // Se já tem barra, assume que é um ID completo do OpenRouter
       if (!orModel.includes("/")) {
-        orModel = "google/gemini-2.0-flash-001"; 
+        orModel = "google/gemini-3.6-flash"; 
       }
     } else if (!orModel.includes("/")) {
       orModel = "deepseek/deepseek-chat";
@@ -3339,7 +3438,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     currentModel = "gemini-3.1-flash-lite-image";
   }
 
-  const finalParams = { ...params, model: currentModel };
+  const finalParams = { ...params, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
 
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -3410,8 +3509,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       // mantém várias chaves justamente pra isso, incluindo recém-adicionadas "virgens") é
       // desperdiçar chaves saudáveis que nem chegaram a ser tentadas. Ver comentário completo em
       // MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
-      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
-        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
+      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && isFloorModel(params.model)) {
+        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || DEFAULT_GEMINI_MODEL} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
       }
 
       // BACKOFF ESCALONADO: várias das nossas chaves compartilham o mesmo
@@ -3439,8 +3538,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
 
       // IMPORTANTE: 503 (servidor sobrecarregado) troca de CHAVE primeiro,
       // mantendo o mesmo modelo escolhido; só rebaixa um nível após 3 falhas
-      // seguidas no mesmo modelo, e nunca abaixo de gemini-3.5-flash (mesma
-      // regra do callGeminiStream). Antes, este bloco capturava is503Overloaded
+      // seguidas no mesmo modelo (3 por nível), e nunca abaixo do piso de
+      // MODEL_HIERARCHY (mesma regra do callGeminiStream). Antes, este bloco capturava is503Overloaded
       // já na 1ª falha e caía numa lista com modelos legados (2.5/1.5/2.0-flash).
       let nextParams = { ...params };
       // MAX_OUTPUT_TOKENS_FALLBACK: se a API rejeitou por causa do teto de saída
@@ -3452,24 +3551,19 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
         console.warn(`[maxOutputTokens] Valor ${nextParams.config.maxOutputTokens} rejeitado pela API (400) — caindo para 16383 (teto já testado).`);
         nextParams.config = { ...nextParams.config, maxOutputTokens: 16383 };
       }
+      nextParams.config = dropThinkingConfigOn400(isBadRequest, errorMessage, nextParams.config);
       if (isDailyQuota) {
-        const currentModel = params.model || "gemini-3.7-flash";
-        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
-        let currentIndex = alternatives.indexOf(currentModel);
-        if (currentIndex === -1) {
-          currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
-        }
-        if (currentIndex !== -1 && currentIndex < alternatives.length - 1) {
-          const nextModel = alternatives[currentIndex + 1];
-          console.warn(`[FAILOVER QUOTA NON-STREAM] Modelo '${currentModel}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
+        const nextModel = nextLowerModel(params.model);
+        if (nextModel) {
+          console.warn(`[FAILOVER QUOTA NON-STREAM] Modelo '${getEffectiveModel(params.model)}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
           nextParams.model = "direct:" + nextModel;
         }
-      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
-        console.warn(`[FAILOVER 503 NON-STREAM] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
-        nextParams.model = 'gemini-3.5-flash';
-      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
-        console.warn(`[FAILOVER 503 NON-STREAM] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.6-flash...`);
-        nextParams.model = 'gemini-3.6-flash';
+      } else if (is503Overloaded) {
+        const lowerModel = nextLowerModelOnOverload(params.model, nextFailures);
+        if (lowerModel) {
+          console.warn(`[FAILOVER 503 NON-STREAM] ${getEffectiveModel(params.model)} sobrecarregado no Google (503) após ${nextFailures} falhas seguidas. Alternando para ${lowerModel}...`);
+          nextParams.model = lowerModel;
+        }
       }
 
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -3496,7 +3590,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     let orModel = params.model || "";
     if (orModel.includes("gemini")) {
       if (!orModel.includes("/")) {
-        orModel = "google/gemini-2.0-flash-001";
+        orModel = "google/gemini-3.6-flash";
       }
     } else if (!orModel.includes("/")) {
       orModel = "deepseek/deepseek-chat";
@@ -3658,8 +3752,14 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   const msgTrial = `[Auto-Failover Matrix] Chave ${currentKeyDisplayIndex}/${keys.length} (${keyMask}) | Tentando modelo: ${currentModel}`;
   console.log(msgTrial);
   if (onStatus) onStatus(msgTrial);
-  
-  const finalParams = { ...params, model: currentModel };
+
+  // Gemini 4 não tem cache explícito: o cache criado para um modelo anterior não pode ser usado aqui.
+  // Mesmo sinal já tratado pelo chamador (pede ao usuário para reenviar com o texto completo).
+  if (params?.config?.cachedContent && !supportsExplicitCaching(currentModel)) {
+    throw new Error('CACHE_INVALID');
+  }
+
+  const finalParams = { ...params, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
 
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -3736,8 +3836,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       // mantém várias chaves justamente pra isso, incluindo recém-adicionadas "virgens") é
       // desperdiçar chaves saudáveis que nem chegaram a ser tentadas. Ver comentário completo em
       // MAX_CONSECUTIVE_503_ON_FLOOR_MODEL.
-      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && !params.model?.includes('3.6-flash') && !params.model?.includes('3.7-flash')) {
-        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || 'gemini-3.5-flash'} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
+      if (is503Overloaded && nextFailures >= Math.max(keys.length, MAX_CONSECUTIVE_503_ON_FLOOR_MODEL) && isFloorModel(params.model)) {
+        throw new Error(`ALL_KEYS_EXHAUSTED: Gemini ${params.model || DEFAULT_GEMINI_MODEL} está sobrecarregado nos servidores do Google (503) após ${nextFailures} tentativas seguidas em chaves diferentes. Tente novamente em alguns minutos.`);
       }
 
       // BACKOFF ESCALONADO: descobrimos que muitas das nossas chaves (19 no
@@ -3762,8 +3862,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
 
       // IMPORTANTE: 503 (servidor sobrecarregado) é tratado primeiro trocando
       // de CHAVE, mantendo o MESMO modelo escolhido pelo usuário — só depois
-      // de 3 falhas seguidas no mesmo modelo é que rebaixa um nível, e nunca
-      // abaixo de gemini-3.5-flash. Antes, este bloco também capturava
+      // de 3 falhas seguidas no mesmo modelo (3 por nível) é que rebaixa, e nunca
+      // abaixo do piso de MODEL_HIERARCHY. Antes, este bloco também capturava
       // is503Overloaded na primeira falha e percorria uma lista com modelos
       // legados (2.5/1.5/2.0-flash), rebaixando o modelo mesmo com chaves
       // novas disponíveis para tentar no modelo original.
@@ -3777,24 +3877,19 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
         console.warn(`[maxOutputTokens] Valor ${nextParams.config.maxOutputTokens} rejeitado pela API (400) — caindo para 16383 (teto já testado).`);
         nextParams.config = { ...nextParams.config, maxOutputTokens: 16383 };
       }
+      nextParams.config = dropThinkingConfigOn400(isBadRequest, errorMessage, nextParams.config);
       if (isDailyQuota) {
-        const currentModel = params.model || "gemini-3.7-flash";
-        const alternatives = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
-        let currentIndex = alternatives.indexOf(currentModel);
-        if (currentIndex === -1) {
-          currentIndex = alternatives.findIndex(alt => currentModel.includes(alt) || alt.includes(currentModel));
-        }
-        if (currentIndex !== -1 && currentIndex < alternatives.length - 1) {
-          const nextModel = alternatives[currentIndex + 1];
-          console.warn(`[FAILOVER QUOTA STREAM] Modelo '${currentModel}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
+        const nextModel = nextLowerModel(params.model);
+        if (nextModel) {
+          console.warn(`[FAILOVER QUOTA STREAM] Modelo '${getEffectiveModel(params.model)}' com cota diária esgotada. Alternando para o modelo reserva: '${nextModel}'`);
           nextParams.model = "direct:" + nextModel;
         }
-      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.6-flash')) {
-        console.warn(`[FAILOVER 503] gemini-3.6-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.5-flash...`);
-        nextParams.model = 'gemini-3.5-flash';
-      } else if (is503Overloaded && nextFailures >= 3 && params.model?.includes('3.7-flash')) {
-        console.warn(`[FAILOVER 503] gemini-3.7-flash sobrecarregado no Google (503). Alternando temporariamente para gemini-3.6-flash...`);
-        nextParams.model = 'gemini-3.6-flash';
+      } else if (is503Overloaded) {
+        const lowerModel = nextLowerModelOnOverload(params.model, nextFailures);
+        if (lowerModel) {
+          console.warn(`[FAILOVER 503] ${getEffectiveModel(params.model)} sobrecarregado no Google (503) após ${nextFailures} falhas seguidas. Alternando para ${lowerModel}...`);
+          nextParams.model = lowerModel;
+        }
       }
 
       const cleanErr = errorMessage.replace(/[\n\r\t]+/g, ' ').substring(0, 90);
@@ -5112,12 +5207,12 @@ app.post("/api/rag/plan", async (req, res) => {
 
 app.post("/api/analyze-cnis", async (req, res) => {
   try {
-    const { cnisContent, model = "gemini-3.5-flash" } = req.body;
+    const { cnisContent, model = "gemini-3.6-flash" } = req.body;
     if (!cnisContent) return res.status(400).json({ error: "CNIS content is required" });
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: "gemini-3.5-flash", // Garante o uso do Flash para CNIS como solicitado
+      model: "gemini-3.6-flash", // Garante o uso do Flash para CNIS como solicitado
       contents: { role: "user", parts: [{ text: cnisContent }] },
       config: {
         systemInstruction: CNIS_SYSTEM_PROMPT + getCurrentDateContext(),
@@ -5385,7 +5480,7 @@ DIRETRIZES DE CONTEÚDO PARA O POST DE MARKETING JURÍDICO:
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: { 
         responseMimeType: 'application/json',
@@ -5475,7 +5570,7 @@ Responda ESTRITAMENTE em formato JSON puro no esquema:
 
     const response = await callGemini({
       bypassOpenRouter: true,
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: { 
         responseMimeType: 'application/json',
@@ -5700,7 +5795,7 @@ Seja extremamente conciso e direto. Retorne estritamente um JSON válido no segu
 
       const response = await callGemini({
         bypassOpenRouter: true,
-        model: "gemini-3.7-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -5837,7 +5932,7 @@ app.post("/api/cache/create", async (req, res) => {
     const idx = currentKeyIndex;
     const ai = new GoogleGenAI({ apiKey: keys[idx] });
     const cache = await ai.caches.create({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       config: {
         contents: [{ role: 'user', parts: [{ text: "DOCUMENTOS DO CASO (ÍNTEGRA PARA CONSULTA E CITAÇÃO LITERAL):\n\n" + documentText }] }],
         ttl: '3600s',
@@ -5947,7 +6042,7 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       model = 'gemini-3.6-flash';
       console.log("[Dr.Michel] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.6-flash';
+      const reqModel = req.body.model || DEFAULT_GEMINI_MODEL;
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -6337,10 +6432,10 @@ ${message}`;
     // modelo (400/INVALID_ARGUMENT), há um fallback automático pra 16383 (valor já
     // testado) em callGemini/callGeminiStream — ver MAX_OUTPUT_TOKENS_FALLBACK.
     let maxOutputTokens = 32766;
-    // Gemini 3.5 Flash usa thinkingLevel (não thinkingBudget do 2.5).
-    // high = máximo raciocínio (geração de petição)
-    // medium = análise/relatório
-    // low = armazenamento/ciência (velocidade máxima)
+    // Esta variável só vale para o OpenRouter (reasoning_effort). Nas chamadas diretas ao Gemini o
+    // nível de raciocínio (thinkingConfig.thinkingLevel) é aplicado de forma centralizada em
+    // sanitizeGeminiConfig() — "medium" por padrão, porque o padrão do Hydrogen ("high") consome
+    // mais tokens dentro do mesmo teto de maxOutputTokens e deixa a resposta mais lenta.
     let thinkingConfig: any = undefined;
 
     if (modelProvider === 'openrouter') {
@@ -6368,8 +6463,8 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
-      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      console.log(`[Dr.Michel] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || DEFAULT_GEMINI_MODEL}`);
+      // Modelos Gemini atuais: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.Michel] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
@@ -6438,7 +6533,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
-              model: model || "gemini-3.5-flash",
+              model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
               bypassOpenRouter: modelProvider === "gemini"
@@ -6725,7 +6820,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
       model = 'gemini-3.6-flash';
       console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.6-flash';
+      const reqModel = req.body.model || DEFAULT_GEMINI_MODEL;
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -6739,7 +6834,7 @@ app.post("/api/dra-luana/chat", async (req, res) => {
     }
 
     // 2. SELEÇÃO DE PROMPT MODULAR (LEGO PROMPT) - Pilar 2
-    // Calibração Inteligente de Modelo por Demanda (Evita estouro de cota do Gemini 3.5 Flash)
+    // Calibração Inteligente de Modelo por Demanda (evita estouro de cota por modelo)
     if (modelProvider !== 'openrouter') {
       const reqModel = req.body.model;
       if (reqModel) {
@@ -6749,8 +6844,8 @@ app.post("/api/dra-luana/chat", async (req, res) => {
         model = "gemini-3.6-flash";
         console.log("[Dra.Luana] ⚖️ Ciência/OCR detectado. Usando 'gemini-3.6-flash' por padrão.");
       } else {
-        model = "gemini-3.6-flash";
-        console.log("[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando 'gemini-3.6-flash' por padrão.");
+        model = DEFAULT_GEMINI_MODEL;
+        console.log(`[Dra.Luana] 🧠 Peça, relatório, auditoria ou chat geral detectado. Usando '${DEFAULT_GEMINI_MODEL}' por padrão.`);
       }
     }
 
@@ -7205,8 +7300,8 @@ ${message}`;
 
       // Telemetria de input — diagnóstico de orçamento de tokens
       const totalInputTokensLuana = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
-      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      console.log(`[Dra.Luana] 📊 Input total: ~${Math.round(totalInputTokensLuana/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || DEFAULT_GEMINI_MODEL}`);
+      // Modelos Gemini atuais: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokensLuana > 200_000) {
         console.warn(`[Dra.Luana] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
@@ -7282,7 +7377,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
-              model: model || "gemini-3.5-flash",
+              model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
               bypassOpenRouter: modelProvider === 'gemini'
@@ -7572,7 +7667,7 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       model = 'gemini-3.6-flash';
       console.log("[Dr.FelixCastro] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.6-flash';
+      const reqModel = req.body.model || DEFAULT_GEMINI_MODEL;
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -7943,8 +8038,8 @@ ${message}`;
       selectedSystemPrompt = await injectAiMemoryRules('felix_castro', selectedSystemPrompt);
 
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
-      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      console.log(`[Dr.FelixCastro] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || DEFAULT_GEMINI_MODEL}`);
+      // Modelos Gemini atuais: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Dr.FelixCastro] ⚠️  Input acima de 200k tokens — uso muito intenso. Considere reduzir documentos.`);
       }
@@ -8012,7 +8107,7 @@ REGRAS ABSOLUTAS:
               ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
-              model: model || "gemini-3.5-flash",
+              model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
               bypassOpenRouter: modelProvider === "gemini"
@@ -8427,7 +8522,7 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
       model = 'gemini-3.6-flash';
       console.log("[Sec.Fabricia] ⚖️ Ciência/OCR detectado via Anexo/GED. Usando 'gemini-3.6-flash' nativo.");
     } else {
-      const reqModel = req.body.model || 'gemini-3.6-flash';
+      const reqModel = req.body.model || DEFAULT_GEMINI_MODEL;
       const reqProvider = req.body.modelProvider || (reqModel.includes('gemini') || !reqModel.includes('/') ? 'gemini' : 'openrouter');
       
       if (reqProvider === 'gemini' || reqModel.includes('gemini') || !reqModel.includes('/')) {
@@ -8682,8 +8777,8 @@ const MAX_ATTEMPTS = 3; // teto fixo — evita empilhamento de petições
 
       // Telemetria de input
       const totalInputTokens = estimateTokens(selectedSystemPrompt) + estimateTokens(JSON.stringify(contents));
-      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || 'gemini-3.5-flash'}`);
-      // Gemini 3.5 Flash: 1M tokens de contexto. 200k é um uso pesado mas seguro.
+      console.log(`[Sec.Fabricia] 📊 Input total: ~${Math.round(totalInputTokens/1000)}k tokens | Output máx: ${maxOutputTokens} tokens | Alvo: ${wordTarget || 'livre'} palavras | Modelo: ${model || DEFAULT_GEMINI_MODEL}`);
+      // Modelos Gemini atuais: 1M tokens de contexto. 200k é um uso pesado mas seguro.
       if (totalInputTokens > 200_000) {
         console.warn(`[Sec.Fabricia] ⚠️  Input acima de 200k tokens — uso muito intenso.`);
       }
@@ -8710,7 +8805,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
 
   try {
     const responseStream = await callGeminiStream({
-      model: model || "gemini-3.5-flash",
+      model: model || DEFAULT_GEMINI_MODEL,
       contents: streamContents,
       config: streamConfig,
       bypassOpenRouter: modelProvider === 'gemini'
@@ -9266,7 +9361,8 @@ app.post("/api/admin/test-gemini-keys", async (req, res) => {
     // criariam a mesma rajada artificial que este diagnóstico existe pra
     // detectar.
     const TEST_BATCH_SIZE = 4;
-    const TEST_MODEL = 'gemini-3.5-flash';
+    // Testa o modelo que o app realmente usa por padrão (e prova que a chave enxerga o Hydrogen).
+    const TEST_MODEL = DEFAULT_GEMINI_MODEL;
     const results: any[] = [];
 
     for (let i = 0; i < keys.length; i += TEST_BATCH_SIZE) {
@@ -9298,7 +9394,9 @@ app.post("/api/admin/test-gemini-keys", async (req, res) => {
           await ai.models.generateContent({
             model: TEST_MODEL,
             contents: 'oi',
-            config: { maxOutputTokens: 1 }
+            // thinking "low": os tokens de raciocínio contam dentro do maxOutputTokens — o ping de 1 token
+            // não pode gastar o teto inteiro pensando (o padrão do Hydrogen é "high").
+            config: { maxOutputTokens: 1, thinkingConfig: { thinkingLevel: 'low' } as any }
           });
           recordKeyUsageShared(apiKey);
           return { ...base, status: 'saudavel', statusLabel: '✅ Saudável', responseTimeMs: Date.now() - start };

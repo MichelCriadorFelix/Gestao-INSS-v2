@@ -52,9 +52,9 @@ import { PersonaConfig } from './personaConfig';
 import { extractTextFromPDF } from '../src/utils/pdfParser';
 
 const modelDisplayNames: Record<string, string> = {
-  'gemini-3.6-flash': 'Gemini 3.6 Flash (Padrão)',
-  'gemini-3.5-flash': 'Gemini 3.5 Flash',
-  'gemini-3.7-flash': 'Gemini 3.7 Flash',
+  'gemini-4-hydrogen': 'Gemini 4 Hydrogen (Padrão)',
+  'gemini-3.8-flash': 'Gemini 3.8 Flash',
+  'gemini-3.6-flash': 'Gemini 3.6 Flash',
   'deepseek/deepseek-v4-flash': 'DeepSeek V4',
   'anthropic/claude-3.5-sonnet': 'Claude 3.5 Sonnet',
 };
@@ -1017,7 +1017,7 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [clients, setClients] = useState<any[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [selectedModelProvider, setSelectedModelProvider] = useState('gemini');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-4-hydrogen');
   const [petitionLength, setPetitionLength] = useState('Padrão (Livre)');
   
   // Anexos pendentes para envio junto com a instrução do usuário
@@ -4775,9 +4775,9 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                     className="bg-slate-50 dark:bg-slate-850/60 px-2 py-1 rounded-lg border border-slate-200/60 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-300 outline-none cursor-pointer hover:text-emerald-600 dark:hover:text-gold-400 transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-none sm:w-auto truncate shrink"
                   >
                     <optgroup label="Nativo Google">
-                      <option value="gemini-3.6-flash">Gemini 3.6 Flash (Padrão)</option>
-                      <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-                      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+                      <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Padrão)</option>
+                      <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
                     </optgroup>
                     <optgroup label="OpenRouter">
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
