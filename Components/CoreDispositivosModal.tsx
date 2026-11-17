@@ -5,6 +5,8 @@ import { CORE_DISPOSITIVOS_CASE_TYPES } from "./coreDispositivosConfig";
 
 interface CoreDispositivosModalProps {
   onClose: () => void;
+  /** Tipo de caso da conversa atual (escolhido ou identificado automaticamente): o modal abre nele em vez do 1º da lista. */
+  initialCaseType?: string;
 }
 
 interface CuratedItem {
@@ -20,8 +22,10 @@ interface SearchResultItem {
   metadata?: { title?: string };
 }
 
-export function CoreDispositivosModal({ onClose }: CoreDispositivosModalProps) {
-  const [caseType, setCaseType] = useState(CORE_DISPOSITIVOS_CASE_TYPES[0].key);
+export function CoreDispositivosModal({ onClose, initialCaseType }: CoreDispositivosModalProps) {
+  const [caseType, setCaseType] = useState(
+    CORE_DISPOSITIVOS_CASE_TYPES.some(t => t.key === initialCaseType) ? (initialCaseType as string) : CORE_DISPOSITIVOS_CASE_TYPES[0].key
+  );
   const [curated, setCurated] = useState<CuratedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");

@@ -225,9 +225,15 @@ const isLegalDeviceCitedInResponse = (key: LegalDeviceKey, responseText: string,
   if (key.kind === 'tema') {
     return !!key.num && new RegExp(`Tema\\s*(?:n[ºo°]\\.?\\s*)?${escapeRegExp(key.num).replace(/\\\./g, '\\.?')}\\b`, 'i').test(responseText);
   }
-  if (key.kind === 'article' && key.num) {
+  // Artigo só vale pelo NÚMERO quando dá para confirmar também a LEI. Sem âncora da lei (título sem número
+  // extraível, ex.: "LEI No 8.245, DE 18 DE OUTUBRO DE 1991 - Lei do Inquilinato"), a antiga regra aceitava o
+  // dispositivo só porque "Art. 6º" aparece em qualquer lugar da resposta (ex.: Art. 6º da CF) — a Lei do Inquilinato
+  // entrava na Base Legal de um caso de incapacidade. Nesse caso cai na prova pelo CONTEÚDO (fim da função).
+  if (key.kind === 'article' && key.num && key.lawAnchor) {
     const artCited = new RegExp(`(?:Art\\.?|Artigo)\\s*${escapeRegExp(key.num)}\\b`, 'i').test(responseText);
-    const lawCited = key.lawAnchor ? normalizedResponse.includes(key.lawAnchor) : true;
+    // A âncora (ex.: "8245" da Lei 8.245) deve aparecer como NÚMERO INTEIRO — um simples includes() casava com qualquer
+    // número longo do relatório (NB, protocolo, processo) que contivesse esses dígitos, "citando" leis que ninguém citou.
+    const lawCited = new RegExp(`(?<!\\d)${escapeRegExp(key.lawAnchor)}(?!\\d)`).test(normalizedResponse);
     return artCited && lawCited;
   }
   if (key.kind === 'jurisprudencia') {
@@ -3886,7 +3892,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
       )}
 
       {showCoreDispositivosModal && (
-        <CoreDispositivosModal onClose={() => setShowCoreDispositivosModal(false)} />
+        <CoreDispositivosModal onClose={() => setShowCoreDispositivosModal(false)} initialCaseType={selectedCaseTypes[0]} />
       )}
 
       {showLegalBaseModal && (
