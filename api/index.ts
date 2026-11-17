@@ -4768,7 +4768,15 @@ app.post("/api/rag/plan", async (req, res) => {
       .map((it: any) => it.titulo);
 
     // COGNITIVE SAFETY-NET: Se o caso tratar de qualquer especialidade (Cível, Consumidor, Trabalhista, Previdenciário), nós garantimos que as leis basilares, decretos e súmulas são injetados no plano de RAG.
-    const contextStr = String(caseContextWithMemory).toLowerCase();
+    // Os gatilhos por palavra-chave abaixo devem olhar só os FATOS do caso (resumo + mensagens do advogado).
+    // O contexto do planner também carrega (a) o RELATÓRIO gerado antes pela IA e (b) as regras de memória — textos
+    // que citam BPC, pensão, súmulas etc. por motivos alheios ao caso e disparavam blocos inteiros sem relação
+    // (raio-X real de 17/11/2026: Súmulas de BPC/pensão/acidente num caso de incapacidade). Ambos saem daqui;
+    // o planner de IA continua lendo o contexto completo.
+    const contextStr = String(caseContextWithMemory)
+      .replace(/\[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS[\s\S]*?\[MENSAGENS E EDIÇÕES DO ADVOGADO\]/i, ' ')
+      .split('[MEMÓRIA DE APRENDIZADO CONTÍNUO')[0]
+      .toLowerCase();
 
     // Helper para injetar/mesclar artigos em um título do plano curatedPlan (usa useFull = true para bypassar filtros de área na segurança cognitiva)
     const injectIntoPlan = (title: string, articles: string[], isWhole = false) => {

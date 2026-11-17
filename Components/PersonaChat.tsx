@@ -2109,7 +2109,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           ? buildCaseDigest(effectiveDocuments as any, 2400) : '';
         if (caseDigest) {
           console.log(`[RAG CASE DIGEST] Resumo do caso extraído dos documentos para guiar a busca (${caseDigest.length} chars): ${caseDigest.substring(0, 220)}...`);
-          ragQuery = (ragQuery + ' ' + caseDigest).substring(0, 3200);
+          // Consulta de embedding LIMPA: em comandos como "gerar relatório" o texto da conversa é ruído ("Tomada de
+          // ciência: leia e armazene os documentos...") e diluía o vetor, trazendo trechos sem relação (Lei do Inquilinato
+          // com similaridade alta no raio-X real). Comando genérico → só o resumo do caso; pergunta com conteúdo → mensagem + resumo.
+          const msgWords = messageText.trim().split(/\s+/).length;
+          ragQuery = ((msgWords >= 12 && !isGenerationCommand) ? `${messageText} ${caseDigest}` : caseDigest).substring(0, 2600);
         }
 
         // ============================================================
