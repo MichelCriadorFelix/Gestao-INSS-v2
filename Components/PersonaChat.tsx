@@ -47,6 +47,7 @@ import EliteRedactionModal from './EliteRedactionModal';
 import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
+import { runSecondPassRag } from './secondPassRag';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
 import { PersonaConfig } from './personaConfig';
@@ -2706,6 +2707,31 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       console.log(`[PERF] ⏱️ Tempos desta mensagem (ms desde o envio): ${JSON.stringify(__perf)}`
         + ` | RAG até a busca terminar: ${__perf.rag_busca_fim ?? '-'} | planner: ${__perf.planner_fim ?? '-'} | embed: ${__perf.embed_fim ?? '-'}`
         + ` | chat enviado→1º texto: ${(__perf.primeiro_texto ?? 0) - (__perf.chat_enviado ?? 0)} | geração: ${(__perf.fim ?? 0) - (__perf.primeiro_texto ?? 0)}`);
+
+      // 2ª RODADA DE RAG (loop): o relatório lista, com "[AUSENTE — SOLICITAR ADIÇÃO]", o que o modelo considera
+      // essencial e não recebeu. Esses itens costumam existir na base — busca dirigida por identificador exato
+      // (súmula/tema/lei/decreto/EC/IN), troca o rótulo e anexa o texto LITERAL (sem IA), sem o advogado precisar
+      // reenviar o comando. O que realmente não está na base continua sinalizado. Ver Components/secondPassRag.ts.
+      if (!isSurgicalCorrection && fullText.length > 1500 && /\[AUSENTE/i.test(fullText)) {
+        try {
+          if (sessionId === currentSessionIdRef.current) setProgressText('🔎 2ª rodada de busca: procurando na base os itens marcados como ausentes...');
+          const sp = await runSecondPassRag(fullText, persona.agentAreas, {
+            getTitles: () => supabaseService.getLegalDocumentTitles(),
+            fetchChunks: (titles, perTitle, query) => supabaseService.searchByTitles(titles, perTitle, query),
+          });
+          if (sp.changed) {
+            fullText = sp.text;
+            // Os dispositivos recuperados também entram na Base Legal desta conversa (via o bloco "citados na resposta").
+            if (sp.pieces.length > 0) ragContext = ragContext ? `${ragContext}\n\n---\n\n${sp.pieces.join('\n\n---\n\n')}` : sp.pieces.join('\n\n---\n\n');
+            console.log(`[2ª BUSCA] Recuperados ${sp.recovered.length} dispositivo(s) marcados como ausentes: ${sp.recovered.map(r => `${r.title} (${r.chunks})`).join(' ; ')}. Continuam ausentes na base: ${sp.stillMissing.length}.`);
+            if (sessionId === currentSessionIdRef.current) setStreamingMessage(fullText);
+          } else {
+            console.log(`[2ª BUSCA] Nenhum dos itens marcados como ausentes pôde ser recuperado por identificador exato (${sp.stillMissing.length} item(ns)) — provavelmente não constam da base.`);
+          }
+        } catch (spErr) {
+          console.warn('[2ª BUSCA] Falha na segunda rodada de busca (relatório segue como gerado):', spErr);
+        }
+      }
 
       if (sessionId === currentSessionIdRef.current) setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
