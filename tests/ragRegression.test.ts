@@ -136,6 +136,22 @@ function realisticContext(): string {
   });
   await test('modelos não-Gemini (OpenRouter) seguem inalterados', () => assert.equal(getEffectiveModel('deepseek/deepseek-v4-flash'), 'deepseek/deepseek-v4-flash'));
 
+  console.log('\nContexto de CRM (agenda/contratos/clientes) só quando a mensagem é sobre isso');
+  const crmCode = between('const CRM_INTENT_RE', 'const QUICK_QUESTION_MAX_CHARS');
+  const { needsCrmContext } = await loadFromIndex(crmCode, ['needsCrmContext']);
+  await test('mensagens JURÍDICAS não arrastam o CRM inteiro (eram ~100k tokens por mensagem)', () => {
+    for (const m of ['gerar relatório', 'Qual foi o motivo do indeferimento da prorrogação e qual a data da DCB?', 'o que diz a Súmula 47 da TNU?',
+      'Tomada de ciência: leia e armazene os documentos anexados desta cliente.', 'elabore a petição inicial de auxílio por incapacidade', 'a perícia médica foi regular?']) {
+      assert.equal(needsCrmContext(m), false, `não deveria injetar CRM em: "${m}"`);
+    }
+  });
+  await test('mensagens de AGENDA/CONTRATO/CLIENTES continuam recebendo o CRM', () => {
+    for (const m of ['quais compromissos tenho hoje na agenda?', 'quantos contratos estão em andamento?', 'marque como resolvido o compromisso de amanhã',
+      'qual o status do contrato da Lanetone?', 'lista de clientes arquivados', 'quais clientes têm perícias esta semana?']) {
+      assert.equal(needsCrmContext(m), true, `deveria injetar CRM em: "${m}"`);
+    }
+  });
+
   console.log('\nResumo do caso e tipo de caso');
   const denizeText = [
     'Meu INSS: Aposentadoria, pensão por morte, salário-maternidade, BPC e auxílio por incapacidade: consulte aqui todos os serviços; veja também o seguro-desemprego.',

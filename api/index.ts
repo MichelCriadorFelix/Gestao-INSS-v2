@@ -3382,6 +3382,16 @@ function sanitizeGeminiConfig(model: string, config: any): any {
 // prazos) e qualquer geração/relatório/revisão mantêm o contexto completo. O montador fitRagContext
 // garante que, mesmo com teto menor, os dispositivos curados pelo planner entram primeiro.
 // --------------------------------------------------------------------
+// CONTEXTO DE CRM (agenda + contratos + clientes) SÓ QUANDO A MENSAGEM É SOBRE ISSO.
+// Medido em produção (17/11/2026): cada mensagem jurídica levava o CRM INTEIRO (agenda, 199 contratos, históricos de 322
+// clientes em JSON) no prompt — a entrada chegou a 206.616 tokens num relatório e 144.890 numa pergunta simples cujo RAG
+// tinha só ~9k tokens. Isso (a) era a maior parte da espera de ~110s até o 1º texto, (b) gastava a cota por minuto das chaves
+// e (c) enviava dados de OUTROS clientes ao modelo em toda consulta de um caso específico (sigilo e risco de mistura na redação).
+const CRM_INTENT_RE = /\b(agenda|compromissos?|contratos?|honor[áa]rios? contratuais|parcelas?|mensalidades?|inadimpl[êe]ncia|faturamento|clientes? (?:ativos?|arquivados?|em andamento|conclu[ií]dos?|do dia|de hoje)|quais (?:s[ãa]o )?(?:os |as )?(?:clientes|contratos|compromissos|audi[êe]ncias|per[íi]cias|prazos)|quantos (?:clientes|contratos|compromissos)|marque|marcar|desmarque|resolva|resolver|reagende|atualiz\w+ (?:o )?(?:status|cliente|contrato|agenda)|lista de clientes|andamentos? (?:do|da) cliente)\b|\[ACTION/i;
+function needsCrmContext(message?: string): boolean {
+  return CRM_INTENT_RE.test(message || '');
+}
+
 const QUICK_QUESTION_MAX_CHARS = 700;
 const QUICK_QUESTION_RAG_CHARS = 175_000; // ~50k tokens (o teto cheio é ~262k chars ≈ 75k tokens)
 const ANALYTIC_QUESTION_RE = /(calcul|compar|estrat|vantaj|viabil|simul|projet|melhor (regra|op[çc][ãa]o|caminho)|ped[áa]gio|regra de transi|\brmi\b|quanto|prazo|prescri|decad|tese|enquadr|poss[ií]vel|pode(ria)?\s+(ser|gerar|converter|somar|averbar|aposentar)|converter|averbar)/i;
@@ -6491,7 +6501,7 @@ REGRAS DE OURO:
     
     
     
-    if (systemState && intent !== "[GERAÇÃO]") {
+    if (systemState && intent !== "[GERAÇÃO]" && !isReportRequest && needsCrmContext(message)) {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
 [COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
@@ -7320,7 +7330,7 @@ REGRAS DE OURO:
     // Previne edge cases extremos sem sacrificar contexto normal
     
     
-    if (systemState && intent !== "[GERAÇÃO]") {
+    if (systemState && intent !== "[GERAÇÃO]" && !isReportRequestLuana && needsCrmContext(message)) {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
 [COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:
@@ -8108,7 +8118,7 @@ REGRAS DE OURO:
 
     
     
-    if (systemState && intent !== "[GERAÇÃO]") {
+    if (systemState && intent !== "[GERAÇÃO]" && !isReportRequest && needsCrmContext(message)) {
       selectedSystemPrompt += `\n\n[DADOS INTERNOS DO SISTEMA - CRM, AGENDA E CONTRATOS]
 Você possui acesso em tempo real aos dados do escritório (via injeção de contexto). Se o usuário perguntar sobre agenda, clientes ou contratos, consulte os dados a seguir para responder de forma precisa, sem alucinar.
 [COMANDOS E DIRETRIZES DE CRM, CONTRATOS, CLIENTES E AGENDA]:

@@ -2595,11 +2595,17 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
               artifactType: activeArtifactMeta?.typeKey,
               artifactTypeLabel: activeArtifactMeta?.config?.label,
               artifactTitle: activeArtifactMeta?.title,
-              systemState: {
-                agenda: agendaEvents,
-                clients: systemClients?.map(c => ({ id: c.id, name: c.name, type: c.type, history: c.eventHistory })),
-                contracts: contracts
-              }
+              // CRM (agenda + contratos + clientes) só é enviado quando a mensagem é sobre isso (ou para a secretária,
+              // que opera o CRM). O servidor aplica a regra final (needsCrmContext). Antes ia em TODA mensagem: ~100k tokens
+              // de entrada e dados de outros clientes no prompt de um caso específico.
+              systemState: (persona.chatEndpoint.includes('sec-fabricia')
+                || /agenda|contrat|cliente|compromiss|honor[áa]rio|parcela|marc(?:ar|ue)|resolv|atualiz|prazo|audi[êe]ncia|per[íi]cia|\[ACTION/i.test(currentMessage))
+                ? {
+                    agenda: agendaEvents,
+                    clients: systemClients?.map(c => ({ id: c.id, name: c.name, type: c.type, history: c.eventHistory })),
+                    contracts: contracts
+                  }
+                : undefined
             }),
             signal: abortController.signal
           });
