@@ -1080,6 +1080,158 @@ function smartTruncate(text: string, maxChars: number): string {
     + text.substring(text.length - tailSize);
 }
 
+// ====================================================================
+// MONTAGEM DO CONTEXTO RAG POR PRIORIDADE (substitui o corte "cabeça + cauda" do smartTruncate no RAG)
+//
+// PROBLEMA REAL (relatório de 17/11/2026): Súmula 47 TNU, Lei 14.331/2022 e outros itens estavam
+// cadastrados na base e o planner os escolheu, mas o relatório os marcava "[AUSENTE — SOLICITAR ADIÇÃO]".
+// Causa: o ragContext chega como UM bloco de texto = resultados do cliente (vetorial/título/keyword,
+// ~200k chars) + chunks do planner (até 300k). Estourando o orçamento (~262k), o smartTruncate guardava
+// 72% do começo + 20% do fim e DESCARTAVA O MEIO — justamente onde caíam os dispositivos curados pelo
+// planner. Além disso o mesmo trecho aparecia 2x (cliente + planner), gastando orçamento à toa.
+//
+// AGORA: o bloco é separado em trechos; duplicatas saem; cada trecho recebe uma PRIORIDADE
+//   0 dispositivos-núcleo do tipo de caso | 1 súmulas/temas/jurisprudência escolhidos pelo planner
+//   2 demais trechos do planner | 3 vetorial forte ou título exato | 4 vetorial fraco/keyword
+//   5 reaproveitado da conversa
+// e entram no orçamento por prioridade, com cotas (planner ≤62%, súmulas ≤35%) para nenhuma fonte
+// engolir a outra; sobra de uma vira espaço da outra. Só se descartam trechos INTEIROS (nunca no meio
+// de uma norma), e o contexto ganha um ÍNDICE DAS FONTES no topo — o Hydrogen "sinaliza o que falta em
+// vez de chutar", então ele precisa conseguir conferir rapidamente o que de fato veio.
+// ====================================================================
+const RAG_PIECE_SEP = '\n\n---\n\n';
+const RAG_DECISION_TITLE_RE = /^\s*(s[úu]mula|tema\b|jurisprud[êe]ncia|orienta[çc][ãa]o jurisprudencial|enunciado|precedente)/i;
+
+interface RagPiece {
+  text: string;
+  title: string;
+  origin: 'core' | 'planner' | 'client' | 'artifact' | 'other';
+  tier: number;
+  order: number;
+}
+
+function parseRagPieces(ragContext: string): RagPiece[] {
+  const fragments = ragContext.split(RAG_PIECE_SEP).map(f => f.trim()).filter(Boolean);
+  // Uma norma pode conter "---" no próprio texto: fragmento sem cabeçalho FONTE: volta para o anterior.
+  const merged: string[] = [];
+  for (const f of fragments) {
+    if (f.startsWith('FONTE:') || merged.length === 0) merged.push(f);
+    else merged[merged.length - 1] += RAG_PIECE_SEP + f;
+  }
+
+  const seen = new Map<string, RagPiece>();
+  const pieces: RagPiece[] = [];
+  merged.forEach((text, order) => {
+    let title = '';
+    let tag = '';
+    const m = text.match(/^FONTE:\s*([^\n]*)\n/);
+    if (m) {
+      const header = m[1].trim();
+      const tm = header.match(/^(.*?)\s*\[([^\]]*)\]\s*$/);
+      title = (tm ? tm[1] : header).trim();
+      tag = tm ? tm[2] : '';
+    }
+    const isDecision = RAG_DECISION_TITLE_RE.test(title);
+    const scoreMatch = tag.match(/^Score:\s*(\d+)/i);
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : -1;
+
+    let origin: RagPiece['origin'] = 'other';
+    let tier = 4;
+    if (/pré-cadastrado/i.test(tag)) { origin = 'core'; tier = 0; }
+    else if (/Recupera[çc][ãa]o Exata/i.test(tag)) { origin = 'planner'; tier = isDecision ? 1 : 2; }
+    else if (/Já usado antes/i.test(tag)) { origin = 'artifact'; tier = 5; }
+    else if (score >= 0) { origin = 'client'; tier = score >= 45 ? (isDecision ? 1 : 3) : 4; }
+    else if (/T[íi]tulo Exato/i.test(tag)) { origin = 'client'; tier = isDecision ? 1 : 3; }
+    else if (/Keyword Match/i.test(tag)) { origin = 'client'; tier = 4; }
+
+    const body = m ? text.slice(m[0].length) : text;
+    const signature = title.toLowerCase().replace(/\s+/g, ' ') + '|' + body.replace(/\s+/g, ' ').slice(0, 200).toLowerCase();
+    const existing = seen.get(signature);
+    if (existing) {
+      // Mesmo trecho vindo de duas fontes: fica 1 cópia, com a MELHOR prioridade das duas.
+      if (tier < existing.tier) { existing.tier = tier; existing.origin = origin; }
+      return;
+    }
+    const piece: RagPiece = { text, title, origin, tier, order };
+    seen.set(signature, piece);
+    pieces.push(piece);
+  });
+
+  // Documento CURTO escolhido pelo planner (≤6 trechos: lei pequena, artigos-núcleo, resolução) é barato e
+  // foi escolhido por pertinência — entra na mesma prioridade das súmulas, antes das leis amplas "integrais".
+  // (Ex.: Lei 14.331/2022 tem 4 trechos; brigava por espaço com Lei 8.213/Decreto 3.048 inteiros e perdia.)
+  const plannerCount = new Map<string, number>();
+  for (const p of pieces) if (p.origin === 'planner') plannerCount.set(p.title, (plannerCount.get(p.title) || 0) + 1);
+  for (const p of pieces) {
+    if (p.origin === 'planner' && p.tier === 2 && (plannerCount.get(p.title) || 0) <= 6) p.tier = 1;
+  }
+  return pieces;
+}
+
+function fitRagContext(ragContext: string, budgetChars: number, label = ''): string {
+  if (!ragContext) return ragContext;
+  const pieces = parseRagPieces(ragContext);
+  const sepLen = RAG_PIECE_SEP.length;
+  const indexReserve = Math.min(7000, Math.floor(budgetChars * 0.03));
+  const budget = Math.max(2000, budgetChars - indexReserve);
+
+  const byPriority = [...pieces].sort((a, b) => a.tier - b.tier || a.order - b.order);
+  const taken = new Set<RagPiece>();
+  let total = 0;
+  let plannerUsed = 0;
+  let decisionUsed = 0;
+  const plannerCap = Math.floor(budget * 0.62);
+  const decisionCap = Math.floor(budget * 0.35);
+
+  // Fase A: respeita as cotas por fonte.
+  for (const p of byPriority) {
+    const len = p.text.length + sepLen;
+    if (total + len > budget) continue;
+    if (p.origin === 'planner' && plannerUsed + len > plannerCap) continue;
+    if (p.tier === 1 && decisionUsed + len > decisionCap) continue;
+    taken.add(p);
+    total += len;
+    if (p.origin === 'planner') plannerUsed += len;
+    if (p.tier === 1) decisionUsed += len;
+  }
+  // Fase B: o que sobrou do orçamento volta para os trechos que ficaram de fora (por prioridade).
+  for (const p of byPriority) {
+    if (taken.has(p)) continue;
+    const len = p.text.length + sepLen;
+    if (total + len > budget) continue;
+    taken.add(p);
+    total += len;
+  }
+
+  const kept = byPriority.filter(p => taken.has(p));
+  const dropped = byPriority.filter(p => !taken.has(p));
+
+  // Índice: título → nº de trechos que de fato entraram.
+  const countByTitle = new Map<string, number>();
+  for (const p of kept) {
+    const t = p.title || '(sem título)';
+    countByTitle.set(t, (countByTitle.get(t) || 0) + 1);
+  }
+  const indexLines = Array.from(countByTitle.entries()).slice(0, 90)
+    .map(([t, n]) => `- ${t} (${n} trecho${n > 1 ? 's' : ''})`);
+  const droppedByTitle = new Map<string, number>();
+  for (const p of dropped) {
+    const t = p.title || '(sem título)';
+    droppedByTitle.set(t, (droppedByTitle.get(t) || 0) + 1);
+  }
+  const droppedLines = Array.from(droppedByTitle.entries()).slice(0, 25)
+    .map(([t, n]) => `- ${t} (${n})`);
+
+  const header = `[ÍNDICE DAS FONTES RECUPERADAS — ${countByTitle.size} fonte(s) neste contexto. Antes de afirmar que um dispositivo está ausente, procure o título/número aqui e no texto abaixo]\n${indexLines.join('\n')}`;
+  const footer = dropped.length > 0
+    ? `[Trechos de menor prioridade omitidos por limite de contexto (${dropped.length}); existem na base e podem ser pedidos em nova busca:\n${droppedLines.join('\n')}]`
+    : '';
+  const out = [header, ...kept.map(p => p.text), ...(footer ? [footer] : [])].join(RAG_PIECE_SEP);
+
+  console.log(`[RAG FIT${label ? ' ' + label : ''}] ${ragContext.length} → ${out.length} chars | trechos: ${pieces.length} únicos de ${ragContext.split(RAG_PIECE_SEP).length} brutos → ${kept.length} mantidos, ${dropped.length} omitidos | planner ${plannerUsed} chars, súmulas/temas ${decisionUsed} chars${droppedLines.length ? ' | omitidos: ' + Array.from(droppedByTitle.keys()).slice(0, 8).join(' ; ') : ''}`);
+  return out;
+}
+
 function normalizeForMatching(str: string): string {
   return (str || "")
     .replace(/\r\n/g, "\n")
@@ -1673,7 +1825,7 @@ COMANDO "GERAR RELATÓRIO":
       FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
       → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
       → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
-      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG). ANTES de marcar AUSENTE, confira o "ÍNDICE DAS FONTES RECUPERADAS" no topo da base de conhecimento e procure o título/número no texto; só marque AUSENTE se o dispositivo realmente não constar no contexto.
       NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
       Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
@@ -2344,7 +2496,7 @@ COMANDO "GERAR RELATÓRIO":
       FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
       → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
       → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
-      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG). ANTES de marcar AUSENTE, confira o "ÍNDICE DAS FONTES RECUPERADAS" no topo da base de conhecimento e procure o título/número no texto; só marque AUSENTE se o dispositivo realmente não constar no contexto.
       NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
       Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    11. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas).
@@ -2653,7 +2805,7 @@ COMANDO "GERAR RELATÓRIO":
       FORMATO — lista numerada, separando **NÚCLEO ESSENCIAL** de **SUBSIDIÁRIO/EVENTUAL**. Para cada item:
       → Título EXATO como apareceu no RAG (prefixo 'FONTE:') + artigo(s) específicos quando for lei.
       → Em uma linha: o FATO/REQUISITO concreto deste caso que justifica o item.
-      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG).
+      → [DISPONÍVEL NA BASE] se veio no RAG; [AUSENTE — SOLICITAR ADIÇÃO] se essencial mas não veio (NUNCA cite fora do RAG). ANTES de marcar AUSENTE, confira o "ÍNDICE DAS FONTES RECUPERADAS" no topo da base de conhecimento e procure o título/número no texto; só marque AUSENTE se o dispositivo realmente não constar no contexto.
       NÃO transcreva o texto dos dispositivos nesta fase — transcrição é tarefa da PEÇA. Aqui você apenas PROPÕE e JUSTIFICA, para o advogado APROVAR, EXCLUIR ou ADICIONAR itens antes da peça.
       Use SOMENTE os títulos exatos presentes no RAG desta conversa. NUNCA use catálogos de memória.
    13. PERGUNTAS AO ADVOGADO (mín. 3 perguntas fundamentadas — incluir obrigatoriamente: "A ação será proposta no Juizado Especial Cível ou na Vara Cível? Qual a comarca (domicílio do autor)?").
@@ -3215,6 +3367,13 @@ function sanitizeGeminiConfig(model: string, config: any): any {
     delete clean.topP;
     delete clean.topK;
   }
+  // O 2.5 (reserva final da cadeia) não conhece thinkingLevel — usa orçamento em tokens. Traduz o nível
+  // pedido para um orçamento equivalente, senão o failover até o piso daria 400 em toda requisição.
+  if (model === 'gemini-2.5-flash' && clean.thinkingConfig && typeof clean.thinkingConfig === 'object'
+      && clean.thinkingConfig.thinkingLevel !== undefined) {
+    const lvl = String(clean.thinkingConfig.thinkingLevel).toLowerCase();
+    clean.thinkingConfig = { thinkingBudget: lvl === 'low' ? 2048 : (lvl === 'high' || lvl === 'xhigh') ? 16384 : 8192 };
+  }
   // `thinkingConfig: null` = o chamador (ou o fallback do 400) pediu para NÃO enviar nenhum nível.
   if (clean.thinkingConfig === null) {
     delete clean.thinkingConfig;
@@ -3226,6 +3385,37 @@ function sanitizeGeminiConfig(model: string, config: any): any {
     clean.thinkingConfig = { thinkingBudget: 8192 };
   }
   return clean;
+}
+
+// --------------------------------------------------------------------
+// PERFIL DE LATÊNCIA DO CHAT (guia oficial do Gemini 4 Hydrogen — níveis de raciocínio):
+//   LOW    = classificação, roteamento, resumo, extração   -> planner do RAG, ciência/OCR, conversa casual
+//   MEDIUM = "perguntas e respostas sobre documentos"      -> RAG jurídico, relatórios, peças, edições
+//   (HIGH é o padrão do Hydrogen e fica de fora: mais lento e consome o teto de saída com raciocínio.)
+// Pergunta "rápida" = dúvida curta e DEFINICIONAL (ex.: "o que diz a Súmula 47?"): não precisa de ~75k tokens
+// de lei, então recebe um teto menor de contexto. Perguntas analíticas (cálculo, comparação, estratégia,
+// prazos) e qualquer geração/relatório/revisão mantêm o contexto completo. O montador fitRagContext
+// garante que, mesmo com teto menor, os dispositivos curados pelo planner entram primeiro.
+// --------------------------------------------------------------------
+const QUICK_QUESTION_MAX_CHARS = 700;
+const QUICK_QUESTION_RAG_CHARS = 175_000; // ~50k tokens (o teto cheio é ~262k chars ≈ 75k tokens)
+const ANALYTIC_QUESTION_RE = /(calcul|compar|estrat|vantaj|viabil|simul|projet|melhor (regra|op[çc][ãa]o|caminho)|ped[áa]gio|regra de transi|\brmi\b|quanto|prazo|prescri|decad|tese|enquadr|poss[ií]vel|pode(ria)?\s+(ser|gerar|converter|somar|averbar|aposentar)|converter|averbar)/i;
+
+function classifyChatLatencyMode(p: {
+  message?: string;
+  intent?: string;
+  isGenerationRequest?: boolean;
+  isReportRequest?: boolean;
+  isRevisionRequested?: boolean;
+  isCasualIntent?: boolean;
+  isStorageRequest?: boolean;
+  forceLight?: boolean;
+}): { quick: boolean; thinkingLevel: 'low' | 'medium' } {
+  const msg = p.message || '';
+  const heavy = !!(p.isGenerationRequest || p.isReportRequest || p.isRevisionRequested);
+  const light = !!(p.forceLight || p.isCasualIntent || p.isStorageRequest);
+  const quick = !heavy && !light && p.intent === '[DÚVIDA]' && msg.length < QUICK_QUESTION_MAX_CHARS && !ANALYTIC_QUESTION_RE.test(msg);
+  return { quick, thinkingLevel: light ? 'low' : 'medium' };
 }
 
 /**
@@ -4238,8 +4428,9 @@ let globalTitleAreasTimestamp = 0;
 
 app.post("/api/rag/plan", async (req, res) => {
   try {
-    const { caseContext, areas, dbConfig, personaId } = req.body;
-    console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Persona: ${personaId || 'N/D'}. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}`);
+    const { caseContext, areas, dbConfig, personaId, reusePlan } = req.body;
+    const __tStart = Date.now();
+    console.log(`[RAG PLAN_API] Recebida requisição de planejamento. Persona: ${personaId || 'N/D'}. Areas: ${JSON.stringify(areas)}. Tamanho contexto: ${caseContext?.length || 0}. Reuso de plano: ${Array.isArray(reusePlan) ? `sim (${reusePlan.length} itens)` : 'não'}`);
     
     // Choose active Supabase client based on client DB config (if present) to stay in sync with custom DB settings
     let activeSupabase = (dbConfig && dbConfig.url && dbConfig.key)
@@ -4413,16 +4604,29 @@ app.post("/api/rag/plan", async (req, res) => {
     const plannerInput = `TÍTULOS DISPONÍVEIS (escolha SOMENTE destes, copie exato):\n${inventory.map(t => `- ${t}`).join('\n')}\n\nCASO / CONTEXTO:\n${String(caseContextWithMemory).substring(0, 9000)}`;
     
     let plan: any[] = [];
-    try {
+    const __tInventoryDone = Date.now();
+    // REUSO DE PLANO (follow-ups na mesma conversa): o cliente reenvia o plano que a IA já montou
+    // para esta conversa quando a pergunta nova é curta e fica dentro do mesmo vocabulário jurídico.
+    // Pula a chamada de IA (a etapa mais lenta) — o Safety-Net determinístico abaixo continua
+    // rodando sobre a mensagem NOVA, então citações/temas novos ainda são injetados no plano.
+    const planReusado = Array.isArray(reusePlan) && reusePlan.length > 0 && reusePlan.length <= 60
+      && reusePlan.every((it: any) => it && typeof it.titulo === 'string');
+    if (planReusado) {
+      plan = reusePlan;
+      console.log(`[RAG PLAN_API] 2. Plano da conversa reaproveitado (${plan.length} itens) — chamada de IA do planner pulada.`);
+    } else try {
       console.log(`[RAG PLAN_API] 2. Invocando modelo de IA para selecionar documentos de ${inventory.length} opções...`);
+      // Escolher títulos de uma lista fechada é tarefa de classificação/extração — o guia oficial do
+      // Gemini 4 recomenda raciocínio LOW para isso. Antes ele "pensava" no nível padrão (medium) e
+      // levava ~20s; o teto de 4096 tokens também incluía esse raciocínio (risco de JSON truncado).
       const plannerResp = await callGemini({
-        model: "gemini-3.6-flash",
+        model: "gemini-3.8-flash",
         contents: { role: "user", parts: [{ text: plannerInput }] },
         config: {
           systemInstruction: RAG_PLANNER_PROMPT,
           responseMimeType: "application/json",
-          temperature: 0.1,
-          maxOutputTokens: 4096
+          thinkingConfig: { thinkingLevel: 'low' },
+          maxOutputTokens: 8192
         }
       });
 
@@ -4439,6 +4643,8 @@ app.post("/api/rag/plan", async (req, res) => {
     } catch (plannerErr: any) {
       console.warn("[RAG PLAN_API] IA falhou no RAG Planner (quota ou timeout). Prosseguindo com o Safety-Net determinístico:", plannerErr.message || plannerErr);
     }
+    const __tPlannerDone = Date.now();
+    const __rawPlannerPlan = JSON.parse(JSON.stringify(plan || []));
 
     // Saneamento: descarta títulos que o planner não copiou exato (anti-alucinação)
     const inventorySet = new Set(inventory);
@@ -5067,8 +5273,10 @@ app.post("/api/rag/plan", async (req, res) => {
             const matchedRowsForPlanItem: any[] = [];
             const seenIds = new Set<string | number>();
 
-            // Varredura por artigo individual
-            for (const numRaw of flatArts) {
+            // Varredura por artigo individual — EM PARALELO (antes cada artigo ausente nas rows locais
+            // fazia uma consulta ao Supabase em série, uma esperando a outra). A ordem dos resultados
+            // segue a ordem dos artigos pedidos, então o conteúdo final é idêntico ao da versão serial.
+            const perArticle = await Promise.all(flatArts.map(async (numRaw: string) => {
               const num = String(numRaw).trim();
               const cleanNum = num.replace(/\./g, '');
               const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -5094,7 +5302,10 @@ app.post("/api/rag/plan", async (req, res) => {
                   console.warn(`[RAG PLAN_API] Erro ao buscar artigo individual ${num}:`, artErr);
                 }
               }
+              return foundForThisArt;
+            }));
 
+            for (const foundForThisArt of perArticle) {
               foundForThisArt.forEach((d: any) => {
                 if (!seenIds.has(d.id)) {
                   seenIds.add(d.id);
@@ -5150,12 +5361,19 @@ app.post("/api/rag/plan", async (req, res) => {
 
     // Limita chunks por título integral para não estourar o orçamento com uma lei só.
     const integralCount = new Map<string, number>();
-    const integralChunks: any[] = [];
+    const integralChunksLimited: any[] = [];
     for (const c of integralChunksRaw) {
       const n = (integralCount.get(c.title) || 0) + 1;
       integralCount.set(c.title, n);
-      if (n <= MAX_CHUNKS_POR_TITULO_INTEGRAL) integralChunks.push(c);
+      if (n <= MAX_CHUNKS_POR_TITULO_INTEGRAL) integralChunksLimited.push(c);
     }
+    // Súmulas/Temas/Jurisprudência (poucos trechos, decisivos) vêm ANTES das leis integrais amplas: se o
+    // teto de caracteres apertar, é a lei ampla que perde trechos — não a súmula que o planner escolheu.
+    // (Era essa a causa de "Súmula 47 AUSENTE" no relatório mesmo estando cadastrada na base.)
+    const integralChunks = [
+      ...integralChunksLimited.filter((c: any) => RAG_DECISION_TITLE_RE.test(c.title || '')),
+      ...integralChunksLimited.filter((c: any) => !RAG_DECISION_TITLE_RE.test(c.title || ''))
+    ];
 
     const parsedChunks = [...nucleoChunks, ...integralChunks];
     let ragContext = '';
@@ -5182,12 +5400,24 @@ app.post("/api/rag/plan", async (req, res) => {
     }
     const ragTem = (needle: string) => ragContext.includes(needle);
 
+    const __tFetchDone = Date.now();
+    const __tempos = {
+      inventarioMs: __tInventoryDone - __tStart,
+      plannerIaMs: __tPlannerDone - __tInventoryDone,
+      buscaNoBancoMs: __tFetchDone - __tPlannerDone,
+      totalMs: __tFetchDone - __tStart,
+      planReusado
+    };
+    console.log(`[RAG PLAN_API] ⏱️ Tempos: inventário ${__tempos.inventarioMs}ms | IA do planner ${__tempos.plannerIaMs}ms${planReusado ? ' (reaproveitado)' : ''} | busca no banco ${__tempos.buscaNoBancoMs}ms | total ${__tempos.totalMs}ms`);
+
     res.json({
       ragContext,
       plan: curatedPlan,
+      plannerPlan: __rawPlannerPlan,
       titlesConsidered: inventory.length,
       chunksFound: (allChunks || []).length,
       diagnostico: {
+        tempos: __tempos,
         areasRecebidas: areas,
         inventarioTamanho: inventory.length,
         leiDeBeneficiosNoInventario: inventory.includes('Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)'),
@@ -6333,16 +6563,15 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       }
     }
 
+    const chatMode = classifyChatLatencyMode({ message, intent, isGenerationRequest, isReportRequest: isReportRequest, isRevisionRequested, isCasualIntent, isStorageRequest });
     let finalMessage = isSurgicalMode 
       ? message 
       : message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
     if (ragContext) {
       // Dynamic RAG Budget based on ratios computed upstream
-      const ragBudgetChars = Math.floor(availableForContext * ratioRag * 3.5);
-      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
-      if (ragTruncated.length < ragContext.length) {
-        console.log(`[RAG] ragContext truncado para Dr. Michel: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
-      }
+      const ragBudgetBase = Math.floor(availableForContext * ratioRag * 3.5);
+      const ragBudgetChars = chatMode.quick ? Math.min(ragBudgetBase, QUICK_QUESTION_RAG_CHARS) : ragBudgetBase;
+      const ragTruncated = fitRagContext(ragContext, ragBudgetChars, `Dr. Michel${chatMode.quick ? ' (pergunta rápida)' : ''}`);
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
@@ -6544,8 +6773,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
+              ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
@@ -7160,6 +7389,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
       }
     }
 
+    const chatMode = classifyChatLatencyMode({ message, intent, isGenerationRequest, isReportRequest: isReportRequestLuana, isRevisionRequested, isCasualIntent, isStorageRequest });
     let finalMessage = isSurgicalMode 
       ? message 
       : message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint; // Fix#1
@@ -7168,10 +7398,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
     }
     if (ragContext) {
       const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
-      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
-      if (ragTruncated.length < ragContext.length) {
-        console.log(`[RAG] ragContext truncado para Dra. Luana: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
-      }
+      const ragTruncated = fitRagContext(ragContext, ragBudgetChars, 'Dra. Luana');
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
@@ -7388,8 +7615,8 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
+              ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
@@ -7918,13 +8145,12 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
 
     // DETECÇÃO DE CORREÇÃO
     // FIX#1: isCorrectionRequest removido — detectRevisionIntent é o único árbitro de modo de revisão
+    const chatMode = classifyChatLatencyMode({ message, intent, isGenerationRequest, isReportRequest, isRevisionRequested, isCasualIntent, isStorageRequest });
     let finalMessage = message;
     if (ragContext) {
-      const ragBudgetChars = Math.floor(availableForContext * ratioRag * 3.5);
-      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
-      if (ragTruncated.length < ragContext.length) {
-        console.log(`[RAG] ragContext truncado para Dr. Felix: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
-      }
+      const ragBudgetBase = Math.floor(availableForContext * ratioRag * 3.5);
+      const ragBudgetChars = chatMode.quick ? Math.min(ragBudgetBase, QUICK_QUESTION_RAG_CHARS) : ragBudgetBase;
+      const ragTruncated = fitRagContext(ragContext, ragBudgetChars, `Dr. Felix${chatMode.quick ? ' (pergunta rápida)' : ''}`);
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]\nLeis/jurisprudências recuperadas:\n${ragTruncated}`;
     }
     if (REINFORCEMENT_PROMPT && !isSurgicalMode) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
@@ -8118,8 +8344,8 @@ REGRAS ABSOLUTAS:
                   ? (files && files.length > 0 ? parseInt(keyIndex) : parseInt(keyIndex) + attempt - 1)
                   : undefined);
             const streamConfig: any = activeDocCache
-              ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
-              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
+              ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+              : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
@@ -8647,13 +8873,11 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
     // FIX#1: isCorrectionRequest removido — dead variable (Fabrícia não gera petições)
     const lengthConstraint = "";
 
+    const chatMode = classifyChatLatencyMode({ message, intent, isCasualIntent, isStorageRequest, forceLight: true });
     let finalMessage = message + "\n\n" + REINFORCEMENT_PROMPT + lengthConstraint;
     if (ragContext) {
       const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
-      const ragTruncated = smartTruncate(ragContext, ragBudgetChars);
-      if (ragTruncated.length < ragContext.length) {
-        console.log(`[RAG] ragContext truncado para Sec. Fabrícia: ${ragContext.length} → ${ragTruncated.length} chars (${Math.round(ragTruncated.length/3.5/1000)}k tokens)`);
-      }
+      const ragTruncated = fitRagContext(ragContext, ragBudgetChars, 'Sec. Fabrícia');
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
@@ -8805,8 +9029,8 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
     ? [{ role: 'user', parts: [{ text: "INSTRUÇÕES OBRIGATÓRIAS DO SISTEMA (SIGA INTEGRALMENTE):\n\n" + selectedSystemPrompt }] }, ...currentContents]
     : currentContents;
   const streamConfig: any = activeDocCache
-    ? { temperature: finalTemperature, maxOutputTokens, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
-    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
+    ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
+    : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
   const pinnedKey = activeDocCache
     ? (parseInt(String(cacheKeyIndex)))
     : (keyIndex !== undefined 

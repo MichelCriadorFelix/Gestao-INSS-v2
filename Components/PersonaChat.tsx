@@ -993,6 +993,10 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
   const [showCoreDispositivosModal, setShowCoreDispositivosModal] = useState(false);
   const [isCaseTypePickerOpen, setIsCaseTypePickerOpen] = useState(false);
   const coreDispositivosCacheRef = useRef<Map<string, { id: number; title: string; content: string }[]>>(new Map());
+  // Plano do RAG (títulos/artigos escolhidos pela IA do planner) por conversa. Em perguntas curtas de
+  // acompanhamento, dentro do mesmo vocabulário jurídico, o plano é reaproveitado e a chamada de IA
+  // (a etapa mais lenta do RAG) é pulada. `vocab` = palavras jurídicas da conversa quando o plano foi feito.
+  const plannerPlanCacheRef = useRef<Map<string, { plan: any[]; ts: number; vocab: Set<string> }>>(new Map());
   const [savedSuggestionIds, setSavedSuggestionIds] = useState<Set<string>>(() => {
     try {
       const local = localStorage.getItem("fc_saved_memory_suggestion_ids");
@@ -1875,6 +1879,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         abortController.abort();
       }, 800000); // 800 seconds — conforme solicitado pelo usuário
 
+      // Cronômetro por etapa (aparece no Console como "[PERF]") — mostra onde o tempo realmente vai.
+      const __perfT0 = performance.now();
+      const __perf: Record<string, number> = {};
+      const perfMark = (name: string) => { __perf[name] = Math.round(performance.now() - __perfT0); };
+
       const activeProvider = eliteProviderOverride || selectedModelProvider;
       const activeModel = eliteModelOverride || selectedModel;
 
@@ -2118,21 +2127,68 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
             return ctx.substring(0, 13000);
           })();
 
+          // REAPROVEITAMENTO DO PLANO: só em pergunta curta de acompanhamento, na mesma conversa, e quando
+          // TODAS as palavras jurídicas da mensagem já estavam no vocabulário do plano anterior (mesmo
+          // assunto) e não há citação explícita nova (art./súmula/tema nº). Peça, relatório, revisão e
+          // edição sempre refazem o plano completo; o plano também expira em 30 min.
+          const legalVocabOf = (text: string): string[] => {
+            const re = new RegExp(LEGAL_DOUBT_REGEX.source, 'gi');
+            return Array.from(new Set((text.match(re) || []).map(w => w.toLowerCase())));
+          };
+          let reusePlan: any[] | null = null;
+          if (session?.id && !isReportOrPeca && !isRevision && !isExplicitSurgicalEdit) {
+            const cached = plannerPlanCacheRef.current.get(session.id);
+            if (cached && Date.now() - cached.ts < 30 * 60 * 1000
+                && messageText.trim().split(/\s+/).length <= 40
+                && extractExplicitLegalRefs(messageText).length === 0
+                && legalVocabOf(messageText).every(w => cached.vocab.has(w))) {
+              reusePlan = cached.plan;
+              console.log(`[RAG PLANNER] ♻️ Reaproveitando o plano da conversa (${cached.plan.length} itens, ${Math.round((Date.now() - cached.ts) / 1000)}s atrás) — pulando a chamada de IA do planner.`);
+            }
+          }
+
           console.log(`[RAG PLANNER] Solicitando plano determinístico em paralelo... (Contexto: ${plannerContext.length} chars).`);
-          
+
+          // Limite de espera: se o planner passar de 40s (modelo congestionado), o chat segue só com a
+          // busca vetorial/título/palavra-chave em vez de deixar o advogado olhando a barra parada.
+          const RAG_PLANNER_TIMEOUT_MS = 40000;
+          const plannerAbort = new AbortController();
+          const plannerTimer = setTimeout(() => {
+            console.warn(`[RAG PLANNER] ⏱️ Planner passou de ${RAG_PLANNER_TIMEOUT_MS / 1000}s — seguindo sem ele nesta mensagem.`);
+            plannerAbort.abort();
+          }, RAG_PLANNER_TIMEOUT_MS);
+          const onMainAbort = () => plannerAbort.abort();
+          abortController.signal.addEventListener('abort', onMainAbort, { once: true });
+          const plannerStartedVocab = legalVocabOf(`${plannerContext}`);
+
           plannerPromise = apiFetch('/api/rag/plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              caseContext: plannerContext, 
+            body: JSON.stringify({
+              caseContext: plannerContext,
               areas: AGENT_AREAS,
               dbConfig: getDbConfig(),
-              personaId: persona.aiName
+              personaId: persona.aiName,
+              ...(reusePlan ? { reusePlan } : {})
             }),
-            signal: abortController.signal
+            signal: plannerAbort.signal
+          }).then(resp => {
+            // Guarda o plano da IA para reaproveitar nos acompanhamentos (só quando foi gerado agora).
+            if (resp && resp.ok && !reusePlan && session?.id) {
+              resp.clone().json().then((j: any) => {
+                if (Array.isArray(j?.plannerPlan) && j.plannerPlan.length > 0) {
+                  plannerPlanCacheRef.current.set(session.id, { plan: j.plannerPlan, ts: Date.now(), vocab: new Set(plannerStartedVocab) });
+                }
+              }).catch(() => {});
+            }
+            return resp;
           }).catch(err => {
             console.warn("RAG planner request failed:", err);
             return null;
+          }).finally(() => {
+            clearTimeout(plannerTimer);
+            abortController.signal.removeEventListener('abort', onMainAbort);
+            perfMark('planner_fim');
           });
         } catch (planErr) {
           console.warn("Erro ao iniciar RAG planner:", planErr);
@@ -2140,16 +2196,18 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
         console.log(`[RAG RETRIEVAL] Efetuando buscas Vetoriais e Palavras-chave com a query: "${ragQuery.substring(0, 150)}..."`);
 
+        perfMark('rag_inicio');
         const [embedResponse, keywordResults, planResp] = await Promise.all([
           apiFetch('/api/rag/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: ragQuery }),
             signal: abortController.signal
-          }),
+          }).finally(() => perfMark('embed_fim')),
           supabaseService.keywordSearchLegalDocuments(enrichedQueryText, 15),
           plannerPromise
         ]);
+        perfMark('rag_busca_fim');
 
         const titleResults = allTitles.length > 0
           ? await supabaseService.searchByTitles(allTitles, 15, enrichedQueryText)
@@ -2205,9 +2263,10 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
             if (merged.length > 0) {
               // Injeta título + score para o modelo saber a relevância
               ragContext = merged.map((r: any) => {
-                const score = r.similarity 
+                // Título exato ganha rótulo próprio: o servidor (fitRagContext) o prioriza acima da palavra-chave solta.
+                const score = r.similarity
                   ? ` [Score: ${(r.similarity * 100).toFixed(0)}%]`
-                  : ' [Keyword Match]';
+                  : r.source === 'title_exact' ? ' [Título Exato]' : ' [Keyword Match]';
                 const title = r.metadata?.title 
                   ? `FONTE: ${r.metadata.title}${score}\n` 
                   : '';
@@ -2424,6 +2483,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
         console.log(`[HTTP POST CHAT] Chamando endpoint: ${persona.chatEndpoint}. Payload:`, fetchPayload);
 
         try {
+          if (__perf.chat_enviado === undefined) perfMark('chat_enviado');
           const response = await apiFetch(persona.chatEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2457,6 +2517,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           });
 
           console.log(`[HTTP RESPONSE STATUS] HTTP status: ${response.status} ${response.statusText}`);
+          if (__perf.chat_cabecalhos === undefined) perfMark('chat_cabecalhos');
 
           if (!response.ok) {
             if (resumeCount === 0) {
@@ -2549,6 +2610,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
 
                   if (data.text) {
                     // console.log(`[SSE TEXT] Recebendo ${data.text.length} chars`);
+                    if (__perf.primeiro_texto === undefined) perfMark('primeiro_texto');
                     fullText += data.text;
                     if (sessionId === currentSessionIdRef.current) {
                       setStreamingMessage(isSurgicalCorrection ? cleanSurgicalStreamMessage(fullText) : fullText);
@@ -2595,6 +2657,10 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       }
 
       console.log(`[GENERATION COMPLETED] Texto final gerado com sucesso! Comprimento total: ${fullText.length} caracteres.`);
+      perfMark('fim');
+      console.log(`[PERF] ⏱️ Tempos desta mensagem (ms desde o envio): ${JSON.stringify(__perf)}`
+        + ` | RAG até a busca terminar: ${__perf.rag_busca_fim ?? '-'} | planner: ${__perf.planner_fim ?? '-'} | embed: ${__perf.embed_fim ?? '-'}`
+        + ` | chat enviado→1º texto: ${(__perf.primeiro_texto ?? 0) - (__perf.chat_enviado ?? 0)} | geração: ${(__perf.fim ?? 0) - (__perf.primeiro_texto ?? 0)}`);
 
       if (sessionId === currentSessionIdRef.current) setStreamingMessage('');
       if (timeoutId) clearTimeout(timeoutId);
