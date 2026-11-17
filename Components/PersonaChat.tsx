@@ -55,6 +55,7 @@ const modelDisplayNames: Record<string, string> = {
   'gemini-4-hydrogen': 'Gemini 4 Hydrogen (Padrão)',
   'gemini-3.8-flash': 'Gemini 3.8 Flash',
   'gemini-3.6-flash': 'Gemini 3.6 Flash',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash (Estável)',
   'deepseek/deepseek-v4-flash': 'DeepSeek V4',
   'anthropic/claude-3.5-sonnet': 'Claude 3.5 Sonnet',
 };
@@ -4778,6 +4779,7 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                       <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Padrão)</option>
                       <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
                       <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Estável)</option>
                     </optgroup>
                     <optgroup label="OpenRouter">
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>

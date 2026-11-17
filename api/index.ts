@@ -3082,7 +3082,12 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 //    são gratuitas), 1M de contexto unificado, saída de 64K. Chega a cortar mais de 5x as
 //    afirmações inventadas em relação ao 3.8 ("sinaliza contexto ausente em vez de chutar").
 //  - gemini-3.8-flash (GA em 02/09/2026): 1ª reserva.
-//  - gemini-3.6-flash: geração anterior, ainda suportada e sem data de desligamento: piso da cadeia.
+//  - gemini-3.6-flash: geração anterior, ainda suportada e sem data de desligamento.
+//  - gemini-2.5-flash: PISO DA CADEIA (reserva de estabilidade). Em 17/11/2026 os três modelos novos
+//    estavam devolvendo 503 "high demand" (onda de lançamento), enquanto o app da Bíblia ADMA, que
+//    roda no 2.5 Flash, respondia normalmente. O Google ainda o serve de verdade até 01/12/2026
+//    (depois redireciona para a geração nova) — até lá, é o que garante resposta quando os novos
+//    estão congestionados. Aceita temperature e usa thinkingBudget (não thinkingLevel).
 //  - gemini-3.7-flash e gemini-3.5-flash estão DESCONTINUADOS (08/10/2026): o endpoint não sai do
 //    ar, mas o Google redireciona sozinho (3.7 -> 3.8 e 3.5 -> 3.6). Por isso eles NÃO servem mais
 //    como "plano B": cair de 3.6 para 3.5 era cair no MESMO modelo já sobrecarregado.
@@ -3091,7 +3096,8 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 const MODEL_HIERARCHY = [
   "gemini-4-hydrogen",
   "gemini-3.8-flash",
-  "gemini-3.6-flash"
+  "gemini-3.6-flash",
+  "gemini-2.5-flash"
 ];
 const DEFAULT_GEMINI_MODEL = MODEL_HIERARCHY[0];
 
@@ -3109,7 +3115,6 @@ const MODEL_MAPPING: Record<string, string> = {
   "gemini-1.5-flash-latest": DEFAULT_GEMINI_MODEL,
   "gemini-1.5-flash": DEFAULT_GEMINI_MODEL,
   "gemini-1.5-pro": DEFAULT_GEMINI_MODEL,
-  "gemini-2.5-flash": DEFAULT_GEMINI_MODEL,
   "gemini-3.5-flash": "gemini-3.6-flash",
   "gemini-3.7-flash": "gemini-3.8-flash",
   "google/gemini-3.5-flash": "gemini-3.6-flash",
@@ -3118,7 +3123,9 @@ const MODEL_MAPPING: Record<string, string> = {
   "gemini-4-hydrogen": "gemini-4-hydrogen",
   "gemini-3.8-flash": "gemini-3.8-flash",
   "gemini-3.6-flash": "gemini-3.6-flash",
+  "gemini-2.5-flash": "gemini-2.5-flash",
   "gemini-3-flash-preview": "gemini-3-flash-preview",
+  "google/gemini-2.5-flash": "gemini-2.5-flash",
   "google/gemini-4-hydrogen": "gemini-4-hydrogen",
   "google/gemini-3.8-flash": "gemini-3.8-flash",
   "google/gemini-3.6-flash": "gemini-3.6-flash",
@@ -3145,6 +3152,7 @@ function getEffectiveModel(modelName?: string): string {
   if (modelName.includes('3.7-flash')) return "gemini-3.8-flash";
   if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
   if (modelName.includes('3.5-flash')) return "gemini-3.6-flash";
+  if (modelName.includes('2.5-flash')) return "gemini-2.5-flash";
   if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
   return modelName;
 }
@@ -3167,13 +3175,15 @@ function nextLowerModel(model?: string): string | null {
 
 /**
  * 503 é sobrecarga do MODELO inteiro no Google — trocar de chave sozinho não resolve. Cada nível da
- * cadeia recebe 3 tentativas (em chaves diferentes) antes de descer ao próximo; `consecutiveFailures`
- * é o contador acumulado da requisição (não zera ao trocar de modelo).
+ * cadeia recebe 2 tentativas (em chaves diferentes) antes de descer ao próximo; `consecutiveFailures`
+ * é o contador acumulado da requisição (não zera ao trocar de modelo). Com 4 níveis, o piso (2.5)
+ * é alcançado após 6 falhas — em vez de 9 com 3 por nível, que deixava o usuário esperando.
  */
+const FAILURES_PER_MODEL_LEVEL = 2;
 function nextLowerModelOnOverload(model: string | undefined, consecutiveFailures: number): string | null {
   if (isFloorModel(model)) return null;
   const idx = failoverIndex(model);
-  return consecutiveFailures >= 3 * (idx + 1) ? MODEL_HIERARCHY[idx + 1] : null;
+  return consecutiveFailures >= FAILURES_PER_MODEL_LEVEL * (idx + 1) ? MODEL_HIERARCHY[idx + 1] : null;
 }
 
 // --------------------------------------------------------------------
@@ -3210,6 +3220,10 @@ function sanitizeGeminiConfig(model: string, config: any): any {
     delete clean.thinkingConfig;
   } else if (GEMINI_THINKING_LEVEL_RE.test(model) && clean.thinkingConfig === undefined && !clean.imageConfig) {
     clean.thinkingConfig = { thinkingLevel: GEMINI_DEFAULT_THINKING_LEVEL };
+  } else if (model === 'gemini-2.5-flash' && clean.thinkingConfig === undefined && !clean.imageConfig) {
+    // 2.5 usa orçamento de tokens (não nível). Sem teto, o raciocínio dinâmico pode chegar a 24K e
+    // comer o maxOutputTokens, cortando a peça; 8192 é folgado para análise jurídica.
+    clean.thinkingConfig = { thinkingBudget: 8192 };
   }
   return clean;
 }
