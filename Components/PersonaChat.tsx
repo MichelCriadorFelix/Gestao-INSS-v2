@@ -4843,9 +4843,6 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                   >
                     <optgroup label="Nativo Google">
                       <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Padrão)</option>
-                      <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-                      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Estável)</option>
                     </optgroup>
                     <optgroup label="OpenRouter">
                       <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>

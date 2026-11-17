@@ -3233,80 +3233,33 @@ function getAvailableKey(keys: string[], startIndex: number): { key: string, ind
 //  - gemini-4-hydrogen (GA em 12/11/2026): NOVO PADRÃO. Gratuito no free tier (as chaves daqui
 //    são gratuitas), 1M de contexto unificado, saída de 64K. Chega a cortar mais de 5x as
 //    afirmações inventadas em relação ao 3.8 ("sinaliza contexto ausente em vez de chutar").
-//  - gemini-3.8-flash (GA em 02/09/2026): 1ª reserva.
-//  - gemini-3.6-flash: geração anterior, ainda suportada e sem data de desligamento.
-//  - gemini-2.5-flash: PISO DA CADEIA (reserva de estabilidade). Em 17/11/2026 os três modelos novos
-//    estavam devolvendo 503 "high demand" (onda de lançamento), enquanto o app da Bíblia ADMA, que
-//    roda no 2.5 Flash, respondia normalmente. O Google ainda o serve de verdade até 01/12/2026
-//    (depois redireciona para a geração nova) — até lá, é o que garante resposta quando os novos
-//    estão congestionados. Aceita temperature e usa thinkingBudget (não thinkingLevel).
-//  - gemini-3.7-flash e gemini-3.5-flash estão DESCONTINUADOS (08/10/2026): o endpoint não sai do
-//    ar, mas o Google redireciona sozinho (3.7 -> 3.8 e 3.5 -> 3.6). Por isso eles NÃO servem mais
-//    como "plano B": cair de 3.6 para 3.5 era cair no MESMO modelo já sobrecarregado.
-//  - Carbon/Argon não estão no free tier — ficam fora da cadeia automática.
+//
+//  DECISÃO DO DR. MICHEL (17/11/2026): "só quero que use o Hydrogen". Todo texto/chat do Gemini roda no
+//  gemini-4-hydrogen — padrão de qualidade único, sem o app trocar de modelo sozinho (3.8/3.6/2.5 ficaram
+//  de fora). Em 503 ("high demand") o app continua no Hydrogen: gira as chaves com pausa curta e, se todas
+//  falharem em sequência, avisa o usuário em vez de entregar resposta de outro modelo. Qualquer ID Gemini
+//  de TEXTO (3.8, 3.6, 3.5, 2.5, 1.5, "google/..." etc.) é normalizado para o Hydrogen por getEffectiveModel.
+//  Ficam fora da normalização (não são o modelo de chat): embeddings (RAG indexada com gemini-embedding-001),
+//  TTS, imagem, Live e Carbon/Argon (não existem no free tier).
 // ====================================================================
 const MODEL_HIERARCHY = [
-  "gemini-4-hydrogen",
-  "gemini-3.8-flash",
-  "gemini-3.6-flash",
-  "gemini-2.5-flash"
+  "gemini-4-hydrogen"
 ];
 const DEFAULT_GEMINI_MODEL = MODEL_HIERARCHY[0];
 
-/**
- * IMPORTANTE: este mapa NÃO deve colapsar os modelos atuais em um só — senão o seletor da
- * interface vira decorativo (o usuário escolhe um e o backend chama outro). Só os nomes LEGADOS
- * são redirecionados, exatamente para o mesmo destino que o próprio Google já aplica; os modelos
- * atuais são respeitados como escolhidos.
- * (O failover por cota/503 continua livre para trocar de modelo em runtime,
- * via prefixo "direct:" — ver callGeminiStream.)
- */
-const MODEL_MAPPING: Record<string, string> = {
-  // Legados / descontinuados -> modelo atual equivalente
-  "gemini-2.0-flash-exp": DEFAULT_GEMINI_MODEL,
-  "gemini-1.5-flash-latest": DEFAULT_GEMINI_MODEL,
-  "gemini-1.5-flash": DEFAULT_GEMINI_MODEL,
-  "gemini-1.5-pro": DEFAULT_GEMINI_MODEL,
-  "gemini-3.5-flash": "gemini-3.6-flash",
-  "gemini-3.7-flash": "gemini-3.8-flash",
-  "google/gemini-3.5-flash": "gemini-3.6-flash",
-  "google/gemini-3.7-flash": "gemini-3.8-flash",
-  // Modelos atuais -> respeitam a escolha do seletor
-  "gemini-4-hydrogen": "gemini-4-hydrogen",
-  "gemini-3.8-flash": "gemini-3.8-flash",
-  "gemini-3.6-flash": "gemini-3.6-flash",
-  "gemini-2.5-flash": "gemini-2.5-flash",
-  "gemini-3-flash-preview": "gemini-3-flash-preview",
-  "google/gemini-2.5-flash": "gemini-2.5-flash",
-  "google/gemini-4-hydrogen": "gemini-4-hydrogen",
-  "google/gemini-3.8-flash": "gemini-3.8-flash",
-  "google/gemini-3.6-flash": "gemini-3.6-flash",
-  "google/gemini-3-flash-preview": "gemini-3-flash-preview"
-};
+/** Modelos Gemini que NÃO são o de texto/chat e por isso passam como pedidos. */
+const GEMINI_NON_CHAT_MODEL_RE = /embedding|tts|image|live|native-audio|veo|imagen|carbon|argon/i;
 
 function getEffectiveModel(modelName?: string): string {
   if (!modelName) return DEFAULT_GEMINI_MODEL;
 
-  // Se houver prefixo "direct:", retorna o modelo solicitado diretamente (bypass para failover de quota)
-  if (modelName.startsWith("direct:")) {
-    return modelName.substring(7);
-  }
+  // Prefixo "direct:" (bypass interno de failover): remove o prefixo e aplica a mesma regra.
+  const raw = modelName.startsWith("direct:") ? modelName.substring(7) : modelName;
+  const id = raw.replace(/^google\//, '').replace(/^models\//, '');
 
-  const mapped = MODEL_MAPPING[modelName];
-  if (mapped) return mapped;
-
-  // Fallback para variantes não mapeadas (ex.: "models/gemini-3.5-flash").
-  // Mesma regra: respeita o modelo pedido, só redireciona os descontinuados.
-  // "flash-lite" primeiro: "gemini-3.5-flash-lite" contém "3.5-flash" mas é OUTRO modelo (não descontinuado).
-  if (modelName.includes('flash-lite')) return modelName;
-  if (modelName.includes('4-hydrogen')) return "gemini-4-hydrogen";
-  if (modelName.includes('3.8-flash')) return "gemini-3.8-flash";
-  if (modelName.includes('3.7-flash')) return "gemini-3.8-flash";
-  if (modelName.includes('3.6-flash')) return "gemini-3.6-flash";
-  if (modelName.includes('3.5-flash')) return "gemini-3.6-flash";
-  if (modelName.includes('2.5-flash')) return "gemini-2.5-flash";
-  if (modelName.includes('3-flash-preview')) return "gemini-3-flash-preview";
-  return modelName;
+  if (GEMINI_NON_CHAT_MODEL_RE.test(id)) return id;
+  if (/^gemini-/i.test(id)) return DEFAULT_GEMINI_MODEL; // "só Hydrogen"
+  return raw; // não-Gemini (ex.: provedores do OpenRouter): inalterado
 }
 
 /** Posição do modelo na cadeia de failover (-1 = fora da cadeia: DeepSeek/OpenRouter, preview, etc.). */
@@ -3723,7 +3676,11 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       // do projeto. Depois de falhas seguidas por sobrecarga/cota, a pausa
       // cresce em vez de continuar rotacionando na mesma velocidade — mesma
       // lógica do callGeminiStream.
-      if (isOverloaded && nextFailures >= 3) {
+      if (is503Overloaded) {
+        // 503 = capacidade do MODELO inteiro no Google (não é cota da chave): esperar mais não ajuda, e o
+        // escalonamento antigo (até 8s por tentativa) deixava o advogado vendo a barra parada. Pausa curta + jitter.
+        delay = 1200 + Math.floor(Math.random() * 900);
+      } else if (isOverloaded && nextFailures >= 3) {
         delay = Math.min(2000 * (nextFailures - 2), 8000);
       }
 
@@ -4053,7 +4010,11 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
       // depois de algumas falhas seguidas por sobrecarga/cota a pausa cresce
       // (em vez de continuar tentando outra chave imediatamente), dando tempo
       // real para as janelas de cota do Google se recuperarem.
-      if (isOverloaded && nextFailures >= 3) {
+      if (is503Overloaded) {
+        // 503 = capacidade do MODELO inteiro no Google (não é cota da chave): esperar mais não ajuda, e o
+        // escalonamento antigo (até 8s por tentativa) deixava o advogado vendo a barra parada. Pausa curta + jitter.
+        delay = 1200 + Math.floor(Math.random() * 900);
+      } else if (isOverloaded && nextFailures >= 3) {
         delay = Math.min(2000 * (nextFailures - 2), 8000);
       }
 

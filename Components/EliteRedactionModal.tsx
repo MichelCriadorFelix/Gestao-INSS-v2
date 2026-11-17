@@ -52,48 +52,6 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
           </button>
 
           <button
-            onClick={() => onConfirm('gemini', 'gemini-3.8-flash')}
-            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
-                  Gemini 3.8 Flash (Nativo Google)
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Geração anterior (set/2026) — alternativa estável se o padrão estiver instável.</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => onConfirm('gemini', 'gemini-3.6-flash')}
-            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
-                  Gemini 3.6 Flash (Nativo Google)
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Modelo alternativo de altíssima velocidade e precisão.</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => onConfirm('gemini', 'gemini-2.5-flash')}
-            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
-                  Gemini 2.5 Flash (Nativo Google)
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Geração madura e estável — use quando os modelos novos estiverem congestionados (erro 503).</p>
-              </div>
-            </div>
-          </button>
-
-          <button
             onClick={() => onConfirm('openrouter', 'deepseek/deepseek-v4-flash')}
             className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
           >
