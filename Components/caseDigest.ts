@@ -18,6 +18,25 @@ export interface DigestDocument {
 // Linhas com termos que caracterizam o objeto da ação (benefício, requisito, prova, fato gerador).
 const CASE_KEY_RE = /(benef[íi]cio|\bNB\b|esp[ée]cie|\bCID\b|incapacidade|incapaz|aux[ií]lio|\bBPC\b|\bLOAS\b|aposentadoria|pens[ãa]o por morte|per[ií]cia|laudo|\bDER\b|\bDCB\b|\bDIB\b|alta m[ée]dica|cessa[çc][ãa]o|indeferi|car[êe]ncia|qualidade de segurado|atividade especial|\bPPP\b|\bLTCAT\b|rural|deficien|transtorno|doen[çc]a|acidente|sal[áa]rio-maternidade|gestante|nascimento|[óo]bito|dependente|tempo de contribui[çc][ãa]o|agente nocivo|ru[íi]do|revis[ãa]o|prorroga[çc][ãa]o|restabelecimento|convers[ãa]o|objeto|requerimento)/gi;
 
+// Famílias de benefício: 3 ou mais na MESMA linha = lista/menu genérico, não o objeto do caso.
+const BENEFIT_FAMILY_RES: RegExp[] = [
+  /\bBPC\b|\bLOAS\b|assistencial/i,
+  /aposentadoria/i,
+  /pens[ãa]o/i,
+  /sal[áa]rio[- ]maternidade|maternidade/i,
+  /aux[ií]lio[- ]doen[çc]a|incapacidade/i,
+  /aux[ií]lio[- ]acidente|acidente de trabalho/i,
+  /seguro[- ]desemprego|\bFGTS\b/i,
+];
+
+// Sinais de fato concreto do caso (número de benefício, CID, data, decisão/ato do INSS).
+const SPECIFIC_FACT_RES: RegExp[] = [
+  /\b\d{3}\.?\d{3}\.?\d{3}-?\d\b/,                    // NB / CPF-like
+  /\bCID\b|\b[A-Z]\d{2}(\.\d)?\b/,                     // CID
+  /\b\d{2}\/\d{2}\/\d{4}\b/,                           // datas
+  /indeferi|alta m[ée]dica|cessa[çc][ãa]o|\bDCB\b|\bDER\b|\bDIB\b|prorroga[çc][ãa]o|per[ií]cia m[ée]dica|laudo/i,
+];
+
 function stripAccents(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
@@ -26,7 +45,7 @@ function stripAccents(s: string): string {
  * Extrai um resumo curto (≈2,4k chars) com as linhas mais "jurídicas" dos documentos: primeiro o mapeamento
  * de auditoria (summary), se existir; depois as linhas do texto integral com mais termos-chave.
  */
-export function buildCaseDigest(docs: DigestDocument[] | undefined | null, maxChars = 2400): string {
+export function buildCaseDigest(docs: DigestDocument[] | undefined | null, maxChars = 1800): string {
   if (!docs || docs.length === 0) return '';
 
   const candidates: { text: string; score: number; pos: number }[] = [];
@@ -40,16 +59,35 @@ export function buildCaseDigest(docs: DigestDocument[] | undefined | null, maxCh
     if (seen.has(key)) return;
     const matches = t.match(CASE_KEY_RE);
     if (!matches) return;
+    // Linha de MENU/lista genérica (ex.: páginas do Meu INSS que citam BPC, aposentadoria, pensão e
+    // salário-maternidade juntos) não descreve ESTE caso e, pior, dispara as regras de BPC/pensão do planner
+    // (teste real 17/11/2026: Súmulas de BPC e pensão entraram no contexto de um caso de incapacidade).
+    const families = BENEFIT_FAMILY_RES.filter(re => re.test(t)).length;
+    if (families >= 3) return;
+    // Fatos específicos do caso valem mais que menção genérica a benefício.
+    const specific = SPECIFIC_FACT_RES.filter(re => re.test(t)).length;
     seen.add(key);
-    candidates.push({ text: t, score: new Set(matches.map(m => m.toLowerCase())).size + bonus, pos: pos++ });
+    candidates.push({
+      text: t,
+      score: new Set(matches.map(m => m.toLowerCase())).size + bonus + Math.min(specific, 3) * 2 - (families === 2 ? 1 : 0),
+      pos: pos++
+    });
   };
 
   for (const d of docs) {
     const summary = (d.summary || '').trim();
     const full = (d.fullText || '').slice(0, 150000);
     // A auditoria/resumo já é curada: bônus. O texto integral entra por pontuação de termos-chave.
-    for (const line of summary.split(/\n+|(?<=[.;:])\s+/)) consider(line, 2);
-    for (const line of full.split(/\n+|(?<=[.;])\s+/)) consider(line, 0);
+    // O filtro de "menu" age na LINHA inteira (antes de dividir em frases): um menu como "Aposentadoria, pensão,
+    // BPC...; veja os serviços" quebrado em frases curtas escaparia do filtro de 3+ famílias.
+    const feed = (block: string, bonus: number, splitRe: RegExp) => {
+      for (const physicalLine of block.split(/\n+/)) {
+        if (BENEFIT_FAMILY_RES.filter(re => re.test(physicalLine)).length >= 3) continue;
+        for (const sentence of physicalLine.split(splitRe)) consider(sentence, bonus);
+      }
+    };
+    feed(summary, 2, /(?<=[.;:])\s+/);
+    feed(full, 0, /(?<=[.;])\s+/);
   }
 
   const best = [...candidates].sort((a, b) => b.score - a.score || a.pos - b.pos);

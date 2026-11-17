@@ -1108,6 +1108,7 @@ interface RagPiece {
   origin: 'core' | 'planner' | 'client' | 'artifact' | 'other';
   tier: number;
   order: number;
+  score: number; // similaridade (%) quando vem da busca vetorial do cliente; -1 nos demais
 }
 
 function parseRagPieces(ragContext: string): RagPiece[] {
@@ -1152,7 +1153,7 @@ function parseRagPieces(ragContext: string): RagPiece[] {
       if (tier < existing.tier) { existing.tier = tier; existing.origin = origin; }
       return;
     }
-    const piece: RagPiece = { text, title, origin, tier, order };
+    const piece: RagPiece = { text, title, origin, tier, order, score };
     seen.set(signature, piece);
     pieces.push(piece);
   });
@@ -1180,12 +1181,23 @@ function fitRagContext(ragContext: string, budgetChars: number, label = ''): str
   let total = 0;
   let plannerUsed = 0;
   let decisionUsed = 0;
-  const plannerCap = Math.floor(budget * 0.62);
-  const decisionCap = Math.floor(budget * 0.35);
+  // COTAS (corrigidas após o raio-X real de 17/11/2026, em que a cota fixa de 62% do planner e a de 35% das
+  // súmulas/temas deixaram a Lei 14.331 INTEIRA de fora enquanto 18 trechos da Lei do Inquilinato entravam):
+  //  - o planner pode usar TUDO, menos a reserva que os resultados FORTES do cliente (vetorial ≥45%/título exato)
+  //    realmente precisam (no máx. 30%) — a reserva é proporcional ao que existe, não um valor fixo;
+  //  - súmulas/temas/documentos curtos escolhidos podem ocupar até 60% (são pequenos e decisivos);
+  //  - resultados FRACOS do cliente (tier ≥4) só entram com a sobra e no máx. 12% — nunca antes de trecho do planner.
+  const lenOf = (p: RagPiece) => p.text.length + sepLen;
+  const clientStrongTotal = pieces.filter(p => p.origin === 'client' && p.tier <= 3).reduce((a, p) => a + lenOf(p), 0);
+  const clientReserve = Math.min(clientStrongTotal, Math.floor(budget * 0.30));
+  const plannerCap = budget - clientReserve;
+  const decisionCap = Math.floor(budget * 0.60);
+  const weakCap = Math.floor(budget * 0.12);
 
-  // Fase A: respeita as cotas por fonte.
+  // Fase A (prioridades 0–3): respeita as cotas por fonte.
   for (const p of byPriority) {
-    const len = p.text.length + sepLen;
+    if (p.tier > 3) continue;
+    const len = lenOf(p);
     if (total + len > budget) continue;
     if (p.origin === 'planner' && plannerUsed + len > plannerCap) continue;
     if (p.tier === 1 && decisionUsed + len > decisionCap) continue;
@@ -1194,13 +1206,21 @@ function fitRagContext(ragContext: string, budgetChars: number, label = ''): str
     if (p.origin === 'planner') plannerUsed += len;
     if (p.tier === 1) decisionUsed += len;
   }
-  // Fase B: o que sobrou do orçamento volta para os trechos que ficaram de fora (por prioridade).
+  // Fase B: a sobra do orçamento volta, por prioridade, para o que ficou de fora (inclusive trechos do planner
+  // barrados pela cota). Resultados fracos do cliente entram por último, com teto e sem similaridade <30%.
+  let weakUsed = 0;
   for (const p of byPriority) {
     if (taken.has(p)) continue;
-    const len = p.text.length + sepLen;
+    const len = lenOf(p);
     if (total + len > budget) continue;
+    if (p.tier >= 4) {
+      if (p.origin === 'client' && p.score >= 0 && p.score < 30) continue;
+      if (weakUsed + len > weakCap) continue;
+      weakUsed += len;
+    }
     taken.add(p);
     total += len;
+    if (p.origin === 'planner') plannerUsed += len;
   }
 
   const kept = byPriority.filter(p => taken.has(p));
