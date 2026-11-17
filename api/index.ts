@@ -1229,6 +1229,18 @@ function fitRagContext(ragContext: string, budgetChars: number, label = ''): str
   const out = [header, ...kept.map(p => p.text), ...(footer ? [footer] : [])].join(RAG_PIECE_SEP);
 
   console.log(`[RAG FIT${label ? ' ' + label : ''}] ${ragContext.length} → ${out.length} chars | trechos: ${pieces.length} únicos de ${ragContext.split(RAG_PIECE_SEP).length} brutos → ${kept.length} mantidos, ${dropped.length} omitidos | planner ${plannerUsed} chars, súmulas/temas ${decisionUsed} chars${droppedLines.length ? ' | omitidos: ' + Array.from(droppedByTitle.keys()).slice(0, 8).join(' ; ') : ''}`);
+  (globalThis as any).__lastRagFit = {
+    antes: ragContext.length,
+    depois: out.length,
+    orcamento: budgetChars,
+    trechosUnicos: pieces.length,
+    mantidos: kept.length,
+    omitidos: dropped.length,
+    plannerChars: plannerUsed,
+    sumulasTemasChars: decisionUsed,
+    fontes: Object.fromEntries(Array.from(countByTitle.entries()).slice(0, 40).map(([t, n]) => [t.slice(0, 70), n])),
+    titulosComOmissao: Object.fromEntries(Array.from(droppedByTitle.entries()).slice(0, 25).map(([t, n]) => [t.slice(0, 70), n]))
+  };
   return out;
 }
 
@@ -6539,6 +6551,7 @@ ${extMatch ? "Alvo extraído da recomendação do Relatório de Análise Jurídi
       const ragBudgetBase = Math.floor(availableForContext * ratioRag * 3.5);
       const ragBudgetChars = chatMode.quick ? Math.min(ragBudgetBase, QUICK_QUESTION_RAG_CHARS) : ragBudgetBase;
       const ragTruncated = fitRagContext(ragContext, ragBudgetChars, `Dr. Michel${chatMode.quick ? ' (pergunta rápida)' : ''}`);
+      try { res.write(`data: ${JSON.stringify({ ragFit: (globalThis as any).__lastRagFit })}\n\n`); } catch {}
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.
@@ -7366,6 +7379,7 @@ ${extMatchL ? "Alvo extraído do Relatório de Análise Jurídica." : "Alvo padr
     if (ragContext) {
       const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
       const ragTruncated = fitRagContext(ragContext, ragBudgetChars, 'Dra. Luana');
+      try { res.write(`data: ${JSON.stringify({ ragFit: (globalThis as any).__lastRagFit })}\n\n`); } catch {}
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE (ex: se a lei diz que tem fator previdenciário, você deve dizer que tem).
@@ -8118,6 +8132,7 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
       const ragBudgetBase = Math.floor(availableForContext * ratioRag * 3.5);
       const ragBudgetChars = chatMode.quick ? Math.min(ragBudgetBase, QUICK_QUESTION_RAG_CHARS) : ragBudgetBase;
       const ragTruncated = fitRagContext(ragContext, ragBudgetChars, `Dr. Felix${chatMode.quick ? ' (pergunta rápida)' : ''}`);
+      try { res.write(`data: ${JSON.stringify({ ragFit: (globalThis as any).__lastRagFit })}\n\n`); } catch {}
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]\nLeis/jurisprudências recuperadas:\n${ragTruncated}`;
     }
     if (REINFORCEMENT_PROMPT && !isSurgicalMode) { finalMessage += `\n\n${REINFORCEMENT_PROMPT}`; }
@@ -8845,6 +8860,7 @@ Você possui acesso em tempo real aos dados do escritório (via injeção de con
     if (ragContext) {
       const ragBudgetChars = Math.floor((availableForContext * 0.35) * 3.5); // 35% do disponível → ~92k chars
       const ragTruncated = fitRagContext(ragContext, ragBudgetChars, 'Sec. Fabrícia');
+      try { res.write(`data: ${JSON.stringify({ ragFit: (globalThis as any).__lastRagFit })}\n\n`); } catch {}
       finalMessage += `\n\n[BASE DE CONHECIMENTO (RAG)]
 ATENÇÃO MÁXIMA: A legislação/jurisprudência abaixo foi extraída da nossa base de dados oficial. 
 Você DEVE basear sua resposta ESTRITAMENTE no texto abaixo. Se a lei abaixo disser algo diferente do seu conhecimento prévio, a lei abaixo PREVALECE.

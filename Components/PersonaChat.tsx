@@ -2626,6 +2626,12 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                     continue;
                   }
 
+                  if (data.ragFit) {
+                    // Resultado do montador de contexto no servidor: o que entrou/foi omitido (diagnóstico).
+                    console.log('[RAG FIT]', JSON.stringify(data.ragFit));
+                    continue;
+                  }
+
                   if (data.status) {
                     console.log(`[SSE STATUS] ${data.status}`);
                     lastRealStatusAtRef.current = Date.now();
