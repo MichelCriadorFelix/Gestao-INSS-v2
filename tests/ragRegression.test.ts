@@ -1,0 +1,218 @@
+// TESTE DE REGRESSÃO DO RAG — rodar com:  npm run test:rag
+//
+// Por quê: o mesmo tipo de bug já voltou mais de uma vez (ordem planner/cliente que regrediu em commit externo;
+// em 17/11/2026 a Lei 14.331 e a Súmula 47 sumiam do relatório por corte do contexto). Estes testes são OFFLINE
+// (sem rede, sem chaves) e falham com código de saída ≠ 0 se algum item essencial deixar de chegar ao modelo.
+//
+// Como funciona: o montador de contexto (fitRagContext), a normalização de modelos e o dono do relatório vivem em
+// api/index.ts, que NÃO pode importar módulos locais (um import quebrado derrubaria todas as rotas da Vercel). Por
+// isso o teste EXTRAI esses trechos do próprio arquivo pelos marcadores abaixo; se alguém renomear um marcador, o
+// teste falha avisando — melhor falhar alto do que passar sem testar nada.
+//
+// Teste opcional contra produção (planner real): defina RAG_BASE_URL (ex.: https://gestao-de-logins-inss.vercel.app)
+// e RAG_TOKEN (access_token da sessão do Supabase) — não é salvo nem impresso.
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+
+import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
+import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
+
+function between(startMarker: string, endMarker: string): string {
+  const a = src.indexOf(startMarker);
+  const b = src.indexOf(endMarker);
+  if (a < 0 || b < 0 || b <= a) throw new Error(`Marcador não encontrado em api/index.ts: "${startMarker}" … "${endMarker}". Atualize tests/ragRegression.test.ts.`);
+  return src.slice(a, b);
+}
+
+async function loadFromIndex(code: string, exportsList: string[]): Promise<any> {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ragtest-')), 'extracted.ts');
+  fs.writeFileSync(file, `${code}\nexport { ${exportsList.join(', ')} };\n`, 'utf-8');
+  return import(pathToFileURL(file).href);
+}
+
+let passed = 0;
+let failed = 0;
+async function test(name: string, fn: () => void | Promise<void>) {
+  try { await fn(); passed++; console.log(`  ✓ ${name}`); }
+  catch (e: any) { failed++; console.log(`  ✗ ${name}\n      ${String(e?.message || e).split('\n').join('\n      ')}`); }
+}
+
+// ---------- fixtures ----------
+const SEP = '\n\n---\n\n';
+const chunk = (title: string, tag: string, i: number, size = 2200) =>
+  `FONTE: ${title} [${tag}]\n` + (`Texto ${title} #${i} `).repeat(Math.ceil(size / 20)).slice(0, size);
+
+const T = {
+  s47: 'SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais',
+  l14331: 'Honorários Periciais e Requisitos da Petição Inicial Previdenciária (Lei nº 14.331/2022)',
+  t905: 'TEMA 905 STJ — PREVIDENCIÁRIO — Correção monetária IPCA-E e juros Selic',
+  t1013: 'TEMA 1.013 STJ — PREVIDENCIÁRIO — Trabalho durante aguardo de benefício por incapacidade',
+  l8213: 'Lei de Benefícios da Previdência Social (Lei nº 8.213/1991)',
+  inquilinato: 'LEI No 8.245, DE 18 DE OUTUBRO DE 1991 - Lei do Inquilinato',
+};
+
+/** Cenário que reproduz o raio-X real de 17/11/2026 (406k chars de contexto bruto, orçamento ~184k). */
+function realisticContext(): string {
+  const core = [0, 1, 2, 3, 4].map(i => chunk(T.s47, 'Dispositivo núcleo pré-cadastrado para este tipo de caso', 900 + i, 1200));
+  const client: string[] = [];
+  for (let i = 0; i < 10; i++) client.push(chunk(T.l8213, `Score: ${60 - i}%`, 100 + i));
+  for (let i = 0; i < 18; i++) client.push(chunk(T.inquilinato, 'Score: 28%', i));
+  for (let i = 0; i < 12; i++) client.push(chunk('Código Civil (Lei nº 10.406/2002)', 'Keyword Match', i));
+  const planner: string[] = [];
+  for (const [t, n] of [['Constituição Federal', 18], [T.l8213, 18], ['Código de Processo Civil (Lei nº 13.105/2015)', 12],
+    ['Regulamento da Previdência Social (Decreto nº 3.048/1999)', 12], ['Regulamento da Previdência Social — Alterações (Decreto nº 10.410/2020)', 12],
+    ['INSTRUÇÃO NORMATIVA PRES/INSS Nº 128, DE 28 DE MARÇO DE 2022', 14], ['Estatuto da Pessoa com Deficiência — LEI Nº 13.146', 14]] as Array<[string, number]>) {
+    for (let i = 0; i < n; i++) planner.push(chunk(t, 'Recuperação Exata', i));
+  }
+  // 45 súmulas irrelevantes (BPC/pensão) competindo por espaço — o defeito que cortava a Lei 14.331
+  for (let i = 0; i < 45; i++) planner.push(chunk(`SÚMULA ${100 + i} TNU — BPC/pensão irrelevante`, 'Recuperação Exata', 0, 1700));
+  planner.push(chunk(T.s47, 'Recuperação Exata', 0, 900), chunk(T.t905, 'Recuperação Exata', 0, 1500));
+  for (let i = 0; i < 5; i++) planner.push(chunk(T.t1013, 'Recuperação Exata', i, 1500));
+  [418, 2632, 2778, 743].forEach((sz, i) => planner.push(chunk(T.l14331, 'Recuperação Exata', i, sz)));
+  return [...core, ...client, ...planner].join(SEP);
+}
+
+(async () => {
+  const ragCode = between('const RAG_PIECE_SEP', 'function normalizeForMatching');
+  const { fitRagContext, parseRagPieces } = await loadFromIndex(ragCode, ['fitRagContext', 'parseRagPieces']);
+  const modelCode = between('const MODEL_HIERARCHY = [', '/** Posição do modelo na cadeia');
+  const { getEffectiveModel, DEFAULT_GEMINI_MODEL } = await loadFromIndex(modelCode, ['getEffectiveModel', 'DEFAULT_GEMINI_MODEL']);
+
+  console.log('\nMontador de contexto (fitRagContext)');
+  const BUDGET = 183_750;
+  const body = (out: string) => out.split('[Trechos de menor prioridade')[0];
+
+  await test('mantém Súmula 47, Tema 905, Tema 1.013 e Lei 14.331 com contexto bruto de ~400k chars', () => {
+    const out = body(fitRagContext(realisticContext(), BUDGET, 'teste'));
+    for (const t of [T.s47, T.t905, T.t1013, T.l14331]) assert.ok(out.includes(`FONTE: ${t}`), `faltou no contexto: ${t}`);
+  });
+  await test('Lei 14.331 entra com os 4 trechos (não pode ser cortada pela cota de súmulas)', () => {
+    const out = body(fitRagContext(realisticContext(), BUDGET, 'teste'));
+    const n = out.split(`FONTE: ${T.l14331}`).length - 1;
+    assert.equal(n, 4, `esperado 4 trechos da Lei 14.331, vieram ${n}`);
+  });
+  await test('resultados FRACOS do cliente (Inquilinato score 28%, Código Civil keyword) ficam de fora', () => {
+    const out = body(fitRagContext(realisticContext(), BUDGET, 'teste'));
+    assert.ok(!out.includes(`FONTE: ${T.inquilinato}`), 'Lei do Inquilinato fraca entrou no contexto');
+  });
+  await test('respeita o orçamento (± índice) e traz o ÍNDICE DAS FONTES no topo', () => {
+    const out = fitRagContext(realisticContext(), BUDGET, 'teste');
+    assert.ok(out.length <= BUDGET + 8000, `contexto estourou o orçamento: ${out.length}`);
+    assert.ok(out.startsWith('[ÍNDICE DAS FONTES RECUPERADAS'), 'índice ausente');
+  });
+  await test('remove duplicatas cliente×planner (mesmo trecho vira uma cópia)', () => {
+    const dup = [chunk(T.s47, 'Score: 70%', 0, 900), chunk(T.s47, 'Recuperação Exata', 0, 900)].join(SEP);
+    const pieces = parseRagPieces(dup);
+    assert.equal(pieces.length, 1);
+    assert.equal(pieces[0].tier, 1, 'a cópia deve ficar com a MELHOR prioridade');
+  });
+  await test('núcleo por tipo de caso (tier 0) tem prioridade absoluta', () => {
+    const pieces = parseRagPieces(chunk(T.s47, 'Dispositivo núcleo pré-cadastrado para este tipo de caso', 0, 500));
+    assert.equal(pieces[0].tier, 0);
+  });
+  await test('contexto que já cabe no orçamento não perde nenhum trecho', () => {
+    const small = [chunk(T.s47, 'Recuperação Exata', 0, 900), chunk(T.l14331, 'Recuperação Exata', 0, 800)].join(SEP);
+    const out = fitRagContext(small, BUDGET, 'teste');
+    assert.ok(out.includes(`FONTE: ${T.s47}`) && out.includes(`FONTE: ${T.l14331}`));
+    assert.ok(!out.includes('[Trechos de menor prioridade'), 'não deveria omitir nada');
+  });
+
+  console.log('\nModelo (somente Hydrogen)');
+  await test('qualquer id Gemini de texto vira gemini-4-hydrogen', () => {
+    for (const m of ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'direct:gemini-3.6-flash', 'google/gemini-3.7-flash', 'models/gemini-3.5-flash-lite', 'gemini-1.5-pro', undefined]) {
+      assert.equal(getEffectiveModel(m as any), DEFAULT_GEMINI_MODEL, `${m} deveria virar o Hydrogen`);
+    }
+    assert.equal(DEFAULT_GEMINI_MODEL, 'gemini-4-hydrogen');
+  });
+  await test('embeddings, TTS e imagem NÃO são redirecionados', () => {
+    for (const m of ['gemini-embedding-001', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-image-preview']) assert.equal(getEffectiveModel(m), m);
+  });
+  await test('modelos não-Gemini (OpenRouter) seguem inalterados', () => assert.equal(getEffectiveModel('deepseek/deepseek-v4-flash'), 'deepseek/deepseek-v4-flash'));
+
+  console.log('\nResumo do caso e tipo de caso');
+  const denizeText = [
+    'Meu INSS: Aposentadoria, pensão por morte, salário-maternidade, BPC e auxílio por incapacidade: consulte aqui todos os serviços; veja também o seguro-desemprego.',
+    'Benefícios assistenciais BPC LOAS para pessoa com deficiência e idoso; aposentadoria por idade e pensão por morte; salário-maternidade.',
+    'Resultado da perícia médica de prorrogação - INDEFERIMENTO em 16/10/2026 do benefício NB 722.356.189-1 (auxílio por incapacidade temporária).',
+    'Laudo psiquiátrico: transtornos mentais graves CID F41.2, F32 e F43.1 com incapacidade para o trabalho; alta médica em 13/03/2026 (DCB).',
+  ].join('\n');
+  await test('resumo descarta linhas de MENU (≥3 famílias de benefício) e mantém os fatos do caso', () => {
+    const d = buildCaseDigest([{ fullText: denizeText }]);
+    assert.ok(!/salário-maternidade/i.test(d), 'linha de menu entrou no resumo');
+    assert.ok(/INDEFERIMENTO/.test(d) && /CID F41\.2/.test(d), 'fatos do caso ausentes do resumo');
+  });
+  await test('identifica auxílio-doença no caso da Denize', () => {
+    const t = detectCaseTypes('gerar relatório ' + buildCaseDigest([{ fullText: denizeText }])).types;
+    assert.ok(t.includes('auxilio_doenca'), `tipos: ${t.join(',')}`);
+  });
+  await test('conversa solta não classifica tipo de caso', () => assert.deepEqual(detectCaseTypes('olá, tudo bem?').types, []));
+  await test('BPC com deficiência é identificado como BPC', () => {
+    assert.ok(detectCaseTypes('Pedido de BPC LOAS para pessoa com deficiência, impedimento de longo prazo').types.includes('bpc_deficiencia'));
+  });
+
+  console.log('\n2ª rodada de busca (itens AUSENTES)');
+  const titles = [T.s47, T.l14331, T.t905, T.t1013, 'SÚMULA 73 TNU — PREVIDENCIÁRIO — Gozo de auxílio-doença', 'Reforma da Previdência (EC nº 103/2019)'].map(t => ({ title: t, areas: ['INSS'] }));
+  const deps = { getTitles: async () => titles, fetchChunks: async (ts: string[]) => ts.map(t => ({ content: 'TEXTO LITERAL ' + t })) };
+  const report = `**Súmula 47 da TNU**\nJustificativa: x.\n[AUSENTE — SOLICITAR ADIÇÃO]\n\n**Lei nº 14.331/2022**\nJustificativa: y.\n[AUSENTE — SOLICITAR ADIÇÃO]\n\nTema 810 do STF / Tema 905 do STJ (juros); [AUSENTE — SOLICITAR ADIÇÃO]\n\nArt. 22, § 4º, da Lei nº 8.906/1994 (Estatuto da OAB); [AUSENTE — SOLICITAR ADIÇÃO]\n\nResolução CJF nº 10/2020. [AUSENTE — SOLICITAR ADIÇÃO]\n`;
+  await test('recupera Súmula 47, Lei 14.331 e Tema 905 que o relatório marcou como ausentes', async () => {
+    const r = await runSecondPassRag(report, ['INSS'], deps);
+    assert.ok(r.changed);
+    const got = r.recovered.map(x => x.title).join('|');
+    assert.ok(got.includes('SÚMULA 47') && got.includes('14.331') && got.includes('TEMA 905'), got);
+  });
+  await test('NÃO inventa: Estatuto da OAB e Resolução CJF (fora da base) continuam AUSENTES', async () => {
+    const r = await runSecondPassRag(report, ['INSS'], deps);
+    assert.equal((r.text.match(/\[AUSENTE/g) || []).length, 2, 'devem sobrar exatamente 2 marcadores AUSENTE');
+    assert.equal(r.stillMissing.length, 2);
+  });
+  await test('item com parte na base vira PARCIALMENTE DISPONÍVEL (Tema 810 STF não existe)', async () => {
+    const r = await runSecondPassRag(report, ['INSS'], deps);
+    assert.ok(/PARCIALMENTE DISPONÍVEL[^\]]*TEMA 905|PARCIALMENTE DISPONÍVEL[^\]]*Tema 810/i.test(r.text));
+  });
+  await test('anexa o texto LITERAL da base em um adendo', async () => {
+    const r = await runSecondPassRag(report, ['INSS'], deps);
+    assert.ok(r.text.includes('ADENDO AUTOMÁTICO') && r.text.includes('TEXTO LITERAL SÚMULA 47'));
+  });
+  await test('relatório sem AUSENTE não é alterado', async () => {
+    const r = await runSecondPassRag('tudo [DISPONÍVEL NA BASE]', ['INSS'], deps);
+    assert.equal(r.changed, false);
+  });
+  await test('extração de identificadores: súmula+tribunal, tema+tribunal, lei', () => {
+    const refs = extractRefs('Súmula 47 da TNU; Tema 905 do STJ; Lei nº 14.331/2022');
+    assert.ok(refs.some(r => r.kind === 'sumula' && r.num === '47' && r.court === 'tnu'));
+    assert.ok(refs.some(r => r.kind === 'tema' && r.num === '905' && r.court === 'stj'));
+    assert.ok(refs.some(r => r.kind === 'lei' && r.num.replace(/\D/g, '') === '14331'));
+  });
+
+  // ---------- opcional: planner real em produção ----------
+  if (process.env.RAG_BASE_URL && process.env.RAG_TOKEN) {
+    console.log('\nPlanner em produção (golden case: incapacidade)');
+    await test('plano contém Súmula 47, Lei 14.331 e Tema 905 e NÃO traz o cacho de BPC/pensão', async () => {
+      const res = await fetch(`${process.env.RAG_BASE_URL}/api/rag/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.RAG_TOKEN}` },
+        body: JSON.stringify({
+          caseContext: '[RESUMO DO CASO]\nRestabelecimento de Auxílio por Incapacidade Temporária (NB 722.356.189-1) com pedido subsidiário de conversão em Aposentadoria por Incapacidade Permanente. Alta médica indeferiu prorrogação. Transtornos mentais graves CID F41.2.\n\ngerar relatório',
+          areas: ['INSS'], personaId: 'Dr. Michel Felix',
+        }),
+      });
+      const j: any = await res.json();
+      const plano: string[] = (j.diagnostico?.planoFinal || []).map((p: any) => p.titulo);
+      for (const needle of ['SÚMULA 47 TNU', '14.331/2022', 'TEMA 905 STJ']) assert.ok(plano.some(t => t.includes(needle)), `plano sem ${needle}`);
+      assert.ok(!plano.some(t => /SÚMULA (48|79|80) TNU|TEMA 640 STJ|RE 567985/.test(t)), 'cacho de BPC voltou ao plano');
+      assert.ok((j.ragContext || '').length < 200_000, `contexto do planner grande demais: ${(j.ragContext || '').length}`);
+    });
+  } else {
+    console.log('\n(teste do planner em produção ignorado: defina RAG_BASE_URL e RAG_TOKEN para ativá-lo)');
+  }
+
+  console.log(`\n${passed} passaram, ${failed} falharam.`);
+  process.exit(failed > 0 ? 1 : 0);
+})();

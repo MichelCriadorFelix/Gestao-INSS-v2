@@ -1861,6 +1861,39 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
     setInput('');
     const textarea = document.getElementById(persona.inputId);
     if (textarea) textarea.style.height = 'auto';
+
+    // TOMADA DE CIÊNCIA LOCAL: o prompt do arquivista (servidor) define uma resposta FIXA de confirmação. Chamar o
+    // modelo só para devolver esse texto custava ~2 minutos (112 s medidos no Hydrogen) e uma chamada de cota por
+    // caso, sem nenhuma informação nova — os documentos já foram lidos/integrados ao chat antes (GED/OCR no
+    // navegador). Quando o pedido é SÓ a ciência e a conversa já tem documentos, responde na hora.
+    const sessionForScience = sessionsRef.current.find(s => s.id === sessionId);
+    const isPlainScienceRequest =
+      (!images || images.length === 0)
+      && messageText.trim().length < 220
+      && /^\s*(?:\[[^\]]*\]\s*)?(tomada de ci[êe]ncia|tomar ci[êe]ncia|apenas armazene|armazene (?:os )?documentos)/i.test(messageText)
+      && !/relat[óo]rio|pe[çc]a\b|peti[çc][ãa]o|gerar|elabor|redig|an[áa]lise|resumo|quesit|contest|recurso|\?/i.test(messageText.replace(/tomada de ci[êe]ncia|tomar ci[êe]ncia/gi, ''))
+      && (sessionForScience?.documents?.length || 0) > 0;
+    if (isPlainScienceRequest) {
+      console.log('[CIÊNCIA LOCAL] Pedido só de tomada de ciência com documentos já integrados — respondendo sem chamar o modelo.');
+      const scienceMsg: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: `✅ **Tomada de ciência completa dos autos realizada com sucesso!**
+
+Já estou com acesso integral a todo o conteúdo, peças, documentos e evidências do processo indexados e prontos em memória.
+
+Como deseja prosseguir, Dr(a).? Você pode me orientar a:
+- 📊 **Elaborar Relatório / Análise do Caso**: Diagnóstico minucioso dos fatos, datas e teses.
+- 💡 **Contextualizar o Processo**: Resumo executivo da situação atual dos autos.
+- 📝 **Criar Peça Processual**: Redação de petição inicial, réplica, recurso, contestação ou manifestação intercorrente.
+- ❓ **Responder Dúvidas / Consultas**: Perguntas pontuais sobre dados, datas ou provas dos autos.`,
+        timestamp: new Date().toISOString()
+      };
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, messages: [...s.messages, scienceMsg] } : s));
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
     let timeoutId: any;
@@ -2245,8 +2278,17 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           if (embedding && embedding.length > 0) {
             console.log(`[RAG EMBED] Obtidos embeddings com sucesso. Tamanho do vetor: ${embedding.length}. Buscando no banco...`);
             // Threshold 0.25 e máximo 30 resultados para ampla cobertura de buscas por área e retrocompatibilidade de legados
+            // Caso PREVIDENCIÁRIO (tipo de caso escolhido ou deduzido do resumo): a busca vetorial não precisa olhar
+            // áreas cíveis/consumidor/trabalhistas — o Dr. Michel inclui CIVEL no roteamento geral e isso trazia a Lei do
+            // Inquilinato (CIVEL) para dentro de um relatório de incapacidade. O CPC continua vindo pelo planner.
+            const isInssCase = (AGENT_AREAS || []).includes('INSS')
+              && (selectedCaseTypes.length > 0 || (!!caseDigest && detectCaseTypes(`${messageText}\n${caseDigest}`).types.length > 0));
+            const vectorAreas = isInssCase
+              ? (AGENT_AREAS as string[]).filter(a => a === 'INSS' || a === 'RPPS')
+              : AGENT_AREAS;
+            if (isInssCase) console.log(`[RAG DB AREA] Caso previdenciário — busca vetorial restrita às áreas: ${vectorAreas.join(', ')}.`);
             const vectorResults = await supabaseService
-              .searchLegalDocumentsByArea(embedding, AGENT_AREAS, 0.25, 30);
+              .searchLegalDocumentsByArea(embedding, vectorAreas, 0.25, 30);
 
             console.log(`[RAG DB AREA] Buscas vetoriais por área retornaram: ${vectorResults.length} docs.`);
 
@@ -2628,6 +2670,11 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                   if (data.heartbeat) {
                     // Mute heatbeats in console to reduce noise
                     // console.log("[SSE HEARTBEAT] Servidor enviou sinal de atividade.");
+                    continue;
+                  }
+
+                  if (data.usage) {
+                    console.log('[USO TOKENS]', JSON.stringify(data.usage));
                     continue;
                   }
 

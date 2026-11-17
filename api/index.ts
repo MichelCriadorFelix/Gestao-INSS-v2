@@ -1192,7 +1192,7 @@ function fitRagContext(ragContext: string, budgetChars: number, label = ''): str
   const clientReserve = Math.min(clientStrongTotal, Math.floor(budget * 0.30));
   const plannerCap = budget - clientReserve;
   const decisionCap = Math.floor(budget * 0.60);
-  const weakCap = Math.floor(budget * 0.12);
+  const weakCap = Math.floor(budget * 0.04); // resultado fraco é ruído que custa tokens (latência): teto baixo
 
   // Fase A (prioridades 0–3): respeita as cotas por fonte.
   for (const p of byPriority) {
@@ -1214,7 +1214,7 @@ function fitRagContext(ragContext: string, budgetChars: number, label = ''): str
     const len = lenOf(p);
     if (total + len > budget) continue;
     if (p.tier >= 4) {
-      if (p.origin === 'client' && p.score >= 0 && p.score < 30) continue;
+      if (p.origin === 'client' && p.score >= 0 && p.score < 35) continue;
       if (weakUsed + len > weakCap) continue;
       weakUsed += len;
     }
@@ -6796,6 +6796,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
               if (chunk.candidates && chunk.candidates.length > 0) {
                 const candidate = chunk.candidates[0];
+                // Uso de tokens (entrada/cache/raciocínio/saída) no chunk final — vai ao navegador como "[USO TOKENS]" para medir
+                // o custo real do contexto e se o cache implícito do Gemini 4 está acertando (cachedContentTokenCount).
+                if (candidate.finishReason && (chunk as any).usageMetadata) { try { const u = (chunk as any).usageMetadata; res.write(`data: ${JSON.stringify({ usage: { entrada: u.promptTokenCount, cache: u.cachedContentTokenCount || 0, raciocinio: u.thoughtsTokenCount || 0, saida: u.candidatesTokenCount, total: u.totalTokenCount } })}
+
+`); } catch {} }
                 if (candidate.finishReason === 'MAX_TOKENS') {
                   maxTokensHit = true;
                 } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
@@ -7643,6 +7648,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
 
               if (chunk.candidates && chunk.candidates.length > 0) {
                 const candidate = chunk.candidates[0];
+                // Uso de tokens (entrada/cache/raciocínio/saída) no chunk final — vai ao navegador como "[USO TOKENS]" para medir
+                // o custo real do contexto e se o cache implícito do Gemini 4 está acertando (cachedContentTokenCount).
+                if (candidate.finishReason && (chunk as any).usageMetadata) { try { const u = (chunk as any).usageMetadata; res.write(`data: ${JSON.stringify({ usage: { entrada: u.promptTokenCount, cache: u.cachedContentTokenCount || 0, raciocinio: u.thoughtsTokenCount || 0, saida: u.candidatesTokenCount, total: u.totalTokenCount } })}
+
+`); } catch {} }
                 if (candidate.finishReason === 'MAX_TOKENS') {
                   maxTokensHit = true;
                 } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
@@ -8369,6 +8379,11 @@ REGRAS ABSOLUTAS:
 
               if (chunk.candidates && chunk.candidates.length > 0) {
                 const candidate = chunk.candidates[0];
+                // Uso de tokens (entrada/cache/raciocínio/saída) no chunk final — vai ao navegador como "[USO TOKENS]" para medir
+                // o custo real do contexto e se o cache implícito do Gemini 4 está acertando (cachedContentTokenCount).
+                if (candidate.finishReason && (chunk as any).usageMetadata) { try { const u = (chunk as any).usageMetadata; res.write(`data: ${JSON.stringify({ usage: { entrada: u.promptTokenCount, cache: u.cachedContentTokenCount || 0, raciocinio: u.thoughtsTokenCount || 0, saida: u.candidatesTokenCount, total: u.totalTokenCount } })}
+
+`); } catch {} }
                 if (candidate.finishReason === 'MAX_TOKENS') {
                   maxTokensHit = true;
                 } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {
@@ -9066,6 +9081,11 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
 
       if (chunk.candidates && chunk.candidates.length > 0) {
         const candidate = chunk.candidates[0];
+        // Uso de tokens (entrada/cache/raciocínio/saída) no chunk final — vai ao navegador como "[USO TOKENS]" para medir
+        // o custo real do contexto e se o cache implícito do Gemini 4 está acertando (cachedContentTokenCount).
+        if (candidate.finishReason && (chunk as any).usageMetadata) { try { const u = (chunk as any).usageMetadata; res.write(`data: ${JSON.stringify({ usage: { entrada: u.promptTokenCount, cache: u.cachedContentTokenCount || 0, raciocinio: u.thoughtsTokenCount || 0, saida: u.candidatesTokenCount, total: u.totalTokenCount } })}
+
+`); } catch {} }
         if (candidate.finishReason === 'MAX_TOKENS') {
                   maxTokensHit = true;
                 } else if (candidate.finishReason && candidate.finishReason !== 'STOP' && !text) {

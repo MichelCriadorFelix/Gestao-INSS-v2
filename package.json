@@ -9,6 +9,7 @@
     "start": "node api/index.ts",
     "build": "vite build",
     "lint": "tsc --noEmit",
+    "test:rag": "tsx tests/ragRegression.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
