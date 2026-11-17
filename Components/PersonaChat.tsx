@@ -46,6 +46,7 @@ import { getDbConfig } from '../supabaseClient';
 import EliteRedactionModal from './EliteRedactionModal';
 import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
+import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
 import { PersonaConfig } from './personaConfig';
@@ -1643,6 +1644,11 @@ const PersonaChat: React.FC<PersonaChatProps> = ({ persona, initialSessions, onS
     };
     setSessions([newSession, ...sessions]);
     setCurrentSessionId(newSession.id);
+    // Fecha o painel do artefato da conversa anterior: antes ele continuava aberto ao lado da conversa
+    // nova (mostrando o relatório de OUTRO cliente), o que confunde e arrisca copiar/editar a peça errada.
+    setActiveArtifactId(null);
+    setEditableArtifactText('');
+    setStreamingAsArtifact(false);
   };
 
   const copyToClipboard = (text: string, msgId: string) => {
@@ -2094,6 +2100,18 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
           ragQuery = (ragQuery + ' ' + allSessionText).substring(0, 1500);
         }
 
+        // RESUMO DO CASO PARA O RAG: sem isso, "gerar relatório"/"gerar peça" buscava só pelo texto da conversa
+        // (o planner chegou a receber 859 caracteres, nenhum do caso) e os fundamentos certos não eram achados.
+        // O resumo (linhas mais jurídicas dos documentos anexados) alimenta a consulta de embedding e o planner.
+        // Só para pedidos amplos (peça/relatório/comando de gerar/mensagem curta) — não em edição cirúrgica.
+        const caseDigest = (!isExplicitSurgicalEdit && effectiveDocuments.length > 0
+          && (isReportOrPeca || isGenerationCommand || messageText.trim().split(/\s+/).length < 25))
+          ? buildCaseDigest(effectiveDocuments as any, 2400) : '';
+        if (caseDigest) {
+          console.log(`[RAG CASE DIGEST] Resumo do caso extraído dos documentos para guiar a busca (${caseDigest.length} chars): ${caseDigest.substring(0, 220)}...`);
+          ragQuery = (ragQuery + ' ' + caseDigest).substring(0, 3200);
+        }
+
         // ============================================================
         // RAG DETERMINÍSTICO (PLANNER) + BUSCAS EM PARALELO!
         // ============================================================
@@ -2124,6 +2142,8 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
                 : reportFull.substring(0, 9000);
               ctx = `[RELATÓRIO COM FUNDAMENTOS JÁ DEFINIDOS — SIGA ESTA LISTA E APLIQUE AS EDIÇÕES DO ADVOGADO]\n${reportForPlan}\n\n[MENSAGENS E EDIÇÕES DO ADVOGADO]\n${ctx}`;
             }
+            // O resumo do caso vai NO TOPO (o corte de tamanho age no fim do texto).
+            if (caseDigest) ctx = `[RESUMO DO CASO — extraído dos documentos anexados]\n${caseDigest}\n\n${ctx}`;
             return ctx.substring(0, 13000);
           })();
 
@@ -2324,12 +2344,27 @@ Responda diretamente com a síntese, de forma concisa, formal e técnica, sem pr
       // na FRENTE de tudo (mesma lógica de ordem do smartTruncate — cabeça do
       // texto sobrevive ao corte, meio não). Cache local por combinação de tipos
       // evita rebuscar no banco a cada mensagem da mesma conversa.
-      if (shouldSendRag && selectedCaseTypes.length > 0) {
-        const cacheKey = [...selectedCaseTypes].sort().join('|');
+      // IDENTIFICAÇÃO AUTOMÁTICA DO TIPO DE CASO: se o advogado não escolheu nenhum tipo, o app deduz pelo
+      // conteúdo (mensagem + resumo dos documentos) e GRAVA na conversa — o chip "Tipo de caso (núcleo)"
+      // passa a mostrar o(s) tipo(s) e o advogado pode remover/ajustar. Conservador: ≥2 sinais distintos.
+      let effectiveCaseTypes = selectedCaseTypes;
+      if (shouldSendRag && selectedCaseTypes.length === 0 && (AGENT_AREAS || []).includes('INSS')
+          && effectiveDocuments.length > 0 && !isExplicitSurgicalEdit) {
+        const detected = detectCaseTypes(`${messageText}\n${buildCaseDigest(effectiveDocuments as any, 3000)}`);
+        if (detected.types.length > 0) {
+          effectiveCaseTypes = detected.types;
+          setCaseTypesForCurrentSession(detected.types);
+          console.log(`[TIPO DE CASO] Identificado automaticamente: ${detected.types.join(', ')} (pontuação: ${JSON.stringify(detected.scores)}).`);
+        } else {
+          console.log('[TIPO DE CASO] Não foi possível identificar o tipo de caso com segurança — mantendo sem núcleo.');
+        }
+      }
+      if (shouldSendRag && effectiveCaseTypes.length > 0) {
+        const cacheKey = [...effectiveCaseTypes].sort().join('|');
         let coreItems = coreDispositivosCacheRef.current.get(cacheKey);
         if (!coreItems) {
           try {
-            coreItems = await supabaseService.getCoreDispositivos(selectedCaseTypes);
+            coreItems = await supabaseService.getCoreDispositivos(effectiveCaseTypes);
             coreDispositivosCacheRef.current.set(cacheKey, coreItems);
           } catch (e) {
             console.warn('Erro ao buscar dispositivos núcleo:', e);
