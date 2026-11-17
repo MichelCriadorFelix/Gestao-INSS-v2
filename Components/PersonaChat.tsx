@@ -48,6 +48,7 @@ import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { runSecondPassRag } from './secondPassRag';
+import { buildCrmPayload } from './crmContext';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
 import { PersonaConfig } from './personaConfig';
@@ -2598,14 +2599,21 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
               // CRM (agenda + contratos + clientes) só é enviado quando a mensagem é sobre isso (ou para a secretária,
               // que opera o CRM). O servidor aplica a regra final (needsCrmContext). Antes ia em TODA mensagem: ~100k tokens
               // de entrada e dados de outros clientes no prompt de um caso específico.
-              systemState: (persona.chatEndpoint.includes('sec-fabricia')
-                || /agenda|contrat|cliente|compromiss|honor[áa]rio|parcela|marc(?:ar|ue)|resolv|atualiz|prazo|audi[êe]ncia|per[íi]cia|\[ACTION/i.test(currentMessage))
+              // Busca ESPECÍFICA: quando é comando de CRM, envia só o que ele pede (uma pessoa → só ela, seus contratos e
+              // compromissos; "esta semana" → só a agenda; "contratos…" → só contratos). Ver Components/crmContext.ts.
+              systemState: persona.chatEndpoint.includes('sec-fabricia')
                 ? {
                     agenda: agendaEvents,
                     clients: systemClients?.map(c => ({ id: c.id, name: c.name, type: c.type, history: c.eventHistory })),
                     contracts: contracts
                   }
-                : undefined
+                : (/agenda|contrat|cliente|compromiss|honor[áa]rio|parcela|marc(?:ar|ue)|resolv|atualiz|prazo|audi[êe]ncia|per[íi]cia|\[ACTION/i.test(currentMessage)
+                    ? buildCrmPayload(currentMessage, {
+                        agenda: agendaEvents,
+                        clients: systemClients?.map(c => ({ id: c.id, name: c.name, type: c.type, history: c.eventHistory })),
+                        contracts: contracts
+                      })
+                    : undefined)
             }),
             signal: abortController.signal
           });

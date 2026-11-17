@@ -20,6 +20,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
+import { buildCrmPayload } from '../Components/crmContext';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
@@ -150,6 +151,47 @@ function realisticContext(): string {
       'qual o status do contrato da Lanetone?', 'lista de clientes arquivados', 'quais clientes têm perícias esta semana?']) {
       assert.equal(needsCrmContext(m), true, `deveria injetar CRM em: "${m}"`);
     }
+  });
+
+  console.log('\nBusca específica no CRM (só o que o comando pede)');
+  const crmClients = [
+    { id: 'c1', name: 'LANETONE TAVARES PIRES DE OLIVEIRA', type: 'AUXÍLIO DOENÇA/A', history: [] },
+    { id: 'c2', name: 'DENIZE CRISTINA ANDRADE DE LIMA', type: 'AUXÍLIO DOENÇA/A', history: [] },
+    ...Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, name: `MARIA SILVA ${i}`, type: 'BPC', history: [] })),
+  ];
+  const crmContracts = [
+    { id: 'k1', firstName: 'LANETONE', lastName: 'TAVARES PIRES DE OLIVEIRA', status: 'Concluído' },
+    { id: 'k2', firstName: 'DENIZE', lastName: 'CRISTINA ANDRADE DE LIMA', status: 'Em Andamento' },
+  ];
+  const crmAgenda = [{ id: 'a1', title: 'Perícia Lanetone', date: '2026-11-20' }, { id: 'a2', title: 'Audiência Denize', date: '2026-11-21' }];
+  const crmIn = { agenda: crmAgenda, clients: crmClients, contracts: crmContracts };
+
+  await test('comando sobre uma PESSOA envia só ela, seus contratos e seus compromissos', () => {
+    const r: any = buildCrmPayload('conclua o contrato da Lanetone', crmIn);
+    assert.equal(r.clients.length, 1);
+    assert.equal(r.clients[0].id, 'c1');
+    assert.deepEqual(r.contracts.map((c: any) => c.id), ['k1']);
+    assert.deepEqual(r.agenda.map((a: any) => a.id), ['a1']);
+  });
+  await test('nome com acento/caixa diferente ainda casa (Lanétone)', () => {
+    const r: any = buildCrmPayload('qual o status da LANÉTONE?', crmIn);
+    assert.equal(r.clients.length, 1);
+  });
+  await test('"o que temos para essa semana?" envia só a AGENDA', () => {
+    const r: any = buildCrmPayload('o que temos para essa semana?', crmIn);
+    assert.equal(r.agenda.length, 2);
+    assert.equal(r.clients, undefined);
+    assert.equal(r.contracts, undefined);
+  });
+  await test('"quais contratos estão em andamento?" envia só os CONTRATOS', () => {
+    const r: any = buildCrmPayload('quais contratos estão em andamento?', crmIn);
+    assert.equal(r.contracts.length, 2);
+    assert.equal(r.agenda, undefined);
+  });
+  await test('nome comum que casa com muitos clientes (>8) não vira filtro: cai no comando genérico', () => {
+    const r: any = buildCrmPayload('quais clientes silva estão arquivados?', crmIn);
+    assert.ok(r.clients.length > 8, 'deveria enviar a lista de clientes, não filtrar por "silva"');
+    assert.equal(r.agenda, undefined);
   });
 
   console.log('\nResumo do caso e tipo de caso');
