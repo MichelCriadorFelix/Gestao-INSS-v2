@@ -1598,6 +1598,23 @@ function isPetitionComplete(text: string): boolean {
   return hasPedeDeferimento && (hasOABorAssinatura || hasDataLocal);
 }
 
+/**
+ * Peça NOVA que o modelo encerrou SOZINHO (finishReason STOP) antes do fecho obrigatório.
+ * Visto em produção (17/11/2026, Hydrogen): a petição parou no tópico "IX. DO VALOR DA CAUSA", sem "X. DO ROL DE DOCUMENTOS" e
+ * sem "Nestes termos, pede e espera deferimento" + local/data/advogados — e o servidor só continuava quando o texto era cortado
+ * por MAX_TOKENS, então a peça saía incompleta sem aviso. Só vale para geração de peça (com alvo de palavras) que realmente
+ * parece uma petição endereçada a um juízo; relatórios, dúvidas e edições cirúrgicas ficam de fora.
+ */
+function petitionEndedWithoutClosing(fullText: string, opts: { hasWordTarget: boolean; maxTokensHit: boolean }): boolean {
+  if (!opts.hasWordTarget || opts.maxTokensHit) return false;
+  if (!fullText || fullText.length < 6000) return false;
+  if (!/AO\s+JU[ÍI]ZO|EXCELENT[ÍI]SSIM/i.test(fullText.slice(0, 1500))) return false;
+  return !isPetitionComplete(fullText);
+}
+
+const PETITION_CLOSING_PROMPT = (anchor: string) =>
+  `[COMPLEMENTO AUTOMÁTICO — ENCERRAMENTO DA PEÇA]\nA peça foi encerrada antes do fecho obrigatório.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor}"\n\nContinue EXATAMENTE de onde parou, SEM repetir nenhum tópico já escrito: (1) se ainda não existir, escreva o último tópico da estrutura obrigatória (ex.: "DO ROL DE DOCUMENTOS", em lista numerada com os documentos dos autos); (2) encerre com "Nestes termos, pede e espera deferimento", local, data e a assinatura dos advogados conforme as regras do sistema. NÃO recomece a petição.`;
+
 // FIX RESIDUAL #2: extractStructuralSummary removida (dead code desde Fix#3)
 
 // AI Service Logic Integrated
@@ -6906,6 +6923,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             currentContents.push({ role: "model", parts: [{ text: attemptText }] });
             currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações, sem reescrever o que já foi gerado.\n\nÚltima linha gerada (use como âncora sintática — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
           }
+        } else if (modelProvider !== 'openrouter' && attempt < MAX_ATTEMPTS && petitionEndedWithoutClosing(fullResponseText, { hasWordTarget: !!wordTarget, maxTokensHit })) {
+          // Peça encerrada pelo próprio modelo sem o fecho obrigatório: pede o complemento (tópico final + "Nestes termos…").
+          console.log(`[Peça] Encerrada sem o fecho obrigatório no ciclo ${attempt} (${currentWordCount} palavras). Solicitando complemento automático...`);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: PETITION_CLOSING_PROMPT(fullResponseText.slice(-200)) }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -7751,6 +7773,11 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
             currentContents.push({ role: "model", parts: [{ text: attemptText }] });
             currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou, no meio do parágrafo se necessário, sem recomeçar a peça, sem saudações.\n\nÚltima linha: "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
           }
+        } else if (modelProvider !== 'openrouter' && attempt < MAX_ATTEMPTS && petitionEndedWithoutClosing(fullResponseText, { hasWordTarget: !!wordTarget, maxTokensHit })) {
+          // Peça encerrada pelo próprio modelo sem o fecho obrigatório: pede o complemento (tópico final + "Nestes termos…").
+          console.log(`[Peça] Encerrada sem o fecho obrigatório no ciclo ${attempt} (${currentWordCount} palavras). Solicitando complemento automático...`);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: PETITION_CLOSING_PROMPT(fullResponseText.slice(-200)) }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;
@@ -8483,6 +8510,11 @@ REGRAS ABSOLUTAS:
             currentContents.push({ role: "model", parts: [{ text: attemptText }] });
             currentContents.push({ role: "user", parts: [{ text: `[CONTINUAÇÃO AUTOMÁTICA — CICLO ${attempt + 1}]\nA API foi cortada por limite de tokens. Continue EXATAMENTE de onde parou.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor.slice(-200)}"\n\nProssiga naturalmente. Se já chegou aos pedidos, finalize com "Nestes termos, pede e espera deferimento", local, data e assinatura. NÃO recomece a petição.` }] });
           }
+        } else if (modelProvider !== 'openrouter' && attempt < MAX_ATTEMPTS && petitionEndedWithoutClosing(fullResponseText, { hasWordTarget: !!wordTarget, maxTokensHit })) {
+          // Peça encerrada pelo próprio modelo sem o fecho obrigatório: pede o complemento (tópico final + "Nestes termos…").
+          console.log(`[Peça] Encerrada sem o fecho obrigatório no ciclo ${attempt} (${currentWordCount} palavras). Solicitando complemento automático...`);
+          currentContents.push({ role: "model", parts: [{ text: attemptText }] });
+          currentContents.push({ role: "user", parts: [{ text: PETITION_CLOSING_PROMPT(fullResponseText.slice(-200)) }] });
         } else {
           if (maxTokensHit && attempt >= MAX_ATTEMPTS) {
             finalMaxTokensHit = true;

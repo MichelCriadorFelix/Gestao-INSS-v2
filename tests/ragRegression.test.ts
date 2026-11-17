@@ -194,6 +194,24 @@ function realisticContext(): string {
     assert.equal(r.agenda, undefined);
   });
 
+  console.log('\nPeça encerrada pelo modelo sem o fecho obrigatório');
+  const closingCode = between('function isPetitionComplete', 'const PETITION_CLOSING_PROMPT');
+  const { petitionEndedWithoutClosing } = await loadFromIndex(closingCode, ['petitionEndedWithoutClosing']);
+  const corpo = ' Fundamentação detalhada do pedido com análise da prova dos autos. '.repeat(120);
+  const pecaSemFecho = `AO JUÍZO DO JUIZADO ESPECIAL FEDERAL DE SÃO JOÃO DE MERITI/RJ\n${corpo}\nIX. DO VALOR DA CAUSA\nTOTAL: R$ 32.420,00`;
+  const pecaCompleta = `${pecaSemFecho}\nX. DO ROL DE DOCUMENTOS\n1. Procuração\nNestes termos, pede e espera deferimento.\nSão João de Meriti, 17 de novembro de 2026.\nMichel Santos Felix — OAB/RJ 231.640`;
+  await test('peça nova que parou no tópico IX sem "Nestes termos…" é detectada (pede o complemento)', () => {
+    assert.equal(petitionEndedWithoutClosing(pecaSemFecho, { hasWordTarget: true, maxTokensHit: false }), true);
+  });
+  await test('peça completa (Rol de documentos + "Nestes termos, pede e espera deferimento" + OAB) NÃO dispara complemento', () => {
+    assert.equal(petitionEndedWithoutClosing(pecaCompleta, { hasWordTarget: true, maxTokensHit: false }), false);
+  });
+  await test('relatório, edição cirúrgica (sem alvo de palavras) e corte por MAX_TOKENS não disparam complemento', () => {
+    assert.equal(petitionEndedWithoutClosing(`RELATÓRIO DE ANÁLISE JURÍDICA\n${corpo}`, { hasWordTarget: true, maxTokensHit: false }), false);
+    assert.equal(petitionEndedWithoutClosing(pecaSemFecho, { hasWordTarget: false, maxTokensHit: false }), false);
+    assert.equal(petitionEndedWithoutClosing(pecaSemFecho, { hasWordTarget: true, maxTokensHit: true }), false);
+  });
+
   console.log('\nResumo do caso e tipo de caso');
   const denizeText = [
     'Meu INSS: Aposentadoria, pensão por morte, salário-maternidade, BPC e auxílio por incapacidade: consulte aqui todos os serviços; veja também o seguro-desemprego.',
