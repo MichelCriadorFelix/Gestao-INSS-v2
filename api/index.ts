@@ -4944,7 +4944,11 @@ app.post("/api/rag/plan", async (req, res) => {
         // regra consolidada central de qualquer ação de benefício por incapacidade e
         // estava ausente do curador determinístico — por isso a IA a omitia no relatório.
         injectIntoPlan("SÚMULA 47 TNU — PREVIDENCIÁRIO — Incapacidade parcial e condições pessoais", [], true);
-        
+        // Lei 14.331/2022 (art. 129-A da Lei 8.213 e requisitos da petição inicial em ações de incapacidade):
+        // obrigatória em TODA inicial de benefício por incapacidade e tem só 4 trechos. O planner de IA a
+        // omitia quando o contexto vinha do resumo do caso (teste real 17/11/2026) e o relatório a marcava AUSENTE.
+        injectIntoPlan("Honorários Periciais e Requisitos da Petição Inicial Previdenciária (Lei nº 14.331/2022)", [], true);
+
         if (/reintegraç|trabalho|per[íi]odo/i.test(contextStr)) {
           injectIntoPlan("TEMA 1.013 STJ — PREVIDENCIÁRIO — Trabalho durante aguardo de benefício por incapacidade", [], true);
         }
@@ -4955,6 +4959,13 @@ app.post("/api/rag/plan", async (req, res) => {
           injectIntoPlan("SÚMULA 88 TNU — PREVIDENCIÁRIO — Auxílio-acidente e limitação leve para atividade habitual", [], true);
           injectIntoPlan("SÚMULA 89 TNU — PREVIDENCIÁRIO — Auxílio-acidente e ausência de redução da capacidade laborativa", [], true);
         }
+      }
+
+      // Tema 905 STJ (correção monetária e juros sobre as parcelas vencidas): vale para qualquer ação
+      // previdenciária com atrasados/cálculo e é item recorrente do relatório ("AUSENTE" no teste de 17/11/2026
+      // mesmo cadastrado na base). Só dispara quando o pedido envolve peça/relatório/atrasados.
+      if (/gerar|pe[çc]a|peti[çc][ãa]o|relat[óo]rio|inicial|atrasad|vencid|retroativ|restabelec|cessa[çc]|indefer|resumo do caso/i.test(contextStr)) {
+        injectIntoPlan("TEMA 905 STJ — PREVIDENCIÁRIO — Correção monetária IPCA-E e juros Selic", [], true);
       }
 
       // 1b. LOAS / BPC
@@ -5242,28 +5253,15 @@ app.post("/api/rag/plan", async (req, res) => {
               const cleanNum = num.replace(/\./g, '');
               const escNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const escClean = cleanNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const re = new RegExp(`(?:Art\\.?|Artigo|§|Súmula|Tema)\\s*(?:${escNum}|${escClean})(?:[^0-9]|$)`, 'i');
+              // O "§" saiu da alternativa: "§ 5º" é PARÁGRAFO (de qualquer artigo), não o artigo 5 — casava com
+              // dezenas de trechos da Constituição (47 trechos ≈ 100k chars só para os arts. 5/6) e inundava o contexto.
+              const re = new RegExp(`(?:Art\\.?|Artigo|Súmula|Tema)\\s*(?:${escNum}|${escClean})(?:[^0-9]|$)`, 'i');
 
-              // 1. Tenta encontrar na lista de rows carregada
-              let foundForThisArt = rows.filter((d: any) => re.test(d.content || ''));
-
-              // 2. Se não encontrou nas rows locais, faz busca direcionada no Supabase para ESTE artigo específico
-              if (foundForThisArt.length === 0) {
-                try {
-                  const { data: artData } = await activeSupabase
-                    .from('legal_documents')
-                    .select('id, content, metadata')
-                    .ilike('content', `%${num}%`)
-                    .limit(30);
-
-                  if (artData && artData.length > 0) {
-                    foundForThisArt = artData.filter((d: any) => re.test(d.content || ''));
-                  }
-                } catch (artErr) {
-                  console.warn(`[RAG PLAN_API] Erro ao buscar artigo individual ${num}:`, artErr);
-                }
-              }
-              return foundForThisArt;
+              // `rows` já traz TODOS os trechos deste título (limit 3000). A antiga busca de reserva por
+              // ilike('%N%') varria a base inteira e devolvia trechos de OUTRAS normas que depois eram rotulados
+              // com o título deste item (texto de uma lei atribuído a outra). Foi removida: o filtro agora
+              // atua só dentro do próprio título.
+              return rows.filter((d: any) => re.test(d.content || ''));
             }));
 
             for (const foundForThisArt of perArticle) {
@@ -5275,7 +5273,15 @@ app.post("/api/rag/plan", async (req, res) => {
               });
             }
 
-            rows = matchedRowsForPlanItem;
+            if (matchedRowsForPlanItem.length === 0) {
+              // "Escolhido ⇒ entregue": se o filtro de artigo não casou com nada (numeração diferente, "129-A"...),
+              // entrega o começo do próprio título (limitado) em vez de nada — nada entregue vira "AUSENTE".
+              console.warn(`[RAG PLAN_API] Nenhum trecho casou com os artigos ${flatArts.join(',')} de "${planItem.titulo}" — entregando os primeiros trechos do título.`);
+              rows = rows.slice(0, 8);
+            } else {
+              // Teto por título: evita que um item com artigos genéricos monopolize o contexto.
+              rows = matchedRowsForPlanItem.slice(0, 18);
+            }
           }
         }
 
