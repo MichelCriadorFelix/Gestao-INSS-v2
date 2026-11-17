@@ -1175,6 +1175,19 @@ export default function Dashboard({
           setContracts(updated);
           safeSetLocalStorage('inss_contracts', JSON.stringify(updated));
           setIsContractModalOpen(false);
+          // O contrato recém-salvo precisa APARECER: se um filtro ativo o esconderia (ex.: aba "Em pagamento" e o
+          // contrato nasceu quitado/à vista, ou busca por outro nome), solta os filtros em vez de deixar a lista
+          // sem o item — o advogado achava que não salvou e cadastrava de novo (contrato duplicado).
+          const payState = getContractPaymentState(newRec);
+          const hiddenByPayment = contractPaymentFilter !== 'todos' && payState !== contractPaymentFilter;
+          const hiddenByStatus = contractStatusFilter !== 'todos' && newRec.status !== contractStatusFilter;
+          if (hiddenByPayment) setContractPaymentFilter('todos');
+          if (hiddenByStatus) setContractStatusFilter('todos');
+          const q = (searchTerm || '').trim().toLowerCase();
+          if (q) {
+            const nm = `${newRec.firstName || ''} ${newRec.lastName || ''}`.toLowerCase();
+            if (!nm.includes(q) && !(newRec.cpf || '').includes(q)) setSearchTerm('');
+          }
       } catch (e) {
           console.error("Error creating contract:", e);
           alert("Erro ao salvar contrato no servidor. Por favor, tente novamente.");
@@ -1673,9 +1686,13 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
           });
       } else {
           return contracts.filter(c => {
+            // Nome COMPLETO também casa ("lanetone tavares"): antes só o primeiro nome OU o sobrenome isolado
+            // eram comparados, então uma busca com 2+ palavras nunca achava o contrato.
+            const fullName = `${c.firstName || ''} ${c.lastName || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
             const searchMatch =
               ((c.firstName || '').toLowerCase().includes(lowerSearch)) ||
               ((c.lastName || '').toLowerCase().includes(lowerSearch)) ||
+              fullName.includes(lowerSearch.replace(/\s+/g, ' ').trim()) ||
               ((c.cpf || '').includes(lowerSearch));
             const statusMatch = contractStatusFilter === 'todos' || c.status === contractStatusFilter;
             const paymentMatch = contractPaymentFilter === 'todos' || getContractPaymentState(c) === contractPaymentFilter;
@@ -2671,6 +2688,33 @@ console.log('[Dashboard] handleOpenPetition called with:', { petition, clientId 
                                         <tr>
                                             <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                                                 Nenhum contrato encontrado{contractStatusFilter !== 'todos' ? ` com status "${contractStatusFilter}"` : ''}{contractPaymentFilter !== 'todos' ? ` (${contractPaymentFilter === 'quitado' ? 'quitados' : 'em pagamento'})` : ''}.
+                                                {(() => {
+                                                    // Aviso útil: a busca não achou nada NESTA aba, mas existe em outra (ex.: contrato à vista já
+                                                    // quitado não aparece em "Em pagamento", e sim em "Quitados").
+                                                    const q = (searchTerm || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                                                    if (!q || (contractStatusFilter === 'todos' && contractPaymentFilter === 'todos')) return null;
+                                                    const hits = contracts.filter((c: any) => {
+                                                        const nm = `${c.firstName || ''} ${c.lastName || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+                                                        return nm.includes(q) || (c.cpf || '').includes(q);
+                                                    });
+                                                    if (hits.length === 0) return null;
+                                                    const quitados = hits.filter((c: any) => getContractPaymentState(c) === 'quitado').length;
+                                                    const emPag = hits.filter((c: any) => getContractPaymentState(c) === 'em_pagamento').length;
+                                                    const semValor = hits.length - quitados - emPag;
+                                                    const partes = [quitados ? `${quitados} em Quitados` : '', emPag ? `${emPag} em Em pagamento` : '', semValor ? `${semValor} sem valor definido` : ''].filter(Boolean).join(', ');
+                                                    return (
+                                                        <div className="mt-3 inline-flex flex-col items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+                                                            <span className="text-sm font-semibold">Encontrei {hits.length} contrato(s) para "{searchTerm}" em outra aba/filtro: {partes}.</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setContractStatusFilter('todos'); setContractPaymentFilter('todos'); }}
+                                                                className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600"
+                                                            >
+                                                                Mostrar em Todos
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                         </tr>
                                     )}
