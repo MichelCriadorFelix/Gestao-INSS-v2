@@ -111,13 +111,23 @@ interface Found { start: number; end: number; marker: string; block: string }
 /** Localiza cada marcador [AUSENTE ...] e o bloco de texto (item + justificativa) que o antecede. */
 export function findAbsentMarkers(report: string): Found[] {
   const out: Found[] = [];
+  let prevEnd = 0;
   for (const m of report.matchAll(MARKER_RE)) {
     const end = m.index! + m[0].length;
-    // Bloco = do início do parágrafo/item anterior (até ~900 chars) até o marcador.
-    const lookback = report.slice(Math.max(0, m.index! - 900), m.index!);
+    // Bloco = SÓ o item deste marcador: começa depois do marcador anterior, do último parágrafo em branco e do último
+    // "FONTE:" (itens vêm colados, um por linha — antes o bloco engolia os itens vizinhos e a Resolução CJF, que não existe na
+    // base, saía rotulada "parcialmente disponível" por causa do Tema 905 do item ao lado). Teto de ~900 chars.
+    const lookbackStart = Math.max(0, m.index! - 900, prevEnd);
+    const lookback = report.slice(lookbackStart, m.index!);
     const lastBlank = lookback.lastIndexOf('\n\n');
-    const block = (lastBlank >= 0 ? lookback.slice(lastBlank + 2) : lookback) + ' ' + m[0];
+    const lastFonte = lookback.lastIndexOf('FONTE:');
+    const lastLineBreak = lookback.lastIndexOf('\n');
+    // Item numa linha só (início da linha) ou em várias linhas até o parágrafo em branco: usa a fronteira mais próxima.
+    let startRel = Math.max(lastBlank >= 0 ? lastBlank + 2 : 0, lastFonte >= 0 ? lastFonte : 0);
+    if (startRel === 0 && lastLineBreak >= 0 && /\S/.test(lookback.slice(lastLineBreak + 1))) startRel = lastLineBreak + 1;
+    const block = lookback.slice(startRel) + ' ' + m[0];
     out.push({ start: m.index!, end, marker: m[0], block });
+    prevEnd = end;
   }
   return out;
 }

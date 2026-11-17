@@ -238,6 +238,20 @@ function realisticContext(): string {
     const r = await runSecondPassRag(report, ['INSS'], deps);
     assert.ok(r.text.includes('ADENDO AUTOMÁTICO') && r.text.includes('TEXTO LITERAL SÚMULA 47'));
   });
+  await test('itens COLADOS (um por linha) não contaminam os vizinhos: Resolução CJF segue AUSENTE ao lado do Tema 905', async () => {
+    // Formato real visto em produção (17/11/2026): "FONTE: …[AUSENTE]" um item por linha, sem linha em branco entre eles.
+    const glued = [
+      'FONTE: Tema 905 STJ: correção monetária e juros. [AUSENTE — SOLICITAR ADIÇÃO]',
+      'FONTE: Resolução CJF nº 10/2020: Juízo 100% Digital. [AUSENTE — SOLICITAR ADIÇÃO]',
+      'FONTE: Art. 22, § 4º, da Lei nº 8.906/1994: honorários. [AUSENTE — SOLICITAR ADIÇÃO]',
+      '',
+    ].join('\n');
+    const r = await runSecondPassRag(glued, ['INSS'], deps);
+    const linhas = r.text.split('\n').filter(l => l.startsWith('FONTE:'));
+    assert.ok(/DISPONÍVEL NA BASE[^\]]*TEMA 905/i.test(linhas[0]), 'Tema 905 deveria ser recuperado: ' + linhas[0]);
+    assert.ok(/\[AUSENTE/.test(linhas[1]) && !/DISPON/.test(linhas[1]), 'Resolução CJF deveria continuar AUSENTE: ' + linhas[1]);
+    assert.ok(/\[AUSENTE/.test(linhas[2]) && !/DISPON/.test(linhas[2]), 'Lei 8.906 deveria continuar AUSENTE: ' + linhas[2]);
+  });
   await test('relatório sem AUSENTE não é alterado', async () => {
     const r = await runSecondPassRag('tudo [DISPONÍVEL NA BASE]', ['INSS'], deps);
     assert.equal(r.changed, false);
