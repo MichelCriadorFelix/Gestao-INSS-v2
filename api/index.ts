@@ -3223,20 +3223,25 @@ function normalizeUsage(u: any): { input: number; output: number; thought: numbe
 // Diagnóstico em memória (por instância da função): quantas gravações foram tentadas/puladas/ok/falharam e o último erro.
 const usageDiag = { tentativas: 0, semDados: 0, ok: 0, falhas: 0, ultimoErro: '', ultimoTipo: '', ultimaEm: '', viaOpenRouter: 0 };
 
-function recordAiUsage(kind: string, usageMetadata: any): void {
+// IMPORTANTE: a gravação é AGUARDADA (com limite de 4 s). Disparada sem await ("fire-and-forget"), ela era cortada quando a resposta
+// terminava na Vercel — o diagnóstico mostrou "TypeError: fetch failed" justamente nas chamadas de chat.
+async function recordAiUsage(kind: string, usageMetadata: any): Promise<void> {
   try {
     usageDiag.tentativas++;
     usageDiag.ultimoTipo = kind || 'outros';
     const u = normalizeUsage(usageMetadata);
     if (!u) { usageDiag.semDados++; return; }
-    Promise.resolve(supabaseAdmin.rpc('gestao_ai_usage_add', { p_kind: kind || 'outros', p_in: u.input, p_out: u.output, p_thought: u.thought, p_cached: u.cached }))
-      .then((r: any) => {
-        usageDiag.ultimaEm = new Date().toISOString();
-        if (r?.error) { usageDiag.falhas++; usageDiag.ultimoErro = `${r.error.code || ''} ${r.error.message || ''}`.trim(); console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); }
-        else usageDiag.ok++;
-      })
-      .catch((e: any) => { usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e); console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); });
-  } catch (e: any) { usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e); /* consumo é só medição */ }
+    const r: any = await Promise.race([
+      Promise.resolve(supabaseAdmin.rpc('gestao_ai_usage_add', { p_kind: kind || 'outros', p_in: u.input, p_out: u.output, p_thought: u.thought, p_cached: u.cached })),
+      new Promise(resolve => setTimeout(() => resolve({ error: { message: 'tempo esgotado (4s) ao gravar consumo' } }), 4000)),
+    ]);
+    usageDiag.ultimaEm = new Date().toISOString();
+    if (r?.error) { usageDiag.falhas++; usageDiag.ultimoErro = `${r.error.code || ''} ${r.error.message || ''}`.trim(); console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); }
+    else usageDiag.ok++;
+  } catch (e: any) {
+    usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e);
+    console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); /* consumo é só medição: nunca derruba a resposta */
+  }
 }
 
 /**
@@ -3252,7 +3257,7 @@ async function* withUsageRecording(stream: any, kind: string) {
       yield chunk;
     }
   } finally {
-    if (lastUsage) recordAiUsage(kind, lastUsage);
+    if (lastUsage) await recordAiUsage(kind, lastUsage);
   }
 }
 
@@ -3742,7 +3747,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       const data = await orRes.json();
       const content = data.choices?.[0]?.message?.content || "";
       usageDiag.viaOpenRouter++;
-      recordAiUsage(`or:${params.usageKind || 'outros'}`, { promptTokenCount: data.usage?.prompt_tokens, candidatesTokenCount: data.usage?.completion_tokens });
+      await recordAiUsage(`or:${params.usageKind || 'outros'}`, { promptTokenCount: data.usage?.prompt_tokens, candidatesTokenCount: data.usage?.completion_tokens });
       return { text: content };
     } catch (orErr: any) {
       console.error("[PROXY GEMINI ERR] Falha fatal no proxy do callGemini p/ OpenRouter:", orErr);
@@ -3818,7 +3823,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   try {
     const result = await ai.models.generateContent(finalParams);
     clearTimeout(callTimeoutId);
-    recordAiUsage(__usageKind || 'outros', (result as any)?.usageMetadata);
+    await recordAiUsage(__usageKind || 'outros', (result as any)?.usageMetadata);
     return result;
   } catch (error: any) {
     clearTimeout(callTimeoutId);

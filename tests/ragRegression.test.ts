@@ -368,7 +368,7 @@ function realisticContext(): string {
   });
 
   console.log('\nConsumo diário de tokens (medição)');
-  const { normalizeUsage } = await loadFromIndex(between('function normalizeUsage', 'function recordAiUsage'), ['normalizeUsage']);
+  const { normalizeUsage } = await loadFromIndex(between('function normalizeUsage', '// IMPORTANTE: a gravação é AGUARDADA'), ['normalizeUsage']);
   await test('normalizeUsage: lê usageMetadata do Gemini, ignora lixo e zera negativos/NaN', () => {
     assert.deepEqual(normalizeUsage({ promptTokenCount: 114425, candidatesTokenCount: 12873, thoughtsTokenCount: 4100, cachedContentTokenCount: 0 }), { input: 114425, output: 12873, thought: 4100, cached: 0 });
     assert.equal(normalizeUsage(undefined), null);
@@ -390,6 +390,14 @@ function realisticContext(): string {
     mod.__calls.length = 0;
     await consumir(mod.withUsageRecording(fonte([{ text: 'sem uso' }]), 'chat-felix'));
     assert.equal(mod.__calls.length, 0, 'sem usageMetadata não grava');
+  });
+  await test('gravação do consumo é AGUARDADA (fire-and-forget era cortado pela Vercel: "fetch failed" no chat)', () => {
+    const chamadas = [...src.matchAll(/(?<!function )(await )?recordAiUsage\(/g)];
+    assert.ok(chamadas.length >= 3, `esperava ao menos 3 chamadas, achei ${chamadas.length}`);
+    const soltas = chamadas.filter(m => !m[1]);
+    assert.equal(soltas.length, 0, `há ${soltas.length} chamada(s) a recordAiUsage SEM await`);
+    assert.match(src, /async function recordAiUsage\(/);
+    assert.match(src, /tempo esgotado \(4s\)/, 'a gravação precisa ter limite de tempo para nunca travar a resposta');
   });
   await test('summarizeUsage: soma por dia (entrada+saída+raciocínio), ordena do mais recente e calcula média dos dias com uso', () => {
     const rows = [
