@@ -3199,6 +3199,38 @@ const PROACTIVE_RPM_PER_KEY = Number(process.env.GEMINI_RPM_PER_KEY) || 8;
 const PROACTIVE_TPM_PER_KEY = Number(process.env.GEMINI_TPM_PER_KEY) || 200000;
 const KEY_STATE_TABLE = 'gemini_key_state';
 
+// CONSUMO REAL DE TOKENS POR DIA (18/11/2026): cada chamada ao Gemini grava (fire-and-forget) tokens de entrada/saída/raciocínio/cache
+// em gestao_ai_usage_daily (por dia de Brasília e por TIPO de chamada). Antes só havia estimativas; o painel "Diagnóstico de Chaves"
+// agora mostra o consumo medido. Falha de gravação NUNCA afeta a resposta ao advogado.
+function normalizeUsage(u: any): { input: number; output: number; thought: number; cached: number } | null {
+  if (!u || typeof u !== 'object') return null;
+  const n = (v: any) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
+  const out = { input: n(u.promptTokenCount), output: n(u.candidatesTokenCount), thought: n(u.thoughtsTokenCount), cached: n(u.cachedContentTokenCount) };
+  return out.input + out.output + out.thought === 0 ? null : out;
+}
+
+function recordAiUsage(kind: string, usageMetadata: any): void {
+  try {
+    const u = normalizeUsage(usageMetadata);
+    if (!u) return;
+    Promise.resolve(supabaseAdmin.rpc('gestao_ai_usage_add', { p_kind: kind || 'outros', p_in: u.input, p_out: u.output, p_thought: u.thought, p_cached: u.cached }))
+      .then((r: any) => { if (r?.error) console.warn('[USO IA] Falha ao gravar consumo:', r.error.message); })
+      .catch((e: any) => console.warn('[USO IA] Falha ao gravar consumo:', e?.message || e));
+  } catch { /* consumo é só medição */ }
+}
+
+/** Repassa os chunks do stream e grava o consumo quando chega o chunk final (com usageMetadata). */
+async function* withUsageRecording(stream: any, kind: string) {
+  let recorded = false;
+  for await (const chunk of stream) {
+    if (!recorded && (chunk as any)?.usageMetadata && (chunk as any)?.candidates?.[0]?.finishReason) {
+      recorded = true;
+      recordAiUsage(kind, (chunk as any).usageMetadata);
+    }
+    yield chunk;
+  }
+}
+
 interface KeyStatus {
   exhaustedUntil: number; // Para Rate Limits (por minuto)
   dailyExhausted: boolean; // Para Cota Diária (ex: 25M tokens)
@@ -3740,7 +3772,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
     currentModel = "gemini-3.1-flash-lite-image";
   }
 
-  const finalParams = { ...params, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
+  const { usageKind: __usageKind, ...__paramsNoTag } = params as any;
+  const finalParams = { ...__paramsNoTag, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
 
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -3758,6 +3791,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
   try {
     const result = await ai.models.generateContent(finalParams);
     clearTimeout(callTimeoutId);
+    recordAiUsage(__usageKind || 'outros', (result as any)?.usageMetadata);
     return result;
   } catch (error: any) {
     clearTimeout(callTimeoutId);
@@ -4065,7 +4099,8 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
     throw new Error('CACHE_INVALID');
   }
 
-  const finalParams = { ...params, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
+  const { usageKind: __usageKindS, ...__paramsNoTagS } = params as any;
+  const finalParams = { ...__paramsNoTagS, model: currentModel, config: sanitizeGeminiConfig(currentModel, params.config) };
 
   if (failuresOnCurrentModel > 1) {
     if (finalParams.config && finalParams.config.tools) {
@@ -4084,7 +4119,7 @@ async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex =
   finalParams.config = { ...(finalParams.config || {}), abortSignal: callTimeoutController.signal };
 
   try {
-    return await ai.models.generateContentStream(finalParams);
+    return withUsageRecording(await ai.models.generateContentStream(finalParams), __usageKindS || 'chat-outros');
   } catch (error: any) {
     clearTimeout(callTimeoutId);
     const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
@@ -4572,6 +4607,7 @@ app.post("/api/peca/review", async (req, res) => {
 
     const resp: any = await Promise.race([
       callGemini({
+        usageKind: 'revisao-peca',
         model: DEFAULT_GEMINI_MODEL,
         contents: { role: "user", parts: [{ text: input }] },
         config: {
@@ -4798,6 +4834,7 @@ app.post("/api/rag/plan", async (req, res) => {
       // Gemini 4 recomenda raciocínio LOW para isso. Antes ele "pensava" no nível padrão (medium) e
       // levava ~20s; o teto de 4096 tokens também incluía esse raciocínio (risco de JSON truncado).
       const plannerResp = await callGemini({
+        usageKind: 'planner-rag',
         model: "gemini-3.8-flash",
         contents: { role: "user", parts: [{ text: plannerInput }] },
         config: {
@@ -6976,6 +7013,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
+              usageKind: 'chat-michel',
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
@@ -7830,6 +7868,7 @@ REGRAS ABSOLUTAS E INEGOCIÁVEIS:
               ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
+              usageKind: 'chat-luana',
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
@@ -8571,6 +8610,7 @@ REGRAS ABSOLUTAS:
               ? { temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, safetySettings: DEFAULT_SAFETY_SETTINGS, cachedContent: activeDocCache }
               : { systemInstruction: selectedSystemPrompt, temperature: finalTemperature, maxOutputTokens, thinkingConfig: { thinkingLevel: chatMode.thinkingLevel }, tools, safetySettings: DEFAULT_SAFETY_SETTINGS };
             const responseStream = await callGeminiStream({
+              usageKind: 'chat-felix',
               model: model || DEFAULT_GEMINI_MODEL,
               contents: streamContents,
               config: streamConfig,
@@ -9278,6 +9318,7 @@ while (!isFinished && attempt < MAX_ATTEMPTS) {
 
   try {
     const responseStream = await callGeminiStream({
+              usageKind: 'chat-fabricia',
       model: model || DEFAULT_GEMINI_MODEL,
       contents: streamContents,
       config: streamConfig,
@@ -9820,6 +9861,23 @@ app.post("/api/admin/fix-embeddings", async (req, res) => {
 // não encontrada) e cruza com o estado compartilhado (gemini_key_state)
 // para estimar o uso na janela proativa de 60s. Protegido pelo mesmo
 // middleware de autenticação de sessão que cobre todo /api/*.
+// Consumo diário medido (tokens e chamadas) dos últimos N dias, total e por tipo de chamada. Alimenta o painel "Diagnóstico de Chaves".
+app.get("/api/admin/ai-usage", async (req, res) => {
+  try {
+    const days = Math.min(Math.max(parseInt(String(req.query.days || '14'), 10) || 14, 1), 90);
+    const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+    const { data, error } = await supabaseAdmin
+      .from('gestao_ai_usage_daily')
+      .select('day, kind, requests, input_tokens, output_tokens, thought_tokens, cached_tokens')
+      .gte('day', since)
+      .order('day', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ days, rows: data || [] });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Falha ao ler o consumo.' });
+  }
+});
+
 app.post("/api/admin/test-gemini-keys", async (req, res) => {
   try {
     const keys = getApiKeys();

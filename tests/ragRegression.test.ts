@@ -21,6 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
 import { buildCrmPayload } from '../Components/crmContext';
+import { summarizeUsage, formatTokens, formatDay } from '../Components/aiUsage';
 import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, wantsToApplyReview, reviewApplyRequest, buildReviewBase } from '../Components/petitionReview';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -337,6 +338,34 @@ function realisticContext(): string {
     assert.equal(src.split('correção (Tema 905/STJ)').length - 1, 0, 'estrutura ainda indica "(Tema 905/STJ)" como índice dos atrasados');
     const regra = src.slice(src.indexOf('const REGRA_CORRECAO_JUROS'), src.indexOf('const REGRA_CORRECAO_JUROS') + 1600);
     assert.ok(/08\/12\/2021/.test(regra) && /EC 113\/2021/.test(regra) && /SEM fixar índice único/.test(regra), 'regra incompleta');
+  });
+
+  console.log('\nConsumo diário de tokens (medição)');
+  const { normalizeUsage } = await loadFromIndex(between('function normalizeUsage', 'function recordAiUsage'), ['normalizeUsage']);
+  await test('normalizeUsage: lê usageMetadata do Gemini, ignora lixo e zera negativos/NaN', () => {
+    assert.deepEqual(normalizeUsage({ promptTokenCount: 114425, candidatesTokenCount: 12873, thoughtsTokenCount: 4100, cachedContentTokenCount: 0 }), { input: 114425, output: 12873, thought: 4100, cached: 0 });
+    assert.equal(normalizeUsage(undefined), null);
+    assert.equal(normalizeUsage({}), null, 'sem nenhum contador não grava linha vazia');
+    assert.deepEqual(normalizeUsage({ promptTokenCount: '1500', candidatesTokenCount: -5, thoughtsTokenCount: 'x' }), { input: 1500, output: 0, thought: 0, cached: 0 });
+  });
+  await test('summarizeUsage: soma por dia (entrada+saída+raciocínio), ordena do mais recente e calcula média dos dias com uso', () => {
+    const rows = [
+      { day: '2026-11-17', kind: 'chat-michel', requests: 4, input_tokens: 400000, output_tokens: 30000, thought_tokens: 10000, cached_tokens: 0 },
+      { day: '2026-11-18', kind: 'chat-michel', requests: 3, input_tokens: 300000, output_tokens: 20000, thought_tokens: 8000, cached_tokens: 0 },
+      { day: '2026-11-18', kind: 'planner-rag', requests: 2, input_tokens: 12000, output_tokens: 1500, thought_tokens: 0, cached_tokens: 0 },
+      { day: '2026-11-16', kind: 'outros', requests: 0, input_tokens: 0, output_tokens: 0, thought_tokens: 0, cached_tokens: 0 },
+    ];
+    const r = summarizeUsage(rows);
+    assert.deepEqual(r.days.map(d => d.day), ['2026-11-18', '2026-11-17', '2026-11-16']);
+    assert.equal(r.days[0].total, 300000 + 20000 + 8000 + 12000 + 1500);
+    assert.equal(r.days[0].requests, 5);
+    assert.equal(r.days[0].kinds[0].kind, 'chat-michel', 'tipos ordenados do maior para o menor');
+    assert.equal(r.days[0].kinds[1].label, 'Busca de leis (planner)');
+    assert.equal(r.avgTotalPerActiveDay, Math.round((341500 + 440000) / 2), 'dia sem uso não entra na média');
+    assert.deepEqual(summarizeUsage([]).days, []);
+    assert.equal(formatTokens(1234567), '1,23 mi');
+    assert.equal(formatTokens(85400), '85 mil');
+    assert.equal(formatDay('2026-11-18'), '18/11');
   });
 
   console.log('\nPoda das estruturas de peça (economia de tokens)');

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { X, KeyRound, RefreshCw, CheckCircle2, Clock, ShieldOff, HelpCircle, Flame, AlertTriangle, CalendarX } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { X, KeyRound, RefreshCw, CheckCircle2, Clock, ShieldOff, HelpCircle, Flame, AlertTriangle, CalendarX, BarChart3 } from "lucide-react";
 import { apiFetch } from "../services/apiService";
+import { summarizeUsage, formatTokens, formatDay, type UsageRow } from "./aiUsage";
 
 interface KeyTestResult {
   index: number;
@@ -67,6 +68,26 @@ export function ApiKeysDiagnosticsModal({ onClose }: ApiKeysDiagnosticsModalProp
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<KeyTestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usageRows, setUsageRows] = useState<UsageRow[] | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
+
+  // Consumo diário MEDIDO (tokens e chamadas) — vem do servidor, que grava a cada chamada ao Gemini.
+  const loadUsage = async () => {
+    setUsageError(null);
+    try {
+      const res = await apiFetch('/api/admin/ai-usage?days=14');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Erro ${res.status}`);
+      }
+      const json = await res.json();
+      setUsageRows(json.rows || []);
+    } catch (e: any) {
+      setUsageError(e.message || 'Falha ao ler o consumo.');
+    }
+  };
+  useEffect(() => { loadUsage(); }, []);
+  const usage = usageRows ? summarizeUsage(usageRows) : null;
 
   const runTest = async () => {
     setLoading(true);
@@ -110,6 +131,52 @@ export function ApiKeysDiagnosticsModal({ onClose }: ApiKeysDiagnosticsModalProp
 
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-bordeaux-950/40">
+
+          {/* Consumo diário medido */}
+          <div className="mb-6 bg-white dark:bg-bordeaux-900/30 border border-slate-200 dark:border-gold-500/20 rounded-xl p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
+                <BarChart3 size={16} /> Consumo por dia (últimos 14 dias, horário de Brasília)
+              </div>
+              <button onClick={loadUsage} className="text-xs text-primary-700 dark:text-gold-400 hover:underline">Atualizar</button>
+            </div>
+            {usageError && <p className="text-xs text-red-600 dark:text-red-300">{usageError}</p>}
+            {!usageError && !usage && <p className="text-xs text-slate-500">Carregando…</p>}
+            {usage && usage.days.length === 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400">Ainda sem registros: o consumo passa a ser gravado a partir das próximas chamadas ao Gemini.</p>
+            )}
+            {usage && usage.days.length > 0 && (
+              <>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                  Média nos dias com uso: <strong>{formatTokens(usage.avgTotalPerActiveDay)}</strong> tokens e <strong>{usage.avgRequestsPerActiveDay}</strong> chamadas por dia.
+                  “Total” = entrada + saída + raciocínio.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-gold-500/20">
+                        <th className="py-1.5 pr-3">Dia</th><th className="pr-3">Chamadas</th><th className="pr-3">Entrada</th><th className="pr-3">Saída</th><th className="pr-3">Raciocínio</th><th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usage.days.map(d => (
+                        <React.Fragment key={d.day}>
+                          <tr className="border-b border-slate-100 dark:border-bordeaux-800/40 font-semibold text-slate-800 dark:text-slate-100">
+                            <td className="py-1.5 pr-3">{formatDay(d.day)}</td><td className="pr-3">{d.requests}</td><td className="pr-3">{formatTokens(d.input)}</td><td className="pr-3">{formatTokens(d.output)}</td><td className="pr-3">{formatTokens(d.thought)}</td><td>{formatTokens(d.total)}</td>
+                          </tr>
+                          {d.day === usage.days[0].day && d.kinds.map(k => (
+                            <tr key={k.kind} className="text-slate-500 dark:text-slate-400">
+                              <td className="py-1 pr-3 pl-3" colSpan={1}>↳ {k.label}</td><td className="pr-3">{k.requests}</td><td className="pr-3">{formatTokens(k.input)}</td><td className="pr-3">{formatTokens(k.output)}</td><td className="pr-3">{formatTokens(k.thought)}</td><td>{formatTokens(k.total)}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <button
