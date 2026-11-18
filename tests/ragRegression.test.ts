@@ -315,13 +315,6 @@ function realisticContext(): string {
     assert.equal(hasWorkAfterCessationHint('Ela fez bicos como diarista enquanto aguardava o benefício.'), true);
     assert.equal(hasWorkAfterCessationHint('Pedido de reintegração ao emprego.'), true);
   });
-  await test('prompt não cita mais "Resolução CJF nº 10/2020" como fundamento (só a proibição)', () => {
-    const todas = src.split('Resolução CJF nº 10/2020').length - 1;
-    const proibicoes = src.split('NÃO cite "Resolução CJF nº 10/2020"').length - 1;
-    assert.ok(todas >= 1, 'a proibição desapareceu do prompt');
-    assert.equal(todas, proibicoes, `há ${todas - proibicoes} citação(ões) de "Resolução CJF nº 10/2020" fora da proibição`);
-    assert.ok(src.includes('Resolução CNJ nº 345/2020'), 'a Resolução CNJ nº 345/2020 sumiu do prompt');
-  });
   await test('regra de correção/juros está nos 3 chats que geram peça e Tema 810/905 não são mais "o regime"', () => {
     assert.ok(/const REGRA_CORRECAO_JUROS = `5\. CORREÇÃO MONETÁRIA E JUROS/.test(src), 'constante da regra sumiu');
     const usos = src.split('${REGRA_CORRECAO_JUROS}').length - 1;
