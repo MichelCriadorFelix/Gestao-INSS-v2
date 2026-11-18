@@ -202,11 +202,15 @@ export function parseReviewAlerts(raw: any): ReviewAlert[] {
  * "corrija conforme os apontamentos"). Nesse caso o chat anexa o texto da última revisão ao pedido (ela não vai no histórico
  * do modelo) e trata o pedido como correção cirúrgica do artefato.
  */
-export function wantsToApplyReview(message: string): boolean {
+export function wantsToApplyReview(message: string, opts: { reviewIsLatest?: boolean } = {}): boolean {
   if (!message || message.length > 600) return false;
+  // A revisão é a ÚLTIMA mensagem do chat e o advogado responde curto com um verbo de ação ("pode aplicar", "faça isso",
+  // "corrija") — mesmo sem citar a palavra "revisão". Pedido real do Michel (18/11/2026): "pode aplicar a correçã no artefato".
+  if (opts.reviewIsLatest && message.length <= 200 && /\b(?:apli(?:c|qu)\w*|corrij\w+|corrig\w+|atualiz\w+|ajust\w+|incorpor\w+|implement\w+|execut\w+|fa[çc]a\w*|pode)\b/i.test(message)) return true;
   // "aplique" NÃO contém "aplic" (apli+qu+e): sem o (?:c|qu) a frase mais natural deixava de ser reconhecida.
   const verbo = '(?:apli(?:c|qu)\\w*|atualiz\\w+|corrij\\w+|corrig\\w+|ajust\\w+|incorpor\\w+|implement\\w+|execut\\w+|fa[çc]a)';
-  const alvo = '(?:revis[ãa]o|alertas?|apontamentos?|atualiza[çc][ãa]o|atualiza[çc][õo]es|corre[çc][õo]es|sugest[õo]es|itens?\\s+\\d)';
+  // inclui singular e o erro de digitação comum "correçã" (sem o "o" final)
+  const alvo = '(?:revis[ãa]o|alertas?|apontamentos?|atualiza[çc](?:[ãa]o|[õo]es|[ãa])|corre[çc](?:[ãa]o|[õo]es|[ãa])|ajustes?|sugest(?:[ãa]o|[õo]es)|altera[çc](?:[ãa]o|[õo]es)|itens?\\s+\\d)';
   return new RegExp(`${verbo}[^.\\n]{0,60}${alvo}|${alvo}[^.\\n]{0,40}${verbo}`, 'i').test(message);
 }
 
@@ -215,11 +219,11 @@ export function wantsToApplyReview(message: string): boolean {
  * painel do artefato; (3) trecho selecionado + "Editar com IA". As formas 2 e 3 embrulham o texto do advogado em
  * "[CORREÇÃO CIRÚRGICA NO ARTEFATO …] … INSTRUÇÃO DE ALTERAÇÃO:\n<texto>"; aqui extraímos o texto dele e dizemos se havia trecho selecionado.
  */
-export function reviewApplyRequest(messageText: string): { apply: boolean; hasSelection: boolean } {
+export function reviewApplyRequest(messageText: string, opts: { reviewIsLatest?: boolean } = {}): { apply: boolean; hasSelection: boolean } {
   const raw = messageText || '';
   const m = raw.match(/INSTRUÇÃO DE ALTERAÇÃO:\s*\n([\s\S]*)$/);
   const instruction = (m ? m[1] : raw).trim();
-  return { apply: wantsToApplyReview(instruction), hasSelection: /TRECHO SELECIONADO A MODIFICAR/.test(raw) };
+  return { apply: wantsToApplyReview(instruction, opts), hasSelection: /TRECHO SELECIONADO A MODIFICAR/.test(raw) };
 }
 
 /** Junta as duas camadas sem repetir o mesmo problema: o alerta automático de regra some se o revisor de IA já apontou o mesmo ponto. */

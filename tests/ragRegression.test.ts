@@ -416,6 +416,17 @@ function realisticContext(): string {
       assert.equal(wantsToApplyReview(m), false, m);
     assert.equal(wantsToApplyReview('aplique a revisão ' + 'x'.repeat(700)), false, 'mensagem enorme não é um pedido curto de aplicar');
   });
+  await test('frase real do Michel ("pode aplicar a correçã no artefato", com erro de digitação) é reconhecida', () => {
+    assert.equal(wantsToApplyReview('pode aplicar a correçã no artefato'), true);
+    assert.equal(wantsToApplyReview('pode aplicar a correção no artefato'), true);
+    assert.equal(wantsToApplyReview('aplique os ajustes'), true);
+    // revisão é a última mensagem + resposta curta de ação (sem citar "revisão")
+    assert.equal(wantsToApplyReview('pode aplicar', { reviewIsLatest: true }), true);
+    assert.equal(wantsToApplyReview('faça isso', { reviewIsLatest: true }), true);
+    assert.equal(wantsToApplyReview('pode aplicar'), false, 'sem a revisão por perto, "pode aplicar" é ambíguo e não deve anexar nada');
+    assert.equal(wantsToApplyReview('qual o prazo para recorrer?', { reviewIsLatest: true }), false);
+    assert.equal(reviewApplyRequest('[CORREÇÃO CIRÚRGICA NO ARTEFATO #ART-01]\n\nINSTRUÇÃO DE ALTERAÇÃO:\npode aplicar', { reviewIsLatest: true }).apply, true);
+  });
   await test('as 3 formas de pedir: chat principal, caixa do artefato e trecho selecionado', () => {
     const principal = reviewApplyRequest('aplique a atualização na peça');
     assert.deepEqual(principal, { apply: true, hasSelection: false });
