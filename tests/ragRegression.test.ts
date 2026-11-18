@@ -346,6 +346,27 @@ function realisticContext(): string {
     assert.equal(novos.length, 3, `esperava 3 chats (Michel, Luana, Felix) zerando a base no casual, achei ${novos.length}`);
   });
 
+  console.log('\nOpenRouter desativado (decisão do Michel, 18/11/2026)');
+  const clientChat = fs.readFileSync(path.join(root, 'Components', 'PersonaChat.tsx'), 'utf-8');
+  const clientElite = fs.readFileSync(path.join(root, 'Components', 'EliteRedactionModal.tsx'), 'utf-8');
+  await test('servidor: interruptor ligado e a chave do OpenRouter só é lida via getOpenRouterKey() (+ diagnóstico)', () => {
+    assert.match(src, /const OPENROUTER_DISABLED = true;/);
+    const leituras = [...src.matchAll(/process\.env\.OPENROUTER_API_KEY/g)].length;
+    assert.equal(leituras, 2, `esperava 2 leituras diretas (a função e o diagnóstico), achei ${leituras}`);
+    assert.ok(/function getOpenRouterKey\(\)[^}]*OPENROUTER_DISABLED \? undefined/.test(src), 'getOpenRouterKey deve devolver undefined com o interruptor ligado');
+  });
+  await test('detector de intenção usa o Gemini (não chama mais callOpenRouter/DeepSeek)', () => {
+    const trecho = src.slice(src.indexOf('Fast-path para perguntas simples'), src.indexOf('MOTOR DE TAMANHO DE PETIÇÃO'));
+    assert.ok(!/callOpenRouter\(/.test(trecho), 'o detector de intenção voltou a chamar o OpenRouter');
+    assert.ok(/callGemini\(\{[\s\S]*usageKind: 'intent'[\s\S]*bypassOpenRouter: true/.test(trecho), 'detector de intenção deveria usar callGemini com bypassOpenRouter');
+  });
+  await test('os 4 chats nunca roteiam para o OpenRouter e a tela não oferece DeepSeek/Claude', () => {
+    const forcados = (src.match(/if \(OPENROUTER_DISABLED\) \{\s*console\.warn\(`\[OpenRouter\] Desativado/g) || []).length;
+    assert.equal(forcados, 4, `esperava 4 chats forçando o Hydrogen, achei ${forcados}`);
+    assert.ok(!/deepseek|anthropic\/claude/i.test(clientElite.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')), 'modal ainda oferece DeepSeek/Claude');
+    assert.ok(!/<option value="(?:deepseek|anthropic)\//.test(clientChat), 'seletor de modelo ainda oferece DeepSeek/Claude');
+  });
+
   console.log('\nConsumo diário de tokens (medição)');
   const { normalizeUsage } = await loadFromIndex(between('function normalizeUsage', 'function recordAiUsage'), ['normalizeUsage']);
   await test('normalizeUsage: lê usageMetadata do Gemini, ignora lixo e zera negativos/NaN', () => {

@@ -5048,10 +5048,6 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
                     <optgroup label="Nativo Google">
                       <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Padrão)</option>
                     </optgroup>
-                    <optgroup label="OpenRouter">
-                      <option value="deepseek/deepseek-v4-flash">DeepSeek V4</option>
-                      <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                    </optgroup>
                   </select>
                 </div>
                 {isLoading ? (

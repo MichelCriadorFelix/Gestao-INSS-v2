@@ -51,19 +51,7 @@ export default function EliteRedactionModal({ isOpen, onClose, onConfirm, curren
             </div>
           </button>
 
-          <button
-            onClick={() => onConfirm('openrouter', 'deepseek/deepseek-v4-flash')}
-            className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-gold-500/20 bg-slate-50 dark:bg-bordeaux-900/10 hover:border-emerald-500 transition-all group"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-gold-400">
-                  DeepSeek V4 Flash (OpenRouter)
-                </h4>
-                <p className="text-xs text-slate-500 mt-1">Modelo alternativo via OpenRouter para redações contínuas.</p>
-              </div>
-            </div>
-          </button>
+          {/* OpenRouter/DeepSeek removido (decisão do Michel, 18/11/2026): o escritório usa só o Gemini 4 Hydrogen. */}
         </div>
       </div>
     </div>

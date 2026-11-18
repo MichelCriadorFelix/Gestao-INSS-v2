@@ -29,6 +29,15 @@ app.use((req, res, next) => {
 const DEFAULT_SUPABASE_URL = "https://nnhatyvrtlbkyfadumqo.supabase.co";
 const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uaGF0eXZydGxia3lmYWR1bXFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU1Mzk1NDYsImV4cCI6MjA4MTExNTU0Nn0.F_020GSnZ_jQiSSPFfAxY9Q8dU6FmjUDixOeZl4YHDg";
 
+// OPENROUTER DESATIVADO (decisão do Michel, 18/11/2026: "não use nada da OpenRouter"). Antes, com OPENROUTER_API_KEY configurada
+// na Vercel, o buscador de leis, a revisão da peça e outras chamadas internas iam SILENCIOSAMENTE para o OpenRouter (modelo
+// google/gemini-3.6-flash, cobrado por lá), o detector de intenção chamava o DeepSeek a cada mensagem e a tela oferecia DeepSeek/Claude.
+// Tudo isso agora usa o Gemini 4 Hydrogen nas chaves do Google. Só reative trocando esta constante (e a tela) de propósito.
+const OPENROUTER_DISABLED = true;
+function getOpenRouterKey(): string | undefined {
+  return OPENROUTER_DISABLED ? undefined : process.env.OPENROUTER_API_KEY;
+}
+
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.URL_SUPABASE || DEFAULT_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY,
@@ -642,7 +651,7 @@ app.post("/api/ocr-unified", async (req, res) => {
       return res.status(400).json({ error: "Documents are required" });
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = getOpenRouterKey();
     let unifiedText = "";
 
     for (let i = 0; i < documents.length; i++) {
@@ -963,18 +972,20 @@ async function detectUserIntent(message: string): Promise<string> {
   }
 
   try {
-    const response = await callOpenRouter({
-      model: "deepseek/deepseek-chat",
-      messages: [
-        { role: "system", content: INTENT_DETECTOR_PROMPT },
-        { role: "user", content: safeMessage }
-      ],
-      temperature: 0
+    // Hydrogen nas chaves do Google (nada de OpenRouter). Classificar é tarefa de raciocínio BAIXO.
+    const response = await callGemini({
+      usageKind: 'intent',
+      bypassOpenRouter: true,
+      model: DEFAULT_GEMINI_MODEL,
+      contents: { role: "user", parts: [{ text: safeMessage }] },
+      config: { systemInstruction: INTENT_DETECTOR_PROMPT, thinkingConfig: { thinkingLevel: 'low' }, maxOutputTokens: 512 },
     });
-    const intent = (response.text || "[DÚVIDA]").trim().toUpperCase();
-    return intent;
+    const found = String(response?.text || '').toUpperCase().match(/\[(CASUAL|D[ÚU]VIDA|GERA[ÇC][ÃA]O|ARQUIVO)\]/);
+    if (!found) return "[DÚVIDA]";
+    const label = found[1];
+    return label.startsWith('D') ? "[DÚVIDA]" : label.startsWith('GERA') ? "[GERAÇÃO]" : `[${label}]`;
   } catch (error) {
-    console.warn("Falha na detecção de intenção via OpenRouter, assumindo [DÚVIDA]:", error);
+    console.warn("Falha na detecção de intenção, assumindo [DÚVIDA]:", error);
     return "[DÚVIDA]";
   }
 }
@@ -3648,7 +3659,7 @@ function stripExpiredFileData(params: any): any {
 }
 
 async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number): Promise<any> {
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const openRouterKey = getOpenRouterKey();
   if (openRouterKey && !params.bypassOpenRouter) {
     console.log(`[PROXY GEMINI -> OpenRouter] Redirecionando chamada para OpenRouter usando o modelo: ${params.model}`);
     
@@ -3935,7 +3946,7 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
 }
 
 async function callGeminiStream(params: any, retries = MAX_RETRIES, modelIndex = 0, failuresOnCurrentModel = 0, forcedKeyIndex?: number, onStatus?: (msg: string) => void): Promise<any> {
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const openRouterKey = getOpenRouterKey();
   if (openRouterKey && !params.bypassOpenRouter) {
     console.log(`[PROXY GEMINI_STREAM -> OpenRouter] Redirecionando streaming para OpenRouter usando o modelo: ${params.model}`);
     
@@ -4362,7 +4373,7 @@ async function callGeminiEmbed(text: string, retries = MAX_RETRIES): Promise<num
 }
 
 async function callOpenRouter(params: any): Promise<any> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = getOpenRouterKey();
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY não configurada no servidor.");
   }
@@ -4392,7 +4403,7 @@ async function callOpenRouter(params: any): Promise<any> {
 }
 
 async function callOpenRouterStream(params: any, res: any, shouldEndStream = true): Promise<{ fullText: string; maxTokensHit: boolean }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = getOpenRouterKey();
   if (!apiKey) {
     (() => {
     let _errStr = "OPENROUTER_API_KEY não configurada no servidor." ;
@@ -6540,8 +6551,14 @@ app.post("/api/dr-michel/chat", async (req, res) => {
         modelProvider = 'gemini';
         model = getEffectiveModel(reqModel);
       } else {
-        modelProvider = 'openrouter';
-        model = reqModel.replace(/^openrouter\//, '');
+        if (OPENROUTER_DISABLED) {
+          console.warn(`[OpenRouter] Desativado (decisão do Michel, 18/11/2026): pedido de '${reqModel}' atendido pelo Gemini 4 Hydrogen.`);
+          modelProvider = 'gemini';
+          model = DEFAULT_GEMINI_MODEL;
+        } else {
+          modelProvider = 'openrouter';
+          model = reqModel.replace(/^openrouter\//, '');
+        }
       }
       console.log(`[Dr.Michel] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
@@ -7336,8 +7353,14 @@ app.post("/api/dra-luana/chat", async (req, res) => {
         modelProvider = 'gemini';
         model = getEffectiveModel(reqModel);
       } else {
-        modelProvider = 'openrouter';
-        model = reqModel.replace(/^openrouter\//, '');
+        if (OPENROUTER_DISABLED) {
+          console.warn(`[OpenRouter] Desativado (decisão do Michel, 18/11/2026): pedido de '${reqModel}' atendido pelo Gemini 4 Hydrogen.`);
+          modelProvider = 'gemini';
+          model = DEFAULT_GEMINI_MODEL;
+        } else {
+          modelProvider = 'openrouter';
+          model = reqModel.replace(/^openrouter\//, '');
+        }
       }
       console.log(`[Dra.Luana] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
@@ -8195,8 +8218,14 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
         modelProvider = 'gemini';
         model = getEffectiveModel(reqModel);
       } else {
-        modelProvider = 'openrouter';
-        model = reqModel.replace(/^openrouter\//, '');
+        if (OPENROUTER_DISABLED) {
+          console.warn(`[OpenRouter] Desativado (decisão do Michel, 18/11/2026): pedido de '${reqModel}' atendido pelo Gemini 4 Hydrogen.`);
+          modelProvider = 'gemini';
+          model = DEFAULT_GEMINI_MODEL;
+        } else {
+          modelProvider = 'openrouter';
+          model = reqModel.replace(/^openrouter\//, '');
+        }
       }
       console.log(`[Dr.FelixCastro] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
@@ -9064,8 +9093,14 @@ app.post("/api/sec-fabricia/chat", async (req, res) => {
         modelProvider = 'gemini';
         model = getEffectiveModel(reqModel);
       } else {
-        modelProvider = 'openrouter';
-        model = reqModel.replace(/^openrouter\//, '');
+        if (OPENROUTER_DISABLED) {
+          console.warn(`[OpenRouter] Desativado (decisão do Michel, 18/11/2026): pedido de '${reqModel}' atendido pelo Gemini 4 Hydrogen.`);
+          modelProvider = 'gemini';
+          model = DEFAULT_GEMINI_MODEL;
+        } else {
+          modelProvider = 'openrouter';
+          model = reqModel.replace(/^openrouter\//, '');
+        }
       }
       console.log(`[Sec.Fabricia] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
@@ -9893,7 +9928,7 @@ app.get("/api/admin/ai-usage", async (req, res) => {
       .gte('day', since)
       .order('day', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ days, rows: data || [], diagnostico: { ...usageDiag, openrouterConfigurado: !!process.env.OPENROUTER_API_KEY } });
+    return res.json({ days, rows: data || [], diagnostico: { ...usageDiag, openrouterDesativado: OPENROUTER_DISABLED, chaveNoServidor: !!process.env.OPENROUTER_API_KEY } });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Falha ao ler o consumo.' });
   }
