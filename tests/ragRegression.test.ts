@@ -21,7 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
 import { buildCrmPayload } from '../Components/crmContext';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, wantsToApplyReview, reviewApplyRequest } from '../Components/petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, wantsToApplyReview, reviewApplyRequest, buildReviewBase } from '../Components/petitionReview';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
@@ -415,6 +415,20 @@ function realisticContext(): string {
     for (const m of ['gerar relatório', 'qual o prazo para recorrer?', 'atualize o endereço da autora', 'tomada de ciência: leia os documentos', 'gerar peça: petição inicial de restabelecimento'])
       assert.equal(wantsToApplyReview(m), false, m);
     assert.equal(wantsToApplyReview('aplique a revisão ' + 'x'.repeat(700)), false, 'mensagem enorme não é um pedido curto de aplicar');
+  });
+  await test('base do revisor é ENXUTA: índice de todos os títulos + texto só do que a peça cita', () => {
+    const grande = (t: string, i: number) => `FONTE: ${t} [Score: 50%]\n` + (`Texto ${t} ${i} `).repeat(300);
+    const ctx = [grande('Lei nº 14.331/2022', 1), grande('Lei nº 8.213/1991', 2), grande('Código Civil', 3), grande('Lei do Inquilinato', 4), grande('Lei nº 8.213/1991', 5)].join('\n\n---\n\n');
+    const r = buildReviewBase(ctx, (title) => /14\.331|8\.213/.test(title));
+    assert.equal(r.totalPieces, 5);
+    assert.equal(r.citedPieces, 3);
+    for (const t of ['Lei nº 14.331/2022', 'Lei nº 8.213/1991', 'Código Civil', 'Lei do Inquilinato']) assert.ok(r.text.includes(`- ${t}`), `índice sem ${t}`);
+    assert.equal((r.text.match(/- Lei nº 8\.213\/1991/g) || []).length, 1, 'título repetido no índice');
+    assert.ok(r.text.includes('Texto Lei nº 14.331/2022 1'), 'texto literal do citado sumiu');
+    assert.ok(!r.text.includes('Texto Código Civil 3'), 'texto de dispositivo NÃO citado não pode ir ao revisor');
+    assert.ok(r.text.length < ctx.length * 0.7, `base do revisor não encolheu (${r.text.length} vs ${ctx.length})`);
+    assert.equal(buildReviewBase(undefined, () => true).text, '');
+    assert.match(buildReviewBase(grande('Código Civil', 1), () => false).text, /não cita nenhum dispositivo/);
   });
   await test('frase real do Michel ("pode aplicar a correçã no artefato", com erro de digitação) é reconhecida', () => {
     assert.equal(wantsToApplyReview('pode aplicar a correçã no artefato'), true);

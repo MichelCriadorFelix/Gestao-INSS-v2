@@ -4478,7 +4478,7 @@ let globalTitleAreasTimestamp = 0;
 // uma lista curta de alertas (JSON). Nunca reescreve a peça. O navegador chama esta rota depois que a peça aparece no chat
 // (Components/petitionReview.ts + PersonaChat.tsx), em segundo plano. Existe porque os desvios achados na peça da Denize
 // eram de redação do modelo (paráfrase que contradiz o artigo, índice desatualizado, dado do dossiê trocado).
-const PETITION_REVIEW_PROMPT = `Você é o REVISOR de petições do escritório Felix & Castro Advocacia. Recebe: [PEÇA A REVISAR], [BASE LEGAL RECUPERADA] (texto literal de leis, súmulas e temas) e [DOSSIÊ DO CLIENTE (OCR)] (documentos dos autos). Sua tarefa é APONTAR ERROS VERIFICÁVEIS na peça. Você NÃO reescreve a peça e NÃO comenta estilo, tamanho ou retórica.
+const PETITION_REVIEW_PROMPT = `Você é o REVISOR de petições do escritório Felix & Castro Advocacia. Recebe: [PEÇA A REVISAR], [BASE LEGAL RECUPERADA] (um ÍNDICE com os títulos disponíveis na base + o TEXTO LITERAL dos dispositivos que a peça cita) e [DOSSIÊ DO CLIENTE (OCR)] (documentos dos autos). Sua tarefa é APONTAR ERROS VERIFICÁVEIS na peça. Você NÃO reescreve a peça e NÃO comenta estilo, tamanho ou retórica.
 
 O QUE CONFERIR (nesta ordem de importância):
 1. CITAÇÕES: toda lei, artigo, súmula, tema ou resolução citado. (a) A norma está na BASE LEGAL? O texto em blockquote é IDÊNTICO ao da base? (b) A PARÁFRASE contradiz ou extrapola o dispositivo (ex.: atribuir a um artigo o que ele não diz, ou citar o artigo errado para uma ideia)? (c) O parágrafo/inciso citado existe?
@@ -4494,7 +4494,7 @@ REGRAS DO ESCRITÓRIO (não aponte como erro quando a peça as cumpre; aponte qu
 - Assinaturas: Michel Santos Felix (OAB/RJ 231.640) e Luana de Oliveira Castro Pacheco (OAB/RJ 226.749).
 
 DISCIPLINA (muito importante):
-- Só aponte o que você CONSEGUIU VERIFICAR no dossiê ou na base. Antes de dizer que uma citação está errada, localize o dispositivo na BASE LEGAL e leia-o inteiro; se ele NÃO estiver na base, NÃO afirme que está errado: use severidade "baixa" e escreva em "fonte": "não consta na base recuperada — confirmar no Planalto/STJ".
+- Só aponte o que você CONSEGUIU VERIFICAR no dossiê ou na base. Antes de dizer que uma citação está errada, localize o dispositivo na BASE LEGAL e leia-o inteiro; se ele NÃO estiver na base, NÃO afirme que está errado: use severidade "baixa" e escreva em "fonte": "não consta na base recuperada — confirmar no Planalto/STJ". Uma norma está na base quando o título dela consta do ÍNDICE; se consta do índice mas o texto literal não veio, não dá para conferir a transcrição: NÃO aponte.
 - Se a base confirma o que a peça diz, NÃO aponte. Na dúvida entre apontar e calar, calar — exceto para cálculos e dados que contradizem o dossiê.
 - No máximo 12 alertas, os mais graves primeiro. Se não houver nada a apontar, devolva [].
 - "trecho" = cópia LITERAL e curta (até 160 caracteres) do que está na peça. "sugestao" = a correção concreta. "fonte" = onde você conferiu (ex.: "Dossiê, Doc. 8, pág. 4", "Base Legal: Lei 8.213/1991 art. 60 §9º").
@@ -4509,8 +4509,8 @@ app.post("/api/peca/review", async (req, res) => {
       return res.status(400).json({ error: "Peça ausente ou curta demais para revisão." });
     }
     const cut = (v: any, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
-    const input = `[DATA DE HOJE]\n${cut(hoje, 40)}\n\n[PEÇA A REVISAR]\n${peca.slice(0, 120_000)}\n\n[BASE LEGAL RECUPERADA]\n${cut(ragContext, 250_000) || '(nenhuma peça da base foi recuperada nesta conversa)'}\n\n[DOSSIÊ DO CLIENTE (OCR)]\n${cut(documentContext, 220_000) || '(dossiê não enviado)'}`;
-    console.log(`[REVISÃO PEÇA] Iniciando. Peça: ${peca.length} chars | base: ${cut(ragContext, 250_000).length} | dossiê: ${cut(documentContext, 220_000).length}`);
+    const input = `[DATA DE HOJE]\n${cut(hoje, 40)}\n\n[PEÇA A REVISAR]\n${peca.slice(0, 120_000)}\n\n[BASE LEGAL RECUPERADA]\n${cut(ragContext, 120_000) || '(nenhuma peça da base foi recuperada nesta conversa)'}\n\n[DOSSIÊ DO CLIENTE (OCR)]\n${cut(documentContext, 220_000) || '(dossiê não enviado)'}`;
+    console.log(`[REVISÃO PEÇA] Iniciando. Peça: ${peca.length} chars | base: ${cut(ragContext, 120_000).length} | dossiê: ${cut(documentContext, 220_000).length}`);
 
     const resp: any = await Promise.race([
       callGemini({

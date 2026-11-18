@@ -198,6 +198,37 @@ export function parseReviewAlerts(raw: any): ReviewAlert[] {
 }
 
 /**
+ * Base Legal ENXUTA para o revisor de IA. Antes o revisor recebia o contexto de RAG inteiro (até ~250 mil caracteres ≈ 70 mil
+ * tokens, em geral a maior parte irrelevante) e custava quase o mesmo que gerar a peça. Ele só precisa de (a) um ÍNDICE com os
+ * títulos disponíveis (para saber se uma norma citada consta na base) e (b) o texto LITERAL dos dispositivos que a peça de fato
+ * cita (para conferir transcrição e paráfrase). `isCited` decide se a peça cita o dispositivo (mesma regra do artefato de Base Legal).
+ */
+export function buildReviewBase(
+  ragCtx: string | undefined,
+  isCited: (title: string, content: string) => boolean,
+  opts: { maxChars?: number } = {},
+): { text: string; totalPieces: number; citedPieces: number } {
+  if (!ragCtx) return { text: '', totalPieces: 0, citedPieces: 0 };
+  const maxChars = opts.maxChars ?? 60_000;
+  const pieces = ragCtx.split(/\n\n---\n\n/).filter(p => p.trim().length > 0);
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  const cited: string[] = [];
+  for (const piece of pieces) {
+    const h = piece.match(/^FONTE:\s*(.+?)\s*\[[^\]]*\]\n([\s\S]*)$/);
+    const title = h ? h[1].trim() : (piece.match(/^FONTE:\s*(.+)$/m)?.[1]?.trim() || '');
+    const content = h ? h[2] : piece.replace(/^FONTE:.*\n/, '');
+    if (!title || !content) continue;
+    if (!seen.has(title)) { seen.add(title); titles.push(title); }
+    if (isCited(title, content)) cited.push(piece);
+  }
+  let citedText = cited.join('\n\n---\n\n');
+  if (citedText.length > maxChars) citedText = citedText.slice(0, maxChars) + '\n[… texto dos dispositivos truncado por tamanho …]';
+  const text = `ÍNDICE DOS DISPOSITIVOS DISPONÍVEIS NA BASE (títulos):\n${titles.map(t => `- ${t}`).join('\n')}\n\nTEXTO LITERAL DOS DISPOSITIVOS CITADOS NA PEÇA:\n${citedText || '(a peça não cita nenhum dispositivo da base recuperada)'}`;
+  return { text, totalPieces: pieces.length, citedPieces: cited.length };
+}
+
+/**
  * O advogado pede para APLICAR a revisão na peça ("aplique a atualização na peça", "aplique os itens 1 e 3 da revisão",
  * "corrija conforme os apontamentos"). Nesse caso o chat anexa o texto da última revisão ao pedido (ela não vai no histórico
  * do modelo) e trata o pedido como correção cirúrgica do artefato.

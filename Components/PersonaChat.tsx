@@ -48,7 +48,7 @@ import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { runSecondPassRag } from './secondPassRag';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, reviewApplyRequest } from './petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, reviewApplyRequest, buildReviewBase } from './petitionReview';
 import { buildCrmPayload } from './crmContext';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
@@ -3024,6 +3024,10 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
     }));
     upsert('🔎 **Revisão automática da peça em andamento…**\n\nEstou conferindo as citações com a Base Legal, os fatos com o dossiê, a conta do valor da causa e o rol de documentos. Leva cerca de 1 a 2 minutos; você já pode ler a peça.');
     const auto = deterministicPetitionChecks(petitionText, { hoje: new Date() });
+    // Base Legal ENXUTA: índice de títulos + texto só dos dispositivos que a peça cita (antes ia o contexto de RAG inteiro,
+    // ~70 mil tokens, para conferir o que a peça cita em ~10 mil).
+    const base = buildReviewBase(ragCtx, (title, content) => isLegalDeviceCitedInResponse(buildLegalDeviceKey(title, content), petitionText, content));
+    console.log(`[REVISÃO PEÇA] Base enviada ao revisor: ${base.citedPieces} de ${base.totalPieces} trechos citados (${(ragCtx || '').length} → ${base.text.length} caracteres).`);
     const t0 = Date.now();
     try {
       const resp = await apiFetch('/api/peca/review', {
@@ -3031,7 +3035,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           peca: petitionText,
-          ragContext: ragCtx || '',
+          ragContext: base.text,
           documentContext: docCtx || '',
           hoje: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
         }),
