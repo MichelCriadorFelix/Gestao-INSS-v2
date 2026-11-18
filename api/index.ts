@@ -3209,14 +3209,23 @@ function normalizeUsage(u: any): { input: number; output: number; thought: numbe
   return out.input + out.output + out.thought === 0 ? null : out;
 }
 
+// Diagnóstico em memória (por instância da função): quantas gravações foram tentadas/puladas/ok/falharam e o último erro.
+const usageDiag = { tentativas: 0, semDados: 0, ok: 0, falhas: 0, ultimoErro: '', ultimoTipo: '', ultimaEm: '' };
+
 function recordAiUsage(kind: string, usageMetadata: any): void {
   try {
+    usageDiag.tentativas++;
+    usageDiag.ultimoTipo = kind || 'outros';
     const u = normalizeUsage(usageMetadata);
-    if (!u) return;
+    if (!u) { usageDiag.semDados++; return; }
     Promise.resolve(supabaseAdmin.rpc('gestao_ai_usage_add', { p_kind: kind || 'outros', p_in: u.input, p_out: u.output, p_thought: u.thought, p_cached: u.cached }))
-      .then((r: any) => { if (r?.error) console.warn('[USO IA] Falha ao gravar consumo:', r.error.message); })
-      .catch((e: any) => console.warn('[USO IA] Falha ao gravar consumo:', e?.message || e));
-  } catch { /* consumo é só medição */ }
+      .then((r: any) => {
+        usageDiag.ultimaEm = new Date().toISOString();
+        if (r?.error) { usageDiag.falhas++; usageDiag.ultimoErro = `${r.error.code || ''} ${r.error.message || ''}`.trim(); console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); }
+        else usageDiag.ok++;
+      })
+      .catch((e: any) => { usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e); console.warn('[USO IA] Falha ao gravar consumo:', usageDiag.ultimoErro); });
+  } catch (e: any) { usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e); /* consumo é só medição */ }
 }
 
 /** Repassa os chunks do stream e grava o consumo quando chega o chunk final (com usageMetadata). */
@@ -9872,7 +9881,7 @@ app.get("/api/admin/ai-usage", async (req, res) => {
       .gte('day', since)
       .order('day', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ days, rows: data || [] });
+    return res.json({ days, rows: data || [], diagnostico: usageDiag });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Falha ao ler o consumo.' });
   }
