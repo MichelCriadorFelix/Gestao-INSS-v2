@@ -6553,7 +6553,9 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       temperature = 0.1;
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_MICHEL_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag && !ragContext) ragContext = "";
+      // Conversa casual ("olá", "obrigado"): NÃO manda a base legal (antes a condição "&& !ragContext" tornava isto um no-op e uma saudação
+      // custava ~57 mil tokens). Se o pedido for, na verdade, geração/relatório (classificação casual errada), a base é mantida.
+      if (!req.body.forceRag && !isGenerationRequest && !isReportRequest) ragContext = "";
     } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequest) {
       selectedSystemPrompt = DR_MICHEL_DUVIDA_PROMPT + getCurrentDateContext();
     }
@@ -7415,7 +7417,8 @@ NÃO gere ou reescreva a petição inteira; forneca unicamente este laudo de aud
     } else if (isCasualIntent) {
       console.log("Modo Dra. Luana Casual Ativado (Mínimo de Tokens)");
       selectedSystemPrompt = DRA_LUANA_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag && !ragContext) ragContext = "";
+      // Conversa casual ("olá", "obrigado"): NÃO manda a base legal (antes a condição "&& !ragContext" tornava isto um no-op).
+      if (!req.body.forceRag && !isGenerationRequest && !isReportRequestLuana) ragContext = "";
     } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequestLuana) {
       console.log("Modo Dra. Luana Dúvida Ativado (Consultora Trabalhista)");
       selectedSystemPrompt = DRA_LUANA_DUVIDA_PROMPT + getCurrentDateContext();
@@ -8201,7 +8204,9 @@ app.post("/api/dr-felix-castro/chat", async (req, res) => {
       temperature = 0.1;
     } else if (isCasualIntent) {
       selectedSystemPrompt = DR_FELIX_CASTRO_CASUAL_PROMPT + getCurrentDateContext();
-      if (!req.body.forceRag && !ragContext) ragContext = "";
+      // Conversa casual ("olá", "obrigado"): NÃO manda a base legal (antes a condição "&& !ragContext" tornava isto um no-op e uma saudação
+      // custava ~57 mil tokens). Se o pedido for, na verdade, geração/relatório (classificação casual errada), a base é mantida.
+      if (!req.body.forceRag && !isGenerationRequest && !isReportRequest) ragContext = "";
     } else if (intent === "[DÚVIDA]" && !isGenerationRequest && !isReportRequest) {
       selectedSystemPrompt = DR_FELIX_CASTRO_DUVIDA_PROMPT + getCurrentDateContext();
     }

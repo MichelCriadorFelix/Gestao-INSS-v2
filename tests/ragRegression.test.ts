@@ -340,6 +340,12 @@ function realisticContext(): string {
     assert.ok(/08\/12\/2021/.test(regra) && /EC 113\/2021/.test(regra) && /SEM fixar índice único/.test(regra), 'regra incompleta');
   });
 
+  await test('conversa casual NÃO carrega a base legal nos 3 chats (bug: "&& !ragContext" deixava o ragContext passar)', () => {
+    assert.equal((src.match(/if \(!req\.body\.forceRag && !ragContext\) ragContext = ""/g) || []).length, 0, 'a condição antiga (no-op) voltou');
+    const novos = src.match(/if \(!req\.body\.forceRag && !isGenerationRequest && !isReportRequest(?:Luana)?\) ragContext = ""/g) || [];
+    assert.equal(novos.length, 3, `esperava 3 chats (Michel, Luana, Felix) zerando a base no casual, achei ${novos.length}`);
+  });
+
   console.log('\nConsumo diário de tokens (medição)');
   const { normalizeUsage } = await loadFromIndex(between('function normalizeUsage', 'function recordAiUsage'), ['normalizeUsage']);
   await test('normalizeUsage: lê usageMetadata do Gemini, ignora lixo e zera negativos/NaN', () => {
