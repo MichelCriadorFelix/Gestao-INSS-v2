@@ -2080,7 +2080,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR IDADE:
 - DA JUSTIÇA GRATUITA: Fundamentação nos arts. 98 a 102 
   do CPC e declaração de hipossuficiência.
 - DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução 
-  CNJ nº 345/2020 e Resolução CJF nº 10/2020, com dispensa 
+  CNJ nº 345/2020 (cite APENAS esta; NÃO cite "Resolução CJF nº 10/2020" — decisão do Michel em 18/11/2026), com dispensa 
   de comparecimento presencial.
 - DOS FATOS E FUNDAMENTOS JURÍDICOS:
     - Requisitos Legais: Detalhar regras Pré-Reforma (até 13/11/2019) e Pós-Reforma (EC 103/2019).
@@ -2206,7 +2206,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA ESPECIAL:
 - QUALIFICAÇÃO DO RÉU: Conforme regra 7.
 - TÍTULO: Ação Previdenciária — Concessão de Aposentadoria Especial (Art. 57 da Lei nº 8.213/91).
 - I. DA GRATUIDADE DE JUSTIÇA: Fundamentação nos arts. 98 a 102 do CPC e declaração de hipossuficiência.
-- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução CNJ nº 345/2020 e Resolução CJF nº 10/2020.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução CNJ nº 345/2020 (cite APENAS esta; NÃO cite "Resolução CJF nº 10/2020" — decisão do Michel em 18/11/2026).
 - III. DO RESUMO DA DEMANDA: Síntese narrativa e estratégica (1-2 parágrafos) — destacar a profissão, o agente nocivo, o tempo de exposição e o erro do INSS em negar o reconhecimento. Texto corrido, denso e persuasivo. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
 - IV. DOS FATOS:
     IV.1. Da Trajetória Profissional: Descrever cada emprego, função exercida, agentes nocivos a que esteve exposto (físicos, químicos ou biológicos), equipamentos de proteção individual e coletiva (EPI/EPC), e se o uso de EPI neutralizou efetivamente a nocividade (Tema 555 STF).
