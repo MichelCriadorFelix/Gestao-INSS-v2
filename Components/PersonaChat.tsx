@@ -48,6 +48,7 @@ import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { runSecondPassRag } from './secondPassRag';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage } from './petitionReview';
 import { buildCrmPayload } from './crmContext';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
@@ -84,6 +85,8 @@ interface Message {
   isSystem?: boolean;
   artifactId?: string;
   artifactType?: ArtifactTypeKey;
+  /** Mensagem da revisão automática da peça: aparece no chat, mas NÃO vai para o histórico/planner do modelo. */
+  isReview?: boolean;
 }
 
 export interface LegalBaseArtifactItem {
@@ -2021,7 +2024,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
       // vocabulário-gatilho, mas seguem o MESMO tema — precisam do mesmo RAG.
       // Olha as últimas mensagens da sessão; se alguma já disparou RAG ou trouxe
       // uma citação de fonte (marcador "FONTE:"), a conversa continua em modo RAG.
-      const recentMsgs = (session?.messages || []).slice(-4);
+      const recentMsgs = (session?.messages || []).filter((m: any) => !m.isReview).slice(-4);
       const conversationAlreadyLegal = recentMsgs.some((m: any) =>
         typeof m.content === 'string' && (LEGAL_DOUBT_REGEX.test(m.content) || m.content.includes('FONTE:'))
       );
@@ -2164,7 +2167,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
         let plannerPromise: Promise<Response | null> = Promise.resolve(null);
         try {
           const plannerContext = (() => {
-            const msgs = session?.messages || [];
+            const msgs = (session?.messages || []).filter((m: any) => !m.isReview);
             // Último RELATÓRIO do assistente (contém a lista de fundamentos curada)
             const lastReport = [...msgs].reverse().find((m: any) =>
               m.role === 'assistant' && typeof m.content === 'string' &&
@@ -2480,7 +2483,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
       // COMPRESSÃO DE HISTORY (Camada 1 — economia de tokens)
       // ============================================================
       const compressHistory = (msgs: Message[]): Message[] => {
-        const last = msgs.slice(-40); // FASE C: Expanded history to 40 messages for deep traceability
+        const last = msgs.filter(m => !m.isReview).slice(-40); // FASE C: Expanded history to 40 messages for deep traceability
         return last.map((m) => {
           // Tomada de ciência: tem padrão "[FASE DE TOMADA DE CIÊNCIA]" ou conteúdo enorme com "CONTEÚDO:"
           if (m.role === 'user' && (m.content.includes('[FASE DE TOMADA DE CIÊNCIA]') || (m.content.length > 5000 && m.content.includes('CONTEÚDO:')))) {
@@ -2953,6 +2956,11 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
         setSessions(prev => prev.map(s => 
           s.id === sessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
         ));
+
+        // REVISÃO AUTOMÁTICA: peça nova completa → confere em segundo plano (não bloqueia o chat nem altera a peça).
+        if (!isSurgicalCorrection && shouldReviewPetition(fullText)) {
+          void runPetitionReview(sessionId, fullText, ragContext, effectiveDocSummaries);
+        }
       }
     } catch (error: any) {
       if (timeoutId) clearTimeout(timeoutId);
@@ -2984,6 +2992,42 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
       activeAbortControllerRef.current = null;
       setProgress(0);
       setProgressText('');
+    }
+  };
+
+  // REVISÃO AUTOMÁTICA DA PEÇA (18/11/2026). Roda DEPOIS que a peça já apareceu no chat (o advogado já pode ler), sem bloquear
+  // o chat: 1) checagens determinísticas instantâneas (conta do valor da causa, rol, data, marcas de sistema, regras do
+  // escritório); 2) revisor de IA no servidor (/api/peca/review) que confere citações com a Base Legal e fatos com o dossiê.
+  // Nunca altera a peça: só publica uma mensagem com os alertas (marcada isReview, fora do histórico enviado ao modelo).
+  const runPetitionReview = async (sessionId: string, petitionText: string, ragCtx: string | undefined, docCtx: string | undefined) => {
+    const msgId = generateId();
+    const upsert = (content: string) => setSessions(prev => prev.map(s => {
+      if (s.id !== sessionId) return s;
+      const msg: Message = { id: msgId, role: 'assistant', content, timestamp: new Date().toISOString(), isReview: true };
+      return { ...s, messages: s.messages.some(m => m.id === msgId) ? s.messages.map(m => m.id === msgId ? msg : m) : [...s.messages, msg] };
+    }));
+    upsert('🔎 **Revisão automática da peça em andamento…**\n\nEstou conferindo as citações com a Base Legal, os fatos com o dossiê, a conta do valor da causa e o rol de documentos. Leva cerca de 1 a 2 minutos; você já pode ler a peça.');
+    const auto = deterministicPetitionChecks(petitionText, { hoje: new Date() });
+    const t0 = Date.now();
+    try {
+      const resp = await apiFetch('/api/peca/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peca: petitionText,
+          ragContext: ragCtx || '',
+          documentContext: docCtx || '',
+          hoje: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const j = await resp.json();
+      const ia = parseReviewAlerts(j?.alertas);
+      console.log(`[REVISÃO PEÇA] ${auto.length} alerta(s) automático(s) + ${ia.length} do revisor de IA em ${Math.round((Date.now() - t0) / 1000)}s.`);
+      upsert(formatReviewMessage([...auto, ...ia], { ia: 'ok' }));
+    } catch (e) {
+      console.warn('[REVISÃO PEÇA] Revisor de IA indisponível; publicando só as checagens automáticas:', e);
+      upsert(formatReviewMessage(auto, { ia: 'falhou' }));
     }
   };
 

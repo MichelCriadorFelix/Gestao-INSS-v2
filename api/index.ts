@@ -4463,6 +4463,78 @@ Se nada se aplicar, responda [].`;
 let globalTitleAreas = new Map<string, Set<string>>();
 let globalTitleAreasTimestamp = 0;
 
+// REVISOR DE PEÇAS (18/11/2026): confere uma peça JÁ GERADA contra a Base Legal recuperada e o dossiê do cliente e devolve
+// uma lista curta de alertas (JSON). Nunca reescreve a peça. O navegador chama esta rota depois que a peça aparece no chat
+// (Components/petitionReview.ts + PersonaChat.tsx), em segundo plano. Existe porque os desvios achados na peça da Denize
+// eram de redação do modelo (paráfrase que contradiz o artigo, índice desatualizado, dado do dossiê trocado).
+const PETITION_REVIEW_PROMPT = `Você é o REVISOR de petições do escritório Felix & Castro Advocacia. Recebe: [PEÇA A REVISAR], [BASE LEGAL RECUPERADA] (texto literal de leis, súmulas e temas) e [DOSSIÊ DO CLIENTE (OCR)] (documentos dos autos). Sua tarefa é APONTAR ERROS VERIFICÁVEIS na peça. Você NÃO reescreve a peça e NÃO comenta estilo, tamanho ou retórica.
+
+O QUE CONFERIR (nesta ordem de importância):
+1. CITAÇÕES: toda lei, artigo, súmula, tema ou resolução citado. (a) A norma está na BASE LEGAL? O texto em blockquote é IDÊNTICO ao da base? (b) A PARÁFRASE contradiz ou extrapola o dispositivo (ex.: atribuir a um artigo o que ele não diz, ou citar o artigo errado para uma ideia)? (c) O parágrafo/inciso citado existe?
+2. FATOS: datas, números de benefício (NB), protocolos, valores, nomes, CIDs, CRM, idade, páginas/folhas e números de documento (Doc. N) confrontados com o DOSSIÊ. Aponte também contradições internas da peça (datas, cessação x DCB, valores diferentes para o mesmo fato).
+3. CÁLCULOS: valor da causa (multiplicações e soma, parcelas vencidas x vincendas, prescrição quinquenal quando houver).
+4. ESTRATÉGIA: tese que expõe o cliente sem fato nos autos que a justifique (ex.: admitir atividade remunerada sem que haja indício) ou pedido que contradiz a narrativa.
+
+REGRAS DO ESCRITÓRIO (não aponte como erro quando a peça as cumpre; aponte quando descumpre):
+- O "__" no endereçamento ("AO JUÍZO DO __ JUIZADO...") é PROPOSITAL (sorteio automático): NÃO aponte.
+- Juízo 100% Digital: Resolução CNJ nº 345/2020 (NÃO cite "Resolução CJF nº 10/2020").
+- Correção monetária e juros: o Tema 905/STJ (INPC + poupança) e o Tema 810/STF só valem até 08/12/2021; a peça deve pedir "critérios legais vigentes em cada período" (art. 3º da EC 113/2021, quando aplicável, e Manual de Cálculos da Justiça Federal) sem fixar índice único.
+- A peça não pode conter marcas de sistema ("[RAG]", "Base de Conhecimento", "[AUSENTE", "[DISPONÍVEL NA BASE").
+- Assinaturas: Michel Santos Felix (OAB/RJ 231.640) e Luana de Oliveira Castro Pacheco (OAB/RJ 226.749).
+
+DISCIPLINA (muito importante):
+- Só aponte o que você CONSEGUIU VERIFICAR no dossiê ou na base. Antes de dizer que uma citação está errada, localize o dispositivo na BASE LEGAL e leia-o inteiro; se ele NÃO estiver na base, NÃO afirme que está errado: use severidade "baixa" e escreva em "fonte": "não consta na base recuperada — confirmar no Planalto/STJ".
+- Se a base confirma o que a peça diz, NÃO aponte. Na dúvida entre apontar e calar, calar — exceto para cálculos e dados que contradizem o dossiê.
+- No máximo 12 alertas, os mais graves primeiro. Se não houver nada a apontar, devolva [].
+- "trecho" = cópia LITERAL e curta (até 160 caracteres) do que está na peça. "sugestao" = a correção concreta. "fonte" = onde você conferiu (ex.: "Dossiê, Doc. 8, pág. 4", "Base Legal: Lei 8.213/1991 art. 60 §9º").
+
+SAÍDA: SOMENTE um array JSON, sem texto fora dele. Cada item: {"severidade":"alta|media|baixa","tipo":"citacao|fato|calculo|regra|estrategia|forma","trecho":"...","problema":"...","sugestao":"...","fonte":"..."}. Severidade "alta" = erro que pode prejudicar o cliente ou a credibilidade da peça (dado trocado, citação que não diz o que a peça afirma, conta errada).`;
+
+app.post("/api/peca/review", async (req, res) => {
+  const __t0 = Date.now();
+  try {
+    const { peca, ragContext, documentContext, hoje } = req.body || {};
+    if (typeof peca !== 'string' || peca.length < 3000) {
+      return res.status(400).json({ error: "Peça ausente ou curta demais para revisão." });
+    }
+    const cut = (v: any, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+    const input = `[DATA DE HOJE]\n${cut(hoje, 40)}\n\n[PEÇA A REVISAR]\n${peca.slice(0, 120_000)}\n\n[BASE LEGAL RECUPERADA]\n${cut(ragContext, 250_000) || '(nenhuma peça da base foi recuperada nesta conversa)'}\n\n[DOSSIÊ DO CLIENTE (OCR)]\n${cut(documentContext, 220_000) || '(dossiê não enviado)'}`;
+    console.log(`[REVISÃO PEÇA] Iniciando. Peça: ${peca.length} chars | base: ${cut(ragContext, 250_000).length} | dossiê: ${cut(documentContext, 220_000).length}`);
+
+    const resp: any = await Promise.race([
+      callGemini({
+        model: DEFAULT_GEMINI_MODEL,
+        contents: { role: "user", parts: [{ text: input }] },
+        config: {
+          systemInstruction: PETITION_REVIEW_PROMPT,
+          responseMimeType: "application/json",
+          // Conferir texto contra documentos é "perguntas e respostas sobre documento": nível médio (guia oficial do Gemini 4).
+          thinkingConfig: { thinkingLevel: 'medium' },
+          maxOutputTokens: 14000,
+        },
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('A revisão demorou demais (timeout de 6 min).')), 360_000)),
+    ]);
+
+    let raw = String(resp?.text || '[]').trim();
+    if (raw.startsWith('```')) raw = raw.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
+    let alertas: any[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) alertas = parsed;
+    } catch {
+      const s = raw.indexOf('['); const e = raw.lastIndexOf(']');
+      if (s > -1 && e > s) { try { alertas = JSON.parse(raw.substring(s, e + 1)); } catch { alertas = []; } }
+    }
+    const ms = Date.now() - __t0;
+    console.log(`[REVISÃO PEÇA] Concluída em ${Math.round(ms / 1000)}s com ${alertas.length} alerta(s).`);
+    return res.json({ alertas: alertas.slice(0, 15), tempoMs: ms });
+  } catch (err: any) {
+    console.error("[REVISÃO PEÇA] Falha:", err?.message || err);
+    return res.status(500).json({ error: err?.message || "Falha na revisão da peça." });
+  }
+});
+
 app.post("/api/rag/plan", async (req, res) => {
   try {
     const { caseContext, areas, dbConfig, personaId, reusePlan } = req.body;

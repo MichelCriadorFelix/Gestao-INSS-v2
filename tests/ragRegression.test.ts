@@ -21,6 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
 import { buildCrmPayload } from '../Components/crmContext';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage } from '../Components/petitionReview';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
@@ -330,6 +331,79 @@ function realisticContext(): string {
     assert.equal(src.split('correção (Tema 905/STJ)').length - 1, 0, 'estrutura ainda indica "(Tema 905/STJ)" como índice dos atrasados');
     const regra = src.slice(src.indexOf('const REGRA_CORRECAO_JUROS'), src.indexOf('const REGRA_CORRECAO_JUROS') + 1600);
     assert.ok(/08\/12\/2021/.test(regra) && /EC 113\/2021/.test(regra) && /SEM fixar índice único/.test(regra), 'regra incompleta');
+  });
+
+  console.log('\nRevisão automática da peça — checagens determinísticas');
+  const filler = 'O autor demonstra, com base nos documentos acostados, que a incapacidade persiste e que o benefício deve ser restabelecido. '.repeat(70);
+  const corpoLimpo = (extra = '', rol = 'Doc. 1 - Procuração.pdf\nDoc. 2 - Declaração de pobreza.pdf\nDoc. 3 - Termo de renúncia.pdf\nDoc. 4 - Identidade.pdf', data = '18 de novembro de 2026') =>
+    `AO JUÍZO DO __ JUIZADO ESPECIAL FEDERAL DE SÃO JOÃO DE MERITI/RJ\n\nFULANA DE TAL, qualificada, propõe ação.\n\nI. DOS FATOS\n${filler}(Doc. 2 e Doc. 3). Laudo (Doc. 4, fls. 1/2).\n${extra}\nIX. DO VALOR DA CAUSA\nParcelas vencidas (8 meses): 8 × R$ 1.621,00 = R$ 12.968,00\nParcelas vincendas (12 meses): 12 × R$ 1.621,00 = R$ 19.452,00\nTOTAL DO VALOR DA CAUSA: R$ 32.420,00 (trinta e dois mil, quatrocentos e vinte reais).\n\nNestes termos, pede e espera deferimento.\n\nSão João de Meriti/RJ, ${data}.\n\nMICHEL SANTOS FELIX\nOAB/RJ 231.640\n\nX. DO ROL DE DOCUMENTOS\n${rol}\n`;
+  const HOJE = new Date(2026, 10, 18);
+  await test('peça correta não gera alerta (sem falso positivo): conta, rol, data e regras ok', () => {
+    const peca = corpoLimpo();
+    assert.equal(shouldReviewPetition(peca), true);
+    assert.deepEqual(deterministicPetitionChecks(peca, { hoje: HOJE }), []);
+  });
+  await test('relatório e conversa NÃO entram na revisão', () => {
+    assert.equal(shouldReviewPetition(`RELATÓRIO DE ANÁLISE JURÍDICA\n${filler}`), false);
+    assert.equal(shouldReviewPetition('Sim, pode pedir tutela. Nestes termos, pede deferimento.'), false);
+  });
+  await test('conta do valor da causa errada e total que não fecha são apontados', () => {
+    const errada = corpoLimpo().replace('12 × R$ 1.621,00 = R$ 19.452,00', '12 × R$ 1.621,00 = R$ 19.000,00');
+    const a = deterministicPetitionChecks(errada, { hoje: HOJE }).filter(x => x.tipo === 'calculo');
+    assert.ok(a.length >= 2, `esperava 2 alertas de cálculo (conta e total), veio ${a.length}`);
+    assert.ok(a.every(x => x.severidade === 'alta'));
+    const soTotal = corpoLimpo().replace('R$ 32.420,00 (trinta', 'R$ 33.000,00 (trinta');
+    assert.equal(deterministicPetitionChecks(soTotal, { hoje: HOJE }).filter(x => x.tipo === 'calculo').length, 1);
+  });
+  await test('valor da causa limitado ao teto do JEF (total ≠ soma das parcelas, sem linha "Total") não vira falso alarme', () => {
+    const teto = corpoLimpo().replace(/TOTAL DO VALOR DA CAUSA: R\$ 32\.420,00/, 'VALOR DA CAUSA: R$ 97.260,00');
+    assert.equal(deterministicPetitionChecks(teto, { hoje: HOJE }).filter(x => x.tipo === 'calculo').length, 0);
+  });
+  await test('data da assinatura diferente de hoje é apontada (baixa); ausência de data também', () => {
+    const velha = deterministicPetitionChecks(corpoLimpo('', undefined, '17 de novembro de 2026'), { hoje: HOJE });
+    assert.equal(velha.length, 1);
+    assert.equal(velha[0].severidade, 'baixa');
+    assert.match(velha[0].problema, /17 de novembro de 2026/);
+    const semData = deterministicPetitionChecks(corpoLimpo().replace(/São João de Meriti\/RJ, .*\n/, ''), { hoje: HOJE });
+    assert.ok(semData.some(x => /data da assinatura/i.test(x.problema)));
+  });
+  await test('marcas do sistema, lacunas, INPC+poupança e Resolução CJF são apontados', () => {
+    const peca = corpoLimpo('Conforme a Base de Conhecimento (RAG) [AUSENTE — SOLICITAR ADIÇÃO]. Valor R$ XX. Juros: INPC e poupança (Tema 905). Juízo 100% Digital: Resolução CJF nº 10/2020.');
+    const a = deterministicPetitionChecks(peca, { hoje: HOJE });
+    assert.ok(a.some(x => x.tipo === 'forma' && /marcas internas/.test(x.problema)), 'marcas');
+    assert.ok(a.some(x => x.tipo === 'forma' && /lacuna/.test(x.problema)), 'lacuna');
+    assert.ok(a.some(x => x.tipo === 'regra' && /INPC/.test(x.problema)), 'INPC');
+    assert.ok(a.some(x => x.tipo === 'regra' && /CNJ nº 345/.test(x.problema)), 'CJF');
+  });
+  await test('inciso romano "XXX" (art. 7º, XXX) não é tratado como lacuna', () => {
+    const a = deterministicPetitionChecks(corpoLimpo('Art. 7º, XXX, da Constituição.'), { hoje: HOJE });
+    assert.equal(a.filter(x => /lacuna/.test(x.problema)).length, 0);
+  });
+  await test('documento citado no corpo e ausente do rol é apontado (inclusive em "Docs. 17 e 18")', () => {
+    const a = deterministicPetitionChecks(corpoLimpo('Vide Docs. 3 e 9 e o Doc. 12.'), { hoje: HOJE }).filter(x => /não constam do rol/.test(x.problema));
+    assert.equal(a.length, 1);
+    assert.match(a[0].problema, /Doc\. 9, Doc\. 12/);
+  });
+  await test('parser do revisor de IA descarta lixo, normaliza severidade/tipo e limita a 15', () => {
+    const lixo = [{ problema: 'x' }, null, 'texto', { severidade: 'MÉDIA', tipo: 'Citação', problema: 'Art. 60 §§ 8º e 9º não diz isso', trecho: 'abc', correcao_sugerida: 'Citar o art. 78 do Decreto 3.048' }];
+    const r = parseReviewAlerts(lixo);
+    assert.equal(r.length, 1);
+    assert.equal(r[0].severidade, 'media');
+    assert.equal(r[0].tipo, 'citacao');
+    assert.match(r[0].sugestao || '', /art\. 78/);
+    assert.equal(parseReviewAlerts(Array.from({ length: 40 }, (_, i) => ({ problema: `problema número ${i} detalhado` }))).length, 15);
+    assert.deepEqual(parseReviewAlerts({ nao: 'array' }), []);
+  });
+  await test('mensagem do chat: ordena por gravidade, avisa quando a IA falhou e diz "nenhum alerta" quando limpo', () => {
+    const msg = formatReviewMessage([
+      { severidade: 'baixa', tipo: 'forma', problema: 'Data antiga', origem: 'automatica' },
+      { severidade: 'alta', tipo: 'calculo', problema: 'Conta errada', origem: 'automatica' },
+    ], { ia: 'ok' });
+    assert.ok(msg.indexOf('Conta errada') < msg.indexOf('Data antiga'), 'ordem por gravidade');
+    assert.match(msg, /2 ponto\(s\).*1 grave/);
+    assert.match(formatReviewMessage([], { ia: 'ok' }), /Nenhum alerta/);
+    assert.match(formatReviewMessage([], { ia: 'falhou' }), /revisor de IA não respondeu/);
+    assert.ok(!shouldReviewPetition(msg) && !/^\s*(?:#+\s*)?(?:AO\s+JU[ÍI]ZO|EXCELENT[ÍI]SSIM)/i.test(msg), 'a mensagem de revisão não pode ser confundida com uma peça');
   });
 
   console.log(`\n${passed} passaram, ${failed} falharam.`);
