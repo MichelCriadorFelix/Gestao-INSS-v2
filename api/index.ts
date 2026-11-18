@@ -1615,6 +1615,23 @@ function petitionEndedWithoutClosing(fullText: string, opts: { hasWordTarget: bo
 const PETITION_CLOSING_PROMPT = (anchor: string) =>
   `[COMPLEMENTO AUTOMÁTICO — ENCERRAMENTO DA PEÇA]\nA peça foi encerrada antes do fecho obrigatório.\n\nÚltima linha gerada (âncora — NÃO repita): "${anchor}"\n\nContinue EXATAMENTE de onde parou, SEM repetir nenhum tópico já escrito: (1) se ainda não existir, escreva o último tópico da estrutura obrigatória (ex.: "DO ROL DE DOCUMENTOS", em lista numerada com os documentos dos autos); (2) encerre com "Nestes termos, pede e espera deferimento", local, data e a assinatura dos advogados conforme as regras do sistema. NÃO recomece a petição.`;
 
+/**
+ * Tema 1.013/STJ (trabalho durante o aguardo do benefício por incapacidade) só entra no contexto quando há INDÍCIO de
+ * atividade depois da cessação. Antes disparava com as palavras soltas "trabalho"/"período", presentes em praticamente
+ * todo caso, e o redator escrevia uma seção sobre "atividade informal" que a cliente nem tinha (peça da Denize, 17/11/2026).
+ */
+function hasWorkAfterCessationHint(ctx: string): boolean {
+  return /reintegra[çc]|voltou a trabalhar|retornou ao trabalho|trabalh\w+ (?:ap[óo]s|depois d\w+|durante|enquanto)\b[^.\n]{0,40}(?:cessa|indefer|alta|aguard|benef[íi]cio)|atividade informal|\bbicos?\b|renda do trabalho (?:exercido|obtida)/i.test(ctx);
+}
+
+/**
+ * Regra de correção monetária e juros dos atrasados. O Tema 905/STJ (INPC + juros da poupança) e o Tema 810/STF só descrevem
+ * o regime até 08/12/2021; depois disso vale o art. 3º da EC 113/2021 (SELIC) e regimes posteriores. O redator transcrevia o
+ * Tema 905 como se fosse o regime de 2026 (peça da Denize, 17/11/2026), então a regra manda pedir "critérios vigentes em cada
+ * período" sem fixar índice único. O advogado confere o regime exato na liquidação.
+ */
+const REGRA_CORRECAO_JUROS = `5. CORREÇÃO MONETÁRIA E JUROS (REGRA OBRIGATÓRIA): o Tema 905/STJ (INPC e juros da poupança) e o Tema 810/STF só descrevem o regime até 08/12/2021. A partir de 09/12/2021 aplica-se o art. 3º da EC 113/2021 (taxa SELIC), e regimes posteriores seguem o Manual de Cálculos da Justiça Federal vigente na liquidação. Por isso: (a) NÃO apresente o Tema 905 nem o Tema 810 como o regime dos atrasados de período posterior a 08/12/2021 e NÃO os transcreva integralmente como se fossem o regime atual; (b) no tópico de consectários e no pedido de correção e juros, requeira "correção monetária e juros de mora segundo os critérios previstos na legislação vigente em cada período (inclusive o art. 3º da EC 113/2021, quando aplicável) e no Manual de Cálculos da Justiça Federal vigente na data da liquidação", SEM fixar índice único; (c) se citar o Tema 905, que seja apenas como referência a eventual período anterior a 09/12/2021.`;
+
 // FIX RESIDUAL #2: extractStructuralSummary removida (dead code desde Fix#3)
 
 // AI Service Logic Integrated
@@ -1950,7 +1967,7 @@ JURISPRUDÊNCIA DE REFERÊNCIA:
 - Súmula 60 TNU
 - Súmula 75 TNU (presunção de veracidade da CTPS — citar em blockquote quando vínculos forem negados por pendência no CNIS)
 - Súmula 416 STJ (perda da qualidade de segurado)
-- Tema 810 STF (correção monetária)
+- Tema 810 STF (correção monetária — vale só até 08/12/2021; ver regra de CORREÇÃO MONETÁRIA E JUROS)
 - Tema 995 STJ (reafirmação da DER)
 - Tema 1.207 STJ (encontro de contas)
 
@@ -1987,7 +2004,7 @@ ESTRUTURA OBRIGATÓRIA PARA BENEFÍCIO POR INCAPACIDADE:
     d) Produção de provas (detalhar a necessidade de perícia com especialista específico);
     e) Procedência total (detalhar o benefício, a DII e a conversão);
     f) Pagamento de parcelas vencidas e vincendas (detalhar o marco inicial);
-    g) Correção monetária e juros (detalhar os índices - Tema 810 STF);
+    g) Correção monetária e juros (critérios legais vigentes em cada período, conforme a regra de CORREÇÃO MONETÁRIA E JUROS; NÃO fixar índice único);
     h) Destaque dos honorários contratuais (30%);
     i) Honorários de sucumbência (20%) (Apenas se Justiça Comum, excluir se JEF);
     j) Renúncia aos valores excedentes (se JEF).
@@ -2044,7 +2061,7 @@ ESTRUTURA OBRIGATÓRIA PARA BPC/LOAS (IDOSO):
     - Reclamação 4.374/PE (STF): consolida que o critério de 1/2 salário mínimo previsto em outros benefícios assistenciais pode ser usado como parâmetro orientativo.
     - Exclusão de benefícios de valor mínimo pagos a outros idosos/deficientes do grupo familiar (Art. 20, §14 da LOAS).
     - Aplicação ao caso: demonstrar miserabilidade por outros meios além da renda (CadÚnico, CRAS, declarações, ausência de patrimônio, gastos com saúde).
-- DOS PEDIDOS: Gratuidade, Condenação do INSS à concessão desde a DER, Pagamento de atrasados com correção (Tema 810 STF), Honorários (20% a 30% contratuais, e sucumbenciais apenas se Justiça Comum).
+- DOS PEDIDOS: Gratuidade, Condenação do INSS à concessão desde a DER, Pagamento de atrasados com correção (critérios legais vigentes em cada período), Honorários (20% a 30% contratuais, e sucumbenciais apenas se Justiça Comum).
 - DA ANTECIPAÇÃO DOS EFEITOS DA TUTELA: Natureza alimentar e periculum in mora.
 - DOS REQUERIMENTOS: Prioridade, Destaque de honorários, Inexistência de interesse em conciliação.
 - DAS PROVAS e VALOR DA CAUSA (Cálculo detalhado).
@@ -2063,7 +2080,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR IDADE:
 - DA JUSTIÇA GRATUITA: Fundamentação nos arts. 98 a 102 
   do CPC e declaração de hipossuficiência.
 - DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução 
-  CNJ nº 345/2020 e Resolução CJF nº 10/2020, com dispensa 
+  CNJ nº 345/2020 (cite APENAS esta; NÃO cite "Resolução CJF nº 10/2020", que não foi confirmada), com dispensa 
   de comparecimento presencial.
 - DOS FATOS E FUNDAMENTOS JURÍDICOS:
     - Requisitos Legais: Detalhar regras Pré-Reforma (até 13/11/2019) e Pós-Reforma (EC 103/2019).
@@ -2090,7 +2107,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR IDADE:
 - DIREITO ADQUIRIDO E REGRAS DE TRANSIÇÃO: Art. 18 da EC 103/19.
 - DA REAFIRMAÇÃO DA DER: Tema 995 do STJ.
 - DO ENCONTRO DE CONTAS: Tema 1.207 do STJ (evitar execução invertida).
-- DOS PEDIDOS: Condenação à concessão do benefício (NB específico), pagamento de atrasados (Tema 810 STF), averbação de períodos e reafirmação da DER subsidiária.
+- DOS PEDIDOS: Condenação à concessão do benefício (NB específico), pagamento de atrasados (critérios legais vigentes em cada período), averbação de períodos e reafirmação da DER subsidiária.
 - DOS REQUERIMENTOS: Juízo 100% Digital e inexistência de interesse em conciliação.
 - DAS PROVAS, VALOR DA CAUSA e ROL DE DOCUMENTOS.
 
@@ -2179,7 +2196,7 @@ ESTRUTURA OBRIGATÓRIA PARA RECURSO INOMINADO (JEF — 1ª para 2ª Turma Recurs
     IV.2. DA INCORRETA APLICAÇÃO DO DIREITO: Apontar os dispositivos legais e súmulas que a sentença aplicou erroneamente ou deixou de aplicar.
     IV.3. DA JURISPRUDÊNCIA DAS TURMAS RECURSAIS E TNU: Citar precedentes favoráveis das Turmas Recursais da seção e da TNU (especialmente súmulas vinculantes da TNU). Usar blockquote para transcrições da base.
     IV.4. DO PEDIDO DE REFORMA: Ser específico — qual benefício, desde quando, com quais parcelas em atraso.
-- V. DO PEDIDO: Conhecimento e provimento do recurso para reforma integral da sentença, com concessão do benefício desde a DER/DII, pagamento de atrasados com correção (Tema 905/STJ), e condenação em honorários sucumbenciais (se aplicável à Turma Recursal).
+- V. DO PEDIDO: Conhecimento e provimento do recurso para reforma integral da sentença, com concessão do benefício desde a DER/DII, pagamento de atrasados com correção (critérios legais vigentes em cada período), e condenação em honorários sucumbenciais (se aplicável à Turma Recursal).
 - VI. DOS DOCUMENTOS: Listar documentos novos eventualmente juntados (se admissível).
 ATENÇÃO: Recurso Inominado vai para a Turma Recursal, não para o TRF. PROIBIDO mencionar "apelação". Honorários sucumbenciais são vedados no JEF em 1ª instância, mas cabíveis em Recurso Inominado se o recorrido for vencido.
 
@@ -2189,7 +2206,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA ESPECIAL:
 - QUALIFICAÇÃO DO RÉU: Conforme regra 7.
 - TÍTULO: Ação Previdenciária — Concessão de Aposentadoria Especial (Art. 57 da Lei nº 8.213/91).
 - I. DA GRATUIDADE DE JUSTIÇA: Fundamentação nos arts. 98 a 102 do CPC e declaração de hipossuficiência.
-- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução CNJ nº 345/2020 e Resolução CJF nº 10/2020.
+- II. DA OPÇÃO PELO JUÍZO 100% DIGITAL: Conforme Resolução CNJ nº 345/2020 (cite APENAS esta; NÃO cite "Resolução CJF nº 10/2020", que não foi confirmada).
 - III. DO RESUMO DA DEMANDA: Síntese narrativa e estratégica (1-2 parágrafos) — destacar a profissão, o agente nocivo, o tempo de exposição e o erro do INSS em negar o reconhecimento. Texto corrido, denso e persuasivo. PROIBIDO USAR TABELA OU LISTA NESTE TÓPICO.
 - IV. DOS FATOS:
     IV.1. Da Trajetória Profissional: Descrever cada emprego, função exercida, agentes nocivos a que esteve exposto (físicos, químicos ou biológicos), equipamentos de proteção individual e coletiva (EPI/EPC), e se o uso de EPI neutralizou efetivamente a nocividade (Tema 555 STF).
@@ -2218,7 +2235,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA ESPECIAL:
     d) Produção de provas, especialmente perícia técnica no local de trabalho e oitiva de testemunhas;
     e) Reconhecimento de todos os períodos especiais listados no Quadro de Períodos Especiais;
     f) Concessão da Aposentadoria Especial desde a DER (NB específico), com os acréscimos legais;
-    g) Pagamento das parcelas vencidas desde a DER, com correção monetária (Tema 810 STF) e juros;
+    g) Pagamento das parcelas vencidas desde a DER, com correção monetária (critérios legais vigentes em cada período) e juros;
     h) Destaque dos honorários contratuais (percentual do contrato — usualmente 20% a 30%);
     i) Condenação em honorários sucumbenciais de 20% (apenas se Justiça Comum; excluir se JEF);
     j) Renúncia aos valores excedentes ao teto do JEF (apenas se JEF).
@@ -2267,7 +2284,7 @@ ESTRUTURA OBRIGATÓRIA PARA APOSENTADORIA POR TEMPO DE CONTRIBUIÇÃO — REGRAS
     d) Produção de provas (documental e, se necessário, testemunhal);
     e) Reconhecimento de todos os períodos contributivos controvertidos;
     f) Concessão da aposentadoria pela regra de transição identificada, desde a DER;
-    g) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    g) Pagamento das parcelas vencidas com correção (critérios legais vigentes em cada período) e juros;
     h) Destaque de honorários contratuais;
     i) Honorários sucumbenciais de 20% (apenas Justiça Comum);
     j) Renúncia ao excedente do teto (apenas JEF).
@@ -2306,7 +2323,7 @@ ESTRUTURA OBRIGATÓRIA PARA SALÁRIO-MATERNIDADE:
     c) Citação do INSS;
     d) Produção de provas;
     e) Concessão do Salário-Maternidade desde a data do parto/adoção, pelo período de [120/180] dias;
-    f) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    f) Pagamento das parcelas vencidas com correção (critérios legais vigentes em cada período) e juros;
     g) Destaque de honorários contratuais;
     h) Honorários sucumbenciais (apenas Justiça Comum);
     i) Renúncia ao excedente do teto (apenas JEF).
@@ -2341,7 +2358,7 @@ ESTRUTURA OBRIGATÓRIA PARA AUXÍLIO-ACIDENTE:
     c) Citação do INSS;
     d) Produção de provas, especialmente perícia médica por especialista na área da sequela;
     e) Concessão do Auxílio-Acidente (Espécie 94) a partir do dia seguinte à alta do Auxílio-Doença (ou da DER), no valor de 50% do salário de benefício;
-    f) Pagamento das parcelas vencidas com correção (Tema 810 STF) e juros;
+    f) Pagamento das parcelas vencidas com correção (critérios legais vigentes em cada período) e juros;
     g) Destaque de honorários contratuais;
     h) Honorários sucumbenciais de 20% (apenas Justiça Comum);
     i) Renúncia ao excedente do teto (apenas JEF).
@@ -5016,7 +5033,7 @@ app.post("/api/rag/plan", async (req, res) => {
         // omitia quando o contexto vinha do resumo do caso (teste real 17/11/2026) e o relatório a marcava AUSENTE.
         injectIntoPlan("Honorários Periciais e Requisitos da Petição Inicial Previdenciária (Lei nº 14.331/2022)", [], true);
 
-        if (/reintegraç|trabalho|per[íi]odo/i.test(contextStr)) {
+        if (hasWorkAfterCessationHint(contextStr)) {
           injectIntoPlan("TEMA 1.013 STJ — PREVIDENCIÁRIO — Trabalho durante aguardo de benefício por incapacidade", [], true);
         }
         // Súmula 88/89 só são pertinentes em caso ACIDENTÁRIO (auxílio-acidente).
@@ -5032,6 +5049,8 @@ app.post("/api/rag/plan", async (req, res) => {
       // previdenciária com atrasados/cálculo e é item recorrente do relatório ("AUSENTE" no teste de 17/11/2026
       // mesmo cadastrado na base). Só dispara quando o pedido envolve peça/relatório/atrasados.
       if (/gerar|pe[çc]a|peti[çc][ãa]o|relat[óo]rio|inicial|atrasad|vencid|retroativ|restabelec|cessa[çc]|indefer|resumo do caso/i.test(contextStr)) {
+        // Entra no contexto só como REFERÊNCIA do período até 08/12/2021 (evita "[AUSENTE]" no relatório). O prompt (REGRA_CORRECAO_JUROS)
+        // proíbe apresentá-lo como regime atual dos atrasados.
         injectIntoPlan("TEMA 905 STJ — PREVIDENCIÁRIO — Correção monetária IPCA-E e juros Selic", [], true);
       }
 
@@ -6508,8 +6527,9 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
-3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ, Tema 905/STJ etc.) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
+3. Súmulas e Temas de 1 chunk (Súmula 75 TNU, Súmula 416 STJ, Tema 1.030/STJ etc.; EXCETO Tema 905/STJ e Tema 810/STF — ver regra 5) — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.
+${REGRA_CORRECAO_JUROS}`;
     }
 
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
@@ -7343,8 +7363,9 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
-3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
+3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem, EXCETO o Tema 905/STJ e o Tema 810/STF (ver regra 5).
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.
+${REGRA_CORRECAO_JUROS}`;
     }
 
     // Histórico completo — Gemini 3.5 Flash tem 1M tokens de contexto
@@ -8139,8 +8160,9 @@ A Base de Conhecimento dinâmica chegará via tag [BASE DE CONHECIMENTO (RAG)] n
 REGRAS DE OURO:
 1. Citações em blockquote devem ser IDÊNTICAS ao texto recuperado.
 2. REGRA DE PRIORIDADE ABSOLUTA: independentemente do score, se o item recuperado é a lei, súmula, tema ou decreto EXATAMENTE necessário para o caso, TRANSCREVA DIRETAMENTE em blockquote, sem alterar uma vírgula. Score baixo indica apenas incerteza do sistema de recuperação — nunca autoriza paráfrase ou omissão da fonte.
-3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem.
-4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.`;
+3. Súmulas e Temas de 1 chunk — CITE INTEGRALMENTE em blockquote sempre que aparecerem, EXCETO o Tema 905/STJ e o Tema 810/STF (ver regra 5).
+4. PROIBIDO inventar citações. Se uma lei/súmula necessária não estiver no RAG, NÃO cite, mencione, sugira nem parafraseie a norma. Redija o argumento jurídico com base nos fatos e nas normas que ESTÃO no RAG. Ao final da peça, inclua obrigatoriamente o alerta: 'ATENÇÃO AO ADVOGADO: A [Lei X / Súmula Y] foi identificada como relevante para este caso mas NÃO consta na Base de Conhecimento. Adicione-a à base para que possa ser citada com segurança em futuras peças.'.
+${REGRA_CORRECAO_JUROS}`;
     }
 
     

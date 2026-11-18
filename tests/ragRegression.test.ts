@@ -303,6 +303,35 @@ function realisticContext(): string {
     console.log('\n(teste do planner em produção ignorado: defina RAG_BASE_URL e RAG_TOKEN para ativá-lo)');
   }
 
+  console.log('\nRedator: regras do prompt (peça da Denize, 17/11/2026)');
+  const redatorCode = between('function hasWorkAfterCessationHint', 'const REGRA_CORRECAO_JUROS');
+  const { hasWorkAfterCessationHint } = await loadFromIndex(redatorCode, ['hasWorkAfterCessationHint']);
+  await test('Tema 1.013 NÃO dispara só por "trabalho"/"período" (caso comum de incapacidade)', () => {
+    const ctxComum = 'Segurada afastada do trabalho desde 04/04/2024; último dia de trabalho declarado pela empregadora; período de graça de 12 meses; perícia de prorrogação indeferida; retorno ao trabalho não indicado.';
+    assert.equal(hasWorkAfterCessationHint(ctxComum), false);
+  });
+  await test('Tema 1.013 dispara quando há indício de atividade depois da cessação', () => {
+    assert.equal(hasWorkAfterCessationHint('A cliente voltou a trabalhar informalmente após a cessação do benefício.'), true);
+    assert.equal(hasWorkAfterCessationHint('Ela fez bicos como diarista enquanto aguardava o benefício.'), true);
+    assert.equal(hasWorkAfterCessationHint('Pedido de reintegração ao emprego.'), true);
+  });
+  await test('prompt não cita mais "Resolução CJF nº 10/2020" como fundamento (só a proibição)', () => {
+    const todas = src.split('Resolução CJF nº 10/2020').length - 1;
+    const proibicoes = src.split('NÃO cite "Resolução CJF nº 10/2020"').length - 1;
+    assert.ok(todas >= 1, 'a proibição desapareceu do prompt');
+    assert.equal(todas, proibicoes, `há ${todas - proibicoes} citação(ões) de "Resolução CJF nº 10/2020" fora da proibição`);
+    assert.ok(src.includes('Resolução CNJ nº 345/2020'), 'a Resolução CNJ nº 345/2020 sumiu do prompt');
+  });
+  await test('regra de correção/juros está nos 3 chats que geram peça e Tema 810/905 não são mais "o regime"', () => {
+    assert.ok(/const REGRA_CORRECAO_JUROS = `5\. CORREÇÃO MONETÁRIA E JUROS/.test(src), 'constante da regra sumiu');
+    const usos = src.split('${REGRA_CORRECAO_JUROS}').length - 1;
+    assert.equal(usos, 3, `a regra deveria estar em 3 chats, está em ${usos}`);
+    assert.equal(src.split('(Tema 810 STF)').length - 1, 0, 'estrutura ainda indica "(Tema 810 STF)" como índice dos atrasados');
+    assert.equal(src.split('correção (Tema 905/STJ)').length - 1, 0, 'estrutura ainda indica "(Tema 905/STJ)" como índice dos atrasados');
+    const regra = src.slice(src.indexOf('const REGRA_CORRECAO_JUROS'), src.indexOf('const REGRA_CORRECAO_JUROS') + 1600);
+    assert.ok(/08\/12\/2021/.test(regra) && /EC 113\/2021/.test(regra) && /SEM fixar índice único/.test(regra), 'regra incompleta');
+  });
+
   console.log(`\n${passed} passaram, ${failed} falharam.`);
   process.exit(failed > 0 ? 1 : 0);
 })();
