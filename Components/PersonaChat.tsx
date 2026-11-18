@@ -48,7 +48,7 @@ import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { runSecondPassRag } from './secondPassRag';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts } from './petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, reviewApplyRequest } from './petitionReview';
 import { buildCrmPayload } from './crmContext';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
@@ -1984,7 +1984,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
         messageText.includes('[EDICAO CIRURGICA') ||
         messageText.includes('CORREÇÃO CIRÚRGICA NO ARTEFATO') ||
         messageText.includes('CORRECAO CIRURGICA NO ARTEFATO') ||
-        (!!currentActiveDoc && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText));
+        (!!currentActiveDoc && (reviewApplyRequest(messageText).apply || /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText)));
 
       // Se for uma edição cirúrgica pontual de trecho selecionado, verificamos se o usuário pediu especificamente leis/RAG ou menção a documentos
       const mentionsLawsOrRag = /\b(lei|leis|artigo|artigos|art|art\.|súmula|sumula|jurisprudência|jurisprudencia|tema|temas|acórdão|acordao|base de conhecimento|rag)\b/i.test(messageText);
@@ -2536,7 +2536,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
                                    messageText.includes('[CORRECAO NO ARTEFATO') ||
                                    messageText.includes('CORREÇÃO CIRÚRGICA NO ARTEFATO') ||
                                    messageText.includes('CORRECAO CIRURGICA NO ARTEFATO') ||
-                                   (!!activeDocText && /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText));
+                                   (!!activeDocText && (reviewApplyRequest(messageText).apply || /(?:altere|mude|troque|substitua|adicione|acrescente|insira|remova|delete|exclua|retire|mova|coloque|posicione|comport|encaix|acomod|adapt|incorpor|inclu|abaixo|acima|antes|depois|corrija|ajuste|edite|mantenha a estrutura|sem refazer|nessa peça|na peça|no artefato|na inicial|no recurso|nos quesitos)/i.test(messageText)));
 
       fullText = '';
       let isFinished = false;
@@ -2547,6 +2547,19 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
 
       while (!isFinished && resumeCount <= MAX_RESUMES) {
         let currentMessage = messageText;
+        // APLICAR A REVISÃO: o texto da última revisão automática (que fica FORA do histórico) acompanha o pedido, para o modelo
+        // corrigir a peça cirurgicamente conforme os itens — ou só os que o advogado citou ("aplique os itens 1 e 3").
+        const applyReq = reviewApplyRequest(messageText);
+        if (resumeCount === 0 && applyReq.apply) {
+          const lastReview = [...(session?.messages || [])].reverse().find(m => m.isReview && m.role === 'assistant' && !/em andamento/.test(m.content.slice(0, 120)));
+          if (lastReview) {
+            const escopo = applyReq.hasSelection
+              ? 'aplique SOMENTE os itens que se refiram ao TRECHO SELECIONADO acima (ignore os demais)'
+              : 'aplique na peça SOMENTE o que o advogado pediu acima (se ele não citou itens, aplique todos os que trazem "Sugestão")';
+            currentMessage = `${messageText}\n\n[APONTAMENTOS DA REVISÃO AUTOMÁTICA DA PEÇA — ${escopo}. Mantenha o restante da peça intacto, no mesmo padrão. NÃO aplique itens marcados como "confirmar" nem inclua citações que não estejam na Base Legal da conversa.]\n${lastReview.content}`;
+            console.log(`[REVISÃO PEÇA] Pedido de aplicar a revisão (${applyReq.hasSelection ? 'trecho selecionado' : 'peça inteira'}): apontamentos anexados à mensagem.`);
+          }
+        }
         if (resumeCount > 0) {
           const anchor = fullText.slice(-400).replace(/\n/g, ' ');
           currentMessage = `(GERAÇÃO INTERROMPIDA — CONTINUE A PEÇA EXATAMENTE DE ONDE PAROU, SEM INTRODUÇÕES, SEM RECOMEÇAR. Última linha gerada: "${anchor}")`;

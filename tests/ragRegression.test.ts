@@ -21,7 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
 import { buildCrmPayload } from '../Components/crmContext';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts } from '../Components/petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts, wantsToApplyReview, reviewApplyRequest } from '../Components/petitionReview';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
@@ -408,6 +408,24 @@ function realisticContext(): string {
     assert.equal(mesclado.filter(x => /905|INPC/.test(x.problema)).length, 1, 'o alerta de INPC deveria aparecer uma vez só');
     const outro = parseReviewAlerts([{ severidade: 'media', tipo: 'fato', problema: 'A data da DIB diverge do dossiê (14/06/2025)' }]);
     assert.equal(mergeReviewAlerts(auto, outro).length, auto.length + 1, 'alerta não relacionado não pode apagar o automático');
+  });
+  await test('pedido para APLICAR a revisão é reconhecido (e conversa comum não)', () => {
+    for (const m of ['aplique a atualização na peça', 'Aplique os itens 1 e 3 da revisão', 'corrija conforme os apontamentos', 'faça as correções sugeridas pela revisão', 'aplique as sugestões na peça'])
+      assert.equal(wantsToApplyReview(m), true, m);
+    for (const m of ['gerar relatório', 'qual o prazo para recorrer?', 'atualize o endereço da autora', 'tomada de ciência: leia os documentos', 'gerar peça: petição inicial de restabelecimento'])
+      assert.equal(wantsToApplyReview(m), false, m);
+    assert.equal(wantsToApplyReview('aplique a revisão ' + 'x'.repeat(700)), false, 'mensagem enorme não é um pedido curto de aplicar');
+  });
+  await test('as 3 formas de pedir: chat principal, caixa do artefato e trecho selecionado', () => {
+    const principal = reviewApplyRequest('aplique a atualização na peça');
+    assert.deepEqual(principal, { apply: true, hasSelection: false });
+    const caixaArtefato = '[ARTEFATO ALVO: ID #ART-01 | NATUREZA: Petição Inicial | TÍTULO: AO JUÍZO]\n\n[CORREÇÃO CIRÚRGICA NO ARTEFATO #ART-01]\n\nINSTRUÇÃO DE ALTERAÇÃO:\naplique a atualização na peça';
+    assert.deepEqual(reviewApplyRequest(caixaArtefato), { apply: true, hasSelection: false });
+    const selecao = '[ARTEFATO ALVO: ID #ART-01 | NATUREZA: Petição Inicial | TÍTULO: AO JUÍZO]\n\n[CORREÇÃO CIRÚRGICA NO ARTEFATO #ART-01]\n\nTRECHO SELECIONADO A MODIFICAR:\n"c) Inconsistências da avaliação médico-pericial discutida"\n\nINSTRUÇÃO DE ALTERAÇÃO:\nAplique os apontamentos da revisão aqui';
+    assert.deepEqual(reviewApplyRequest(selecao), { apply: true, hasSelection: true });
+    // correção cirúrgica comum (sem falar da revisão) NÃO anexa a revisão
+    const comum = '[CORREÇÃO CIRÚRGICA NO ARTEFATO #ART-01]\n\nINSTRUÇÃO DE ALTERAÇÃO:\ntroque o nome da empresa para Venâncio Produtos Farmacêuticos';
+    assert.equal(reviewApplyRequest(comum).apply, false);
   });
   await test('mensagem do chat: ordena por gravidade, avisa quando a IA falhou e diz "nenhum alerta" quando limpo', () => {
     const msg = formatReviewMessage([
