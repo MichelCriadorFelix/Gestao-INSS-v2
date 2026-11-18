@@ -24,7 +24,11 @@ const KIND_LABELS: Record<string, string> = {
   outros: 'Outras chamadas',
 };
 
-export const kindLabel = (kind: string): string => KIND_LABELS[kind] || kind;
+/** "or:planner-rag" = a mesma chamada, mas feita pelo OpenRouter (cobrada por lá) em vez das chaves do Google. */
+export const kindLabel = (kind: string): string => {
+  if (kind.startsWith('or:')) return `${kindLabel(kind.slice(3))} — via OpenRouter`;
+  return KIND_LABELS[kind] || kind;
+};
 
 const num = (v: any): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
 

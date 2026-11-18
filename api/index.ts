@@ -3210,7 +3210,7 @@ function normalizeUsage(u: any): { input: number; output: number; thought: numbe
 }
 
 // Diagnóstico em memória (por instância da função): quantas gravações foram tentadas/puladas/ok/falharam e o último erro.
-const usageDiag = { tentativas: 0, semDados: 0, ok: 0, falhas: 0, ultimoErro: '', ultimoTipo: '', ultimaEm: '' };
+const usageDiag = { tentativas: 0, semDados: 0, ok: 0, falhas: 0, ultimoErro: '', ultimoTipo: '', ultimaEm: '', viaOpenRouter: 0 };
 
 function recordAiUsage(kind: string, usageMetadata: any): void {
   try {
@@ -3725,6 +3725,8 @@ async function callGemini(params: any, retries = MAX_RETRIES, modelIndex = 0, fa
       
       const data = await orRes.json();
       const content = data.choices?.[0]?.message?.content || "";
+      usageDiag.viaOpenRouter++;
+      recordAiUsage(`or:${params.usageKind || 'outros'}`, { promptTokenCount: data.usage?.prompt_tokens, candidatesTokenCount: data.usage?.completion_tokens });
       return { text: content };
     } catch (orErr: any) {
       console.error("[PROXY GEMINI ERR] Falha fatal no proxy do callGemini p/ OpenRouter:", orErr);
@@ -9881,7 +9883,7 @@ app.get("/api/admin/ai-usage", async (req, res) => {
       .gte('day', since)
       .order('day', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ days, rows: data || [], diagnostico: usageDiag });
+    return res.json({ days, rows: data || [], diagnostico: { ...usageDiag, openrouterConfigurado: !!process.env.OPENROUTER_API_KEY } });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message || 'Falha ao ler o consumo.' });
   }

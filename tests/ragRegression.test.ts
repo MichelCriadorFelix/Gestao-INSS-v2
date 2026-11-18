@@ -366,6 +366,7 @@ function realisticContext(): string {
     assert.equal(formatTokens(1234567), '1,23 mi');
     assert.equal(formatTokens(85400), '85 mil');
     assert.equal(formatDay('2026-11-18'), '18/11');
+    assert.equal(summarizeUsage([{ day: '2026-11-18', kind: 'or:planner-rag', requests: 1, input_tokens: 10, output_tokens: 1, thought_tokens: 0, cached_tokens: 0 }]).days[0].kinds[0].label, 'Busca de leis (planner) — via OpenRouter');
   });
 
   console.log('\nPoda das estruturas de peça (economia de tokens)');
