@@ -354,6 +354,22 @@ function realisticContext(): string {
     assert.equal(normalizeUsage({}), null, 'sem nenhum contador não grava linha vazia');
     assert.deepEqual(normalizeUsage({ promptTokenCount: '1500', candidatesTokenCount: -5, thoughtsTokenCount: 'x' }), { input: 1500, output: 0, thought: 0, cached: 0 });
   });
+  await test('stream: grava UMA vez o ÚLTIMO usageMetadata (mesmo sem finishReason no chunk) e também se o stream for interrompido', async () => {
+    const stub = 'const __calls: any[] = []; function recordAiUsage(k: string, u: any) { __calls.push([k, u]); }\n';
+    const mod = await loadFromIndex(stub + between('async function* withUsageRecording', 'interface KeyStatus {'), ['withUsageRecording', '__calls']);
+    async function* fonte(chunks: any[], quebra = false) { for (const c of chunks) yield c; if (quebra) throw new Error('rede caiu'); }
+    const consumir = async (it: any) => { const out: any[] = []; try { for await (const c of it) out.push(c); } catch {} return out; };
+    mod.__calls.length = 0;
+    const vistos = await consumir(mod.withUsageRecording(fonte([{ text: 'a', usageMetadata: { promptTokenCount: 10 } }, { text: 'b' }, { usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 7 } }]), 'chat-michel'));
+    assert.equal(vistos.length, 3, 'os chunks precisam passar intactos');
+    assert.deepEqual(mod.__calls, [['chat-michel', { promptTokenCount: 10, candidatesTokenCount: 7 }]], 'grava uma vez, com o último');
+    mod.__calls.length = 0;
+    await consumir(mod.withUsageRecording(fonte([{ usageMetadata: { promptTokenCount: 5 } }], true), 'chat-luana'));
+    assert.equal(mod.__calls.length, 1, 'stream interrompido ainda registra o que foi consumido');
+    mod.__calls.length = 0;
+    await consumir(mod.withUsageRecording(fonte([{ text: 'sem uso' }]), 'chat-felix'));
+    assert.equal(mod.__calls.length, 0, 'sem usageMetadata não grava');
+  });
   await test('summarizeUsage: soma por dia (entrada+saída+raciocínio), ordena do mais recente e calcula média dos dias com uso', () => {
     const rows = [
       { day: '2026-11-17', kind: 'chat-michel', requests: 4, input_tokens: 400000, output_tokens: 30000, thought_tokens: 10000, cached_tokens: 0 },

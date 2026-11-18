@@ -3228,15 +3228,20 @@ function recordAiUsage(kind: string, usageMetadata: any): void {
   } catch (e: any) { usageDiag.falhas++; usageDiag.ultimoErro = String(e?.message || e); /* consumo é só medição */ }
 }
 
-/** Repassa os chunks do stream e grava o consumo quando chega o chunk final (com usageMetadata). */
+/**
+ * Repassa os chunks do stream e grava o consumo UMA vez, ao terminar: usa o ÚLTIMO usageMetadata visto (no streaming ele é
+ * cumulativo). Antes só gravava se o chunk final trouxesse finishReason E usageMetadata juntos — frágil. O "finally" também
+ * cobre stream interrompido no meio (o consumo até ali já foi cobrado).
+ */
 async function* withUsageRecording(stream: any, kind: string) {
-  let recorded = false;
-  for await (const chunk of stream) {
-    if (!recorded && (chunk as any)?.usageMetadata && (chunk as any)?.candidates?.[0]?.finishReason) {
-      recorded = true;
-      recordAiUsage(kind, (chunk as any).usageMetadata);
+  let lastUsage: any = null;
+  try {
+    for await (const chunk of stream) {
+      if ((chunk as any)?.usageMetadata) lastUsage = (chunk as any).usageMetadata;
+      yield chunk;
     }
-    yield chunk;
+  } finally {
+    if (lastUsage) recordAiUsage(kind, lastUsage);
   }
 }
 
