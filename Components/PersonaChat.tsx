@@ -2607,6 +2607,8 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
               modelProvider: eliteProviderOverride || selectedModelProvider,
               model: eliteModelOverride || selectedModel,
               petitionLength,
+              // Tipo(s) de caso já escolhidos/detectados: o servidor só envia ao modelo a estrutura de peça desse tipo (economia ~10 mil tokens).
+              caseTypes: effectiveCaseTypes,
               keyIndex: session?.uploadKeyIndex,
               sessionId: session?.id,
               artifactContent: activeDocText || undefined,

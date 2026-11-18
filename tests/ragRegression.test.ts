@@ -339,6 +339,32 @@ function realisticContext(): string {
     assert.ok(/08\/12\/2021/.test(regra) && /EC 113\/2021/.test(regra) && /SEM fixar índice único/.test(regra), 'regra incompleta');
   });
 
+  console.log('\nPoda das estruturas de peça (economia de tokens)');
+  const poda = await loadFromIndex(between('const MICHEL_STRUCTURE_BY_CASE', 'const DR_MICHEL_SYSTEM_PROMPT = `'), ['pruneMichelStructures']);
+  const promptReal = src.slice(src.indexOf('const DR_MICHEL_SYSTEM_PROMPT = `') + 'const DR_MICHEL_SYSTEM_PROMPT = `'.length, src.indexOf('`;\n\nconst CNIS_SYSTEM_PROMPT'));
+  const titulos = (t: string) => [...t.matchAll(/^ESTRUTURA OBRIGATÓRIA PARA ([^\n]*?):[ \t]*$/gm)].map(m => m[1]);
+  await test('prompt real tem os 12 cabeçalhos de estrutura (se alguém mudar o formato, a poda precisa ser revista)', () => {
+    assert.equal(titulos(promptReal).length, 12, titulos(promptReal).join(' | '));
+  });
+  await test('incapacidade: mantém a estrutura do caso + recursos e corta o resto (≥25% do prompt)', () => {
+    const out: string = poda.pruneMichelStructures(promptReal, { caseTypes: ['auxilio_doenca'], message: 'gerar peça: petição inicial de restabelecimento do auxílio por incapacidade temporária com pedido subsidiário de conversão em aposentadoria por incapacidade permanente' });
+    const t = titulos(out);
+    assert.ok(t.some(x => /INCAPACIDADE/.test(x)), 'estrutura de incapacidade sumiu');
+    assert.ok(t.filter(x => /RECURSO/.test(x)).length === 2, 'estruturas de recurso devem ficar sempre');
+    assert.ok(!t.some(x => /PENSÃO|SALÁRIO-MATERNIDADE|POR IDADE|BPC|TEMPO DE CONTRIBUI|APOSENTADORIA ESPECIAL/.test(x)), `ficaram estruturas de outros tipos: ${t.join(' | ')}`);
+    assert.ok(out.length < promptReal.length * 0.75, `poda insuficiente: ${out.length} de ${promptReal.length}`);
+    assert.match(out, /ESTRUTURAS DE OUTROS TIPOS DE AÇÃO OMITIDAS/);
+    assert.ok(out.includes('V. DO DIREITO - DA INCAPACIDADE'), 'conteúdo da estrutura do caso foi cortado');
+  });
+  await test('travas: sem tipo de caso, tipo desconhecido ou mensagem citando outro tipo NÃO podam errado', () => {
+    assert.equal(poda.pruneMichelStructures(promptReal, { caseTypes: [], message: 'gerar peça' }), promptReal, 'sem tipo de caso não pode cortar');
+    assert.equal(poda.pruneMichelStructures(promptReal, { caseTypes: undefined, message: 'gerar peça' }), promptReal);
+    assert.equal(poda.pruneMichelStructures(promptReal, { caseTypes: ['tipo_inexistente'], message: 'gerar peça' }), promptReal, 'tipo desconhecido não pode cortar');
+    const mistura = titulos(poda.pruneMichelStructures(promptReal, { caseTypes: ['auxilio_doenca'], message: 'agora preciso de uma petição de pensão por morte' }));
+    assert.ok(mistura.some(x => /PENSÃO/.test(x)) && mistura.some(x => /INCAPACIDADE/.test(x)), 'mensagem citando pensão deve manter as duas');
+    assert.equal(poda.pruneMichelStructures('prompt curto sem cabeçalhos', { caseTypes: ['auxilio_doenca'], message: '' }), 'prompt curto sem cabeçalhos', 'formato desconhecido não corta');
+  });
+
   console.log('\nRevisão automática da peça — checagens determinísticas');
   const filler = 'O autor demonstra, com base nos documentos acostados, que a incapacidade persiste e que o benefício deve ser restabelecido. '.repeat(70);
   const corpoLimpo = (extra = '', rol = 'Doc. 1 - Procuração.pdf\nDoc. 2 - Declaração de pobreza.pdf\nDoc. 3 - Termo de renúncia.pdf\nDoc. 4 - Identidade.pdf', data = '18 de novembro de 2026') =>

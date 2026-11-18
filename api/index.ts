@@ -1721,6 +1721,64 @@ const ELITE_REDACTION_MANUAL = `
     - Use criatividade para fundamentar, NUNCA para alterar a ordem ou os tópicos obrigatórios.
 `;
 
+// ESTRUTURAS DE PEÇA POR TIPO DE AÇÃO (18/11/2026, auditoria de tokens): o prompt do Dr. Michel carrega as estruturas obrigatórias
+// dos 12 tipos de ação (~34 mil caracteres ≈ 11 mil tokens) em TODA mensagem de relatório/peça, e um caso usa só uma (~1 mil
+// tokens no de incapacidade). pruneMichelStructures() mantém só as estruturas do tipo de caso já detectado/escolhido no chat.
+// TRAVAS DE SEGURANÇA: (1) sem tipo de caso conhecido, NÃO corta nada; (2) as estruturas de RECURSO sempre ficam; (3) se a
+// mensagem do advogado cita outro tipo (pensão, BPC, aposentadoria por idade…), a estrutura dele também fica; (4) se o formato
+// do prompt mudar (menos de 6 cabeçalhos), NÃO corta; (5) o trecho omitido vira um aviso que manda selecionar o tipo certo.
+const MICHEL_STRUCTURE_BY_CASE: Record<string, RegExp[]> = {
+  auxilio_doenca: [/INCAPACIDADE/i, /AUXÍLIO-ACIDENTE/i],
+  aposentadoria_invalidez: [/INCAPACIDADE/i, /AUXÍLIO-ACIDENTE/i],
+  bpc_deficiencia: [/BPC\/LOAS/i],
+  bpc_idoso: [/BPC\/LOAS/i],
+  aposentadoria_idade: [/POR IDADE/i],
+  aposentadoria_tempo_contribuicao: [/TEMPO DE CONTRIBUI/i],
+  aposentadoria_especial: [/APOSENTADORIA ESPECIAL/i, /TEMPO DE CONTRIBUI/i],
+  pensao_morte: [/PENSÃO POR MORTE/i],
+  salario_maternidade: [/SALÁRIO-MATERNIDADE/i],
+};
+const MICHEL_STRUCTURE_BY_KEYWORD: Array<[RegExp, RegExp[]]> = [
+  [/pens[ãa]o|[óo]bito|dependente/i, [/PENSÃO POR MORTE/i]],
+  [/\bbpc\b|loas|assistencial|miserabilidade/i, [/BPC\/LOAS/i]],
+  [/por idade|aposentadoria programada|idade m[íi]nima|\brural\b|h[íi]brida/i, [/POR IDADE/i]],
+  [/tempo de contribui|convers[ãa]o (?:de tempo|especial)|regras? de transi|ped[áa]gio|reafirma[çc]/i, [/TEMPO DE CONTRIBUI/i]],
+  [/aposentadoria especial|insalubr|periculos|\bppp\b|agente nocivo|tempo especial/i, [/APOSENTADORIA ESPECIAL/i, /TEMPO DE CONTRIBUI/i]],
+  [/maternidade|gestante|parto|ado[çc][ãa]o/i, [/SALÁRIO-MATERNIDADE/i]],
+  [/aux[íi]lio[- ]acidente|sequela|\bcat\b|acidente/i, [/AUXÍLIO-ACIDENTE/i]],
+  [/incapacidade|aux[íi]lio[- ]doen|invalidez|restabelec|per[íi]cia m[ée]dica/i, [/INCAPACIDADE/i]],
+];
+
+function pruneMichelStructures(prompt: string, opts: { caseTypes?: any; message?: string }): string {
+  const types: string[] = Array.isArray(opts.caseTypes) ? opts.caseTypes.filter((t: any) => typeof t === 'string').slice(0, 10) : [];
+  if (types.length === 0) return prompt;
+  const headRe = /^ESTRUTURA OBRIGATÓRIA PARA ([^\n]*?):[ \t]*$/gm;
+  const heads: { idx: number; title: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = headRe.exec(prompt))) heads.push({ idx: m.index, title: m[1] });
+  if (heads.length < 6) return prompt;
+  const wanted: RegExp[] = [/RECURSO/i];
+  let knownType = false;
+  for (const t of types) {
+    const rs = MICHEL_STRUCTURE_BY_CASE[t];
+    if (rs) { knownType = true; wanted.push(...rs); }
+  }
+  if (!knownType) return prompt;
+  const msg = opts.message || '';
+  for (const [kw, rs] of MICHEL_STRUCTURE_BY_KEYWORD) if (kw.test(msg)) wanted.push(...rs);
+  const keep = heads.map(h => wanted.some(r => r.test(h.title)));
+  if (!keep.some((k, i) => k && !/RECURSO/i.test(heads[i].title))) return prompt;
+  const parts: string[] = [prompt.slice(0, heads[0].idx)];
+  const omitted: string[] = [];
+  heads.forEach((h, i) => {
+    const end = i + 1 < heads.length ? heads[i + 1].idx : prompt.length;
+    if (keep[i]) parts.push(prompt.slice(h.idx, end)); else omitted.push(h.title);
+  });
+  if (omitted.length === 0) return prompt;
+  parts.push(`\n[ESTRUTURAS DE OUTROS TIPOS DE AÇÃO OMITIDAS NESTA CONVERSA (não se aplicam ao tipo de caso detectado: ${types.join(', ')}). Se o advogado pedir uma peça de OUTRO tipo (${omitted.length} tipos omitidos, ex.: ${omitted.slice(0, 3).join('; ')}), NÃO improvise a estrutura: avise que ele deve selecionar o tipo de caso correspondente no chip "Tipo de caso" e pedir de novo.]\n`);
+  return parts.join('');
+}
+
 const DR_MICHEL_SYSTEM_PROMPT = `
 ═══════════════════════════════════════════════════════════
 IDENTIDADE: Dr. Michel Felix — Advogado Previdenciarista de Elite (OAB/RJ 231.640)
@@ -6435,7 +6493,11 @@ app.post("/api/dr-michel/chat", async (req, res) => {
       console.log(`[Dr.Michel] 🧠 Provider: ${modelProvider}, Modelo: ${model}`);
     }
 
-    let selectedSystemPrompt = DR_MICHEL_SYSTEM_PROMPT + getCurrentDateContext();
+    const michelPrompt = pruneMichelStructures(DR_MICHEL_SYSTEM_PROMPT, { caseTypes: req.body.caseTypes, message });
+    if (michelPrompt.length < DR_MICHEL_SYSTEM_PROMPT.length) {
+      console.log(`[Dr.Michel] 🧩 Estruturas de ação: prompt reduzido de ${DR_MICHEL_SYSTEM_PROMPT.length} para ${michelPrompt.length} caracteres (tipo(s) de caso: ${JSON.stringify(req.body.caseTypes)}).`);
+    }
+    let selectedSystemPrompt = michelPrompt + getCurrentDateContext();
     let temperature = 0.2;
 
     if (isStorageRequest && !isGenerationRequest) {
