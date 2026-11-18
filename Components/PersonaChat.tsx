@@ -48,7 +48,7 @@ import { CoreDispositivosModal } from './CoreDispositivosModal';
 import { CORE_DISPOSITIVOS_CASE_TYPES } from './coreDispositivosConfig';
 import { buildCaseDigest, detectCaseTypes } from './caseDigest';
 import { runSecondPassRag } from './secondPassRag';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage } from './petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts } from './petitionReview';
 import { buildCrmPayload } from './crmContext';
 import { AiMemoryModal } from './AiMemoryModal';
 import { LegalBaseArtifactModal } from './LegalBaseArtifactModal';
@@ -3024,7 +3024,7 @@ Como deseja prosseguir, Dr(a).? Você pode me orientar a:
       const j = await resp.json();
       const ia = parseReviewAlerts(j?.alertas);
       console.log(`[REVISÃO PEÇA] ${auto.length} alerta(s) automático(s) + ${ia.length} do revisor de IA em ${Math.round((Date.now() - t0) / 1000)}s.`);
-      upsert(formatReviewMessage([...auto, ...ia], { ia: 'ok' }));
+      upsert(formatReviewMessage(mergeReviewAlerts(auto, ia), { ia: 'ok' }));
     } catch (e) {
       console.warn('[REVISÃO PEÇA] Revisor de IA indisponível; publicando só as checagens automáticas:', e);
       upsert(formatReviewMessage(auto, { ia: 'falhou' }));

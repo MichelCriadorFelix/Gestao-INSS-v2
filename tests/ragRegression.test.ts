@@ -21,7 +21,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { buildCaseDigest, detectCaseTypes } from '../Components/caseDigest';
 import { runSecondPassRag, extractRefs } from '../Components/secondPassRag';
 import { buildCrmPayload } from '../Components/crmContext';
-import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage } from '../Components/petitionReview';
+import { shouldReviewPetition, deterministicPetitionChecks, parseReviewAlerts, formatReviewMessage, mergeReviewAlerts } from '../Components/petitionReview';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = fs.readFileSync(path.join(root, 'api', 'index.ts'), 'utf-8');
@@ -306,7 +306,13 @@ function realisticContext(): string {
 
   console.log('\nRedator: regras do prompt (peça da Denize, 17/11/2026)');
   const redatorCode = between('function hasWorkAfterCessationHint', 'const REGRA_CORRECAO_JUROS');
-  const { hasWorkAfterCessationHint } = await loadFromIndex(redatorCode, ['hasWorkAfterCessationHint']);
+  const { hasWorkAfterCessationHint, shouldInjectTema905 } = await loadFromIndex(redatorCode, ['hasWorkAfterCessationHint', 'shouldInjectTema905']);
+  await test('Tema 905 entra no contexto do RELATÓRIO mas é retirado na geração da PEÇA', () => {
+    assert.equal(shouldInjectTema905('[RESUMO DO CASO] Restabelecimento de auxílio por incapacidade.\n\ngerar relatório'), true);
+    assert.equal(shouldInjectTema905('Restabelecimento NB 722.356.189-1, atrasados desde 14/03/2026.\n\ngerar peça: petição inicial de restabelecimento do auxílio'), false);
+    assert.equal(shouldInjectTema905('redigir a petição inicial com os atrasados'), false);
+    assert.equal(shouldInjectTema905('qual o prazo para recorrer?'), false);
+  });
   await test('Tema 1.013 NÃO dispara só por "trabalho"/"período" (caso comum de incapacidade)', () => {
     const ctxComum = 'Segurada afastada do trabalho desde 04/04/2024; último dia de trabalho declarado pela empregadora; período de graça de 12 meses; perícia de prorrogação indeferida; retorno ao trabalho não indicado.';
     assert.equal(hasWorkAfterCessationHint(ctxComum), false);
@@ -393,6 +399,15 @@ function realisticContext(): string {
     assert.match(r[0].sugestao || '', /art\. 78/);
     assert.equal(parseReviewAlerts(Array.from({ length: 40 }, (_, i) => ({ problema: `problema número ${i} detalhado` }))).length, 15);
     assert.deepEqual(parseReviewAlerts({ nao: 'array' }), []);
+  });
+  await test('mesclar camadas não repete o mesmo problema (INPC/Tema 905 já apontado pela IA)', () => {
+    const auto = deterministicPetitionChecks(corpoLimpo('Juros: INPC e poupança (Tema 905).'), { hoje: HOJE });
+    assert.equal(auto.filter(x => /INPC/.test(x.problema)).length, 1);
+    const ia = parseReviewAlerts([{ severidade: 'alta', tipo: 'regra', problema: 'A peça transcreve o Tema 905/STJ (INPC) para débitos de 2026', trecho: 'Tema 905' }]);
+    const mesclado = mergeReviewAlerts(auto, ia);
+    assert.equal(mesclado.filter(x => /905|INPC/.test(x.problema)).length, 1, 'o alerta de INPC deveria aparecer uma vez só');
+    const outro = parseReviewAlerts([{ severidade: 'media', tipo: 'fato', problema: 'A data da DIB diverge do dossiê (14/06/2025)' }]);
+    assert.equal(mergeReviewAlerts(auto, outro).length, auto.length + 1, 'alerta não relacionado não pode apagar o automático');
   });
   await test('mensagem do chat: ordena por gravidade, avisa quando a IA falhou e diz "nenhum alerta" quando limpo', () => {
     const msg = formatReviewMessage([

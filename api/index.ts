@@ -1625,12 +1625,23 @@ function hasWorkAfterCessationHint(ctx: string): boolean {
 }
 
 /**
+ * O Tema 905/STJ só entra no contexto de RELATÓRIO/resumo (evita "[AUSENTE]" no relatório). Na GERAÇÃO DA PEÇA ele é retirado:
+ * com o texto do Tema 905 na Base Legal o modelo se sente obrigado a transcrevê-lo (regra "transcreva a súmula/tema recuperado")
+ * e a peça pede INPC + juros da poupança, regime que só vale até 08/12/2021 (visto de novo no teste ao vivo de 18/11/2026,
+ * mesmo com a REGRA_CORRECAO_JUROS no prompt).
+ */
+function shouldInjectTema905(ctx: string): boolean {
+  if (/gerar\s+pe[çc]a|redigir\s+(?:a\s+)?(?:pe[çc]a|peti)|elabor\w+\s+(?:a\s+)?(?:pe[çc]a|peti)|peti[çc][ãa]o\s+inicial\s+de/i.test(ctx)) return false;
+  return /relat[óo]rio|resumo do caso|atrasad|vencid|retroativ/i.test(ctx);
+}
+
+/**
  * Regra de correção monetária e juros dos atrasados. O Tema 905/STJ (INPC + juros da poupança) e o Tema 810/STF só descrevem
  * o regime até 08/12/2021; depois disso vale o art. 3º da EC 113/2021 (SELIC) e regimes posteriores. O redator transcrevia o
  * Tema 905 como se fosse o regime de 2026 (peça da Denize, 17/11/2026), então a regra manda pedir "critérios vigentes em cada
  * período" sem fixar índice único. O advogado confere o regime exato na liquidação.
  */
-const REGRA_CORRECAO_JUROS = `5. CORREÇÃO MONETÁRIA E JUROS (REGRA OBRIGATÓRIA): o Tema 905/STJ (INPC e juros da poupança) e o Tema 810/STF só descrevem o regime até 08/12/2021. A partir de 09/12/2021 aplica-se o art. 3º da EC 113/2021 (taxa SELIC), e regimes posteriores seguem o Manual de Cálculos da Justiça Federal vigente na liquidação. Por isso: (a) NÃO apresente o Tema 905 nem o Tema 810 como o regime dos atrasados de período posterior a 08/12/2021 e NÃO os transcreva integralmente como se fossem o regime atual; (b) no tópico de consectários e no pedido de correção e juros, requeira "correção monetária e juros de mora segundo os critérios previstos na legislação vigente em cada período (inclusive o art. 3º da EC 113/2021, quando aplicável) e no Manual de Cálculos da Justiça Federal vigente na data da liquidação", SEM fixar índice único; (c) se citar o Tema 905, que seja apenas como referência a eventual período anterior a 09/12/2021.`;
+const REGRA_CORRECAO_JUROS = `5. CORREÇÃO MONETÁRIA E JUROS (REGRA OBRIGATÓRIA): o Tema 905/STJ (INPC e juros da poupança) e o Tema 810/STF só descrevem o regime até 08/12/2021. A partir de 09/12/2021 aplica-se o art. 3º da EC 113/2021 (taxa SELIC), e regimes posteriores seguem o Manual de Cálculos da Justiça Federal vigente na liquidação. Por isso: (a) NÃO apresente o Tema 905 nem o Tema 810 como o regime dos atrasados de período posterior a 08/12/2021, NÃO os cite como fundamento do pedido e NÃO os transcreva em blockquote — mesmo que apareçam na Base Legal recuperada (a regra de transcrever súmulas e temas NÃO vale para eles); (b) no tópico de consectários e no pedido de correção e juros, requeira "correção monetária e juros de mora segundo os critérios previstos na legislação vigente em cada período (inclusive o art. 3º da EC 113/2021, quando aplicável) e no Manual de Cálculos da Justiça Federal vigente na data da liquidação", SEM fixar índice único; (c) se citar o Tema 905, que seja apenas como referência a eventual período anterior a 09/12/2021.`;
 
 // FIX RESIDUAL #2: extractStructuralSummary removida (dead code desde Fix#3)
 
@@ -5120,7 +5131,7 @@ app.post("/api/rag/plan", async (req, res) => {
       // Tema 905 STJ (correção monetária e juros sobre as parcelas vencidas): vale para qualquer ação
       // previdenciária com atrasados/cálculo e é item recorrente do relatório ("AUSENTE" no teste de 17/11/2026
       // mesmo cadastrado na base). Só dispara quando o pedido envolve peça/relatório/atrasados.
-      if (/gerar|pe[çc]a|peti[çc][ãa]o|relat[óo]rio|inicial|atrasad|vencid|retroativ|restabelec|cessa[çc]|indefer|resumo do caso/i.test(contextStr)) {
+      if (shouldInjectTema905(contextStr)) {
         // Entra no contexto só como REFERÊNCIA do período até 08/12/2021 (evita "[AUSENTE]" no relatório). O prompt (REGRA_CORRECAO_JUROS)
         // proíbe apresentá-lo como regime atual dos atrasados.
         injectIntoPlan("TEMA 905 STJ — PREVIDENCIÁRIO — Correção monetária IPCA-E e juros Selic", [], true);

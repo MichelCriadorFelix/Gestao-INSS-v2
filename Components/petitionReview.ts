@@ -197,6 +197,18 @@ export function parseReviewAlerts(raw: any): ReviewAlert[] {
   return out;
 }
 
+/** Junta as duas camadas sem repetir o mesmo problema: o alerta automático de regra some se o revisor de IA já apontou o mesmo ponto. */
+export function mergeReviewAlerts(auto: ReviewAlert[], ia: ReviewAlert[]): ReviewAlert[] {
+  const iaTxt = ia.map(a => `${a.trecho || ''} ${a.problema}`).join('\n');
+  const kept = auto.filter(a => {
+    if (a.tipo !== 'regra') return true;
+    if (/INPC/.test(a.problema)) return !/905|INPC|poupan/i.test(iaTxt);
+    if (/CNJ nº 345/.test(a.problema)) return !/CJF|345\/2020/.test(iaTxt);
+    return true;
+  });
+  return [...kept, ...ia];
+}
+
 const SEV_ORDER: Record<ReviewSeverity, number> = { alta: 0, media: 1, baixa: 2 };
 const SEV_ICON: Record<ReviewSeverity, string> = { alta: '🔴', media: '🟠', baixa: '🟡' };
 const KIND_LABEL: Record<ReviewKind, string> = { citacao: 'Citação', fato: 'Fato', calculo: 'Cálculo', regra: 'Regra do escritório', estrategia: 'Estratégia', forma: 'Forma' };
